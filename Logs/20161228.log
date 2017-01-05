@@ -1,0 +1,97 @@
+2	00:01:32.833	man-v1 USDJPY,H1: open #30559371 buy 1.07 USDJPY at 117.508 ok
+2	00:01:33.082	man-v1 USDJPY,H1: modify #30559371 buy 1.07 USDJPY at 117.508 sl: 116.988 tp: 117.988 ok
+2	03:15:39.587	man-v1 USDJPY,H1: close #30557945 buy 1.07 USDJPY at 117.597 sl: 117.075 tp: 118.075 at price 117.726
+2	03:15:39.829	man-v1 USDJPY,H1: close #30559371 buy 1.07 USDJPY at 117.508 sl: 116.988 tp: 117.988 at price 117.726
+0	19:55:17.703	man-v1 USDJPY,H1: LIMIT|BUY|116.717|
+0	19:56:53.064	man-v1 USDJPY,H1: LIMIT|BUY|116.709|
+0	19:57:21.352	man-v1 USDJPY,H1: LIMIT|BUY|116.708|
+0	19:57:33.319	man-v1 USDJPY,H1: LIMIT|BUY|116.708|TRAIL|2|
+0	19:57:40.791	man-v1 USDJPY,H1: LIMIT|BUY|116.708|
+0	19:58:11.903	man-v1 USDJPY,H1: LIMIT|BUY|116.706|
+0	19:58:36.729	man-v1 USDJPY,H1: LIMIT|BUY|116.705|
+0	19:59:03.366	man-v1 USDJPY,H1: LIMIT|BUY|116.704|
+0	20:00:03.012	man-v1 USDJPY,H1: LIMIT|BUY|116.702|
+0	20:00:56.582	man-v1 USDJPY,H1: LIMIT|BUY|116.701|
+2	20:02:34.223	man-v1 USDJPY,H1: open #30571584 buy 1.13 USDJPY at 116.677 ok
+2	20:02:34.439	man-v1 USDJPY,H1: modify #30571584 buy 1.13 USDJPY at 116.677 sl: 116.157 tp: 117.157 ok
+0	20:15:55.636	man-v1 USDJPY,H1: LIMIT|BUY|116.617|
+0	20:16:58.142	man-v1 USDJPY,H1: LIMIT|BUY|116.612|
+0	20:17:24.897	man-v1 USDJPY,H1: LIMIT|BUY|116.611|
+0	20:18:02.573	man-v1 USDJPY,H1: LIMIT|BUY|116.608|
+2	20:18:11.701	man-v1 USDJPY,H1: open #30571885 buy 1.13 USDJPY at 116.605 ok
+2	20:18:11.933	man-v1 USDJPY,H1: modify #30571885 buy 1.13 USDJPY at 116.605 sl: 116.081 tp: 117.081 ok
+0	21:07:46.110	man-v1 USDJPY,H1: CLOSE|ALL|
+2	21:07:46.348	man-v1 USDJPY,H1: close #30571584 buy 1.13 USDJPY at 116.677 sl: 116.157 tp: 117.157 at price 116.704
+2	21:07:46.584	man-v1 USDJPY,H1: close #30571885 buy 1.13 USDJPY at 116.605 sl: 116.081 tp: 117.081 at price 116.699
+0	21:17:58.660	Custom indicator fractal-v3 USDJPY,M15: loaded successfully
+0	21:18:05.886	fractal-v3 USDJPY,M15: Before:   Bar Now 1841 2016.12.02 03:00 Major LONG
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Origin: 2036 (o)T:113.249 (o)B:112.049 (o)P:112.049
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Expansion: 1942 (e)T:114.818 (e)B:112.049 (e)P:114.818
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @1942 (p):114.818
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Bottom Leg: Root @2036 (p):112.049
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Origin Peg (Divergent)
+0	21:18:05.886	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> 2036 (o)T:114.818 (o)B:112.049 (o)P:112.049
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Expansion Top @:1942 114.818 (a) 114.818
+0	21:18:05.886	fractal-v3 USDJPY,M15:       --> Root Bottom @:2036 112.049 (a) 112.049
+0	21:18:05.894	fractal-v3 USDJPY,M15: Before:   Bar Now 1318 2016.12.09 13:45 Origin LONG
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Origin: 2036 (o)T:114.818 (o)B:112.049 (o)P:112.049
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Expansion: 1318 (e)T:114.969 (e)B:112.869 (e)P:114.969
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @1318 (p):114.969
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Bottom Leg: Prior @2036 (p):112.049
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> New Origin
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Origin Breakout
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> (e)Breakout: New Origin Top OR Bottom
+0	21:18:05.894	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> 2036 (o)T:114.818 (o)B:112.049 (o)P:112.049
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Expansion Top @:1318 114.969 (a) 114.969
+0	21:18:05.894	fractal-v3 USDJPY,M15:       --> Prior Bottom @:2036 112.049 (a) 112.049
+0	21:18:05.896	fractal-v3 USDJPY,M15: Before:   Bar Now 1198 2016.12.12 19:45 Major LONG
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Origin: 2036 (o)T:114.818 (o)B:112.049 (o)P:112.049
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Expansion: 1236 (e)T:116.116 (e)B:112.869 (e)P:116.116
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @1236 (p):116.116
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Bottom Leg: Prior @2036 (p):112.049
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Origin Peg (Divergent)
+0	21:18:05.896	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> 2036 (o)T:116.116 (o)B:112.049 (o)P:112.049
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Expansion Top @:1236 116.116 (a) 116.116
+0	21:18:05.896	fractal-v3 USDJPY,M15:       --> Prior Bottom @:2036 112.049 (a) 112.049
+0	21:18:05.899	fractal-v3 USDJPY,M15: Before:   Bar Now 1001 2016.12.14 21:00 Origin LONG
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Origin: 2036 (o)T:116.116 (o)B:112.049 (o)P:112.049
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Expansion: 1001 (e)T:116.422 (e)B:114.732 (e)P:116.422
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @1001 (p):116.422
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Bottom Leg: Trend @2036 (p):112.049
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> New Origin
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Origin Breakout
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> (e)Breakout: New Origin Top OR Bottom
+0	21:18:05.899	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> 2036 (o)T:116.116 (o)B:112.049 (o)P:112.049
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Expansion Top @:1001 116.422 (a) 116.422
+0	21:18:05.899	fractal-v3 USDJPY,M15:       --> Trend Bottom @:2036 112.049 (a) 112.049
+0	21:18:05.903	fractal-v3 USDJPY,M15: Before:   Bar Now 784 2016.12.19 03:15 Major LONG
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Origin: 2036 (o)T:116.116 (o)B:112.049 (o)P:112.049
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Expansion: 935 (e)T:118.656 (e)B:114.732 (e)P:118.656
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @935 (p):118.656
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Bottom Leg: Trend @2036 (p):112.049
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Origin Peg (Divergent)
+0	21:18:05.903	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> 2036 (o)T:118.656 (o)B:112.049 (o)P:112.049
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Expansion Top @:935 118.656 (a) 118.656
+0	21:18:05.903	fractal-v3 USDJPY,M15:       --> Trend Bottom @:2036 112.049 (a) 112.049
+0	21:18:05.919	fractal-v3 USDJPY,M15: initialized
+0	22:31:11.789	man-v1 USDJPY,H1: BUY|
+2	22:31:12.054	man-v1 USDJPY,H1: open #30572732 buy 1.15 USDJPY at 116.670 ok
+2	22:31:12.289	man-v1 USDJPY,H1: modify #30572732 buy 1.15 USDJPY at 116.670 sl: 116.150 tp: 117.150 ok
+0	22:43:22.704	fractal-v3 USDJPY,M15: Before:   Bar Now 0 2016.12.29 08:30 Major LONG
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Origin: 2041 (o)T:118.656 (o)B:112.049 (o)P:112.049
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Expansion: 940 (e)T:118.656 (e)B:114.732 (e)P:118.656
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Top Leg: Expansion @940 (p):118.656
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Bottom Leg: Trend @2041 (p):112.049
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Origin Peg (Divergent)
+0	22:43:22.704	fractal-v3 USDJPY,M15: After @:  Breakout LONG
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> 2041 (o)T:118.656 (o)B:112.049 (o)P:112.049
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Expansion Top @:940 118.656 (a) 118.656
+0	22:43:22.704	fractal-v3 USDJPY,M15:       --> Trend Bottom @:2041 112.049 (a) 112.049
+0	23:07:18.917	man-v1 USDJPY,H1: LIMIT|BUY|116.050|
+0	23:07:18.917	man-v1 USDJPY,H1: DCA|LONG|1.2|
+2	23:07:19.165	man-v1 USDJPY,H1: modify #30572732 buy 1.15 USDJPY at 116.670 sl: 116.150 tp: 116.873 ok
