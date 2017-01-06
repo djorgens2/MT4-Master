@@ -116,12 +116,15 @@ void RefreshScreen()
                +" +"+DoubleToStr(Pip(pfractal.StdDev(Positive)),1)
                +" "+DoubleToStr(Pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
                
-/*    if (pfractal.Event(NewFiboLevel))
-      UpdateLabel("lrEvent","New Fibo Level",clrLawnGreen,16);
+    if (pfractal.Event(NewDirection))
+      UpdateLabel("lrEvent","New Direction",DirColor(pfractal.Direction(Term)),16);
     else
-    if (pfractal.Event(NewFractal))
-      UpdateLabel("lrEvent","New Fractal",DirColor(pfractal.Direction(Term)),16);
-    else*/
+    if (pfractal.Event(NewMajor))
+      UpdateLabel("lrEvent","New Major",DirColor(pfractal.Direction(Term)),16);
+    else
+    if (pfractal.Event(NewMinor))
+      UpdateLabel("lrEvent","New Minor",DirColor(pfractal.Direction(Term)),16);
+    else
     if (pfractal.Event(TrendWane))
       UpdateLabel("lrEvent","Trend Wane",DirColor(pfractal.Direction(Term)),16);
     else
