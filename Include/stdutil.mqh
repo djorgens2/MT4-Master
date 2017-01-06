@@ -81,14 +81,14 @@
 
        enum     EventType
                 {
+                  NewDirection,
                   NewFractal,
+                  NewOrigin,
                   NewMajor,
                   NewMinor,
-                  NewOrigin,
                   InsideReversal,
                   TrendWane,
                   TrendResume,
-                  NewFiboLevel,
                   NewHigh,
                   NewLow,
                   NewBoundary,
