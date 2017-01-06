@@ -25,7 +25,6 @@ class CPipFractal : public CPipRegression
                        int        Direction;            //--- Current fractal direction
                        double     PriceHigh;            //--- Highest active price
                        double     PriceLow;             //--- Lowest active price
-                       int        FiboLevel;            //--- Signed fibonacci level
                        
                        //--- Fractal time points
                        datetime   RootTime;             //--- Time stamp of the active root
@@ -52,8 +51,8 @@ class CPipFractal : public CPipRegression
                      
           double     NewFractalRoot(RetraceType Type);  //--- Updates fractal price points
           void       UpdateFractal(RetraceType Type, int Direction);
-          void       CalcFiboLevel(RetraceType Type);
           void       CalcPipFractal(void);
+          void       CalcFiboChange(void);
           
 
     public:
@@ -87,14 +86,30 @@ class CPipFractal : public CPipRegression
   };
 
 //+------------------------------------------------------------------+
-//| CalcFiboLevel - Calculates fibo level; sets event when changed   |
+//| CalcFiboChange - Calculates major/minor fractal events           |
 //+------------------------------------------------------------------+
-void CPipFractal::CalcFiboLevel(RetraceType Type)
+void CPipFractal::CalcFiboChange(void)
   {
-    ClearEvent(NewFiboLevel);
+    static int cfcFiboLevel     = FiboRoot;
+    static int cfcFiboDir       = DirectionNone;
+           int cfcFiboLevelNow  = fabs(FiboLevel(Fibonacci(Term,this.Direction(Term),Expansion,Max),Signed));
     
-    if (IsChanged(pf[Type].FiboLevel,FiboLevel(Fibonacci(Type,this.Direction(Type),Expansion,Max),Signed)))
-      SetEvent(NewFiboLevel);
+    ClearEvent(NewMajor);
+    ClearEvent(NewMinor);
+
+    if (IsChanged(cfcFiboDir,this.Direction(Term)))
+      cfcFiboLevel              = FiboRoot;
+    
+    if (cfcFiboLevelNow>cfcFiboLevel)
+    {
+      cfcFiboLevel              = cfcFiboLevelNow;
+      
+      if (cfcFiboLevel>Fibo100)
+        SetEvent(NewMajor);
+      else
+      if (cfcFiboLevel==Fibo100)
+        SetEvent(NewMinor);
+    }
   }
   
 //+------------------------------------------------------------------+
@@ -211,10 +226,7 @@ void CPipFractal::UpdateFractal(RetraceType Type, int Direction)
     {
       pfPegMax                       = 0.00;
       pfPegMin                       = 0.00;
-    }
-    
-    CalcFiboLevel(Term);
-    CalcFiboLevel(Trend);
+    }    
   }
 
 //+------------------------------------------------------------------+
@@ -330,7 +342,8 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
     else
       CalcMA();
       
-    CalcPipFractal();
+    CalcPipFractal();          
+    CalcFiboChange();
     
     ArrayCopy(MA,maData,0,0,fmin(prPeriods,pipHistory.Count));
   }
@@ -348,7 +361,8 @@ void CPipFractal::Update(void)
     else
       CalcMA();
       
-    CalcPipFractal();
+    CalcPipFractal();          
+    CalcFiboChange();
   }
   
 //+------------------------------------------------------------------+
