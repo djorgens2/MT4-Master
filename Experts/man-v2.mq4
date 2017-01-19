@@ -56,22 +56,36 @@ void ShowAppData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    static int rsLastDisplay   = display;
+    
     switch (display)
     {
       case 0:  fractal.RefreshScreen();
+
+               UpdateLine("oTop",fractal.Price(Origin,Top),STYLE_SOLID,clrGoldenrod);
+               UpdateLine("oBottom",fractal.Price(Origin,Bottom),STYLE_SOLID,clrSteelBlue);
+               UpdateLine("oPrice",fractal.Price(Origin),STYLE_SOLID,clrRed);
+               UpdateLine("oRetrace",fractal.Price(Origin,Retrace),STYLE_DOT,clrLightGray);
+
                break;
+
       case 1:  pfractal.RefreshScreen();
+               
+               UpdateLine("oBase",pfractal.Price(Origin,Base),STYLE_SOLID,clrGoldenrod);
+               UpdateLine("oRoot",pfractal.Price(Origin,Root),STYLE_SOLID,clrSteelBlue);
+               UpdateLine("oExpansion",pfractal.Price(Origin,Expansion),STYLE_SOLID,clrRed);
+               UpdateLine("oRetrace",pfractal.Price(Origin,Retrace),STYLE_DOT,clrLightGray);
+
                break;
+               
       case 2:  ShowAppData();
                break;
-      default: Comment("No Data");
+               
+      default: if (IsChanged(rsLastDisplay,display))
+                 Comment("No Data");
     }
 
     //--- Standard Deviation channel lines
-    UpdateLine("oBase",pfractal.Price(Origin,Base),STYLE_SOLID,clrGoldenrod);
-    UpdateLine("oRoot",pfractal.Price(Origin,Root),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("oExpansion",pfractal.Price(Origin,Expansion),STYLE_SOLID,clrRed);
-    UpdateLine("oRetrace",pfractal.Price(Origin,Retrace),STYLE_DOT,clrLightGray);
     
     pfractal.ShowFiboArrow();
   }
@@ -140,6 +154,10 @@ int OnInit()
     NewLine("oRoot");
     NewLine("oExpansion");
     NewLine("oRetrace");
+
+    NewLine("oTop");
+    NewLine("oBottom");
+    NewLine("oPrice");
     
     return(INIT_SUCCEEDED);
   }

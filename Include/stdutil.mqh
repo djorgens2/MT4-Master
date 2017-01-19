@@ -127,6 +127,8 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   State,
                   Dominant,
                   Direction,
+                  Bar,
+                  Age,
                   Level,
                   Top,
                   Bottom,
@@ -177,7 +179,9 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Reversal,
                   Breakout,
                   Trap,
-                  Continuation
+                  Recovery,
+                  Continuation,
+                  Active
               };
 
          
@@ -592,7 +596,7 @@ double BoolToDouble(bool IsTrue, double TrueValue, double FalseValue=0.00)
 //+------------------------------------------------------------------+
 void Append(string &Source, string Text, string Separator=" ")
   {
-    if (StringLen(Source)>0)
+    if (StringLen(Source)>0 && StringLen(Text)>0)
       Source += Separator;
       
     Source += Text;

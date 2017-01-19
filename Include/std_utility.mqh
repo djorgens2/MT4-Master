@@ -519,6 +519,9 @@ void UpdatePriceTag(string PriceTagName, int Bar, int Direction)
   {
     double uptOffset  = point(5);
     
+    if (Bar<0 || Bar>Bars)
+      return;
+      
     if (Direction == DIR_UP)
       ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+(uptOffset*2));
     else

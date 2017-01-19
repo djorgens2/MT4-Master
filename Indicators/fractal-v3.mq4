@@ -105,8 +105,8 @@ void RefreshScreen(void)
                 
     if (inpShowLines)
     {
-      UpdateLine("fOriginTop",fractal.Origin().Top,STYLE_SOLID,clrWhite);
-      UpdateLine("fOriginBottom",fractal.Origin().Bottom,STYLE_DOT,clrWhite);
+      UpdateLine("fOriginTop",fractal.Price(Origin,Top),STYLE_SOLID,clrWhite);
+      UpdateLine("fOriginBottom",fractal.Price(Origin,Bottom),STYLE_DOT,clrWhite);
 
       UpdateLine("fExpansion",fractal[Expansion].Price,STYLE_SOLID,clrMaroon);
       UpdateLine("fDivergent",fractal[Divergent].Price,STYLE_DOT,clrMaroon);
@@ -124,7 +124,7 @@ void RefreshScreen(void)
       UpdatePriceTag("ptPrior",fractal[Prior].Bar,fractal[Prior].Direction);
       UpdatePriceTag("ptTerm",fractal[Term].Bar,fractal[Term].Direction);
       UpdatePriceTag("ptTrend",fractal[Trend].Bar,fractal[Trend].Direction);
-      UpdatePriceTag("ptOrigin",fractal.Origin(Actual).Bar,fractal.Origin(Actual).Direction);
+      UpdatePriceTag("ptOrigin",fractal.Origin(Bar),fractal[Expansion].Direction);
     }
     
     if (inpShowFibo)
