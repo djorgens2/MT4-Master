@@ -280,7 +280,7 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, CFractal &Fr
     RetraceType   state        = Actual;
     
     //--- PipFractal Initialization
-    state                      = Fractal.LegState();
+    state                      = Fractal.State();
     pf[Term].Direction         = Fractal[state].Direction;
 
     for (int idx=0;idx<5;idx++)
@@ -289,9 +289,9 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, CFractal &Fr
       {
         case 0:  pf[Term].Retrace        = Fractal.Price(state,Next);
                  pf[Term].Expansion      = Fractal.Price(state);
-                 pf[Term].ExpansionTime  = Fractal[Fractal.LegState()].Updated;
+                 pf[Term].ExpansionTime  = Fractal[Fractal.State()].Updated;
         case 1:  pf[Term].Root           = Fractal.Price(state);
-                 pf[Term].RootTime       = Fractal[Fractal.LegState()].Updated;                                           
+                 pf[Term].RootTime       = Fractal[Fractal.State()].Updated;                                           
         case 2:  pf[Term].Base           = Fractal.Price(state);
                  pf[Term].Prior          = Fractal.Price(state);
         case 3:  pfOrigin                = Fractal.Price(state);
