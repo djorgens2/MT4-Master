@@ -113,7 +113,7 @@ void RefreshScreen(void)
       UpdateLine("fConvergent",fractal[Convergent].Price,STYLE_DOT,clrGoldenrod);
       UpdateLine("fInversion",fractal[Inversion].Price,STYLE_DOT,clrSteelBlue);
       UpdateLine("fConversion",fractal[Conversion].Price,STYLE_DOT,clrDarkGray);
-      UpdateLine("fRetrace",fractal.Price(fractal.LegState(),Next),STYLE_SOLID,clrWhite);
+      UpdateLine("fRetrace",fractal.Price(fractal.State(),Next),STYLE_SOLID,clrWhite);
     }
     
     if (inpShowPoints)

@@ -1055,8 +1055,13 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                          case Convergent:
                                          case Conversion:  fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Bottom),f[Type].Price-this.Price(Type,Bottom),3);
                                                            break;
-                                         default:          fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Top),f[Type].Price-this.Price(Type,Top),3);
+                                         default:          if (this[fStateMinor].Direction == this[Type].Direction)
+                                                             fibonacci = fdiv(fabs(f[Type].Price-this.Price(Previous(fStateMinor))),f[Type].Price-this.Price(Type,Bottom),3);
+                                                           else
+                                                             fibonacci = fdiv(fabs(f[Type].Price-this.Price(fStateMinor)),f[Type].Price-this.Price(Type,Top),3);
+                                                           break;
                                        }
+                                     else
 
                                      if (this.Direction(Expansion) == DirectionDown)
                                        switch (Type)
