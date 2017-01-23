@@ -1019,13 +1019,16 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                        {
                                          case Trend:       fibonacci = fdiv(this.Price(Trend,Previous)-Close[fBarNow],this.Price(Trend,Previous)-this.Price(Trend,Bottom),3);
                                                            break;
+
                                          case Term:
                                          case Base:
                                          case Expansion:   
                                          case Convergent:
                                          case Conversion:  fibonacci = fdiv(f[Type].Price-Close[fBarNow],f[Type].Price-this.Price(Type,Bottom),3);
                                                            break;
+
                                          default:          fibonacci = fdiv(f[Type].Price-Close[fBarNow],f[Type].Price-this.Price(Type,Top),3);
+                                                           break;
                                        }
                                      
                                      if (this.Direction(Expansion) == DirectionDown)
@@ -1033,13 +1036,16 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                        {
                                          case Trend:       fibonacci = fdiv(this.Price(Trend,Previous)-Close[fBarNow],this.Price(Trend,Previous)-this.Price(Trend,Top),3);
                                                            break;
+
                                          case Term:
                                          case Base:
                                          case Expansion:   
                                          case Convergent:
                                          case Conversion:  fibonacci = fdiv(f[Type].Price-Close[fBarNow],f[Type].Price-this.Price(Type,Top),3);
                                                            break;
+
                                          default:          fibonacci = fdiv(f[Type].Price-Close[fBarNow],f[Type].Price-this.Price(Type,Bottom),3);
+                                                           break;
                                        }
                                      break;
                                      
@@ -1048,17 +1054,24 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                        {
                                          case Trend:       fibonacci = fdiv(this.Price(Trend,Previous)-this.Price(Divergent),this.Price(Trend,Previous)-this.Price(Trend,Bottom),3);
                                                            break;
+
                                          case Term:
                                          case Base:
                                          case Expansion:   fibonacci = fdiv(f[Type].Price-this.Price(Divergent),f[Type].Price-this.Price(Type,Bottom),3);
                                                            break;
+
                                          case Convergent:
                                          case Conversion:  fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Bottom),f[Type].Price-this.Price(Type,Bottom),3);
                                                            break;
-                                         default:          if (this[fStateMinor].Direction == this[Type].Direction)
-                                                             fibonacci = fdiv(fabs(f[Type].Price-this.Price(Previous(fStateMinor))),f[Type].Price-this.Price(Type,Bottom),3);
+
+                                         case Prior:
+                                         case Root:        if (this.Price(Convergent)>0.00)
+                                                             fibonacci = fdiv(f[Type].Price-this.Price(Convergent),f[Type].Price-f[Expansion].Price,3);
                                                            else
-                                                             fibonacci = fdiv(fabs(f[Type].Price-this.Price(fStateMinor)),f[Type].Price-this.Price(Type,Top),3);
+                                                             fibonacci = FiboPercent(Fibo100);
+                                                           break;
+                                                           
+                                         default:          fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Top),f[Type].Price-this.Price(Type,Top),3);
                                                            break;
                                        }
                                      else
@@ -1068,14 +1081,25 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                        {
                                          case Trend:       fibonacci = fdiv(this.Price(Trend,Previous)-this.Price(Divergent),this.Price(Trend,Previous)-this.Price(Trend,Top),3);
                                                            break;
+
                                          case Term:
                                          case Base:
                                          case Expansion:   fibonacci = fdiv(f[Type].Price-this.Price(Divergent),f[Type].Price-this.Price(Type,Top),3);
                                                            break;
+
                                          case Convergent:
                                          case Conversion:  fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Top),f[Type].Price-this.Price(Type,Top),3);
                                                            break;
+
+                                         case Prior:
+                                         case Root:        if (this.Price(Convergent)>0.00)
+                                                             fibonacci = fdiv(f[Type].Price-this.Price(Convergent),f[Type].Price-f[Expansion].Price,3);
+                                                           else
+                                                             fibonacci = FiboPercent(Fibo100);
+                                                           break;
+                                                           
                                          default:          fibonacci = fdiv(f[Type].Price-this.Price(Next(Type),Bottom),f[Type].Price-this.Price(Type,Bottom),3);
+                                                           break;
                                        }
                         }
                         break;
@@ -1091,10 +1115,13 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                          case Base:
                                          case Expansion:   fibonacci = fdiv(Close[fBarNow]-this.Price(Type,Bottom),this.Price(Type)-this.Price(Type,Bottom),3);
                                                            break;
+
                                          case Prior:
                                          case Root:        fibonacci = fdiv(f[Expansion].Price-Close[fBarNow],f[Expansion].Price-f[Type].Price,3);
                                                            break;
-                                         default:          fibonacci = fdiv(this.Range(Type,Now),this.Range(Type,Max),3);
+
+                                         default:          fibonacci = fdiv(this.Range(Type,Now),this.Range(Previous(Type),Max),3);
+                                                           break;
                                        }
                                      
                                      if (this.Direction(Expansion) == DirectionDown)
@@ -1102,6 +1129,7 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                        {
                                          case Trend:       fibonacci = fdiv(this.Price(Trend,Top)-Close[fBarNow],this.Price(Trend,Top)-this.Price(Trend,Previous),3);
                                                            break;
+
                                          case Term:
                                          case Base:
                                          case Expansion:   fibonacci = fdiv(this.Price(Type,Top)-Close[fBarNow],this.Price(Type,Top)-this.Price(Type),3);
@@ -1109,7 +1137,9 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                          case Prior:
                                          case Root:        fibonacci = fdiv(Close[fBarNow]-f[Expansion].Price,f[Type].Price-f[Expansion].Price,3);
                                                            break;
-                                         default:          fibonacci = fdiv(this.Range(Type,Now),this.Range(Type,Max),3);
+
+                                         default:          fibonacci = fdiv(this.Range(Type,Now),this.Range(Previous(Type),Max),3);
+                                                           break;
                                        }
                                      break;
                                      
@@ -1121,16 +1151,18 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                          case Term:
                                          case Base:        fibonacci = fdiv(f[Expansion].Price-this.Price(Type,Bottom),f[Type].Price-this.Price(Type,Bottom),3);
                                                            break;
+
                                          case Expansion:   if (this.Price(Convergent)>0.00)
                                                              fibonacci = fdiv(f[Root].Price-this.Price(Convergent),f[Root].Price-f[Expansion].Price,3);
                                                            else
                                                              fibonacci = FiboPercent(Fibo100);
                                                            break;
-                                         case Prior:       fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-f[Prior].Price,3);
-                                                           break;
+                                         case Prior:       
                                          case Root:        fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-this.Price(Type,Bottom),3);
                                                            break;
+
                                          default:          fibonacci = fdiv(this.Range(Type),this.Range(Previous(Type)),3);
+                                                           break;
                                        }
 
                                      if (this.Direction(Expansion) == DirectionDown)
@@ -1141,16 +1173,18 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                          case Term:
                                          case Base:        fibonacci = fdiv(this.Price(Type,Top)-f[Expansion].Price,this.Price(Type,Top)-f[Type].Price,3);
                                                            break;
+
                                          case Expansion:   if (this.Price(Convergent)>0.00)
                                                              fibonacci = fdiv(f[Root].Price-this.Price(Convergent),f[Root].Price-f[Expansion].Price,3);
                                                            else
                                                              fibonacci = FiboPercent(Fibo100);
                                                            break;
-                                         case Prior:       fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-f[Prior].Price,3);
-                                                           break;
+                                         case Prior:       
                                          case Root:        fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-this.Price(Type,Top),3);
                                                            break;
+
                                          default:          fibonacci = fdiv(this.Range(Type),this.Range(Previous(Type)),3);
+                                                           break;
                                        }
                         }
     }
