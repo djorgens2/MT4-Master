@@ -206,20 +206,8 @@ void CFractal::CalcOrigin(void)
           fEvents[NewOrigin]        = true;
       }
 
-    if ((Event(NewMajor)&&fStateMajor==Divergent) || Event(NewOrigin) || Event(InsideReversal))
-    {
-      Print("Before:   Bar Now "+IntegerToString(fBarNow)+" "+TimeToStr(Time[fBarNow])+" "+BoolToStr(Event(NewOrigin),"Origin","Major")+BoolToStr(Event(InsideReversal)," Reversal")+" "+DirText(dOrigin.Direction));
-      Print("      --> Origin: "+IntegerToString(dOrigin.Bar)+" (o)T:"+DoubleToStr(dOrigin.Top,Digits)+" (o)B:"+DoubleToStr(dOrigin.Bottom,Digits)+" (o)P:"+DoubleToStr(dOrigin.Price,Digits));
-      Print("      --> Expansion: "+IntegerToString(f[Expansion].Bar)+" (e)T:"+DoubleToStr(Price(Expansion,Top),Digits)+" (e)B:"+DoubleToStr(Price(Expansion,Bottom),Digits)+" (e)P:"+DoubleToStr(f[Expansion].Price,Digits));
-
-      Print("      --> Top Leg: "+EnumToString(coTopLeg)+" @"+IntegerToString(f[coTopLeg].Bar)+" (p):"+DoubleToStr(f[coTopLeg].Price,Digits));
-      Print("      --> Bottom Leg: "+EnumToString(coBottomLeg)+" @"+IntegerToString(f[coBottomLeg].Bar)+" (p):"+DoubleToStr(f[coBottomLeg].Price,Digits));
-    }
-
     if (Event(InsideReversal))
     {
-      Print("      --> New Inside Reversal");
-
       if (dOrigin.State == Retrace)
         dOrigin.State            = Trap;
       else
@@ -232,11 +220,8 @@ void CFractal::CalcOrigin(void)
     
     if (Event(NewOrigin))
     {
-      Print("      --> New Origin");
-
       if (IsChanged(dOrigin.Direction,fDirection))
       {
-        Print("      --> Origin Reversal");
         dOrigin.State            = Reversal;
       
         if (f[Expansion].Direction == DirectionUp)
@@ -252,22 +237,17 @@ void CFractal::CalcOrigin(void)
         }
       }
       else
-      {
-        Print("      --> Origin Breakout");
         dOrigin.State            = Breakout;
-      }      
     }
 
     if (Event(NewFractal))
       if (f[Expansion].Reversal)
       {
-        Print("      --> (e)Reversal: New Origin Top & Bottom");
         dOrigin.Top              = fmax(f[Base].Price,f[Root].Price);
         dOrigin.Bottom           = fmin(f[Base].Price,f[Root].Price);
       }
       else
       {
-        Print("      --> (e)Breakout: New Origin Top OR Bottom");
         if (f[Expansion].Direction == DirectionUp)
           dOrigin.Top            = f[Base].Price;
         
@@ -280,13 +260,11 @@ void CFractal::CalcOrigin(void)
     {
       if (fStateMajor==Divergent)
       {
-        Print("      --> Origin Peg (Divergent)");
         if (f[Expansion].Direction == dOrigin.Direction)
           dOrigin.State          = Retrace;
         else
           dOrigin.State          = Recovery;
           
-        Print("      --> Origin is in "+EnumToString(dOrigin.State));
         if (f[Expansion].Direction == DirectionUp)
           dOrigin.Top            = f[Expansion].Price;
         
@@ -296,7 +274,6 @@ void CFractal::CalcOrigin(void)
       
       if (fStateMajor==Convergent)
       {
-        Print("      --> Origin Peg (Convergent)");
         if (f[Expansion].Direction == dOrigin.Direction)
           dOrigin.State          = Continuation;
         else
@@ -308,15 +285,6 @@ void CFractal::CalcOrigin(void)
     {
       if (this.Fibonacci(Base,Expansion,Max)>FiboPercent(Fibo23)+1)
         dOrigin.State            = Reversal;
-    }
-    
-    if ((Event(NewMajor)&&fStateMajor==Divergent) || Event(NewOrigin) || Event(InsideReversal))
-    {
-//      ObjectCreate("v"+TimeToStr(Time[fBarNow]),OBJ_VLINE,0,Time[fBarNow],0.00);
-      Print("After @: "+EnumToString(dOrigin.State)+" "+DirText(Origin(Direction)));
-      Print("      --> "+IntegerToString(dOrigin.Bar)+" (o)T:"+DoubleToStr(dOrigin.Top,Digits)+" (o)B:"+DoubleToStr(dOrigin.Bottom,Digits)+" (o)P:"+DoubleToStr(dOrigin.Price,Digits));
-      Print("      --> "+EnumToString(coTopLeg)+" Top @:"+IntegerToString(f[coTopLeg].Bar)+" "+DoubleToStr(f[coTopLeg].Price,Digits)+" (a) "+DoubleToStr(Price(coTopLeg,Top),Digits));
-      Print("      --> "+EnumToString(coBottomLeg)+" Bottom @:"+IntegerToString(f[coBottomLeg].Bar)+" "+DoubleToStr(f[coBottomLeg].Price,Digits)+" (a) "+DoubleToStr(Price(coBottomLeg,Bottom),Digits));
     }
   }
         

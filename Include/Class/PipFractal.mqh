@@ -150,6 +150,14 @@ void CPipFractal::UpdateFractal(RetraceType Type, int Direction)
     {
       if (IsChanged(pf[Type].Direction,Direction))
       {
+        switch (Type)
+        {
+          case Term:  SetEvent(NewTerm);
+                      break;
+          case Trend: SetEvent(NewTrend);
+                      break;
+        }
+        
         ufNewFractalRoot             = NewFractalRoot(Type);
         
         if (Direction == DirectionUp)
@@ -230,12 +238,16 @@ void CPipFractal::UpdateFractal(RetraceType Type, int Direction)
   }
 
 //+------------------------------------------------------------------+
-//| CalcPipFractal - updates fractal data                          |
+//| CalcPipFractal - updates fractal data                            |
 //+------------------------------------------------------------------+
 void CPipFractal::CalcPipFractal(void)
   {
     int      uTermDir               = DirectionNone;
     int      uTrendDir              = DirectionNone;
+
+    //--- Clear fractal events
+    ClearEvent(NewTerm);
+    ClearEvent(NewTrend);    
 
     //--- Detect term change
     if (Event(NewBoundary))
@@ -269,7 +281,7 @@ void CPipFractal::CalcPipFractal(void)
     if (Fibonacci(Origin,pfOriginDir,Expansion,Max)>FiboPercent(Fibo100) ||
         Fibonacci(Origin,pfOriginDir,Expansion,Max)<FiboPercent(FiboRoot)
        )
-      pfOriginDir                  = pf[Trend].Direction;  //<---- this is broken
+      pfOriginDir                  = pf[Trend].Direction;  //<---- this may be broken (?)
   }
 
 //+------------------------------------------------------------------+
@@ -574,7 +586,7 @@ void CPipFractal::ShowFiboArrow(void)
 void CPipFractal::RefreshScreen(void)
   { 
     Comment("\n*--- PipFractal ---*\n"
-           +"  FOC Now: "+DoubleToStr(FOC(Now),1)+"  Pivot Deviation: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n\n"
+           +"  FOC: "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)+"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n\n"
            +"  Term: "+DirText(this.Direction(Term))+" ("+IntegerToString(this.Count(Term))+")\n"
            +"     Base: "+DoubleToStr(pf[Term].Base,Digits)+" Root: "+DoubleToStr(pf[Term].Root,Digits)+" Expansion: "+DoubleToStr(pf[Term].Expansion,Digits)+"\n"
            +"     Retrace: "+DoubleToStr(Fibonacci(Term,Direction(Term),Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Direction(Term),Retrace,Max,InPercent),1)+"%"

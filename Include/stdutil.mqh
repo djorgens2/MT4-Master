@@ -89,9 +89,12 @@
                   InsideReversal,
                   TrendWane,
                   TrendResume,
+                  NewTerm,
+                  NewTrend,
                   NewHigh,
                   NewLow,
                   NewBoundary,
+                  ZeroFOCDeviation,
                   EventTypes
                 };
                      
@@ -619,4 +622,29 @@ int DirectionAction(int Direction, bool Contrarian=false)
     }
     
     return NoValue;
+  }
+
+//+------------------------------------------------------------------+
+//| GetEvent - translate string value to enum EventType              |
+//+------------------------------------------------------------------+
+EventType GetEvent(string Event)
+  {
+    StringToUpper(Event);
+    
+    if (Event=="NEWDIRECTION")     return(NewDirection);
+    if (Event=="NEWFRACTAL")       return(NewFractal);
+    if (Event=="NEWORIGIN")        return(NewOrigin);
+    if (Event=="NEWMAJOR")         return(NewMajor);
+    if (Event=="NEWMINOR")         return(NewMinor);
+    if (Event=="INSIDEREVERSAL")   return(InsideReversal);
+    if (Event=="TRENDWANE")        return(TrendWane);
+    if (Event=="TRENDRESUME")      return(TrendResume);
+    if (Event=="NEWTERM")          return(NewTerm);
+    if (Event=="NEWTREND")         return(NewTrend);
+    if (Event=="NEWHIGH")          return(NewHigh);
+    if (Event=="NEWLOW")           return(NewLow);
+    if (Event=="NEWBOUNDARY")      return(NewBoundary);
+    if (Event=="ZEROFOCDEVIATION") return(ZeroFOCDeviation);
+    
+    return (EventTypes);
   }

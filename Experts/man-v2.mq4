@@ -11,8 +11,8 @@
 #include <Class\PipFractal.mqh>
 #include <manual.mqh>
 
-input string appHeader               = "";    //+------ App Options -------+
-input bool   inpShowFiboLines        = false; // Display Fibonacci Lines
+//input string appHeader               = "";    //+------ App Options -------+
+//input bool   inpShowFiboLines        = false; // Display Fibonacci Lines
 
 input string fractalHeader           = "";    //+------ Fractal Options ------+
 input int    inpRangeMax             = 120;   // Maximum fractal pip range
@@ -29,6 +29,251 @@ input double inpTolerance            = 0.5;   // Directional change sensitivity
 
 //--- Operational variables
   int              display           = NoValue;
+  bool             alert[EventTypes];
+  
+//--- Order Opportunity operationals
+  int              oTradeLevel       = NoValue;
+  int              oTradeDir         = DirectionNone;
+  int              oTradeAction      = OP_NO_ACTION;
+  bool             oTradeOpen        = false;
+  
+//--- Trade Action operationals
+  enum TriggerState
+  {
+    Spotting,
+    Loaded,
+    Locked,
+    Ready,
+    Fired
+  };
+  
+  struct TradeRec
+  {
+    TriggerState   OpenTrigger;
+    datetime       OpenTime;
+    double         OpenPrice;
+    double         OpenPriceMax;
+    double         OpenPriceMin;
+    datetime       OrderTime;
+  };
+  
+  TradeRec         TradeAction[2];
+
+//--- Trade Action operationals
+  enum ProfitState
+  {
+    Inactive,
+    Activate,
+    Holding,
+    Pending,
+    Deposited
+  };
+    
+  struct ProfitRec
+  {
+    ProfitState    ProfitTrigger;
+    datetime       ProfitTime;
+    double         ProfitPctMax;
+    double         ProfitPctMin;
+  };
+  
+  ProfitRec        ProfitAction[2];
+
+//+------------------------------------------------------------------+
+//| SetProfitStrategy - Sets the profit state by Action              |
+//+------------------------------------------------------------------+
+void SetProfitStrategy(int Action)
+  {
+    int spsDir              = ActionDir(Action);
+  }
+
+//+------------------------------------------------------------------+
+//| SetProfitAction - Sets the profit state by Action                |
+//+------------------------------------------------------------------+
+void SetProfitAction(int Action, ProfitState Status)
+  {
+    ProfitAction[Action].ProfitTrigger = Status;
+    
+    switch (Status)
+    {
+      case Inactive:
+      case Activate:   ProfitAction[Action].ProfitTime         = 0;
+                       ProfitAction[Action].ProfitPctMax       = LotValue(Action,Net,InEquity);
+                       ProfitAction[Action].ProfitPctMin       = LotValue(Action,Net,InEquity);
+                       
+                       if (LotCount(Action)>0.00)
+                         ProfitAction[Action].ProfitTrigger    = Holding;
+                       else
+                         ProfitAction[Action].ProfitTrigger    = Inactive;
+
+                       break;
+
+      case Pending:    if (LotCount(Action)>0.00)
+                         if (pfractal.Event(NewLow))
+                           ProfitAction[Action].ProfitTrigger  = Holding;
+                         else
+                           SetProfitStrategy(Action);
+                       else
+                         if (OrderClosed(Action))
+                         {
+                           ProfitAction[Action].ProfitTime     = TimeCurrent();
+                           ProfitAction[Action].ProfitTrigger  = Deposited;
+                         }
+
+      default:         ProfitAction[Action].ProfitPctMax       = fmax(ProfitAction[Action].ProfitPctMax,LotValue(Action,Net,InEquity));
+                       ProfitAction[Action].ProfitPctMin       = fmin(ProfitAction[Action].ProfitPctMin,LotValue(Action,Net,InEquity));
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| SetTradeAction - Sets the trade operationals and state by Action |
+//+------------------------------------------------------------------+
+void SetTradeAction(int Action, TriggerState Status)
+  {
+    TradeAction[Action].OpenTrigger   = Status;
+    
+    switch (Status)
+    {
+      case Fired:      TradeAction[Action].OpenTime        = 0;
+                       TradeAction[Action].OpenPrice       = 0.00;
+                       TradeAction[Action].OpenPriceMax    = 0.00;
+                       TradeAction[Action].OpenPriceMin    = 0.00;
+                       
+                       if (TradeAction[Action].OrderTime==0)
+                         TradeAction[Action].OrderTime     = TimeCurrent();
+
+                       break;
+
+      case Spotting:   if (IsEqual(TradeAction[Action].OpenTime,0))
+                       {
+                         TradeAction[Action].OpenTime      = TimeCurrent();
+                         TradeAction[Action].OpenPrice     = Bid;
+                         TradeAction[Action].OpenPriceMax  = Bid;
+                         TradeAction[Action].OpenPriceMin  = Bid;
+                       }
+
+      default:         TradeAction[Action].OpenPriceMax    = fmax(TradeAction[Action].OpenPriceMax,Bid);
+                       TradeAction[Action].OpenPriceMin    = fmin(TradeAction[Action].OpenPriceMax,Bid);
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| ManageShort - Manages short trading positions                    |
+//+------------------------------------------------------------------+
+void ManageShort(void)
+  {
+    switch (TradeAction[OP_SELL].OpenTrigger)
+    {
+      case Fired:       if (oTradeOpen && oTradeDir==DirectionDown)
+                          SetTradeAction(OP_SELL,Spotting);
+                        else
+                          SetTradeAction(OP_SELL,Fired);
+                        break;        
+
+      case Spotting:    if (Bid>pfractal.Intercept(Bottom))
+                          SetTradeAction(OP_SELL,Loaded);
+                        break;
+
+      case Loaded:      if (pfractal.Event(NewLow))
+                          SetTradeAction(OP_SELL,Spotting);
+                        
+                        if (pfractal.Event(NewDirection))
+                          SetTradeAction(OP_SELL,Locked);
+                          
+                        SetProfitAction(OP_SELL,Pending);
+                        
+                        break;
+
+      case Locked:      if (Bid<pfractal.Intercept(Top))
+                          SetTradeAction(OP_SELL,Ready);
+                        break;
+
+      case Ready:       if (OrderFulfilled(OP_SELL))
+                        {
+                          SetTradeAction(OP_SELL,Fired);
+                          SetProfitAction(OP_SELL,Activate);
+                        }
+                        else
+                          OpenLimitOrder(OP_SELL,pfractal.Range(Top),0.00,0.00,0.00,"Trigger Sell");
+                        break;
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| ManageLong - Manages long trading positions                      |
+//+------------------------------------------------------------------+
+void ManageLong(void)
+  {
+    switch (TradeAction[OP_BUY].OpenTrigger)
+    {
+      case Fired:       if (oTradeOpen && oTradeDir==DirectionUp)
+                          SetTradeAction(OP_BUY,Spotting);
+                        else
+                          SetTradeAction(OP_BUY,Fired);
+                        break;        
+
+      case Spotting:    if (Bid>pfractal.Intercept(Top))
+                          SetTradeAction(OP_BUY,Loaded);
+                        break;
+
+      case Loaded:      if (pfractal.Event(NewLow))
+                          SetTradeAction(OP_BUY,Spotting);
+                        
+                        if (pfractal.Event(NewDirection))
+                          SetTradeAction(OP_BUY,Locked);
+
+                        SetProfitAction(OP_BUY,Pending);
+
+                        break;
+
+      case Locked:      if (Bid<pfractal.Intercept(Bottom))
+                          SetTradeAction(OP_BUY,Ready);
+                        break;
+
+      case Ready:       // OpenLimitOrder(OP_BUY,pfractal.Range(Bottom),0.00,0.00,0.00,"Trigger Buy");
+
+                        if (OrderFulfilled(OP_BUY))
+                          SetTradeAction(OP_BUY,Fired);
+                        break;
+    }  
+  }
+  
+//+------------------------------------------------------------------+
+//| ManageProfit - Manages profitable positions by Action            |
+//+------------------------------------------------------------------+
+void ManageProfit(int Action)
+  {
+    if (Action==OP_NO_ACTION)
+      return;
+      
+    SetProfitAction(Action,ProfitAction[Action].ProfitTrigger);
+    
+    if (ProfitAction[Action].ProfitTrigger==Pending)
+    {
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| Execute                                                          |
+//+------------------------------------------------------------------+
+void Execute(void)
+  {
+    if (pfractal.Event(NewMajor))
+    {
+      oTradeOpen                     = true;
+      oTradeDir                      = pfractal.Direction(Trend);
+      oTradeAction                   = DirAction(oTradeDir);
+      oTradeLevel                    = FiboRoot;
+    }
+    
+    if (pfractal.Event(NewTerm))
+      oTradeOpen                     = false;
+      
+    ManageShort();
+    ManageLong();
+    
+    ManageProfit(oTradeAction);
+  }
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
@@ -37,6 +282,7 @@ void GetData(void)
   {
     fractal.Update();
     pfractal.Update();
+
   }
 
 //+------------------------------------------------------------------+
@@ -85,16 +331,85 @@ void RefreshScreen(void)
                  Comment("No Data");
     }
 
-    //--- Standard Deviation channel lines
+    //--- Show trade status
+    if (oTradeOpen)
+      UpdateLabel("oTradeDetails","Trade: "+proper(DirText(oTradeDir))
+                 +" ("+proper(ActionText(oTradeAction))
+                 +"): "+EnumToString(TradeAction[oTradeAction].OpenTrigger)
+                 +BoolToStr(LotCount(oTradeAction)>0.00," Profit: "+EnumToString(ProfitAction[oTradeAction].ProfitTrigger)),
+        BoolToInt(oTradeOpen,clrYellow,clrGray));
+    else
+    if (oTradeAction != OP_NO_ACTION)
+      if (TradeAction[oTradeAction].OpenTrigger==Fired)
+        UpdateLabel("oTradeDetails","Trade: "+proper(DirText(oTradeDir))
+                   +" ("+proper(ActionText(oTradeAction))
+                   +"): "+DoubleToStr(ProfitAction[oTradeAction].ProfitPctMin,1)
+                   +"% "+DoubleToStr(ProfitAction[oTradeAction].ProfitPctMax,1)+"%"
+                   +BoolToStr(LotCount(oTradeAction)>0.00," Profit: "+EnumToString(ProfitAction[oTradeAction].ProfitTrigger)),
+          clrGoldenrod);
+      else
+        UpdateLabel("oTradeDetails","Trade: "+proper(DirText(oTradeDir))
+                   +" ("+proper(ActionText(oTradeAction))
+                   +"): "+EnumToString(TradeAction[oTradeAction].OpenTrigger)
+                   +BoolToStr(LotCount(oTradeAction)>0.00," Profit: "+EnumToString(ProfitAction[oTradeAction].ProfitTrigger)),
+          clrLawnGreen);      
     
-    pfractal.ShowFiboArrow();
+    pfractal.ShowFiboArrow();    
   }
-
+  
 //+------------------------------------------------------------------+
-//| Execute                                                          |
+//| ExecAlerts - executes alert tests for strategy breakpoints       |
 //+------------------------------------------------------------------+
-void Execute(void)
+void ExecAlerts(void)
   {
+    static int    eOK     = IDTRYAGAIN;
+    static bool   eFOC    = true;
+    static string eAlert  = "";
+    
+    if (alert[ZeroFOCDeviation])
+      if (IsEqual(pfractal.FOC(Deviation),0.0,1))
+      {
+        if (!eFOC)
+          if (pfractal.HistoryLoaded())
+            Append(eAlert,"PipMA FOC Deviation at zero","\n");
+
+        eFOC                = true;
+      }
+      else
+        eFOC                = false;
+      
+    if (alert[NewMajor])
+      if (pfractal.Event(NewMajor))
+        Append(eAlert,"New PipMA Major Event","\n");
+
+    if (alert[NewTerm])
+      if (pfractal.Event(NewTerm))
+        Append(eAlert,"New PipMA Term Direction","\n");
+
+    if (alert[NewTrend])
+      if (pfractal.Event(NewTrend))
+        Append(eAlert,"New PipMA Trend Direction","\n");
+
+    if (alert[NewMajor])
+      if (fractal.Event(NewMajor))
+        Append(eAlert,"New Fractal Major Event","\n");
+
+    if (alert[NewFractal])
+      if (fractal.Event(NewFractal))
+        Append(eAlert,"New Fractal Event","\n");
+
+    if (alert[NewOrigin])
+      if (fractal.Event(NewOrigin))
+        Append(eAlert,"New Fractal Origin Event","\n");
+
+    if (StringLen(eAlert)>0)
+    {
+      if (eOK != IDCANCEL)
+        eOK = Pause(eAlert,"Event Watcher",MB_ICONEXCLAMATION|MB_DEFBUTTON3|MB_CANCELTRYCONTINUE);
+      
+      if (eOK == IDCONTINUE)
+        eAlert            = "";
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -102,6 +417,8 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    bool eacAlert;  
+    
     if (Command[0]=="SHOW")
       if (InStr(Command[1],"NONE"))
         display  = NoValue;
@@ -116,6 +433,18 @@ void ExecAppCommands(string &Command[])
         display  = 2;
       else
         display  = NoValue;  
+
+    if (Command[0]=="SET")
+    {
+      eacAlert   = Command[2]=="ON";
+     
+      if (InStr(Command[1],"ALERT"))
+        for (EventType type=0; type<EventTypes; type++)
+          alert[type] = eacAlert;
+      else
+        if (GetEvent(Command[1])<EventTypes)
+          alert[GetEvent(Command[1])] = eacAlert;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -136,6 +465,7 @@ void OnTick()
     GetData(); 
 
     RefreshScreen();
+    ExecAlerts();
     
     if (AutoTrade())
       Execute();
@@ -158,6 +488,13 @@ int OnInit()
     NewLine("oTop");
     NewLine("oBottom");
     NewLine("oPrice");
+    
+    NewLabel("oTradeDetails","Trade: None",5,10,clrLightGray,SCREEN_LL);
+
+    SetTradeAction  (OP_BUY,  Fired);
+    SetTradeAction  (OP_SELL, Fired);
+    SetProfitAction (OP_BUY,  Activate);
+    SetProfitAction (OP_SELL, Activate);
     
     return(INIT_SUCCEEDED);
   }
