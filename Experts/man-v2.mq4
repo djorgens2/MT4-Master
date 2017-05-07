@@ -33,6 +33,7 @@ input double inpTolerance            = 0.5;   // Directional change sensitivity
   
 //--- Order Opportunity operationals
   int              oTradeLevel       = NoValue;
+  int              oTradeEvent       = NoValue;
   int              oTradeDir         = DirectionNone;
   int              oTradeAction      = OP_NO_ACTION;
   bool             oTradeOpen        = false;
@@ -194,7 +195,7 @@ void ManageShort(void)
                           SetProfitAction(OP_SELL,Activate);
                         }
                         else
-                          OpenLimitOrder(OP_SELL,pfractal.Range(Top),0.00,0.00,0.00,"Trigger Sell");
+                        //  OpenLimitOrder(OP_SELL,pfractal.Range(Top),0.00,0.00,0.00,"Trigger Sell");
                         break;
     }
   }
@@ -204,6 +205,8 @@ void ManageShort(void)
 //+------------------------------------------------------------------+
 void ManageLong(void)
   {
+    static bool mlNegAdd = false;
+    
     switch (TradeAction[OP_BUY].OpenTrigger)
     {
       case Fired:       if (oTradeOpen && oTradeDir==DirectionUp)
@@ -212,7 +215,7 @@ void ManageLong(void)
                           SetTradeAction(OP_BUY,Fired);
                         break;        
 
-      case Spotting:    if (Bid>pfractal.Intercept(Top))
+      case Spotting:    if (Bid<pfractal.Intercept(Top))
                           SetTradeAction(OP_BUY,Loaded);
                         break;
 
@@ -226,14 +229,18 @@ void ManageLong(void)
 
                         break;
 
-      case Locked:      if (Bid<pfractal.Intercept(Bottom))
+      case Locked:      if (Bid>pfractal.Intercept(Bottom))
                           SetTradeAction(OP_BUY,Ready);
                         break;
 
-      case Ready:       // OpenLimitOrder(OP_BUY,pfractal.Range(Bottom),0.00,0.00,0.00,"Trigger Buy");
-
-                        if (OrderFulfilled(OP_BUY))
+      case Ready:       if (OrderFulfilled(OP_BUY))
+                        {
                           SetTradeAction(OP_BUY,Fired);
+                          SetProfitAction(OP_BUY,Activate);
+                        }
+                        else
+                          OpenMITOrder(OP_BUY,pfractal.Range(Bottom),0.00,0.00,Pip(1),"Trigger Buy");
+
                         break;
     }  
   }
@@ -257,17 +264,26 @@ void ManageProfit(int Action)
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
-  {
+  {    
     if (pfractal.Event(NewMajor))
     {
       oTradeOpen                     = true;
+      oTradeEvent                    = Major;
       oTradeDir                      = pfractal.Direction(Trend);
       oTradeAction                   = DirAction(oTradeDir);
       oTradeLevel                    = FiboRoot;
     }
-    
+    else
     if (pfractal.Event(NewTerm))
-      oTradeOpen                     = false;
+    {
+      oTradeEvent                    = Minor;
+      
+      if (oTradeDir!=DIR_NONE)
+        if (pfractal.Direction(Origin)==pfractal.Direction(Term))
+          oTradeOpen                   = false;
+        else
+          oTradeOpen                   = true;
+    }
       
     ManageShort();
     ManageLong();
