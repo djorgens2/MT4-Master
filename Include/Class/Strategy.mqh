@@ -10,10 +10,6 @@
 
 #include <Class\PipFractal.mqh>
 
-#define OpenStatistics    0
-#define CloseStatistics   1
-#define AllStatistics     2
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -34,13 +30,14 @@ class CStrategy
            FractalMinor
          };
          
-    enum DirectionType
+    enum MeasureType
          {
-           Down  = -1,
-           None  =  0,
-           Up    =  1
+           MaxGain,
+           ActualGain,
+           MaxDraw,
+           ActualDraw
          };
-  
+         
     struct FibonacciRec
          {
            double          Value;
@@ -51,112 +48,117 @@ class CStrategy
            int             GroupId;
            ClassType       ClassId;
            FractalType     FractalId;
-           DirectionType   DirectionId;
+           int             Direction;
          };
   
     struct GroupRec
          {
-           int             StrategyId;
-           int             Count;
+           int             StrategyId;   //--- Assigned strategy id
+           int             Degree;       //--- DoC value (degree of change)
+           int             Count;        //--- Count of occurrences
          };
 
     struct StatisticRec
          {
            int             GroupId;
-           DirectionType   Direction;
-           datetime        OpenTime;
-           double          OpenPrice;
-           double          OpenRange;
-           double          MaxGain;
-           double          MaxDraw;
-           double          AdverseDraw;
-           double          ActualDraw;
-           datetime        CloseTime;
-           double          ClosePrice;
+           int             Direction;
+           datetime        TimeOpen;
+           double          RangeOpen;
+           double          PriceOpen;
+           double          PriceHigh;
+           double          PriceLow;
+           double          PriceClose;
+           bool            AdverseDraw;
+           datetime        TimeClose;
          };
 
-    ElementRec        Element[];
-    GroupRec          Group[];
-    FibonacciRec      Fibonacci[];
+    ElementRec             Element[];
+    GroupRec               Group[];
+    FibonacciRec           Fibonacci[];
 
-    string            CSV_Record[];
+    string                 CSV_Record[];
     
-    CFractal         *fractal;
-    CPipFractal      *pfractal;
+    CFractal              *fractal;
+    CPipFractal           *pfractal;
 
-    void              LoadFibonacci(void);
-    void              LoadElements(void);
-    void              LoadGroups(void);
-    void              LoadData(void);
+    void                   LoadFibonacci(void);
+    void                   LoadElements(void);
+    void                   LoadGroups(void);
+    void                   LoadData(void);
 
-    bool              UpdateStrategy(void);
+    void                   UpdateStatistics(void);
 
-    void              UpdateStatistics(void);
-    void              OpenStatistic(double MaxDraw);
-    void              CloseStatistic(double MaxDraw, double AdverseDraw, double DrawPrice);
+    void                   InitCurrent(void);
+    void                   OpenRunning(void);
+    void                   CloseRunning(void);
     
+    string                 FormatData(StatisticRec &Data, string Format="PAD");
+    double                 Measure(StatisticRec &Data, int Measure);
+
+
   public:
-                      CStrategy(CFractal &Fractal, CPipFractal &PipFractal);
-                     ~CStrategy();
+                           CStrategy(CFractal &Fractal, CPipFractal &PipFractal);
+                          ~CStrategy();
                 
-    void              Update(void);
-    void              Show(int Measure);
-    
+    void                   Update(void);
+    void                   Show(void);
 
   protected:
 
-    static const string  GroupName[6];
+    StatisticRec           Running[];    //--- running statistics
+    StatisticRec           History[];    //--- closed statistics
+    StatisticRec           Current;      //--- most recent running statistic
 
-    int                  GroupDirection[6];
-    int                  GroupId;
-    int                  Groups;
-    int                  Elements;
-    int                  Degree;        //--- DoC value (degree of change)
-    StatisticRec         Statistic[];
+    int                    GroupId(void);
+    int                    Groups;
+
+    static const string    ElementName[6];
+    int                    ElementDirection[6];
+    int                    Elements;
   };
 
-const string CStrategy::GroupName[6]      = {"fo","fm","fn","pfo","pfm","pfn"};
+const string CStrategy::ElementName[6] = {"fo","fm","fn","pfo","pfm","pfn"};
+
 
 //+------------------------------------------------------------------+
-//| UpdateStrategy - Calc strategy based current fractal pattern     |
+//| GroupId - Returns the current GroupId of the fractal pattern     |
 //+------------------------------------------------------------------+
-bool CStrategy::UpdateStrategy(void)
+int CStrategy::GroupId(void)
   {
-    int    ssGroupId    = 0;
-    int    ssElementId  = Elements;
+    static int  ssGroupId    = 0;
+    int         ssDegree     = 0;
+    int         ssElementId  = Elements;
     
-    if (   IsChanged(GroupDirection[0],this.fractal.Origin(Direction))
-        || IsChanged(GroupDirection[1],this.fractal.Direction(Expansion))
-        || IsChanged(GroupDirection[2],this.fractal.Direction(fractal.State(Major)))
-        || IsChanged(GroupDirection[3],this.pfractal.Direction(Origin))
-        || IsChanged(GroupDirection[4],this.pfractal.Direction(Trend))
-        || IsChanged(GroupDirection[5],this.pfractal.Direction(Term))
-       )
+    if (IsChanged(ElementDirection[0],fractal.Origin(Direction)))
+      ssDegree++;
+    if (IsChanged(ElementDirection[1],fractal.Direction(Expansion)))
+      ssDegree++;
+    if (IsChanged(ElementDirection[2],fractal.Direction(fractal.State(Major))))
+      ssDegree++;
+    if (IsChanged(ElementDirection[3],pfractal.Direction(Origin)))
+      ssDegree++;
+    if (IsChanged(ElementDirection[4],pfractal.Direction(Trend)))
+      ssDegree++;
+    if (IsChanged(ElementDirection[5],pfractal.Direction(Term)))
+      ssDegree++;
+      
+    if (ssDegree>0)
     {
-      Degree            = 1;
-
-      if (IsChanged(GroupDirection[0],this.fractal.Origin(Direction))) Degree++;
-      if (IsChanged(GroupDirection[1],this.fractal.Direction(Expansion))) Degree++;
-      if (IsChanged(GroupDirection[2],this.fractal.Direction(fractal.State(Major)))) Degree++;
-      if (IsChanged(GroupDirection[3],this.pfractal.Direction(Origin))) Degree++;
-      if (IsChanged(GroupDirection[4],this.pfractal.Direction(Trend))) Degree++;
-      if (IsChanged(GroupDirection[5],this.pfractal.Direction(Term))) Degree++;
+      ssGroupId              = 0;
       
       for (int idx=0; idx<6; idx++)
       {
         ssElementId /= 2;
         
-        if (GroupDirection[idx]==DirectionUp)
+        if (ElementDirection[idx]==DirectionUp)
           ssGroupId += ssElementId;
       }
       
-      GroupId = Element[ssGroupId].GroupId;
-      Group[GroupId].Count++;
-      
-      return true;
+      Group[Element[ssGroupId].GroupId].Degree  = ssDegree;
+      Group[Element[ssGroupId].GroupId].Count++;
     }
 
-    return false;
+    return Element[ssGroupId].GroupId;
   }
   
 //+------------------------------------------------------------------+
@@ -238,6 +240,7 @@ void CStrategy::LoadGroups(void)
       StringSplit(fRecord,44,CSV_Record);
       
       Group[Groups].StrategyId  = StrToInteger(CSV_Record[1]);
+      Group[Groups].Degree      = 0;
       Group[Groups].Count       = 0;
 
       Groups++;
@@ -285,7 +288,7 @@ void CStrategy::LoadElements(void)
       Element[Elements].GroupId       = StrToInteger(CSV_Record[0]);
       Element[Elements].ClassId       = (ClassType)StrToInteger(CSV_Record[1]);
       Element[Elements].FractalId     = (FractalType)StrToInteger(CSV_Record[2]);
-      Element[Elements].DirectionId   = (DirectionType)StrToInteger(CSV_Record[3]);
+      Element[Elements].Direction     = StrToInteger(CSV_Record[3]);
       
       Elements++;
     }
@@ -296,70 +299,58 @@ void CStrategy::LoadElements(void)
   }
 
 //+------------------------------------------------------------------+
-//| LoadData - Loads Strategy data from files                        |
+//|                                                                  |
 //+------------------------------------------------------------------+
-void CStrategy::LoadData(void)
+void CStrategy::InitCurrent(void)
   {
-    ArrayInitialize(GroupDirection,None);
-    
-    GroupId                = NoValue;
-    
-    LoadElements();
-    LoadGroups();
-    LoadFibonacci();
+    Current.GroupId        = this.GroupId();
+    Current.Direction      = pfractal.Direction(Term);
+    Current.TimeOpen       = TimeCurrent();
+    Current.RangeOpen      = Pip(pfractal.Range(Size));
+    Current.PriceOpen      = Close[0];
+    Current.PriceHigh      = Close[0];
+    Current.PriceLow       = Close[0];
+    Current.PriceClose     = Close[0];
+    Current.AdverseDraw    = false;
+    Current.TimeClose      = 0;
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void CStrategy::OpenStatistic(double MaxDraw)
+void CStrategy::OpenRunning(void)
   {
-    static int osStatistic  = 0;
-
-    if (osStatistic>0)
-      Statistic[osStatistic-1].MaxDraw    = MaxDraw;
-      
-    ArrayResize(Statistic,osStatistic+1);
+    int osSize = ArraySize(Running);
     
-    Statistic[osStatistic].ClosePrice     = 0.00;
-    Statistic[osStatistic].CloseTime      = 0;
-    Statistic[osStatistic].Direction      = (DirectionType)pfractal.Direction(Term);
-    Statistic[osStatistic].GroupId        = GroupId;
-    Statistic[osStatistic].MaxDraw        = 0.00;
-    Statistic[osStatistic].AdverseDraw    = 0.00;
-    Statistic[osStatistic].ActualDraw     = 0.00;
-    Statistic[osStatistic].OpenPrice      = Close[0];
-    Statistic[osStatistic].OpenRange      = Pip(pfractal.Range(Size));
-    Statistic[osStatistic].OpenTime       = TimeCurrent();
+    InitCurrent();
     
-    osStatistic++;
+    ArrayResize(Running,osSize+1);
+    
+    Running[osSize]     = Current;
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void CStrategy::CloseStatistic(double MaxDraw, double AdverseDraw, double DrawPrice)
+void CStrategy::CloseRunning(void)
   {
-    int csIdxNow      = ArraySize(Statistic)-1;
+    if (ArraySize(Running)>0)
+    {
+      for (int idx=0;idx<ArraySize(Running);idx++)
+      {
+        Running[idx].PriceClose        = Close[0];
+        Running[idx].TimeClose         = TimeCurrent();
+        
+        if (Running[idx].AdverseDraw)
+          if (Running[idx].Direction!=pfractal.Direction(Term))
+            Running[idx].AdverseDraw   = false;
+      }
+        
+      ArrayResize(History,ArraySize(History)+ArraySize(Running));
+      ArrayCopy(History,Running,ArraySize(History)-ArraySize(Running),0,WHOLE_ARRAY);
+    }
     
-    for (int idx=0;idx<ArraySize(Statistic);idx++)
-      if (Statistic[idx].CloseTime == 0)
-        Statistic[idx].CloseTime       = TimeCurrent();
-    
-    Statistic[csIdxNow].MaxDraw        = MaxDraw;
-    Statistic[csIdxNow].AdverseDraw    = AdverseDraw;
-    Statistic[csIdxNow].ActualDraw     = Pip(fabs(Statistic[csIdxNow].OpenPrice-DrawPrice));
-    
-    Print(Statistic[csIdxNow].GroupId+" "
-         +Statistic[csIdxNow].Direction+" "
-         +Statistic[csIdxNow].OpenTime+" "
-         +Statistic[csIdxNow].OpenPrice+" "
-         +Statistic[csIdxNow].OpenRange+" "
-         +Statistic[csIdxNow].MaxGain+" "
-         +Statistic[csIdxNow].MaxDraw+" "
-         +Statistic[csIdxNow].AdverseDraw+" "
-         +Statistic[csIdxNow].ActualDraw+" "
-         +DrawPrice+" ");    
+    ArrayResize(Running,0);
   }
 
 //+------------------------------------------------------------------+
@@ -367,80 +358,92 @@ void CStrategy::CloseStatistic(double MaxDraw, double AdverseDraw, double DrawPr
 //+------------------------------------------------------------------+
 void CStrategy::UpdateStatistics(void)
   {
-    static int    usGroupId        = NoValue;
-    static int    usDirection      = None;
-    static double usMaxDraw        = 0.00;
-    static double usAdvDraw        = 0.00;
-    static double usCurrent        = 0.00;
-    static double usTermPrice      = 0.00;
-    static double usDrawPrice      = 0.00;
-    static double usBndryPrice     = 0.00;
-    static double usAdvBndryPrice  = 0.00;
+    int usRunIdx;
     
     if (pfractal.HistoryLoaded())
     {
-      if (pfractal.Event(NewBoundary))
-      {        
-        if (IsChanged(usDirection,pfractal.Direction(Term)))
-        {
-          CloseStatistic(usMaxDraw,usAdvDraw,usDrawPrice);
-          usAdvBndryPrice          = 0.00;
-        }
-        else
-        {
-          for (int idx=0;idx<ArraySize(Statistic);idx++)
-            if (Statistic[idx].CloseTime == 0)
-              Statistic[idx].MaxGain = fmax(Statistic[idx].MaxGain,Pip(Close[0]-Statistic[idx].OpenPrice)*Statistic[idx].Direction); 
-          
-          if ((pfractal.Event(NewHigh)&&pfractal.Direction(Term)==DirectionUp)||
-              (pfractal.Event(NewLow)&&pfractal.Direction(Term)==DirectionDown))
-          {
-            if (IsHigher(usCurrent,usMaxDraw))
-              usCurrent        = 0.00;
-              
-            if (!IsEqual(usAdvBndryPrice,0.00))
-              usAdvDraw        = fabs(usTermPrice-usAdvBndryPrice);
-
-            usBndryPrice       = Close[0];
-          }
-          else
-            usAdvBndryPrice    = Close[0];
-        }
-      }
-      else
-        usCurrent              = fmax(usCurrent,Pip(usBndryPrice-Close[0])*usDirection);
-      
-      if (IsChanged(usGroupId,GroupId))
+      if (IsChanged(Current.GroupId,this.GroupId()))
       {
-        OpenStatistic(usMaxDraw);
-      
-        usTermPrice            = Close[0];
-        usDrawPrice            = Close[0];
-      
-        usMaxDraw              = 0.00;
-        usCurrent              = 0.00;
+        if (IsChanged(Current.Direction,pfractal.Direction(Term)))
+          CloseRunning();
+
+        OpenRunning();
       }
-      
-      if (pfractal.Direction(Term)==DirectionUp)
-        usDrawPrice            = fmin(usDrawPrice,Close[0]);
 
-      if (pfractal.Direction(Term)==DirectionDown)
-        usDrawPrice            = fmax(usDrawPrice,Close[0]);
+      Current.PriceHigh                  = fmax(Current.PriceHigh,Close[0]);
+      Current.PriceLow                   = fmin(Current.PriceLow,Close[0]);
+          
+      if (pfractal.Event(NewBoundary))
+      {
+        if ((pfractal.Event(NewHigh)&&Current.Direction==DirectionDown)||
+            (pfractal.Event(NewLow)&&Current.Direction==DirectionUp))
+          Current.AdverseDraw            = true;
+          
+        for (usRunIdx=0;usRunIdx<ArraySize(Running);usRunIdx++)
+        {
+          if (Running[usRunIdx].Direction==DirectionUp)
+            Running[usRunIdx].PriceHigh  = Current.PriceHigh;
 
-if (!IsEqual(usTermPrice,0.00))
+          if (Running[usRunIdx].Direction==DirectionDown)
+            Running[usRunIdx].PriceLow   = Current.PriceLow;
+        }
+
+        usRunIdx--;
+        
+        if (Running[usRunIdx].Direction==DirectionUp)
+          Running[usRunIdx].PriceLow     = Current.PriceLow;
+
+        if (Running[usRunIdx].Direction==DirectionDown)
+          Running[usRunIdx].PriceHigh    = Current.PriceHigh;
+
+        Running[usRunIdx].AdverseDraw    = Current.AdverseDraw;
+      }
+
 {
-  UpdateLine("usTermPrice",usTermPrice,STYLE_SOLID,clrLawnGreen);
-  UpdateLine("usActPrice",usDrawPrice,STYLE_SOLID,clrYellow);
-  UpdateLine("usBndryPivot",usBndryPrice,STYLE_SOLID,clrDodgerBlue);
-  UpdateLine("usAdvBndryPivot",usAdvBndryPrice,STYLE_SOLID,clrRed);
+  UpdateLine("Open",Current.PriceOpen,STYLE_SOLID,clrYellow);
+  UpdateLine("High",Current.PriceHigh,STYLE_SOLID,clrLawnGreen);
+  UpdateLine("Low",Current.PriceLow,STYLE_SOLID,clrRed);
 
-  Comment(  "Group: "+IntegerToString(usGroupId)+" "+DirText(usDirection)+"\n"
-           +"Term Price: "+DoubleToStr(usTermPrice,Digits)+" ("+DoubleToStr(Pip(usTermPrice-Close[0])*usDirection,1)+")\n"
-           +"Max Draw: "+DoubleToStr(usMaxDraw,1)+"\n"
-           +"Cur Draw: "+DoubleToStr(usCurrent,1)+"\n"
+  Comment(  "Group: "+IntegerToString(Current.GroupId)+" "+DirText(Current.Direction)+"\n"
+           +"Open: "+DoubleToStr(Current.PriceOpen,Digits)+" ("+DoubleToStr(Pip(Current.PriceOpen-Close[0])*Current.Direction,1)+")\n"
+           +"High: "+DoubleToStr(Current.PriceHigh,Digits)+"\n"
+           +"Low: "+DoubleToStr(Current.PriceLow,Digits)+"\n"
+           +BoolToStr(Current.AdverseDraw,"Yes","No")
          );
 }
     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+string CStrategy::FormatData(StatisticRec &Data, string Format="PAD")
+  {
+    if (Format == "PAD")
+      return( LPad(IntegerToString(Data.GroupId)+"-"
+             +StringSubstr(DirText(Data.Direction),0,1)," ",1)
+             +LPad(DoubleToString(Data.RangeOpen,1)," ",8)
+             +LPad(DoubleToString(Data.PriceOpen,Digits)," ",10)
+             +LPad(DoubleToString(Measure(Data,MaxGain),1)," ",9)
+             +LPad(DoubleToString(Measure(Data,MaxDraw),1)," ",9)
+             +LPad(BoolToStr(Data.AdverseDraw,"Yes","No ")," ",9)
+             +LPad(DoubleToString(Measure(Data,ActualDraw),1)," ",9)+"\n");
+
+    if (Format == "CSV")
+      return( IntegerToString(Data.GroupId)+"|"
+             +DirText(Data.Direction)+"|"
+             +TimeToStr(Data.TimeOpen)+"|"
+             +DoubleToString(Data.RangeOpen,1)+"|"
+             +DoubleToString(Data.PriceOpen,Digits)+"|"
+             +DoubleToString(Data.PriceHigh,Digits)+"|"
+             +DoubleToString(Data.PriceLow,Digits)+"|"
+             +DoubleToString(Data.PriceClose,Digits)+"|"             
+             +DoubleToString(Measure(Data,MaxGain),1)+"|"
+             +DoubleToString(Measure(Data,MaxDraw),1)+"|"
+             +TimeToStr(Data.TimeClose)+"|"             
+             +BoolToStr(Data.AdverseDraw,"Yes","No "));
+             
+    return( " " );
   }
 
 //+------------------------------------------------------------------+
@@ -451,12 +454,18 @@ CStrategy::CStrategy(CFractal &Fractal, CPipFractal &PipFractal)
     this.fractal  = GetPointer(Fractal);
     this.pfractal = GetPointer(PipFractal);
     
-    NewLine("usTermPrice");
-    NewLine("usBndryPivot");
-    NewLine("usAdvBndryPivot");
-    NewLine("usActPrice");
+    Current.GroupId   = NoValue;
+    Current.Direction = DirectionNone;
 
-    LoadData();
+    ArrayInitialize(ElementDirection,DirectionNone);
+    
+    LoadElements();
+    LoadGroups();
+    LoadFibonacci();
+
+    NewLine("Open");
+    NewLine("High");
+    NewLine("Low");
   }
 
 //+------------------------------------------------------------------+
@@ -466,95 +475,98 @@ CStrategy::~CStrategy()
   {
     Print("Strategy summary");
     for (int idx=0;idx<Groups;idx++)
-      Print("Group: "+IntegerToString(idx)+" Count: "+IntegerToString(Group[idx].Count));
+      Print("Group: "+IntegerToString(idx)
+           +" Count: "+IntegerToString(Group[idx].Count)
+           +" Degree: "+IntegerToString(Group[idx].Degree));
+
+    Print("*----- History ------*");
+    Print("Grp|Dir|tOpen|Range|Open|High|Low|Close|Gain|Draw|tClose|Adv");
+
+    for (int idx=0;idx<ArraySize(History);idx++)
+      Print(FormatData(History[idx],"CSV"));
+      
+    Print("*----- Running ------*");
+    Print("Grp|Dir|tOpen|Range|Open|High|Low|Close|Gain|Draw|tClose|Adv");
+
+    for (int idx=0;idx<ArraySize(Running);idx++)
+      Print(FormatData(Running[idx],"CSV"));
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-CStrategy::Show(int Measure)
+double CStrategy::Measure(StatisticRec &Data, int Measure)
+  {    
+    switch (Measure)
+    {
+      case MaxGain:     if (Data.Direction==DirectionUp)
+                          return(Pip(Data.PriceHigh-Data.PriceOpen));
+                        if (Data.Direction==DirectionDown)
+                          return(Pip(Data.PriceOpen-Data.PriceLow));
+                        break;
+
+      case ActualGain:  if (Data.TimeClose>0)
+                          return(Measure(Data,MaxGain));
+                        if (Data.Direction==DirectionUp)
+                          return(fmax(Pip(Close[0]-Data.PriceOpen),0.00));
+                        if (Data.Direction==DirectionDown)
+                          return(fmax(Pip(Data.PriceOpen-Close[0]),0.00));
+                        break;
+
+      case MaxDraw:     if (Data.Direction==DirectionUp)
+                          return(Pip(Data.PriceOpen-Data.PriceLow));
+                        if (Data.Direction==DirectionDown)
+                          return(Pip(Data.PriceHigh-Data.PriceOpen));
+                        break;
+
+      case ActualDraw:  if (Data.TimeClose>0)
+                          return(Measure(Data,MaxDraw));
+                        if (Data.Direction==DirectionUp)
+                          return(fmax(Pip(Data.PriceOpen-Close[0]),0.00));
+                        if (Data.Direction==DirectionDown)
+                          return(fmax(Pip(Close[0]-Data.PriceOpen),0.00));
+                        break;
+                        
+      default:          return(0);
+    }
+    
+    return (NoValue);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void CStrategy::Show(void)
   {
     string uMessage = "";
-    bool   uShow    = false;
     
-    uMessage     = "New Fractal Group\n";
-    uMessage    += "  Group ID: "+IntegerToString(GroupId)+"\n"
-                  +"  Degree (DoC): "+IntegerToString(Degree)+"\n"+"\n";
-    uMessage    += "Active Statistics\n\n";
-    uMessage    += "Grp  Range   Price        Gain    Draw    Adv     Act\n";
-
-    for (int idx=0;idx<ArraySize(Statistic);idx++)
+    if (Current.GroupId>NoValue)
     {
-      uShow        = false;
+      uMessage     = "New Fractal Group\n";
+      uMessage    += "  Group ID: "+IntegerToString(Current.GroupId)+"\n"
+                    +"  Occurs: "+IntegerToString(Group[Current.GroupId].Count)+"\n"
+                    +"  Degree (DoC): "+IntegerToString(Group[Current.GroupId].Degree)+"\n\n";
 
-      switch (Measure)
-      {
-        case OpenStatistics:  if (Statistic[idx].CloseTime == 0)
-                                uShow     = true;
-                              break;
-                              
-        case CloseStatistics: if (Statistic[idx].CloseTime > 0)
-                                uShow     = true;
-                              break;
-                              
-        case AllStatistics:   uShow     = true;
-      }
+      uMessage    += "*----- History ------*\n";
+      uMessage    += "Grp  Range   Price        Gain    Draw    Adv     Act\n";
+
+      for (int idx=0;idx<ArraySize(History);idx++)
+        uMessage += FormatData(History[idx]);
       
-      if (uShow)       
-      {
-        uMessage += LPad(IntegerToString(Statistic[idx].GroupId)+"-"+StringSubstr(DirText(Statistic[idx].Direction),0,1)," ",1)
-                   +LPad(DoubleToString(Statistic[idx].OpenRange,1)," ",8)
-                   +LPad(DoubleToString(Statistic[idx].OpenPrice,Digits)," ",10)
-                   +LPad(DoubleToString(Statistic[idx].MaxGain,1)," ",9)
-                   +LPad(DoubleToString(Statistic[idx].MaxDraw,1)," ",9)
-                   +LPad(DoubleToString(Statistic[idx].AdverseDraw,1)," ",9)
-                   +LPad(DoubleToString(Statistic[idx].ActualDraw,1)," ",9)+"\n";
-      }
-    }
+      uMessage    += "\n*----- Running ------*\n";
+      uMessage    += "Grp  Range   Price        Gain    Draw    Adv     Act\n";
 
-    Comment(uMessage);    
+      for (int idx=0;idx<ArraySize(Running);idx++)
+        uMessage += FormatData(Running[idx]);
+
+      Comment(uMessage);
+    }
   }
   
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-CStrategy::Update(void)
-  {
-    string uMessage = "";
-    
-    if (UpdateStrategy())
-    {
-      uMessage     = "New Fractal Group\n";
-      uMessage    += "  Group ID: "+IntegerToString(GroupId)+"\n"
-                    +"  Degree (DoC): "+IntegerToString(Degree)+"\n"+"\n";
-//      uMessage    += "Active Statistics\n";
-//      uMessage    += " Grp Range Price   Gain   Draw   Adv   Act\n";
-    }
-    
+void CStrategy::Update(void)
+  {    
     UpdateStatistics();
-    
-    if (uMessage != "")
-    {
-//      for (int idx=0;idx<ArraySize(Statistic);idx++)
-//        if (Statistic[idx].CloseTime == 0)
-//        uMessage +="  "+IntegerToString(Statistic[idx].GroupId)+"   "
-//                   +DoubleToString(Statistic[idx].OpenRange,1)+"   "
-//                   +DoubleToString(Statistic[idx].OpenPrice,Digits)+"     "
-//                   +DoubleToString(Statistic[idx].MaxGain,1)+"     "
-//                   +DoubleToString(Statistic[idx].MaxDraw,1)+"     "
-//                   +DoubleToString(Statistic[idx].AdverseDraw,1)+"     "
-//                   +DoubleToString(Statistic[idx].ActualDraw,1)+"\n";
-
-        //printf("  %i   %3.1f   %3.5f    %4.1f    %4.1f    %4.1f    %4.1f\n",
-        //           Statistic[idx].GroupId,
-        //           Statistic[idx].OpenRange,
-        //           Statistic[idx].OpenPrice,
-        //           Statistic[idx].MaxGain,
-        //           Statistic[idx].MaxDraw,
-        //           Statistic[idx].AdverseDraw,
-        //           Statistic[idx].ActualDraw);
-
-      if (this.pfractal.HistoryLoaded())
-        Pause(uMessage,"PatternChange()");    
-    }
   }
