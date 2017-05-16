@@ -35,9 +35,30 @@ input double inpTolerance            = 0.5;   // Directional change sensitivity
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    bool gdProfitFlag[2] = {false,false};
+    
     fractal.Update();
     pfractal.Update();
     strategy.Update();
+
+    if (strategy.Record().Changed)
+      Pause("Strategy Changed","SrategyChange()");
+      
+    if (InProfit(OP_BUY))
+      if (IsChanged(gdProfitFlag[OP_BUY],true))
+        Pause("Longs are in Profit","InProfit()");
+
+    if (InProfit(OP_SELL))
+      if (IsChanged(gdProfitFlag[OP_SELL],true))
+        Pause("Shorts are in Profit","InProfit()");
+        
+    if (OrderFulfilled(OP_BUY))
+      if (IsChanged(gdProfitFlag[OP_BUY],false))
+        Pause("Longs are negative adding","InProfit()");
+ 
+     if (OrderFulfilled(OP_BUY))
+      if (IsChanged(gdProfitFlag[OP_BUY],false))
+        Pause("Shorts are negative adding","InProfit()");   
   }
 
 //+------------------------------------------------------------------+
@@ -101,22 +122,22 @@ void RefreshScreen(void)
 void Execute(void)
   {
     static  bool eTrade = false;
-    
-    if (pfractal.Event(NewBoundary))
+
+    if (strategy.Record().Changed)
       eTrade    = true;
-    else
+//    else
     if (eTrade)
     {
-//      Pause("Open a trade","TradeOpen()");
-      if (pfractal.Direction(Tick)==DirectionUp)
+      if (strategy.Record().Direction==DirectionUp)
       {
-//        OpenOrder(OP_SELL,"Contrarian Sell");
-        CloseOrders(CloseMax,OP_BUY,"TP-Buy");
+//        OpenLimitOrder(OP_BUYLIMIT,strategy.Record().PriceOpen-Pip(ordEQNormalSpread,InPoints)-Pip(9.4,InPoints),"Long Limit");
+//        OpenOrder(OP_BUY,"Long Limit");
       }
-      if (pfractal.Direction(Tick)==DirectionDown)
+
+      if (strategy.Record().Direction==DirectionDown)
       {
-//        OpenOrder(OP_BUY,"Contrarian Buy");
-        CloseOrders(CloseMax,OP_SELL,"TP-Sell");
+//        OpenLimitOrder(OP_SELLLIMIT,strategy.Record().PriceOpen+Pip(9.4,InPoints),"Short Limit");
+//        OpenOrder(OP_SELL,"Long Limit");
       }
       eTrade    = false;
     }

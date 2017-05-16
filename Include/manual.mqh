@@ -95,7 +95,7 @@ bool FormatPrice(string &Price, int Action)
 
     if (upper(StringSubstr(Price,StringLen(Price)-1,1))=="P")
     {
-      sopPips       = Pip(StringToInteger(StringSubstr(Price,0,StringLen(Price)-1)),InPoints);
+      sopPips       = Pip(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)),InPoints);
       
       switch (Action)
       {

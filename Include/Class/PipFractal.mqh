@@ -72,7 +72,7 @@ class CPipFractal : public CPipRegression
        virtual   
           int        Count(int Counter);
           double     Price(int TimeRange, int Measure=Expansion);
-          double     Fibonacci(int Type, int Direction, int Method, int Measure, int Format=InDecimal);                                        
+          double     Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
           bool       IsPegged(void)  {return (pfPeg); }
           
           void       RefreshScreen(void);
@@ -444,15 +444,14 @@ double CPipFractal::Price(int TimeRange, int Measure=Expansion)
 //+------------------------------------------------------------------+
 //| Fibonacci - Returns the fibonacci percentage for supplied params |
 //+------------------------------------------------------------------+
-double CPipFractal::Fibonacci(int TimeRange, int Direction, int Method, int Measure, int Format=InDecimal)
+double CPipFractal::Fibonacci(int TimeRange, int Method, int Measure, int Format=InDecimal)
   {
     int fFormat   = 1;
     
     if (Format == InPercent)
       fFormat     = 100;
       
-    if (TimeRange == Origin)
-    {
+    if (TimeRange==Origin)
       switch (Method)
       {
         case Retrace:   switch (Measure)
@@ -468,9 +467,8 @@ double CPipFractal::Fibonacci(int TimeRange, int Direction, int Method, int Meas
                         }
                         return (0.00);
       }
-    }
     
-    if (Direction == pf[TimeRange].Direction)
+    if (TimeRange==Term || TimeRange==Trend)
       switch (Method)
       {
         case Retrace:   switch (Measure)
@@ -484,22 +482,6 @@ double CPipFractal::Fibonacci(int TimeRange, int Direction, int Method, int Meas
                         {
                           case Now: return (fabs(fdiv(pf[TimeRange].Root-Close[0],pf[TimeRange].Root-pf[TimeRange].Base,3))*fFormat);
                           case Max: return (fabs(fdiv(pf[TimeRange].Root-pf[TimeRange].Expansion,pf[TimeRange].Root-pf[TimeRange].Base,3))*fFormat);
-                        }
-      }
-    else
-      switch (Method)
-      {
-        case Retrace:   switch (Measure)
-                        {
-                          case Now: return (fdiv(pf[TimeRange].Prior-Close[0],pf[TimeRange].Prior-pf[TimeRange].Base,3)*fFormat);
-                          case Max: return (fdiv(pf[TimeRange].Prior-pf[TimeRange].Expansion,pf[TimeRange].Prior-pf[TimeRange].Base,3)*fFormat);
-                        }
-                        break;
-                          
-        case Expansion: switch (Measure)
-                        {
-                          case Now: return (fdiv(Close[0]-pf[TimeRange].Base,pf[TimeRange].Prior-pf[TimeRange].Base,3)*fFormat);
-                          case Max: return (fdiv(pf[TimeRange].Root-pf[TimeRange].Base,pf[TimeRange].Prior-pf[TimeRange].Base,3)*fFormat);
                         }
       }
 
@@ -552,19 +534,19 @@ void CPipFractal::ShowFiboArrow(void)
       arrowName                     = NewArrow(arrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir),arrowPrice);
     }
      
-    if (this.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo823))
+    if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo823))
       arrowCode                     = SYMBOL_POINT4;
     else
-    if (this.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo423))
+    if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo423))
       arrowCode                     = SYMBOL_POINT3;
     else
-    if (this.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo261))
+    if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo261))
       arrowCode                     = SYMBOL_POINT2;
     else  
-    if (this.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo161))
+    if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo161))
       arrowCode                     = SYMBOL_POINT1;
     else
-    if (this.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo100))
+    if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo100))
       arrowCode                     = SYMBOL_CHECKSIGN;
     else
       arrowCode                     = SYMBOL_DASH;
@@ -589,15 +571,15 @@ void CPipFractal::RefreshScreen(void)
            +"  FOC: "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)+"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n\n"
            +"  Term: "+DirText(this.Direction(Term))+" ("+IntegerToString(this.Count(Term))+")\n"
            +"     Base: "+DoubleToStr(pf[Term].Base,Digits)+" Root: "+DoubleToStr(pf[Term].Root,Digits)+" Expansion: "+DoubleToStr(pf[Term].Expansion,Digits)+"\n"
-           +"     Retrace: "+DoubleToStr(Fibonacci(Term,Direction(Term),Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Direction(Term),Retrace,Max,InPercent),1)+"%"
-           +"   Expansion: "+DoubleToStr(Fibonacci(Term,Direction(Term),Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Direction(Term),Expansion,Max,InPercent),1)+"%\n\n"
+           +"     Retrace: "+DoubleToStr(Fibonacci(Term,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Retrace,Max,InPercent),1)+"%"
+           +"   Expansion: "+DoubleToStr(Fibonacci(Term,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Expansion,Max,InPercent),1)+"%\n\n"
            +"  Trend: "+DirText(this.Direction(Trend))+" ("+IntegerToString(this.Count(Trend))+")\n"
            +"     Base: "+DoubleToStr(pf[Trend].Base,Digits)+" Root: "+DoubleToStr(pf[Trend].Root,Digits)+" Expansion: "+DoubleToStr(pf[Trend].Expansion,Digits)+"\n"
-           +"     Retrace: "+DoubleToStr(Fibonacci(Trend,Direction(Trend),Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Trend,Direction(Trend),Retrace,Max,InPercent),1)+"%"
-           +"   Expansion: "+DoubleToStr(Fibonacci(Trend,Direction(Trend),Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Trend,Direction(Trend),Expansion,Max,InPercent),1)+"%\n\n"
+           +"     Retrace: "+DoubleToStr(Fibonacci(Trend,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Trend,Retrace,Max,InPercent),1)+"%"
+           +"   Expansion: "+DoubleToStr(Fibonacci(Trend,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Trend,Expansion,Max,InPercent),1)+"%\n\n"
            +"  Origin: "+DirText(Direction(Origin))+"\n"
            +"     Base: "+DoubleToStr(this.Price(Origin,Base),Digits)+" Root: "+DoubleToStr(this.Price(Origin,Root),Digits)+" Expansion: "+DoubleToStr(this.Price(Origin,Expansion),Digits)+"\n"       
-           +"     Retrace: "+DoubleToStr(Fibonacci(Origin,Direction(Origin),Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Direction(Origin),Retrace,Max,InPercent),1)+"%"
-           +"   Expansion: "+DoubleToStr(Fibonacci(Origin,Direction(Origin),Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Direction(Origin),Expansion,Max,InPercent),1)+"%\n");
+           +"     Retrace: "+DoubleToStr(Fibonacci(Origin,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
+           +"   Expansion: "+DoubleToStr(Fibonacci(Origin,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Expansion,Max,InPercent),1)+"%\n");
   }
 
