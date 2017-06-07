@@ -78,7 +78,7 @@ class CPipFractal : public CPipRegression
           void       RefreshScreen(void);
           void       ShowFiboArrow(void);
    
-          PipFractalRec operator[](const RetraceType Type) const { return(pf[Type]); }
+          PipFractalRec operator[](const RetraceType Type) const { return(pf[Type]); };
              
     protected:
     
@@ -92,7 +92,7 @@ void CPipFractal::CalcFiboChange(void)
   {
     static int cfcFiboLevel     = FiboRoot;
     static int cfcFiboDir       = DirectionNone;
-           int cfcFiboLevelNow  = fabs(FiboLevel(Fibonacci(Term,this.Direction(Term),Expansion,Max),Signed));
+           int cfcFiboLevelNow  = fabs(FiboLevel(Fibonacci(Term,Expansion,Max),Signed));
     
     ClearEvent(NewMajor);
     ClearEvent(NewMinor);
@@ -272,14 +272,14 @@ void CPipFractal::CalcPipFractal(void)
     UpdateFractal(Term,uTermDir);
 
     //--- Detect trend change
-    if (Fibonacci(Term,uTermDir,Expansion,Max)>FiboPercent(Fibo161))
+    if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo161))
       uTrendDir                    = uTermDir;
 
     UpdateFractal(Trend,uTrendDir);
 
     //--- Detect origin change
-    if (Fibonacci(Origin,pfOriginDir,Expansion,Max)>FiboPercent(Fibo100) ||
-        Fibonacci(Origin,pfOriginDir,Expansion,Max)<FiboPercent(FiboRoot)
+    if (Fibonacci(Origin,Expansion,Max)>FiboPercent(Fibo100) ||
+        Fibonacci(Origin,Expansion,Max)<FiboPercent(FiboRoot)
        )
       pfOriginDir                  = pf[Trend].Direction;  //<---- this may be broken (?)
   }

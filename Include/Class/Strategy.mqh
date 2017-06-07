@@ -65,7 +65,6 @@ class CStrategy
     struct GroupRec
          {
            int             GroupId;         //--- Fractal pattern group
-           int             StrategyId;      //--- Assigned strategy id
            int             Degree;          //--- DoC value (degree of change)
            int             Count;           //--- Count of occurrences
            double          FibonacciNow[6]; //--- Current fibonacci
@@ -85,6 +84,16 @@ class CStrategy
            bool            AdverseDraw;
            datetime        TimeClose;
            bool            Changed;
+         };
+         
+    struct StrategyRec
+         {
+           int             GroupId;
+           int             FibonacciId;
+           int             StrategyId;
+           bool            GroupChanged;
+           bool            FibonacciChanged;
+           bool            StrategyChanged;
          };
          
     ElementRec             Element[];
@@ -112,6 +121,7 @@ class CStrategy
     string                 FormatData(GroupRec &Data, string Format="CSV");
 
     double                 Measure(StatisticRec &Data, int Measure);
+    int                    FibonacciLevel(double Value);
 
 
   public:
@@ -120,20 +130,92 @@ class CStrategy
                 
     void                   Update(void);
     void                   Show(void);
-    StatisticRec           Record(void) { return (Current); };
-
+    StatisticRec           Statistic(void) { return (Current); };
+    
+    
+    
+    string                 Pattern(void) {return ( BoolToStr(ElementDirection[fo]==DirectionUp,"L","S")
+                                                  +BoolToStr(ElementDirection[fm]==DirectionUp,"L","S")
+                                                  +BoolToStr(ElementDirection[fn]==DirectionUp,"L","S")
+                                                  +BoolToStr(ElementDirection[pfo]==DirectionUp,"L","S")
+                                                  +BoolToStr(ElementDirection[pfm]==DirectionUp,"L","S")
+                                                  +BoolToStr(ElementDirection[pfn]==DirectionUp,"L","S")
+                                                 ); };
+    StrategyRec            Record(void) { return (Strategy); };
+                                                     
   protected:
 
     StatisticRec           Running[];    //--- running statistics
     StatisticRec           History[];    //--- closed statistics
     StatisticRec           Current;      //--- most recent running statistic
+    StrategyRec            Strategy;     //--- Holds the most current strategy data
 
+    int                    FibonacciId(void);
+    int                    FibonacciGroups;
+    int                    FibonacciElements;
+    int                    ElementFibonacci[6];
     int                    GroupId(void);
     int                    Groups;
     int                    ElementDirection[6];
     int                    Elements;
   };
 
+//+------------------------------------------------------------------+
+//| FibonacciLevel - returns the fibonacci level for supplied value  |
+//+------------------------------------------------------------------+
+int CStrategy::FibonacciLevel(double Value)
+  {
+    int    flFibo;
+
+    for (flFibo=FiboRoot;flFibo<ArraySize(Fibonacci);flFibo++)
+      if (Value>Fibonacci[flFibo].Value)
+        break;
+    
+    return(--flFibo);
+  }
+
+//+------------------------------------------------------------------+
+//| FibonacciId - returns the fibonacci id                           |
+//+------------------------------------------------------------------+
+int CStrategy::FibonacciId(void)
+  {
+    static int       fiFibonacciId  = 0;
+    int              fiDegree       = 0;
+    static const int fiElements[6]  = {145152,12096,1728,144,12,1};
+    
+    if (IsChanged(ElementFibonacci[fo],FibonacciLevel(fractal.Fibonacci(Origin,Expansion,Now))))
+      fiDegree++;
+    if (IsChanged(ElementFibonacci[fm],FibonacciLevel(fractal.Fibonacci(Base,Expansion,Now))))
+      fiDegree++;
+    if (IsChanged(ElementFibonacci[fn],FibonacciLevel(fractal.Fibonacci(Expansion,Expansion,Now))))
+      fiDegree++;
+    if (IsChanged(ElementFibonacci[pfo],FibonacciLevel(fractal.Fibonacci(Origin,Expansion,Now))))
+      fiDegree++;
+    if (IsChanged(ElementFibonacci[pfm],FibonacciLevel(fractal.Fibonacci(Trend,Expansion,Now))))
+      fiDegree++;
+    if (IsChanged(ElementFibonacci[pfn],FibonacciLevel(fractal.Fibonacci(Term,Expansion,Now))))
+      fiDegree++;
+      
+    if (fiDegree>0)
+    {
+      if (IsChanged(fiFibonacciId,
+                     (ElementFibonacci[fo]*fiElements[fo])+
+                     (ElementFibonacci[fm]*fiElements[fm])+
+                     (ElementFibonacci[fn]*fiElements[fn])+
+                     (ElementFibonacci[pfo]*fiElements[pfo])+
+                     (ElementFibonacci[pfm]*fiElements[pfm])+
+                     (ElementFibonacci[pfn]*fiElements[pfn])
+                   ))
+        {
+          Strategy.FibonacciChanged = true;
+        };
+      
+//      Group[Element[ssGroupId].GroupId].Count++;
+//      Group[Element[ssGroupId].GroupId].Degree            = ssDegree;
+    }
+
+    return (fiFibonacciId);
+  }
 
 //+------------------------------------------------------------------+
 //| GroupId - Returns the current GroupId of the fractal pattern     |
@@ -249,7 +331,7 @@ void CStrategy::LoadGroups(void)
     //--- process command file
     while(fHandle<0)
     {
-      fHandle=FileOpen("GroupStrategy.csv",FILE_CSV|FILE_READ);
+      fHandle=FileOpen("Group.csv",FILE_CSV|FILE_READ);
       
       if (++try==20)
       {
@@ -271,7 +353,6 @@ void CStrategy::LoadGroups(void)
       StringSplit(fRecord,44,CSV_Record);
       
       Group[Groups].GroupId     = StrToInteger(CSV_Record[0]);
-      Group[Groups].StrategyId  = StrToInteger(CSV_Record[1]);
       Group[Groups].Degree      = 0;
       Group[Groups].Count       = 0;
 
@@ -299,7 +380,7 @@ void CStrategy::LoadElements(void)
     //--- process command file
     while(fHandle<0)
     {
-      fHandle=FileOpen("Group.csv",FILE_CSV|FILE_READ);
+      fHandle=FileOpen("Element.csv",FILE_CSV|FILE_READ);
       
       if (++try==20)
       {
@@ -356,15 +437,16 @@ void CStrategy::InitCurrent(void)
 //+------------------------------------------------------------------+
 void CStrategy::OpenRunning(void)
   {
-    int orSize = ArraySize(Running);
+    int orRunSize   = ArraySize(Running);
+    int orGrpSize   = ArraySize(GroupHistory);
     
     InitCurrent();
     
-    ArrayResize(Running,orSize+1);
-    ArrayResize(GroupHistory,orSize+1);
+    ArrayResize(Running,orRunSize+1);
+    ArrayResize(GroupHistory,orGrpSize+1);
     
-    Running[orSize]      = Current;
-    GroupHistory[orSize] = Group[Current.GroupId];
+    Running[orRunSize]      = Current;
+    GroupHistory[orGrpSize] = Group[Current.GroupId];
   }
 
 //+------------------------------------------------------------------+
@@ -444,7 +526,9 @@ void CStrategy::UpdateStatistics(void)
   UpdateLine("High",Current.PriceHigh,STYLE_SOLID,clrLawnGreen);
   UpdateLine("Low",Current.PriceLow,STYLE_SOLID,clrRed);
 
-  Comment(  "Group: "+IntegerToString(Current.GroupId)+" "+DirText(Current.Direction)+"\n"
+  string pattern="  {"+Pattern()+"}";
+                
+  Comment(  "Group: "+IntegerToString(Current.GroupId)+" "+DirText(Current.Direction)+pattern+"\n"
            +"Open: "+DoubleToStr(Current.PriceOpen,Digits)+" ("+DoubleToStr(Pip(Current.PriceOpen-Close[0])*Current.Direction,1)+")\n"
            +"High: "+DoubleToStr(Current.PriceHigh,Digits)+"\n"
            +"Low: "+DoubleToStr(Current.PriceLow,Digits)+"\n"
@@ -493,7 +577,6 @@ string CStrategy::FormatData(GroupRec &Data, string Format="CSV")
   {
     if (Format == "CSV")
       return(     IntegerToString(Data.GroupId)
-             +"|"+IntegerToString(Data.StrategyId)
              +"|"+IntegerToString(Data.Count)
              +"|"+IntegerToString(Data.Degree)
              +"|"+DoubleToString(Data.FibonacciNow[fo],1)
@@ -529,7 +612,10 @@ CStrategy::CStrategy(CFractal &Fractal, CPipFractal &PipFractal)
     LoadElements();
     LoadGroups();
     LoadFibonacci();
-
+    
+    FibonacciGroups   = 1741824;
+    FibonacciElements = 10450944;
+    
     NewLine("Open");
     NewLine("High");
     NewLine("Low");
@@ -616,7 +702,7 @@ void CStrategy::Show(void)
     if (Current.GroupId>NoValue)
     {
       uMessage     = "New Fractal Group\n";
-      uMessage    += "  Group ID: "+IntegerToString(Current.GroupId)+"\n"
+      uMessage    += "  Group ID: "+IntegerToString(Current.GroupId)+" {"+Pattern()+"}\n"
                     +"  Occurs: "+IntegerToString(Group[Current.GroupId].Count)+"\n"
                     +"  Degree (DoC): "+IntegerToString(Group[Current.GroupId].Degree)+"\n\n";
 
@@ -642,4 +728,6 @@ void CStrategy::Show(void)
 void CStrategy::Update(void)
   {    
     UpdateStatistics();
+    
+    int uFib = FibonacciId();    
   }

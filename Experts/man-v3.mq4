@@ -41,24 +41,22 @@ void GetData(void)
     pfractal.Update();
     strategy.Update();
 
-    if (strategy.Record().Changed)
+    if (strategy.Statistic().Changed)
       Pause("Strategy Changed","SrategyChange()");
       
     if (InProfit(OP_BUY))
       if (IsChanged(gdProfitFlag[OP_BUY],true))
         Pause("Longs are in Profit","InProfit()");
+        
+    if (LotValue(OP_BUY,Loss)<0.00)
+      gdProfitFlag[OP_BUY] = false;
 
     if (InProfit(OP_SELL))
       if (IsChanged(gdProfitFlag[OP_SELL],true))
         Pause("Shorts are in Profit","InProfit()");
         
-    if (OrderFulfilled(OP_BUY))
-      if (IsChanged(gdProfitFlag[OP_BUY],false))
-        Pause("Longs are negative adding","InProfit()");
- 
-     if (OrderFulfilled(OP_BUY))
-      if (IsChanged(gdProfitFlag[OP_BUY],false))
-        Pause("Shorts are negative adding","InProfit()");   
+    if (LotValue(OP_SELL,Loss)<0.00)
+      gdProfitFlag[OP_SELL] = false;
   }
 
 //+------------------------------------------------------------------+
@@ -123,22 +121,27 @@ void Execute(void)
   {
     static  bool eTrade = false;
 
-    if (strategy.Record().Changed)
+    if (strategy.Statistic().Changed)
       eTrade    = true;
 //    else
     if (eTrade)
     {
-      if (strategy.Record().Direction==DirectionUp)
+      if (strategy.Statistic().Direction==DirectionUp)
       {
 //        OpenLimitOrder(OP_BUYLIMIT,strategy.Record().PriceOpen-Pip(ordEQNormalSpread,InPoints)-Pip(9.4,InPoints),"Long Limit");
 //        OpenOrder(OP_BUY,"Long Limit");
       }
 
-      if (strategy.Record().Direction==DirectionDown)
+      if (strategy.Statistic().Direction==DirectionDown)
       {
 //        OpenLimitOrder(OP_SELLLIMIT,strategy.Record().PriceOpen+Pip(9.4,InPoints),"Short Limit");
 //        OpenOrder(OP_SELL,"Long Limit");
       }
+      
+      if (strategy.Record().FibonacciChanged)
+        {
+         Pause ("Fibonacci Changed", "Record().FibonacciChanged");
+        }
       eTrade    = false;
     }
     
@@ -163,8 +166,11 @@ void ExecAppCommands(string &Command[])
         display  = 2;
       else
         display  = NoValue;
-        
-         
+    else
+    if (Command[0]=="SHOW")
+    {
+      //--- help me! the wife is going nuts!
+    };
   }
 
 //+------------------------------------------------------------------+
