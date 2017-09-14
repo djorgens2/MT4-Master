@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                        UDv01.mq4 |
+//|                                                        UDv02.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -43,6 +43,7 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
   enum FractalType
        {
           fo,
+          fb,
           fm,
           fn,
           pfo,
@@ -75,68 +76,93 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
            double     MaxGain;
          };
 
-  int     fDir[FractalTypes]       = {0,0,0,0,0,0};
-  bool    fAlert[FractalTypes]     = {false,false,false,false,false,false};
-  double  fFiboNow[FractalTypes];
-  double  fFiboMax[FractalTypes];
+  int                 fDir[FractalTypes]       = {0,0,0,0,0,0,0};
+  bool                fAlert[FractalTypes]     = {false,false,false,false,false,false,false};
+
+  double              fFiboNow[FractalTypes];
+  double              fFiboMax[FractalTypes];
+  double              fRetMajor[2];
+  RetraceType         fnType;
   
   //--- Operational variables
-  int              display         = NoValue;
+  int                 display         = NoValue;
 
-  bool             tAlert;
-  FractalType      tAlertType;
-  OrderListRec     tOrderList[];
-  StrategyType     tStrategy[2]    = {Spotting, Spotting};
+  bool                tAlert;
+  FractalType         tAlertType;
+  bool                tOpenOrder[2]   = {false,false};
+  OrderListRec        tOrderList[];
+  StrategyType        tStrategy[2]    = {Spotting, Spotting};
 
-  int              tLast[2];
-  int              tBaseline[2];
+  int                 tLast[2];
+  int                 tBaseline[2];
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {    
-    int gdAlert        = NoValue;
+    int gdAlert      = NoValue;
     
-    tAlert             = false;
+    tAlert           = false;
     
     fractal.Update();
     pfractal.Update();
     tregr.Update();
     
-    //--- Identify Pattern
+    fnType           = fractal.State(Major);
+
+    //--- Reset alerts
     if (IsChanged(fDir[fo],fractal.Origin(Direction)))
-      fAlert[fo]=false;
+      fAlert[fo]     = false;
+    if (IsChanged(fDir[fb],fractal.Direction(Base)))
+      fAlert[fb]     = false;
     if (IsChanged(fDir[fm],fractal.Direction(Expansion)))
-      fAlert[fm]=false;
-    if (IsChanged(fDir[fn],fractal.Direction(fractal.State(Major))))
-      fAlert[fn]=false;
+      fAlert[fm]     = false;
+    if (IsChanged(fDir[fn],fractal.Direction(fnType)))
+      fAlert[fn]     = false;
     if (IsChanged(fDir[pfo],pfractal.Direction(Origin)))
-      fAlert[pfo]=false;
+      fAlert[pfo]    = false;
     if (IsChanged(fDir[pfm],pfractal.Direction(Trend)))
-      fAlert[pfm]=false;
+      fAlert[pfm]    = false;
     if (IsChanged(fDir[pfn],pfractal.Direction(Term)))
-      fAlert[pfn]=false;
-      
+      fAlert[pfn]    = false;
+          
     fFiboNow[fo]     = fractal.Fibonacci(Origin,Expansion,Now);
+    fFiboNow[fb]     = fractal.Fibonacci(Base,Expansion,Now);
     fFiboNow[fm]     = fractal.Fibonacci(Expansion,Expansion,Now);
-    fFiboNow[fn]     = fractal.Fibonacci(fractal.State(Major),Expansion,Now);
+    fFiboNow[fn]     = fractal.Fibonacci(fnType,Expansion,Now);
+    fRetMajor[0]     = fractal.Fibonacci(fnType,Retrace,Now);
     fFiboNow[pfo]    = pfractal.Fibonacci(Origin,Expansion,Now);
     fFiboNow[pfm]    = pfractal.Fibonacci(Trend,Expansion,Now);
     fFiboNow[pfn]    = pfractal.Fibonacci(Term,Expansion,Now);
       
     fFiboMax[fo]     = fractal.Fibonacci(Origin,Expansion,Max);
+    fFiboMax[fb]     = fractal.Fibonacci(Base,Expansion,Max);
     fFiboMax[fm]     = fractal.Fibonacci(Expansion,Expansion,Max);
-    fFiboMax[fn]     = fractal.Fibonacci(fractal.State(Major),Expansion,Max);
+    fFiboMax[fn]     = fractal.Fibonacci(fnType,Expansion,Max);
+    fRetMajor[1]     = fractal.Fibonacci(fnType,Retrace,Max);
     fFiboMax[pfo]    = pfractal.Fibonacci(Origin,Expansion,Max);
     fFiboMax[pfm]    = pfractal.Fibonacci(Trend,Expansion,Max);
     fFiboMax[pfn]    = pfractal.Fibonacci(Term,Expansion,Max);
     
+    if (fFiboNow[pfm]>FiboPercent(Fibo100))
+      fAlert[pfm]    = false;
+    if (fFiboNow[pfn]>FiboPercent(Fibo100))
+      fAlert[pfn]    = false;
+    
     for (FractalType type=fo; type<FractalTypes; type++)
+      if (type==fn)
+      {
+        if (fRetMajor[0]>1-FiboPercent(Fibo23))
+          if (IsChanged(fAlert[type],true))
+            if (gdAlert==NoValue)
+              gdAlert   = type;        
+      }
+      else
       if (fFiboNow[type]<FiboPercent(Fibo23))
         if (IsChanged(fAlert[type],true))
           if (gdAlert==NoValue)
-            gdAlert  = type;
+            gdAlert     = type;
  
     if (gdAlert>NoValue)
     {
@@ -173,7 +199,8 @@ string OrderList(int OrderIndex)
 void ShowAppDisplay(void)
   {
     string sadComment        ="\n*--- Strategy ---*\n"
-                             +"\n";
+                             +"  Long:  "+EnumToString(tStrategy[OP_BUY])+"\n"
+                             +"  Short: "+EnumToString(tStrategy[OP_SELL])+"\n";
     string sadBaselineList   = "\n*--- Baseline ----*\n";
     bool   sadAction[2]      = {false,false};
     string sadLongList       = "\n*--- Long List ---*\n";
@@ -251,9 +278,11 @@ void RefreshScreen(void)
       UpdateLabel(EnumToString(type)+"Max",DoubleToStr(fFiboMax[type]*100,1)+"%",rsArrowColor);
     }
 
-    UpdateLabel("BaseNow",DoubleToStr(fractal.Fibonacci(Base,Expansion,Now,InPercent),1)+"%",DirColor(fractal.Direction(Expansion)));
-    UpdateLabel("BaseMax",DoubleToStr(fractal.Fibonacci(Base,Expansion,Max,InPercent),1)+"%",DirColor(fractal.Direction(Expansion)));
-    UpdateLabel("fMajor",EnumToString(fractal.State(Major)),DirColor(fractal.Direction(fractal.State(Major))));
+    UpdateLabel("fnRetNow",DoubleToStr(fRetMajor[0]*100,1)+"%",DirColor(fDir[fn]));
+    UpdateLabel("fnRetMax",DoubleToStr(fRetMajor[1]*100,1)+"%",DirColor(fDir[fn]));
+    UpdateLabel("fMajor",EnumToString(fnType),DirColor(fDir[fn]));
+    UpdateLabel("tOpenBuy",BoolToStr(tOpenOrder[OP_BUY],"Buy","Idle"),BoolToInt(tOpenOrder[OP_BUY],clrYellow,clrGray));
+    UpdateLabel("tOpenSell",BoolToStr(tOpenOrder[OP_SELL],"Sell","Idle"),BoolToInt(tOpenOrder[OP_SELL],clrYellow,clrGray));
   }
 
 //+------------------------------------------------------------------+
@@ -268,7 +297,7 @@ bool ExecTradeClose(int Action)
                           if (tOrderList[ord].Draw>0.00)
                           {
 //                            Pause("Testing validity of PipMA as a close Agent.","PipMA() Testing");
-                            if (DirAction(Action)==pfractal.Direction(Tick))
+                            if (ActionDir(Action)==pfractal.Direction(Tick))
                             if (CloseOrder(tOrderList[ord].Ticket,true))
                             {
                               tOrderList[ord].Type = TradeClosed;
@@ -312,6 +341,16 @@ bool ExecTradeOpen(int Action)
 //+------------------------------------------------------------------+
 void ExecShort(void)
   {
+    if (pfractal.Direction(Trendline)==DirectionUp)
+      if (pfractal.Event(NewHigh))
+        tOpenOrder[OP_SELL]      = true;
+      else
+      if (tOpenOrder[OP_SELL])
+        if (pfractal.Poly(Deviation)<0.00)
+          if (ExecTradeOpen(OP_SELL))
+            tOpenOrder[OP_SELL]  = false;
+
+     ExecTradeClose(OP_SELL);
   }
 
 //+------------------------------------------------------------------+
@@ -319,15 +358,14 @@ void ExecShort(void)
 //+------------------------------------------------------------------+
 void ExecLong(void)
   {
-    static bool elTrigger = false;
-    
     if (pfractal.Direction(Trendline)==DirectionDown)
       if (pfractal.Event(NewLow))
-        elTrigger           = true;
+        tOpenOrder[OP_BUY]       = true;
       else
-      if (elTrigger)
-        if (ExecTradeOpen(OP_BUY))
-          elTrigger         = false;
+      if (tOpenOrder[OP_BUY])
+        if (pfractal.Poly(Deviation)>0.00)
+          if (ExecTradeOpen(OP_BUY))
+            tOpenOrder[OP_BUY]   = false;
 
      ExecTradeClose(OP_BUY);
   }
@@ -522,10 +560,14 @@ int OnInit()
       NewLabel(EnumToString(type)+"Max","0.0%",850-(type*50),25,DirColor(fDir[type]),SCREEN_UR);
     }
 
-    NewLabel("BaseNow","",800,35,clrGray,SCREEN_UR);
-    NewLabel("BaseMax","",750,35,clrGray,SCREEN_UR);
+    NewLabel("fnRetNow","",800,35,clrGray,SCREEN_UR);
+    NewLabel("fnRetMax","",750,35,clrGray,SCREEN_UR);
     NewLabel("fMajor","",850,35,clrGray,SCREEN_UR);
     
+    NewLabel("tOpenOrder","Trigger",700,35,clrGray,SCREEN_UR);
+    NewLabel("tOpenBuy","",650,35,clrGray,SCREEN_UR);
+    NewLabel("tOpenSell","",600,35,clrGray,SCREEN_UR);
+
     return(INIT_SUCCEEDED);
   }
 
