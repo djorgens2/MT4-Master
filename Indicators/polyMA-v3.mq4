@@ -12,6 +12,7 @@
 #property indicator_plots     3
 
 #include <std_utility.mqh>
+#include <stdutil.mqh>
 #include <Class\PolyRegression.mqh>
 
 //--- plot poly
@@ -55,6 +56,21 @@ double    indPolyBufferMT[];
 double    indPolyBufferLT[];
 
 //+------------------------------------------------------------------+
+//| StrengthColor                                                    |
+//+------------------------------------------------------------------+
+color StrengthColor(double Strength)
+  {    
+    int scFibo = FiboLevel(Strength,Signed);
+    
+    if (scFibo<FiboRoot) return (clrGoldenrod);
+    if (scFibo<Fibo38)   return (clrRed);
+    if (scFibo<Fibo61)   return (clrYellow);
+    if (scFibo<Fibo100)  return (clrLawnGreen);
+    
+    return (clrGoldenrod);
+  }
+
+//+------------------------------------------------------------------+
 //| Refresh Screen                                                   |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
@@ -70,6 +86,7 @@ void RefreshScreen(void)
     double rsPolyBoundary  = (rsPolyTop-rsPolyBottom)*0.20;
     double rsUpperBoundary = rsPolyTop-rsPolyBoundary;
     double rsLowerBoundary = rsPolyBottom+rsPolyBoundary;
+
     ReservedWords rsState  = Tick;
     
     if (pregrst.Poly(Head)>rsUpperBoundary)
@@ -114,7 +131,12 @@ void RefreshScreen(void)
     UpdateLabel("prMARange",DoubleToStr(Pip(rsPolyTop-rsPolyBottom),1),DirColor(dir(pregrlt.Poly(Deviation))),16);
     UpdateLabel("prPolyState",proper(DirText(pregrlt.Direction(PolyAmplitude)))+" ("+EnumToString(pregrlt.State())+")",rsLTColor,12);
     UpdateLabel("prTrendState",BoolToStr(rsState!=Tick,EnumToString(rsState)),rsLTColor,12);
-    
+
+    UpdateLabel("prSTStrength",DoubleToStr(pregrst.Poly(Strength)*100,1),StrengthColor(pregrst.Poly(Strength)),16);
+    UpdateLabel("prMTStrength",DoubleToStr(pregrmt.Poly(Strength)*100,1),StrengthColor(pregrmt.Poly(Strength)),16);
+    UpdateLabel("prLTStrength",DoubleToStr(pregrlt.Poly(Strength)*100,1),StrengthColor(pregrlt.Poly(Strength)),16);
+//    UpdateLabel("prLTStrength",IntegerToString(FiboLevel(pregrlt.Poly(Strength))),StrengthColor(pregrlt.Poly(Strength)),16);
+
     UpdatePriceLabel("prPolyMANow",pregrlt.MA(Now),clrWhite);
   }
 
@@ -169,13 +191,20 @@ int OnInit()
     indWinId = ChartWindowFind(0,indShortName);
     
     NewLabel("pr0","Direction",60,17,clrGoldenrod,SCREEN_UL,indWinId);
+    NewLabel("pr10","Strength",220,17,clrGoldenrod,SCREEN_UL,indWinId);
     NewLabel("pr1","Deviation",18,54,clrWhite,SCREEN_UL,indWinId);
     NewLabel("pr2","Range",120,54,clrWhite,SCREEN_UL,indWinId);
+    NewLabel("pr21","Short",180,54,clrWhite,SCREEN_UL,indWinId);
+    NewLabel("pr22","Mid",235,54,clrWhite,SCREEN_UL,indWinId);
+    NewLabel("pr23","Long",290,54,clrWhite,SCREEN_UL,indWinId);
     NewLabel("prAmpDirection","",70,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prDeviation","",10,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prMARange","",110,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prPolyState","",5,5,clrGray,SCREEN_UR,indWinId);
     NewLabel("prTrendState","",5,20,clrGray,SCREEN_UR,indWinId);
+    NewLabel("prSTStrength","",172,31,clrGray,SCREEN_UL,indWinId);
+    NewLabel("prMTStrength","",227,31,clrGray,SCREEN_UL,indWinId);
+    NewLabel("prLTStrength","",282,31,clrGray,SCREEN_UL,indWinId);
 
     NewLine("prPolyMeanST");
     NewLine("prPolyMeanMT");

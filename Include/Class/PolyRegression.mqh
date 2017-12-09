@@ -358,6 +358,7 @@ void CPolyRegression::prCalcPoly(void)
        for(ii=kk+1;ii<=nn;ii++)
        {
           qq=ai[ii,kk]/ai[kk,kk];
+//          Print(DoubleToStr(ai[ii,kk])+" "+DoubleToStr(ai[kk,kk])+" "+DoubleToStr(qq)+" "+DoubleToStr(fdiv(ai[ii,kk],ai[kk,kk],32)));
           for(jj=1;jj<=nn;jj++)
           {
              if(jj==kk) ai[ii,jj]=0;
@@ -550,6 +551,7 @@ double CPolyRegression::Poly(int Measure)
        case Head:       return (NormalizeDouble(prPolyHead,Digits));
        case Tail:       return (NormalizeDouble(prPolyTail,Digits));
        case Range:      return (NormalizeDouble(prPolyTop-prPolyBottom,Digits));
+       case Strength:   return (fdiv(maData[0]-prPolyBottom,this.Poly(Range)));
        case Deviation:  return (Pip(prPricePolyDev));
     }
     

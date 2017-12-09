@@ -116,6 +116,9 @@ void RefreshScreen()
                +" +"+DoubleToStr(Pip(pfractal.StdDev(Positive)),1)
                +" "+DoubleToStr(Pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
                
+    if (pfractal.Event(NewAggregate))
+      UpdateLabel("lrEvent","New Aggregate",DirColor(pfractal.Direction(Aggregate)),16);
+    else
     if (pfractal.Event(NewDirection))
       UpdateLabel("lrEvent","New Direction",DirColor(pfractal.Direction(Term)),16);
     else
@@ -137,7 +140,7 @@ void RefreshScreen()
         UpdateLabel("lrEvent","New High",clrLawnGreen,16);
 
       if (pfractal.Event(NewLow))
-        UpdateLabel("lrEvent","New Low",clrRed,16);
+        UpdateLabel("lrEvent","New Low",clrRed,16);        
     }
     else
       UpdateLabel("lrEvent","No Event",clrGray,16);

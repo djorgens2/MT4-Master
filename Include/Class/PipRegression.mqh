@@ -192,7 +192,10 @@ int CPipRegression::CalcState(double Last, double Current)
 //+------------------------------------------------------------------+
 void CPipRegression::CalcMA(void)
   {
-    static int cmaRangeDir = DirectionNone;
+    static int cmaRangeDir  = DirectionNone;
+    static int cmaAggregate = DirectionNone;
+    
+    ClearEvent(NewAggregate);
     
     if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=1.0)
     {
@@ -250,7 +253,7 @@ void CPipRegression::CalcMA(void)
 
         ptrRangeAge         = 0;
 
-        SetEvent(NewBoundary);
+        SetEvent(NewBoundary);        
       }
         
       if (cmaRangeDir == DirectionUp)
@@ -261,6 +264,9 @@ void CPipRegression::CalcMA(void)
       
       ptrRangeAge++;
     }
+
+    if (IsChanged(cmaAggregate,ptrRangeDirHigh+ptrRangeDirLow))
+      SetEvent(NewAggregate);
 
     ptrTick++;
   }
@@ -330,6 +336,7 @@ int CPipRegression::Direction(int Type, bool Contrarian=false)
       case Range:         return (ptrRangeDir*dContrary);
       case RangeHigh:     return (ptrRangeDirHigh*dContrary);
       case RangeLow:      return (ptrRangeDirLow*dContrary);
+      case Aggregate:     return (BoolToInt(ptrRangeDirHigh==ptrRangeDirLow,ptrRangeDirHigh*dContrary,DirectionNone));
       case Tick:          return (ptrTickDir*dContrary);
     }
     

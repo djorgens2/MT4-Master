@@ -34,10 +34,11 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
   enum StrategyType
        {
          Spotting,
+         Building,
          Scalping,
          Holding,
-         Closeout,
-         Capture
+         Hedging,
+         Closeout
        };
        
   enum FractalType
@@ -435,40 +436,43 @@ void UpdateOrders()
     
     for (int ord=0; ord<OrdersTotal(); ord++)
       if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
-        if (OrderSymbol()==Symbol())
-        {
-          ArrayResize(uoOrderList,ord+1);
-
-          uoOrderList[ord]          = FindOrder(OrderTicket());
-          uoOrderList[ord].Draw     = TicketValue(OrderTicket(),InEquity);
-          uoOrderList[ord].MaxDraw  = fmin(uoOrderList[ord].MaxDraw,TicketValue(OrderTicket(),InEquity));
-          uoOrderList[ord].MaxGain  = fmax(uoOrderList[ord].MaxGain,TicketValue(OrderTicket(),InEquity));
-
-          if (uoOrderList[ord].OpenTime>uoLastOrderTime[uoOrderList[ord].Action])
+        if (OrderType()==OP_BUY || OrderType()==OP_SELL)
+          if (OrderSymbol()==Symbol())
           {
-            tLast[uoOrderList[ord].Action]           = ord;
-            uoLastOrderTime[uoOrderList[ord].Action] = uoOrderList[ord].OpenTime;
+            ArrayResize(uoOrderList,ord+1);
+
+            uoOrderList[ord]          = FindOrder(OrderTicket());
+            uoOrderList[ord].Draw     = TicketValue(OrderTicket(),InEquity);
+            uoOrderList[ord].MaxDraw  = fmin(uoOrderList[ord].MaxDraw,TicketValue(OrderTicket(),InEquity));
+            uoOrderList[ord].MaxGain  = fmax(uoOrderList[ord].MaxGain,TicketValue(OrderTicket(),InEquity));
+
+            if (uoOrderList[ord].OpenTime>uoLastOrderTime[uoOrderList[ord].Action])
+            {
+              tLast[uoOrderList[ord].Action]           = ord;
+              uoLastOrderTime[uoOrderList[ord].Action] = uoOrderList[ord].OpenTime;
+            }
           }
-        }
 
     for (int ord=0; ord<OrdersTotal(); ord++)
-      if (ord==tLast[uoOrderList[ord].Action])
-        uoOrderList[ord].Type               = LastOpen;
+      if (OrderType()==OP_BUY || OrderType()==OP_SELL)
+    
+        if (ord==tLast[uoOrderList[ord].Action])
+          uoOrderList[ord].Type               = LastOpen;
 
-      else
-      {
-        if (uoOrderList[ord].Action==OP_BUY)
-          if (uoOrderList[ord].OpenPrice>uoOrderList[tLast[OP_BUY]].OpenPrice)
-            uoOrderList[ord].Type           = NegativeDrop;
-          else
-            uoOrderList[ord].Type           = PositiveHold;
+        else
+        {
+          if (uoOrderList[ord].Action==OP_BUY)
+            if (uoOrderList[ord].OpenPrice>uoOrderList[tLast[OP_BUY]].OpenPrice)
+              uoOrderList[ord].Type           = NegativeDrop;
+            else
+              uoOrderList[ord].Type           = PositiveHold;
 
-        if (uoOrderList[ord].Action==OP_SELL)
-          if (uoOrderList[ord].OpenPrice<uoOrderList[tLast[OP_SELL]].OpenPrice)
-            uoOrderList[ord].Type           = NegativeDrop;
-          else
-            uoOrderList[ord].Type           = PositiveHold;
-      }
+          if (uoOrderList[ord].Action==OP_SELL)
+            if (uoOrderList[ord].OpenPrice<uoOrderList[tLast[OP_SELL]].OpenPrice)
+              uoOrderList[ord].Type           = NegativeDrop;
+            else
+              uoOrderList[ord].Type           = PositiveHold;
+        }
     
     ArrayResize(tOrderList,ArraySize(uoOrderList));
     ArrayCopy(tOrderList,uoOrderList);

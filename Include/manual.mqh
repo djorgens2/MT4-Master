@@ -150,7 +150,7 @@ bool AppCommand(string &args[], int Elements=0)
 void GetManualRequest(string Command="")
   {
     int    try            =  0;
-    int    fHandle        = -1;
+    int    fHandle        = INVALID_HANDLE;
     string fRecord;
     double lots           = 0.00;
     string comment        = "MANUAL";
@@ -167,18 +167,15 @@ void GetManualRequest(string Command="")
     appCommand            = false;
        
     //--- process command file
-    while(fHandle<0)
+    while(fHandle==INVALID_HANDLE)
     {
       fHandle=FileOpen(manComFile,FILE_CSV|FILE_READ);
       
       if (++try==20)
       {
-        Print("Error opening file for read: ",GetLastError());
+        Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
         return;
       }
-      
-      if (fHandle>0)
-        break;
     }
     
     while (!FileIsEnding(fHandle))
@@ -611,7 +608,7 @@ void GetManualRequest(string Command="")
         
     fHandle=FileOpen(manComFile,FILE_CSV|FILE_WRITE);
         
-    if(fHandle>0)
+    if(fHandle!=INVALID_HANDLE)
     {
       FileWrite(fHandle,"");
       FileClose(fHandle);
@@ -635,5 +632,4 @@ void ManualInit()
     
     if(fHandle!=INVALID_HANDLE)
       FileClose(fHandle);
-      
-  }
+}

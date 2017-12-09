@@ -309,7 +309,7 @@ string DirText(int Value, bool Contrarian=false)
     case DIR_SREV      : return("REVERSAL SHORT");
     case DIR_SCORR     : return("CORRECTION SHORT");
   }
-  
+
   return("BAD DIRECTION CODE");
 }
 

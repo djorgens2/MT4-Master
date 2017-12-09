@@ -512,6 +512,7 @@ int CPipFractal::Direction(int Type=Term, bool Contrarian=false)
       case Range:         return (ptrRangeDir*dContrary);
       case RangeHigh:     return (ptrRangeDirHigh*dContrary);
       case RangeLow:      return (ptrRangeDirLow*dContrary);
+      case Aggregate:     return (BoolToInt(ptrRangeDirHigh==ptrRangeDirLow,ptrRangeDirHigh*dContrary,DirectionNone));
       case Tick:          return (ptrTickDir*dContrary);
     }
     

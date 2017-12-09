@@ -26,20 +26,21 @@ input bool   inpShowPoints     = false;  // Display Fractal points
 #property indicator_plots     3
 
 
-//--- plot poly
+//--- plot poly Major
 #property indicator_label1    "indFractal"
 #property indicator_type1     DRAW_SECTION
 #property indicator_color1    clrFireBrick
 #property indicator_style1    STYLE_SOLID
 #property indicator_width1    1
 
-//--- plot poly
+//--- plot poly Divergent
 #property indicator_label2    "indDivergent"
 #property indicator_type2     DRAW_SECTION
 #property indicator_color2    clrGoldenrod
 #property indicator_style2    STYLE_SOLID
 #property indicator_width2    1
-//--- plot poly
+
+//--- plot poly Convergent
 #property indicator_label3    "indConvergent"
 #property indicator_type3     DRAW_SECTION
 #property indicator_color3    clrSteelBlue
