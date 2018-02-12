@@ -360,6 +360,20 @@ double Spread(int Format=InPoints)
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
+bool IsChanged(datetime &Check, datetime Compare, bool Update=true)
+  {
+    if (Check == Compare)
+      return (false);
+  
+    if (Update)
+      Check   = Compare;
+  
+    return (true);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
 bool IsChanged(RetraceType &Check, RetraceType Compare, bool Update=true)
   {
     if (Check == Compare)

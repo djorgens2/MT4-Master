@@ -11,6 +11,10 @@
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
 
+input string EAHeader                = "";    //+---- Application Options -------+
+input int    inpMaxVolume            = 30;    // Maximum volume
+input double inpDailyTarget          = 3.6;   // Daily target
+
 input string fractalHeader           = "";    //+------ Fractal Options ---------+
 input int    inpRangeMin             = 60;    // Minimum fractal pip range
 input int    inpRangeMax             = 120;   // Maximum fractal pip range
@@ -38,13 +42,18 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
          tsHold,
          tsPend,
          tsRisk,
+         tsCover,
          TradStates
        };
 
 //--- Operational Vars
   int        opTradeDir              = DirectionNone;
+  int        opTradeAction           = OP_NO_ACTION;
+  int        opRiskDir               = DirectionNone;
+  int        opRiskAction            = OP_NO_ACTION;
   int        opEventDir              = DirectionNone;
   int        opEventAction           = OP_NO_ACTION;
+  int        opPriceDir              = DirectionNone;
   
   
   TradeState opLastEvent             = tsHold;
@@ -52,80 +61,7 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
   double     opLevel[2][TradStates];
   TradeState opStrategy[2]           = {tsHold,tsHold};
   int        opMajorAge              = NoValue;
-
-//+------------------------------------------------------------------+
-//| GetData                                                          |
-//+------------------------------------------------------------------+
-void GetData(void)
-  {
-    fractal.Update();
-    pfractal.Update();
-    tregr.Update();
-    
-    if (IsChanged(opMajorAge,fractal[fractal.Previous(fractal.State(Major))].Bar))
-    {
-      delete tregr;
-      tregr = new CTrendRegression(inpDegree,opMajorAge,inpSmoothFactor);
-    }
-    
-    CalcStrategy();
-  }
-
-//+------------------------------------------------------------------+
-//| ManageRisk                                                       |
-//+------------------------------------------------------------------+
-void ManageRisk(int Action)
-  {
-    opLevel[Action][tsRisk]   = Close[0];
-  }
   
-//+------------------------------------------------------------------+
-//| CalcStrategy                                                     |
-//+------------------------------------------------------------------+
-void CalcStrategy(void)
-  {
-    if (pfractal.Event(NewAggregate))
-    {
-      opEventDir      = pfractal.Direction(Range);
-      opEventAction   = DirAction(opEventDir);
-      
-      if (pfractal.Direction(RangeHigh)==pfractal.Direction(RangeLow))
-        if (pfractal.Event(NewBoundary))
-        {
-          opTradeDir  = opEventDir;
-          opLastEvent = tsPivot;
-        }
-        else
-        {
-          opLastEvent                     = tsPend;
-          opStrategy[opEventAction]       = tsPend;
-        }
-      else
-      {
-        opLastEvent                       = tsExit;
-        opStrategy[opEventAction]         = tsExit;
-      }
-      
-      opLevel[opEventAction][opLastEvent] = Close[0];
-    }
-  
-    if (opStrategy[OP_BUY]==tsPend)
-      if (IsLower(Close[0],opLevel[OP_BUY][tsPend]))
-        opStrategy[OP_BUY]=tsEntry;
-        
-    if (opStrategy[OP_BUY]==tsEntry)
-      if (IsLower(Close[0],opLevel[OP_BUY][tsPend]))
-        ManageRisk(OP_BUY);
-        
-    if (opStrategy[OP_SELL]==tsPend)
-      if (IsHigher(Close[0],opLevel[OP_SELL][tsPend]))
-        opStrategy[OP_SELL]=tsEntry;
-
-    if (opStrategy[OP_SELL]==tsEntry)
-      if (IsHigher(Close[0],opLevel[OP_SELL][tsPend]))
-        ManageRisk(OP_SELL);
-  }
-
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
@@ -135,7 +71,6 @@ void RefreshScreen(void)
     int        rsArrowCode;
     string     rsComment    = "";
   
-    
     if (pfractal.Event(NewAggregate))
     {
       switch (opLastEvent)
@@ -153,11 +88,14 @@ void RefreshScreen(void)
     }
     
     rsComment    = "Trade Direction: "+proper(DirText(opTradeDir))+"\n";
+    rsComment   += BoolToStr(opRiskAction==OP_NO_ACTION,"","Risk Direction: "+proper(DirText(opRiskDir))+"\n");
     rsComment   += "Last Event ("+IntegerToString(rsArrowId)+") "+proper(DirText(opEventDir))
                   +" "+StringSubstr(EnumToString(opLastEvent),2)
                   +" @"+DoubleToStr(opLevel[opEventAction][opLastEvent],Digits)+"\n";
-    rsComment   += "Strategy:  Long:"+StringSubstr(EnumToString(opStrategy[OP_BUY]),2)
-                  +" Short:"+StringSubstr(EnumToString(opStrategy[OP_SELL]),2);
+    rsComment   += "Strategy:  (L):"+StringSubstr(EnumToString(opStrategy[OP_BUY]),2)
+                                    +BoolToStr(AtRisk(OP_BUY)," @Risk")+"\n"
+                  +"               (S):"+StringSubstr(EnumToString(opStrategy[OP_SELL]),2)
+                                        +BoolToStr(AtRisk(OP_SELL)," @Risk")+"\n";
       
     Comment(rsComment);
 
@@ -169,16 +107,202 @@ void RefreshScreen(void)
 
     if (opStrategy[OP_BUY]==tsPend||opStrategy[OP_BUY]==tsEntry)
       UpdatePriceLabel("tLongPend",opLevel[OP_BUY][tsPend],DirColor(DirectionUp));
+    else
+      UpdatePriceLabel("tLongPend",opLevel[OP_BUY][tsPend],clrLightGray);
 
     if (opStrategy[OP_SELL]==tsPend||opStrategy[OP_SELL]==tsEntry)
       UpdatePriceLabel("tShortPend",opLevel[OP_SELL][tsPend],DirColor(DirectionDown));
+    else
+      UpdatePriceLabel("tShortPend",opLevel[OP_SELL][tsPend],clrLightGray);
+  }
+  
+//+------------------------------------------------------------------+
+//| AtRisk - Returns true on pend(entry) less than the action pivot  |
+//+------------------------------------------------------------------+
+bool AtRisk(int Action=OP_NO_ACTION)
+  {
+    if (Action==OP_BUY||Action==OP_SELL)
+      return (opLevel[Action][tsPend]==opLevel[Action][tsRisk]);
+      
+    return (false);
   }
 
+
+//+------------------------------------------------------------------+
+//| CalcStrategy                                                     |
+//+------------------------------------------------------------------+
+void CalcStrategy(void)
+  {
+    if (pfractal.Event(NewAggregate))
+    {
+      opEventDir      = pfractal.Direction(Range);
+      opEventAction   = DirAction(opEventDir);
+      
+      if (pfractal.Direction(RangeHigh)==pfractal.Direction(RangeLow))
+      {
+        if (IsChanged(opPriceDir,opEventDir))
+        {
+          switch (opPriceDir)
+          {
+            case DirectionUp:   opStrategy[OP_BUY]        = tsHold;
+                                opStrategy[OP_SELL]       = tsCover;
+                                break;
+            case DirectionDown: opStrategy[OP_BUY]        = tsHold;
+                                opStrategy[OP_SELL]       = tsCover;
+                                break;
+          }
+          
+          opLevel[OP_BUY][opStrategy[OP_BUY]]   = Close[0];
+          opLevel[OP_SELL][opStrategy[OP_SELL]] = Close[0];
+        }
+        
+        if (pfractal.Event(NewBoundary))
+        {
+          opTradeDir  = opEventDir;
+          opRiskDir   = DirAction(opTradeDir,InContrarian);
+          opLastEvent = tsPivot;
+          
+          opLevel[opRiskDir][tsRisk] = Close[0];
+        }
+        else
+        {
+          opLastEvent                     = tsPend;
+          opStrategy[opEventAction]       = tsPend;
+        }
+      }
+      else
+      {
+        opLastEvent                       = tsExit;
+        opStrategy[opEventAction]         = tsExit;
+      }
+      
+      opLevel[opEventAction][opLastEvent] = Close[0];
+    }
+  
+    if (opStrategy[OP_BUY]==tsPend)
+      if (IsLower(Close[0],opLevel[OP_BUY][tsPend]))
+        opStrategy[OP_BUY]=tsEntry;
+        
+    if (opStrategy[OP_BUY]==tsEntry)
+      if (IsLower(Close[0],opLevel[OP_BUY][tsPend]))
+        SetOpen(OP_BUY);
+        
+    if (IsLower(Close[0],opLevel[OP_BUY][tsRisk]))
+      SetRisk(OP_BUY);
+                
+    if (opStrategy[OP_SELL]==tsPend)
+      if (IsHigher(Close[0],opLevel[OP_SELL][tsPend]))
+        opStrategy[OP_SELL]=tsEntry;
+
+    if (opStrategy[OP_SELL]==tsEntry)
+      if (IsHigher(Close[0],opLevel[OP_SELL][tsPend]))
+        SetOpen(OP_SELL);
+
+    if (IsHigher(Close[0],opLevel[OP_SELL][tsRisk]))
+      SetRisk(OP_SELL);
+  }
+
+//+------------------------------------------------------------------+
+//| GetData                                                          |
+//+------------------------------------------------------------------+
+void GetData(void)
+  {
+    //--- Update indicators
+    fractal.Update();
+    pfractal.Update();
+    tregr.Update();
+    
+    //--- Recalc regrMA
+    if (IsChanged(opMajorAge,fractal[fractal.Previous(fractal.State(Major))].Bar))
+    {
+      delete tregr;
+      tregr = new CTrendRegression(inpDegree,opMajorAge,inpSmoothFactor);
+    }
+    
+    CalcStrategy();
+  }
+  
+//+------------------------------------------------------------------+
+//| ExecTradeOpen - Manages opening trade restrictions               |
+//+------------------------------------------------------------------+
+bool ExecTradeOpen(int Action)
+  {
+   // Pause("Order","ExecTradeOpen()");
+    return (OpenOrder(Action,"Trade Manager "+ActionText(Action)));
+  }
+
+
+//+------------------------------------------------------------------+
+//| ManageRisk                                                       |
+//+------------------------------------------------------------------+
+void ManageRisk()
+  {
+    
+  }
+  
+//+------------------------------------------------------------------+
+//| ManageExit                                                       |
+//+------------------------------------------------------------------+
+void ManageExit()
+  {
+    
+  }
+  
+//+------------------------------------------------------------------+
+//| ManageOpen                                                       |
+//+------------------------------------------------------------------+
+void ManageOpen()
+  { 
+    int moMarketDir  = pfractal.Direction(Tick);
+       
+    switch (opTradeAction)
+    {
+      case OP_BUY:     if (moMarketDir==DirectionUp)
+                         if (pfractal.Poly(Deviation)>0.00)
+                           if (ExecTradeOpen(OP_BUY))
+                             opTradeAction  = OP_NO_ACTION;
+                       break;
+      
+      case OP_SELL:    if (moMarketDir==DirectionDown)
+                         if (pfractal.Poly(Deviation)<0.00)
+                           if (ExecTradeOpen(OP_SELL))
+                             opTradeAction  = OP_NO_ACTION;
+                       break;
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| SetRisk                                                          |
+//+------------------------------------------------------------------+
+void SetRisk(int Action)
+  {
+    opRiskAction   = Action;
+  }
+  
+//+------------------------------------------------------------------+
+//| SetExit                                                          |
+//+------------------------------------------------------------------+
+void SetExit(int Action)
+  {
+    
+  }
+  
+//+------------------------------------------------------------------+
+//| SetOpen                                                          |
+//+------------------------------------------------------------------+
+void SetOpen(int Action)
+  {
+    opTradeAction  = Action;
+  }
+  
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    ManageRisk();
+    ManageExit();
+    ManageOpen();
   }
 
 //+------------------------------------------------------------------+
@@ -196,7 +320,6 @@ void OnTick()
     string     otParams[];
   
     InitializeTick();
-
     GetManualRequest();
 
     while (AppCommand(otParams,6))
@@ -220,7 +343,7 @@ int OnInit()
   {
     ManualInit();
     
-    ArrayInitialize(opLevel,0.00);
+    ArrayInitialize(opLevel,Close[0]);
     
     NewLine("pfRangeHigh");
     NewLine("pfRangeLow");

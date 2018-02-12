@@ -158,12 +158,12 @@ void RefreshScreen()
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,clrGoldenrod);
       else
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,DirColor(pfractal.Direction(RangeHigh)));
+
+      pfractal.ShowFiboArrow();
     }
     
     if (inpShowComment)
       pfractal.RefreshScreen();
-
-    pfractal.ShowFiboArrow();
     
     lastDir = pfractal.FOCDirection();
   }
