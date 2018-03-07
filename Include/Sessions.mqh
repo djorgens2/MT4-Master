@@ -47,7 +47,7 @@ input int    USClose                 = 23;        // US Close
     upSession  = 199,  // Session High
     dnSession  = 200   // Session Low
   };
-       
+  
   struct SessionRec
   {
     double       SessionOpen;
@@ -59,6 +59,17 @@ input int    USClose                 = 23;        // US Close
     bool         Reversal;
   };
   
+  struct DayRec
+  {
+    double       DayOpen;
+    double       DayLow;
+    double       DayHigh;
+    int          DayDir;
+    bool         Breakout;
+    bool         Reversal;
+    double       Fibo;
+  };
+  
 //+------------------------------------------------------------------+
 //| Record Pointers                                                  |
 //+------------------------------------------------------------------+
@@ -66,6 +77,9 @@ input int    USClose                 = 23;        // US Close
   SessionRec            SessionHistory[SessionTypes];
   SessionRec            LastSession;
   SessionType           LeadSession;
+  
+  DayRec                Today;
+  DayRec                Yesterday;
 
 //+------------------------------------------------------------------+
 //| Indicators                                                       |
@@ -118,6 +132,14 @@ void RefreshSession(void)
   }
   
 //+------------------------------------------------------------------+
+//| DailyRecon                                                       |
+//+------------------------------------------------------------------+
+double DayFibo(void)
+  {
+    return 0.00;
+  }
+  
+//+------------------------------------------------------------------+
 //| PriorSession                                                     |
 //+------------------------------------------------------------------+
 SessionType PriorSession(SessionType Id)
@@ -133,6 +155,7 @@ SessionType PriorSession(SessionType Id)
 //+------------------------------------------------------------------+
 SessionType NextSession(SessionType Id)
   {
+  
     if (Id == US)
       return (Asia);
     
@@ -172,6 +195,26 @@ void OpenSession(SessionType Id, int Bar=0)
   }
 
 //+------------------------------------------------------------------+
+//| DailyRecon                                                       |
+//+------------------------------------------------------------------+
+void DailyRecon(int Bar=0)
+  {
+    double drFibo  = DayFibo();
+    
+    Yesterday      = Today;
+    Yesterday.Fibo = drFibo;
+    
+    Today.DayOpen  = Open[Bar];
+    Today.DayHigh  = High[Bar];
+    Today.DayLow   = Low[Bar];
+    Today.DayDir   = DirectionNone;
+    Today.Breakout = false;
+    Today.Reversal = false;
+
+    opNewDay       = true;
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateSessions                                                   |
 //+------------------------------------------------------------------+
 void UpdateSessions(int Bar=0)
@@ -190,7 +233,7 @@ void UpdateSessions(int Bar=0)
     
     if (IsChanged(usHour,TimeHour(Time[Bar])))
     {
-      if (usHour==NewDay)       opNewDay       = true;
+      if (usHour==NewDay)       DailyRecon(Bar);
       if (usHour==AsiaOpen)     OpenSession(Asia,Bar);
       if (usHour==EuropeOpen)   OpenSession(Europe,Bar);
       if (usHour==AsiaClose)    CloseSession(Asia);
