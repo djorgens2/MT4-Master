@@ -57,6 +57,18 @@ input int    USClose                 = 23;        // US Close
     bool         Active;
     bool         Breakout;
     bool         Reversal;
+    SessionState State;
+  };
+  
+  struct DayRec
+  {
+    double       DayOpen;
+    double       DayHigh;
+    double       DayLow;
+    int          DayDir;
+    bool         Breakout;
+    bool         Reversal;
+    SessionState State;
   };
   
 //+------------------------------------------------------------------+
@@ -85,6 +97,7 @@ void RefreshSession(void)
     int      rsSessionColor;
     string   rsComment        = "";
     
+    
     for (SessionType rsId=Asia; rsId<SessionTypes; rsId++)
     {
       rsSessionColor             = clrDarkGray;
@@ -93,7 +106,8 @@ void RefreshSession(void)
         rsSessionColor           = clrYellow;
 
       UpdateLabel("lbSess"+EnumToString(rsId),EnumToString(rsId),rsSessionColor);
-      UpdateDirection("lbArrow"+EnumToString(rsId),SessionNow[rsId].SessionDir,DirColor(SessionNow[rsId].SessionDir));
+      UpdateDirection("lbDir"+EnumToString(rsId),SessionNow[rsId].SessionDir,DirColor(SessionNow[rsId].SessionDir));
+      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
       
       if (rsId==Asia)    rsSessionColor = clrForestGreen;
       if (rsId==Europe)  rsSessionColor = clrFireBrick;
@@ -114,7 +128,7 @@ void RefreshSession(void)
       if (opNewSessionLow)
         UpdateLabel("lbAlert","New Low",clrRed,14);
       else
-        UpdateLabel("lbAlert","",clrBlack,14);      
+        UpdateLabel("lbAlert","",clrBlack,14);   
   }
   
 //+------------------------------------------------------------------+
@@ -163,7 +177,20 @@ void OpenSession(SessionType Id, int Bar=0)
     SessionNow[Id].SessionDir       = DirectionNone;
     SessionNow[Id].Active           = true;
     SessionNow[Id].Breakout         = false;
-    SessionNow[Id].Reversal         = false;
+    SessionNow[Id].Reversal         = false;    
+
+    //dnConsCont = 57,   // Downside Consolidation Continuation
+    //upConsCont = 59,   // Upside Consolidation Continuation
+    //upBrkCons  = 61,   // Upside Breakout from Consolidation
+    //dnBrkCons  = 63,   // Downside Breakout from Consolidation
+    //upTrCont   = 74,   // Upside Trend Continuation
+    //dnTrCont   = 75,   // Downside Trend Continuation
+    //dnRev      = 76,   // Downside Reversal
+    //upRev      = 77,   // Upside Reversal
+    //opSession  = 82,   // Session Open
+    //upSession  = 199,  // Session High
+    //dnSession  = 200   // Session Low
+    SessionNow[Id].State            = CharToStr(dnConsCont);
     
     LastSession                     = SessionNow[PriorSession(Id)];
     LeadSession                     = Id;
@@ -254,13 +281,17 @@ void UpdateSessions(int Bar=0)
 //+------------------------------------------------------------------+
 void InitSessions(void)
   {
-    NewLabel("lbSessAsia","Asia",20,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessEurope","Europe",20,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessUS","US",20,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessAsia","Asia",30,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessEurope","Europe",30,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessUS","US",30,29,clrDarkGray,SCREEN_LR);
     
-    NewLabel("lbArrowAsia","",5,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbArrowEurope","",5,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbArrowUS","",5,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirAsia","",10,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirEurope","",10,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirUS","",10,29,clrDarkGray,SCREEN_LR);
+
+    NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
 
     NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);
     
