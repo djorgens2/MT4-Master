@@ -387,10 +387,6 @@ int CPipFractal::Count(int Counter)
       case Term:           return (pfTermCount);
       case Trend:          return (pfTrendCount);
       case History:        return (pipHistory.Count);
-      case Tick:           return (ptrTick);
-      case Range:          return (ptrRangeAge);
-      case RangeHigh:      return (ptrRangeAgeHigh);
-      case RangeLow:       return (ptrRangeAgeLow);      
     }
     
     return (NoValue);

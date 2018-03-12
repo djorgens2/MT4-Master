@@ -70,7 +70,7 @@ void RefreshScreen()
     if (pfractal.TrendWane())
       ObjectSet("piprMean", OBJPROP_COLOR, clrYellow);
     else
-      ObjectSet("piprMean", OBJPROP_COLOR, DirColor(pfractal.FOCDirection()));
+      ObjectSet("piprMean", OBJPROP_COLOR, DirColor(pfractal.FOCDirection()));   
 
     UpdatePriceLabel("piprHead",pfractal.Trendline(Head),DirColor(pfractal.Direction(Trendline)));
     UpdatePriceLabel("piprTail",pfractal.Trendline(Tail),DirColor(pfractal.Direction(Trendline)));
@@ -90,14 +90,18 @@ void RefreshScreen()
     UpdateLabel("lrFOCPivDev",NegLPad(Pip(pfractal.Pivot(Deviation)),1),DirColor(pfractal.Direction(Pivot)),15);
     UpdateDirection("lrFOCPivDir",pfractal.Direction(Pivot),DirColor(pfractal.Direction(Pivot)),20);
     UpdateLabel("lrFOCRange",DoubleToStr(Pip(pfractal.Range(Size)),1),DirColor(pfractal.FOCDirection()),15);
+    UpdateDirection("lrRangeDir",pfractal.Direction(Range),DirColor(pfractal.Direction(Range)),20);
 
     UpdateLabel("lrFOCDev",DoubleToStr(pfractal.FOC(Deviation),1),DirColor(pfractal.FOCDirection()));
     UpdateLabel("lrFOCMax",NegLPad(pfractal.FOC(Max),1),DirColor(pfractal.FOCDirection()));
     UpdateLabel("lrFOCPivDevMin",NegLPad(Pip(pfractal.Pivot(Min)),1),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCPivDevMax",NegLPad(Pip(pfractal.Pivot(Max)),1),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCPivPrice",DoubleToStr(pfractal.Pivot(Price),Digits),DirColor(pfractal.Direction(Pivot)));
-    UpdateLabel("lrFOCTick",LPad(IntegerToString(pfractal.Count(Tick))," ",2),DirColor(pfractal.Direction(Tick)));
-    UpdateLabel("lrFOCAge",LPad(IntegerToString(pfractal.Count(BoolToInt(pfractal.Direction(Range)==DirectionUp,RangeHigh,RangeLow)))," ",2),DirColor(pfractal.Direction(Range)));
+    UpdateLabel("lrFOCTick",LPad(IntegerToString(pfractal.Age(Tick))," ",2),DirColor(pfractal.Direction(Tick)));
+    UpdateLabel("lrFOCAge",LPad(IntegerToString(pfractal.Age(Range))," ",2),DirColor(pfractal.Direction(Range)));
+    UpdateLabel("lrMALow",LPad(IntegerToString(pfractal.Age(RangeLow))," ",2),DirColor(DirectionDown));
+    UpdateLabel("lrMAHigh",LPad(IntegerToString(pfractal.Age(RangeHigh))," ",2),DirColor(DirectionUp));
+
     UpdateLabel("lrPricePolyDev",NegLPad(pfractal.Poly(Deviation),1),DirColor(pfractal.Direction(Polyline)));
     UpdateLabel("lrPolyTrendDev",NegLPad(pfractal.Trendline(Deviation),1),DirColor(pfractal.Direction(Polyline)));
     
@@ -199,14 +203,16 @@ void InitScreenObjects()
   {
     NewLabel("lrFOC0","Factor of Change",10,12,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrFOC1","Pivot",140,12,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC2","Range/Age",230,12,clrGoldenrod,SCREEN_UL,IndWinId);
 
-    NewLabel("lrFOC2","Current",20,22,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC3","Dev",113,22,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC4","Range",215,22,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC3","Current",20,22,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC4","Dev",113,22,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC5","Current",215,22,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOCNow","",18,32,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrFOCPivDev","",92,32,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrFOCPivDir","",170,29,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrFOCRange","",212,32,clrLightGray,SCREEN_UL,IndWinId);
+    NewLabel("lrRangeDir","",286,29,clrLightGray,SCREEN_UL,IndWinId);
 
     NewLabel("lrFOCDev","",12,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCMax","",47,53,clrNONE,SCREEN_UL,IndWinId);
@@ -215,19 +221,23 @@ void InitScreenObjects()
     NewLabel("lrFOCPivPrice","",160,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCTick","",212,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCAge","",235,53,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrMALow","",274,53,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrMAHigh","",304,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrPricePolyDevTxt","Price-Poly Deviation:",32,5,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrPolyTrendDevTxt","Poly-Trend Deviation:",32,16,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrPricePolyDev","Price-Poly Deviation",5,5,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrPolyTrendDev","Poly-Trend Deviation",5,16,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrEvent","",5,5,clrWhite,SCREEN_LR,IndWinId);
 
-    NewLabel("lrFOC5","Dev",12,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC6","Max",51,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC7","Min",92,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC8","Max",127,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC9","Price",169,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC10","Tick",208,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC11","Age",234,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC6","Dev",12,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC7","Max",51,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC8","Min",92,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC9","Max",127,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC10","Price",169,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC11","Tick",208,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC12","Age",234,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC13","Low",270,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC14","High",300,65,clrWhite,SCREEN_UL,IndWinId);
 
     NewLabel("lrFOCAmpDirection","",15,78,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCState","",85,78,clrNONE,SCREEN_UL,IndWinId);

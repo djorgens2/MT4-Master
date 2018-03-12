@@ -49,7 +49,7 @@ public:
     virtual
        int      Direction(int Direction, bool Contrarian=false);
        string   Text(int Type);
-       int      Count(int Counter);
+       int      Age(int Measure);
        double   Range(int Measure);
        bool     HistoryLoaded(void) {return (pipHistory.Count == prPeriods+prDegree); }
 
@@ -196,6 +196,7 @@ void CPipRegression::CalcMA(void)
     static int cmaAggregate = DirectionNone;
     
     ClearEvent(NewAggregate);
+    Comment("");
     
     if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=1.0)
     {
@@ -242,26 +243,20 @@ void CPipRegression::CalcMA(void)
         
       if (Event(NewHigh)||Event(NewLow))
       {
-        if (IsChanged(cmaRangeDir,ptrTickDir))
-        {
-          if (cmaRangeDir == DirectionUp)
-            ptrRangeAgeHigh = 0;
+        if (IsChanged(cmaRangeDir,ptrRangeDir))
+          ptrRangeAge     = 0;
 
-          if (cmaRangeDir == DirectionDown)
-            ptrRangeAgeLow  = 0;
-        }    
+        if (Event(NewHigh))
+          ptrRangeAgeHigh = 0;
 
-        ptrRangeAge         = 0;
+        if (Event(NewLow))
+          ptrRangeAgeLow  = 0;
 
         SetEvent(NewBoundary);        
       }
         
-      if (cmaRangeDir == DirectionUp)
-        ptrRangeAgeHigh++;
-
-      if (cmaRangeDir == DirectionDown)
-        ptrRangeAgeLow++;
-      
+      ptrRangeAgeHigh++;
+      ptrRangeAgeLow++;
       ptrRangeAge++;
     }
 
@@ -344,11 +339,11 @@ int CPipRegression::Direction(int Type, bool Contrarian=false)
   }
 
 //+------------------------------------------------------------------+
-//|  Count - returns the value for the supplied Counter              |
+//|  Age - returns the value for the supplied Measure                |
 //+------------------------------------------------------------------+
-int CPipRegression::Count(int Counter)
+int CPipRegression::Age(int Measure)
   {
-    switch (Counter)
+    switch (Measure)
     {
       case History:        return (pipHistory.Count);
       case Tick:           return (ptrTick);
