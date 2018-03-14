@@ -1,27 +1,27 @@
 //+------------------------------------------------------------------+
-//|                                                       man-v1.mq4 |
-//|                                 Copyright 2014, Dennis Jorgenson |
+//|                                                       fmm-v1.mq4 |
+//|                            Copyright 2014-2018, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2014, Dennis Jorgenson"
+#property copyright "Copyright 2014-2018, Dennis Jorgenson"
 #property link      ""
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 #include <manual.mqh>
+
+//--- Operational variables
+string fmmNewDate   = "";
+bool   fmmNewDay    = false;
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    static string dtLastDate  = "";
-    
-    if (TimeHour(Time[0])==0)
-      if (IsChanged(dtLastDate,TimeToStr(Time[0], TIME_DATE)))
-        Pause("New Day","NewDay()");
-        
-    Comment("Last Date: "+dtLastDate);
+    if (TimeHour(Time[0]==0))
+      if (IsChanged(fmmNewDate,TimeToStr(Time[0], TIME_DATE)))
+        fmmNewDay  = true;
   }
 
 //+------------------------------------------------------------------+
@@ -36,6 +36,8 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    if (fmmNewDay)
+      Pause ("New Day","NewDay()");
   }
 
 //+------------------------------------------------------------------+
