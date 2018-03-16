@@ -9,6 +9,7 @@
 #property strict
 
 #include <Class\ArrayDouble.mqh>
+#include <Class\Event.mqh>
 #include <stdutil.mqh>
 #include <std_utility.mqh>
 
@@ -79,7 +80,7 @@ private:
        RetraceType   fDominantTrend;        //--- Current dominant trend; largest fractal leg
        RetraceType   fDominantTerm;         //--- Current dominant term; last leg greater tha RangeMax
        
-       bool          fEvents[EventTypes];
+       CEvent        *fEvents;
 
 public:
 
@@ -122,7 +123,6 @@ public:
        bool          IsBreakout(void)                { if (this[Base].Breakout) return (true); return (false); }
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
-       void          EventClear(void)                { ArrayInitialize(fEvents,false); }
        
        FractalRec operator[](const RetraceType Type) const { return(f[Type]); }
   };
@@ -193,17 +193,17 @@ void CFractal::CalcOrigin(void)
     if (fStateMajor==Expansion)
       if (Event(NewFractal))
         if (f[Expansion].Price>fmax(dOrigin.Top,dOrigin.Price) || f[Expansion].Price<fmin(dOrigin.Bottom,dOrigin.Price))
-          fEvents[NewOrigin]        = true;
+          fEvents.SetEvent(NewOrigin);
         else
-          fEvents[InsideReversal]   = true;
+          fEvents.SetEvent(InsideReversal);
       else
       if (f[Expansion].Direction!=dOrigin.Direction)
       {
         if (f[Expansion].Direction==DirectionUp && f[Expansion].Price>dOrigin.Price)
-          fEvents[NewOrigin]        = true;
+          fEvents.SetEvent(NewOrigin);
     
         if (f[Expansion].Direction==DirectionDown && f[Expansion].Price<dOrigin.Price)
-          fEvents[NewOrigin]        = true;
+          fEvents.SetEvent(NewOrigin);
       }
 
     if (Event(InsideReversal))
@@ -384,10 +384,10 @@ void CFractal::CalcRetrace(void)
 
     //--- Calc fractal change events
     if (IsChanged(fStateMinor,crStateMinor))
-      fEvents[NewMinor]         = true;
+      fEvents.SetEvent(NewMinor);
       
     if (IsChanged(fStateMajor,crStateMajor))
-      fEvents[NewMajor]         = true;
+      fEvents.SetEvent(NewMajor);
   }
 
   
@@ -429,7 +429,7 @@ void CFractal::UpdateFractal(int Direction)
       f[Root].Peg              = true;
     }
 
-    fEvents[NewFractal]        = true;  //--- set new fractal alert
+    fEvents.SetEvent(NewFractal);  //--- set new fractal alert
   }
 
 //+------------------------------------------------------------------+
@@ -497,7 +497,7 @@ void CFractal::CalcFractal(void)
     int    lastBarLow     = fBarLow;
     bool   lastBasePeg    = f[Base].Peg;
     
-    EventClear();         //--- reset Events on the tick
+    fEvents.ClearEvents();         //--- reset Events on the tick
     
     //--- identify new high or new low
     if (NormalizeDouble(High[fBarNow],Digits)>NormalizeDouble(High[fBarHigh],Digits))
@@ -601,6 +601,7 @@ CFractal::CFractal(int Range, int MinRange)
     fBarHigh              = Bars-1;
     fBarLow               = Bars-1;
 
+    fEvents               = new CEvent();
     fBuffer               = new CArrayDouble(Bars);
     fBuffer.Initialize(0.00);
     fBuffer.AutoExpand    = true;

@@ -195,4 +195,3 @@ void CSessions::Update(int Bar=0)
       }
     }
   }
-
