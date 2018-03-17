@@ -77,28 +77,7 @@
                   Fibo261,
                   Fibo423,
                   Fibo823
-                };
-
-       enum     EventType
-                {
-                  NewDirection,
-                  NewFractal,
-                  NewOrigin,
-                  NewMajor,
-                  NewMinor,
-                  InsideReversal,
-                  TrendWane,
-                  TrendResume,
-                  NewTerm,
-                  NewTrend,
-                  NewHigh,
-                  NewLow,
-                  NewBoundary,
-                  NewAggregate,
-                  ZeroFOCDeviation,
-                  EventTypes
-                };
-                     
+                };                     
 
 
 static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
@@ -637,29 +616,4 @@ int DirectionAction(int Direction, bool Contrarian=false)
     }
     
     return NoValue;
-  }
-
-//+------------------------------------------------------------------+
-//| GetEvent - translate string value to enum EventType              |
-//+------------------------------------------------------------------+
-EventType GetEvent(string Event)
-  {
-    StringToUpper(Event);
-    
-    if (Event=="NEWDIRECTION")     return(NewDirection);
-    if (Event=="NEWFRACTAL")       return(NewFractal);
-    if (Event=="NEWORIGIN")        return(NewOrigin);
-    if (Event=="NEWMAJOR")         return(NewMajor);
-    if (Event=="NEWMINOR")         return(NewMinor);
-    if (Event=="INSIDEREVERSAL")   return(InsideReversal);
-    if (Event=="TRENDWANE")        return(TrendWane);
-    if (Event=="TRENDRESUME")      return(TrendResume);
-    if (Event=="NEWTERM")          return(NewTerm);
-    if (Event=="NEWTREND")         return(NewTrend);
-    if (Event=="NEWHIGH")          return(NewHigh);
-    if (Event=="NEWLOW")           return(NewLow);
-    if (Event=="NEWBOUNDARY")      return(NewBoundary);
-    if (Event=="ZEROFOCDEVIATION") return(ZeroFOCDeviation);
-    
-    return (EventTypes);
   }

@@ -9,6 +9,8 @@
 #property strict
 
 #include <stdutil.mqh>
+#include <Event.mqh>
+
 //+------------------------------------------------------------------+
 //| Sessions - class to track and monitor session performance        |
 //+------------------------------------------------------------------+
@@ -195,4 +197,3 @@ void CSessions::Update(int Bar=0)
       }
     }
   }
-

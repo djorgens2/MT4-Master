@@ -8,6 +8,7 @@
 #property version   "1.00"
 #property strict
 
+#include <Class\Event.mqh>
 #include <Class\ArrayDouble.mqh>
 #include <stdutil.mqh>
 
@@ -33,7 +34,7 @@ private:
        void     prCalcPolyAmplitude(void);
        
     //--- Event Array
-       bool     prEvents[EventTypes];    //--- Event array
+       CEvent   *prEvents;    //--- Event array
     
 public:
 
@@ -72,8 +73,8 @@ protected:
        void     UpdatePoly(void);
 
        //--- Event methods
-       void     SetEvent(EventType Event)   { prEvents[Event]=true; }   //-- sets the event condition
-       void     ClearEvent(EventType Event) { prEvents[Event]=false; }  //-- clears the event condition
+       void     SetEvent(EventType Event)   { prEvents.SetEvent(Event); }   //-- sets the event condition
+       void     ClearEvent(EventType Event) { prEvents.SetEvent(Event); }  //-- clears the event condition
 
        //--- input parameters
        int      prDegree;            // degree of regression
@@ -487,6 +488,8 @@ void CPolyRegression::SetPeriods(int Periods)
 //+------------------------------------------------------------------+
 CPolyRegression::CPolyRegression(int Degree, int Periods, int MAPeriods)
   {
+    prEvents    = new CEvent();
+    
     SetDegree(Degree);
     SetPeriods(Periods);
     SetMAPeriods(MAPeriods); 
