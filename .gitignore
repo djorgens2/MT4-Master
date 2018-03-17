@@ -3,7 +3,11 @@
 
 # My ignore files
 *.set
-mqlcache.dat
+Experts/mqlcache.dat
+Indicators/mqlcache.dat
+Libraries/mqlcache.dat
+Scripts/mqlcache.dat
+
 
 # User-specific files
 *.suo
