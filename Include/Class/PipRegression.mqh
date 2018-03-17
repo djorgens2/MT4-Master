@@ -196,7 +196,6 @@ void CPipRegression::CalcMA(void)
     static int cmaAggregate = DirectionNone;
     
     ClearEvent(NewAggregate);
-    Comment("");
     
     if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=1.0)
     {
