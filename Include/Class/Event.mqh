@@ -34,6 +34,9 @@ protected:
                   NewBreakout,
                   NewReversal,
                   InsideReversal,
+                  SessionOpen,
+                  SessionClose,
+                  NewDay,
                   EventTypes
                 };
                 

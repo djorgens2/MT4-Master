@@ -9,7 +9,8 @@
 #property strict
 
 #include <stdutil.mqh>
-#include <Event.mqh>
+#include <Class/Event.mqh>
+#include <Class/Session.mqh>
 
 //+------------------------------------------------------------------+
 //| Sessions - class to track and monitor session performance        |
@@ -19,16 +20,6 @@ class CSessions
 
 protected:
 
-             //-- Session Types
-             enum SessionType
-             {
-               Asia,
-               Europe,
-               US,
-               Daily,
-               SessionTypes
-             };
-
              struct SessionHours
              {
                int SessionOpen;
@@ -36,84 +27,77 @@ protected:
                int SessionClose;
              };
 
-             struct SessionInfo
-             {
-               double SessionHigh;
-               double SessionLow;
-               int    SessionDir;
-               bool   Breakout;
-               bool   Reversal;
-             };
 
-             //-- Session Levels
-             SessionHours   slHours[SessionTypes];
-             SessionInfo    slHistory[][SessionTypes];
-             SessionInfo    slCurrent[SessionTypes];
-    
+             //-- Session Data
+             SessionHours    sdHours[SessionTypes];
+             CSession       *sdOpen[SessionTypes];
+             CSession       *sdSession[];
+             CSession       *sdDaily[];
+
+             //-- Global Event Data
+             CEvent         *gevent;
+             
+             //--- Class operational variables
+             bool            covHistoryLoaded;
 
 private:
 
-             //-- Event Operationals
-             bool     Events[EventTypes];
-
-             void    InitSessionHistory(void);
-             void    InitSessions(void);
-             void    PostHistory(SessionType Session);
-             void    OpenSession(SessionType Session, int Bar=0);
-
-             bool    Event(EventType Type)      {return (Events[Type]);}
-             void    SetEvent(EventType Type)   {Events[Type] = true;}
-             void    ClearEvent(EventType Type) {Events[Type] = false;}
-             void    ClearEvents(void)          {ArrayInitialize(Events,false);}
+             //-- Session Private Operational Variables
+             int             spBar;
+             SessionType     spLastOpen[SessionTypes];
              
+             //-- Session Methods
+             void            OpenSession(SessionType Type);
+             void            CloseSession(SessionType Type);
+             void            LoadHistory(void);
 
+          
 public:
-                     CSessions(void);
+                     CSessions(int Bar);
                     ~CSessions(void);
 
              void    SetSessionHours(SessionType Session, int HourOpen, int HourClose);
-             bool    IsOpen(SessionType Session, int Bar=0);
-             void    Update(int Bar=0);
+             bool    IsOpen(SessionType Session);
+             void    Update(void);
   };
+
+//+------------------------------------------------------------------+
+//| LoadHistory - Called after hours are configured; loads history   |
+//+------------------------------------------------------------------+
+void CSessions::LoadHistory(void)
+  {
+    for (spBar=spBar;spBar>0;spBar--)
+      Update();
+  }
 
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes session data on Session Open           |
 //+------------------------------------------------------------------+
-void CSessions::OpenSession(SessionType Session, int Bar=0)
+void CSessions::OpenSession(SessionType Type)
   {
-    slCurrent[Session].SessionHigh   = High[Bar];
-    slCurrent[Session].SessionLow    = Low[Bar];
-    slCurrent[Session].SessionDir    = DirectionNone;
-    slCurrent[Session].Breakout      = false;
-    slCurrent[Session].Reversal      = false;
-  }
-
-//+------------------------------------------------------------------+
-//| InitSessions - Initializes session data for first use            |
-//+------------------------------------------------------------------+
-void CSessions::InitSessions(void)
-  {
-    for (SessionType session=0;session<SessionTypes;session++)
-      OpenSession(session,Bars-1);
-  }
-
-//+------------------------------------------------------------------+
-//| InitSessionHistory - Loads session history                       |
-//+------------------------------------------------------------------+
-void CSessions::InitSessionHistory(void)
-  {
-    InitSessions();
+    ArrayResize(sdSession,(ArraySize(sdSession)+1));
     
-    for (int ishBar=Bars-1;ishBar>0;ishBar--)
-      Update(ishBar);
+    sdSession[ArraySize(sdSession)-1] = new CSession(Type);
+    sdSession[ArraySize(sdSession)-1].OpenSession(spBar);
+
+    sdOpen[Type] = sdSession[ArraySize(sdSession)-1];
+  }
+
+//+------------------------------------------------------------------+
+//| CloseSession - Closes a session object and ends future updates   |
+//+------------------------------------------------------------------+
+void CSessions::CloseSession(SessionType Type)
+  {
   }
 
 //+------------------------------------------------------------------+
 //| Sessions Constructor                                             |
 //+------------------------------------------------------------------+
-CSessions::CSessions(void)
+CSessions::CSessions(int Bar)
   {
-    InitSessionHistory();
+    gevent       = new CEvent();
+    
+    ArrayInitialize(spLastOpen,false);
   }
   
 //+------------------------------------------------------------------+
@@ -128,72 +112,58 @@ CSessions::~CSessions()
 //+------------------------------------------------------------------+
 void CSessions::SetSessionHours(SessionType Session, int HourOpen, int HourClose)
   {
-    slHours[Session].SessionOpen   = HourOpen;
-    slHours[Session].SessionClose  = HourClose;
-    slHours[Session].SessionMid    = (HourOpen+HourClose)/2;
+    sdHours[Session].SessionOpen   = HourOpen;
+    sdHours[Session].SessionClose  = HourClose;
+    sdHours[Session].SessionMid    = (HourOpen+HourClose)/2;
     
-    Print(EnumToString(Session)+":"+IntegerToString(slHours[Session].SessionOpen)+":"
-                                   +IntegerToString(slHours[Session].SessionMid)+":"
-                                   +IntegerToString(slHours[Session].SessionClose)
+    Print(EnumToString(Session)+":"+IntegerToString(sdHours[Session].SessionOpen)+":"
+                                   +IntegerToString(sdHours[Session].SessionMid)+":"
+                                   +IntegerToString(sdHours[Session].SessionClose)
          );
   }
 
 //+------------------------------------------------------------------+
 //| IsOpen - returns true if the supplied session is open            |
 //+------------------------------------------------------------------+
-bool CSessions::IsOpen(SessionType Session, int Bar=0)
+bool CSessions::IsOpen(SessionType Session)
   {
-    int soHour   = TimeHour(Time[Bar]);
-    
-    if (soHour>=slHours[Session].SessionOpen && soHour<slHours[Session].SessionClose)
-      return (true);
-      
+    bool   soOpen   = false;
+    int    soHour   = TimeHour(Time[spBar]);
+
+    if (soHour>=sdHours[Session].SessionOpen && soHour<sdHours[Session].SessionClose)
+      soOpen                 = true;
+
     if (Session==Daily)
-      return (true);
+    {
+      soOpen                 = true;
       
-    return false;
+      if (soHour==inpNewDay)
+        gevent.SetEvent(NewDay);
+        
+      CloseSession(Session);
+    }
+
+    if (IsChanged(soLastOpen,soOpen))
+      if (soOpen)
+        gevent.SetEvent(SessionOpen);
+      else
+        gevent.SetEvent(SessionClose);
+
+    if (gevent[SessionOpen])
+      UpdateSession(Session);
+    return (soOpen);
   }
 
 //+------------------------------------------------------------------+
 //| Update - Updates session data                                    |
 //+------------------------------------------------------------------+
-void CSessions::Update(int Bar=0)
+void CSessions::Update(void)
   {
-    static int   uHour     = NoValue;
-    SessionInfo  uSession;
+    gevent.ClearEvents();
     
-    ClearEvents();
-    
-    for (SessionType session=Asia;session<SessionTypes;session++)
+    for (SessionType type=Asia;type<SessionTypes;type++)
     {
-      uSession             = slCurrent[session];
-      
-      if (IsOpen(session, Bar))
-      {
-        if (IsHigher(High[Bar],slCurrent[session].SessionHigh))
-        {
-          if (IsChanged(slCurrent[session].SessionDir,DirectionUp))
-            SetEvent(NewDirection);
-            
-          SetEvent(NewHigh);
-        }
-        
-        if (IsLower(Low[Bar],slCurrent[session].SessionLow))
-        {
-          if (IsChanged(slCurrent[session].SessionDir,DirectionDown))
-            SetEvent(NewDirection);
-            
-          SetEvent(NewLow);
-        }
-      }
-
-      if (IsChanged(uHour,TimeHour(Time[Bar])))
-      {
-        if (slHours[session].SessionClose==uHour)
-          PostHistory(session);
-
-        if (slHours[session].SessionOpen==uHour)
-          OpenSession(session, Bar);
-      }
+      if (IsOpen(type))
+        if (gevent[SessionOpen])
     }
   }
