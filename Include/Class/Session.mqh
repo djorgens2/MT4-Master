@@ -100,10 +100,28 @@ public:
              void    Update(int Bar=0);
              
              void    SetBoundary(int SessionDir, double Resistance, double Support);
+             bool    SessionIsOpen(int Bar=0);
 
              bool operator[](const EventType Type) const { return(sEvent[Type]); };
 
   };
+
+//+------------------------------------------------------------------+
+//| SessionIsOpen - returns true if the this session is open         |
+//+------------------------------------------------------------------+
+bool CSession::SessionIsOpen(int Bar=0)
+  {
+    int    soHour   = TimeHour(Time[Bar]);
+
+    if (soHour>=sHourOpen && soHour<sHourClose)
+      return (true);
+
+    if (sSessionType==Daily)
+      return (true);
+
+    return (false);
+  }
+
 
 //+------------------------------------------------------------------+
 //| OpenSession - Sets the session details on session open           |
@@ -172,8 +190,11 @@ CSession::Update(int Bar=0)
     
     sEvent.ClearEvents();
     
-    if (this.sSessionOpen)
+    if (SessionIsOpen(Bar))
     {
+      if (!IsOpen())
+        OpenSession(Bar);
+        
       if (IsHigher(High[Bar],sHigh))
         sEvent.SetEvent(NewHigh);
 
@@ -218,13 +239,9 @@ CSession::Update(int Bar=0)
         }
       }
     }
-    else
+    else 
     
-    if (sHourOpen==TimeHour(Time[Bar]))
-      OpenSession(Bar);
-      
-    else
-    if (sHourClose==TimeHour(Time[Bar]))
+    if (IsOpen())
       CloseSession(Bar);
   }
 

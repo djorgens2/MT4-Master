@@ -68,11 +68,7 @@ void CSessions::LoadHistory(void)
 //+------------------------------------------------------------------+
 void CSessions::NewSession(SessionType Type)
   {
-    ArrayResize(sdSession,(ArraySize(sdSession)+1));
-    
     sdOpen[Type] = new CSession(Type,sdHours[Type].HourOpen,sdHours[Type].HourClose);
-
-    sdSession[ArraySize(sdSession)-1] = GetPointer(sdSession[ArraySize(sdSession)-1]);
   }
 
 //+------------------------------------------------------------------+
@@ -80,6 +76,9 @@ void CSessions::NewSession(SessionType Type)
 //+------------------------------------------------------------------+
 void CSessions::CloseSession(SessionType Type)
   {
+    ArrayResize(sdSession,(ArraySize(sdSession)+1));
+    sdSession[ArraySize(sdSession)-1] = GetPointer(sdOpen[Type]);
+    sdOpen[Type]     = NULL;
   }
 
 //+------------------------------------------------------------------+
@@ -87,7 +86,9 @@ void CSessions::CloseSession(SessionType Type)
 //+------------------------------------------------------------------+
 void CSessions::CloseDaily(void)
   {
-    
+    ArrayResize(sdDaily,(ArraySize(sdDaily)+1));
+    sdDaily[ArraySize(sdDaily)-1] = GetPointer(sdOpen[Daily]);
+    sdOpen[Daily]    = NULL;    
   }
 
 //+------------------------------------------------------------------+
@@ -147,5 +148,15 @@ void CSessions::Update(void)
         NewSession(type);
      
       sdOpen[type].Update(spBar);
+      
+      //--- Check events
+      if (sdOpen[type][SessionClose])
+        if (type==Daily)
+          CloseDaily();
+        else
+          CloseSession(type);
+            
+      if (sdOpen[type][SessionOpen])
+        NewSession(type);
     }
   }

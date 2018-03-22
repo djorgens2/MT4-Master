@@ -74,7 +74,7 @@ protected:
 
        //--- Event methods
        void     SetEvent(EventType Event)   { prEvents.SetEvent(Event); }   //-- sets the event condition
-       void     ClearEvent(EventType Event) { prEvents.SetEvent(Event); }  //-- clears the event condition
+       void     ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }  //-- clears the event condition
 
        //--- input parameters
        int      prDegree;            // degree of regression
