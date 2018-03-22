@@ -49,9 +49,12 @@ protected:
 
 private:
 
+          //--- Private Class properties
              SessionType   sSessionType;
              bool          sSessionOpen;
              int           sSessionDir;
+             int           sHourOpen;
+             int           sHourClose;
              double        sOpen;
              double        sHigh;
              double        sLow;
@@ -64,28 +67,36 @@ private:
              bool          sReversal;
              CEvent       *sEvent;
 
-public:
-
-                     CSession(SessionType Type);
-                    ~CSession(void);
-
-          //--- Class properties
-             SessionType   Type(void) {return (sSessionType);};
-             bool          IsOpen(void) {return (sSessionOpen);};
-             int           Direction(DirectionType Type);
-             double        Open(void) {return (sOpen);};
-             double        High(void) {return (sHigh);};
-             double        Low(void) {return (sLow);};
-             double        Close(void) {return (sClose);};
-             double        Support(void);
-             double        Resistance(void);
-             bool          IsBreakout(void) {return (sBreakout);};
-             bool          IsReversal(void) {return (sReversal);};
-             int           BoundaryCount(void) {return(sBoundaryCount);};
-
-          //--- Class methods
+          //--- Private Class methods
              void    OpenSession(int Bar=0);
              void    CloseSession(int Bar=0);
+
+public:
+
+             CSession(SessionType Type, int HourOpen, int HourClose);
+            ~CSession(void);
+
+          //--- Class properties
+             SessionType   Type(void)  {return (sSessionType);};
+
+             double        Open(void)  {return (sOpen);};
+             double        High(void)  {return (sHigh);};
+             double        Low(void)   {return (sLow);};
+             double        Close(void) {return (sClose);};
+
+             double        Support(void);
+             double        Resistance(void);
+
+             int           Direction(DirectionType Type);
+             int           BoundaryCount(void) {return(sBoundaryCount);};
+
+          //--- Class conditionals
+             bool          IsOpen(void)     {return (sSessionOpen);};
+             bool          IsLocked(void)   {return (sClose>0.00);}; 
+             bool          IsBreakout(void) {return (sBreakout);};
+             bool          IsReversal(void) {return (sReversal);};
+
+          //--- Class methods
              void    Update(int Bar=0);
              
              void    SetBoundary(int SessionDir, double Resistance, double Support);
@@ -95,13 +106,42 @@ public:
   };
 
 //+------------------------------------------------------------------+
+//| OpenSession - Sets the session details on session open           |
+//+------------------------------------------------------------------+
+CSession::OpenSession(int Bar=0)
+  {
+    sSessionOpen        = true;
+    sOpen               = Open[Bar];
+    sHigh               = High[Bar];
+    sLow                = Low[Bar];    
+
+    if (sSessionType==Daily)
+      sEvent.SetEvent(NewDay);
+    else
+      sEvent.SetEvent(SessionOpen);
+  }
+
+//+------------------------------------------------------------------+
+//| Close - Sets the final session details on session close          |
+//+------------------------------------------------------------------+
+CSession::CloseSession(int Bar=0)
+  {
+    sClose           = Close[Bar+1];
+    sSessionOpen     = false;
+
+    sEvent.SetEvent(SessionClose);
+  }
+
+//+------------------------------------------------------------------+
 //| Class Constructor - instantiates the CSession class object       |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose)
   {
     sSessionType        = Type;
     sSessionOpen        = false;
     sSessionDir         = DirectionNone;
+    sHourOpen           = HourOpen;
+    sHourClose          = HourClose;
     sOpen               = NoValue;
     sHigh               = NoValue;
     sLow                = NoValue;
@@ -121,26 +161,6 @@ CSession::CSession(SessionType Type)
 CSession::~CSession(void)
   {
     delete sEvent;
-  }
-
-//+------------------------------------------------------------------+
-//| Open - Sets the session details on session open                  |
-//+------------------------------------------------------------------+
-CSession::OpenSession(int Bar=0)
-  {
-    sSessionOpen     = true;
-    sOpen            = Open[Bar];
-    sHigh            = High[Bar];
-    sLow             = Low[Bar];
-  }
-
-//+------------------------------------------------------------------+
-//| Close - Sets the final session details on session close          |
-//+------------------------------------------------------------------+
-CSession::CloseSession(int Bar=0)
-  {
-    sClose           = Close[Bar+1];
-    sSessionOpen     = false;
   }
 
 //+------------------------------------------------------------------+
@@ -198,6 +218,14 @@ CSession::Update(int Bar=0)
         }
       }
     }
+    else
+    
+    if (sHourOpen==TimeHour(Time[Bar]))
+      OpenSession(Bar);
+      
+    else
+    if (sHourClose==TimeHour(Time[Bar]))
+      CloseSession(Bar);
   }
 
 //+------------------------------------------------------------------+

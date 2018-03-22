@@ -22,11 +22,10 @@ protected:
 
              struct SessionHours
              {
-               int SessionOpen;
-               int SessionMid;
-               int SessionClose;
+               int HourOpen;
+               int MidSession;
+               int HourClose;
              };
-
 
              //-- Session Data
              SessionHours    sdHours[SessionTypes];
@@ -34,21 +33,15 @@ protected:
              CSession       *sdSession[];
              CSession       *sdDaily[];
 
-             //-- Global Event Data
-             CEvent         *gevent;
-             
-             //--- Class operational variables
-             bool            covHistoryLoaded;
-
 private:
 
              //-- Session Private Operational Variables
              int             spBar;
-             SessionType     spLastOpen[SessionTypes];
              
              //-- Session Methods
-             void            OpenSession(SessionType Type);
+             void            NewSession(SessionType Type);
              void            CloseSession(SessionType Type);
+             void            CloseDaily(void);
              void            LoadHistory(void);
 
           
@@ -57,7 +50,7 @@ public:
                     ~CSessions(void);
 
              void    SetSessionHours(SessionType Session, int HourOpen, int HourClose);
-             bool    IsOpen(SessionType Session);
+             bool    IsSessionOpen(SessionType Session);
              void    Update(void);
   };
 
@@ -71,16 +64,15 @@ void CSessions::LoadHistory(void)
   }
 
 //+------------------------------------------------------------------+
-//| OpenSession - Initializes session data on Session Open           |
+//| NewSession - Initializes session data on Session Open            |
 //+------------------------------------------------------------------+
-void CSessions::OpenSession(SessionType Type)
+void CSessions::NewSession(SessionType Type)
   {
     ArrayResize(sdSession,(ArraySize(sdSession)+1));
     
-    sdSession[ArraySize(sdSession)-1] = new CSession(Type);
-    sdSession[ArraySize(sdSession)-1].OpenSession(spBar);
+    sdOpen[Type] = new CSession(Type,sdHours[Type].HourOpen,sdHours[Type].HourClose);
 
-    sdOpen[Type] = sdSession[ArraySize(sdSession)-1];
+    sdSession[ArraySize(sdSession)-1] = GetPointer(sdSession[ArraySize(sdSession)-1]);
   }
 
 //+------------------------------------------------------------------+
@@ -91,15 +83,21 @@ void CSessions::CloseSession(SessionType Type)
   }
 
 //+------------------------------------------------------------------+
+//| CloseDaily - Closes daily and Opens new daily record updates     |
+//+------------------------------------------------------------------+
+void CSessions::CloseDaily(void)
+  {
+    
+  }
+
+//+------------------------------------------------------------------+
 //| Sessions Constructor                                             |
 //+------------------------------------------------------------------+
 CSessions::CSessions(int Bar)
   {
-    gevent       = new CEvent();
-    
-    ArrayInitialize(spLastOpen,false);
+    spBar    = Bar;
   }
-  
+
 //+------------------------------------------------------------------+
 //| Sessions Destructor                                              |
 //+------------------------------------------------------------------+
@@ -112,46 +110,30 @@ CSessions::~CSessions()
 //+------------------------------------------------------------------+
 void CSessions::SetSessionHours(SessionType Session, int HourOpen, int HourClose)
   {
-    sdHours[Session].SessionOpen   = HourOpen;
-    sdHours[Session].SessionClose  = HourClose;
-    sdHours[Session].SessionMid    = (HourOpen+HourClose)/2;
+    sdHours[Session].HourOpen     = HourOpen;
+    sdHours[Session].HourClose    = HourClose;
+    sdHours[Session].MidSession   = (HourOpen+HourClose)/2;
     
-    Print(EnumToString(Session)+":"+IntegerToString(sdHours[Session].SessionOpen)+":"
-                                   +IntegerToString(sdHours[Session].SessionMid)+":"
-                                   +IntegerToString(sdHours[Session].SessionClose)
+    Print(EnumToString(Session)+":"+IntegerToString(sdHours[Session].HourOpen)+":"
+                                   +IntegerToString(sdHours[Session].MidSession)+":"
+                                   +IntegerToString(sdHours[Session].HourClose)
          );
   }
 
 //+------------------------------------------------------------------+
-//| IsOpen - returns true if the supplied session is open            |
+//| IsSessionOpen - returns true if the supplied session is open     |
 //+------------------------------------------------------------------+
-bool CSessions::IsOpen(SessionType Session)
+bool CSessions::IsSessionOpen(SessionType Type)
   {
-    bool   soOpen   = false;
     int    soHour   = TimeHour(Time[spBar]);
 
-    if (soHour>=sdHours[Session].SessionOpen && soHour<sdHours[Session].SessionClose)
-      soOpen                 = true;
+    if (soHour>=sdHours[Type].HourOpen && soHour<sdHours[Type].HourClose)
+      return (true);
 
-    if (Session==Daily)
-    {
-      soOpen                 = true;
-      
-      if (soHour==inpNewDay)
-        gevent.SetEvent(NewDay);
-        
-      CloseSession(Session);
-    }
+    if (Type==Daily)
+      return (true);
 
-    if (IsChanged(soLastOpen,soOpen))
-      if (soOpen)
-        gevent.SetEvent(SessionOpen);
-      else
-        gevent.SetEvent(SessionClose);
-
-    if (gevent[SessionOpen])
-      UpdateSession(Session);
-    return (soOpen);
+    return (false);
   }
 
 //+------------------------------------------------------------------+
@@ -159,11 +141,11 @@ bool CSessions::IsOpen(SessionType Session)
 //+------------------------------------------------------------------+
 void CSessions::Update(void)
   {
-    gevent.ClearEvents();
-    
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
-      if (IsOpen(type))
-        if (gevent[SessionOpen])
+      if (sdSession[type]==NULL)
+        NewSession(type);
+     
+      sdOpen[type].Update(spBar);
     }
   }
