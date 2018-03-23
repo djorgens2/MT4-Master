@@ -50,7 +50,7 @@ public:
                     ~CSessions(void);
 
              void    SetSessionHours(SessionType Session, int HourOpen, int HourClose);
-             bool    IsSessionOpen(SessionType Session);
+             bool    SessionIsOpen(SessionType Session);
              void    Update(void);
   };
 
@@ -116,15 +116,15 @@ void CSessions::SetSessionHours(SessionType Session, int HourOpen, int HourClose
     sdHours[Session].MidSession   = (HourOpen+HourClose)/2;
     
     Print(EnumToString(Session)+":"+IntegerToString(sdHours[Session].HourOpen)+":"
+  }
                                    +IntegerToString(sdHours[Session].MidSession)+":"
                                    +IntegerToString(sdHours[Session].HourClose)
          );
-  }
 
 //+------------------------------------------------------------------+
-//| IsSessionOpen - returns true if the supplied session is open     |
+//| SessionIsOpen - returns true if the supplied session is open     |
 //+------------------------------------------------------------------+
-bool CSessions::IsSessionOpen(SessionType Type)
+bool CSessions::SessionIsOpen(SessionType Type)
   {
     int    soHour   = TimeHour(Time[spBar]);
 
@@ -142,21 +142,24 @@ bool CSessions::IsSessionOpen(SessionType Type)
 //+------------------------------------------------------------------+
 void CSessions::Update(void)
   {
-    for (SessionType type=Asia;type<SessionTypes;type++)
+    if (HistoryIsLoaded())
     {
-      if (sdSession[type]==NULL)
-        NewSession(type);
+      for (SessionType type=Asia;type<SessionTypes;type++)
+      {
+        if (sdSession[type]==NULL)
+          NewSession(type);
      
-      sdOpen[type].Update(spBar);
+        sdOpen[type].Update(spBar);
       
-      //--- Check events
-      if (sdOpen[type][SessionClose])
-        if (type==Daily)
-          CloseDaily();
-        else
-          CloseSession(type);
+        //--- Check events
+        if (sdOpen[type][SessionClose])
+          if (type==Daily)
+            CloseDaily();
+          else
+            CloseSession(type);
             
-      if (sdOpen[type][SessionOpen])
-        NewSession(type);
+        if (sdOpen[type][SessionOpen])
+          NewSession(type);
+      }
     }
   }
