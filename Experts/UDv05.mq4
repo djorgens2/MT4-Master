@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                       man-v1.mq4 |
+//|                                                        ud-v5.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -9,9 +9,8 @@
 #property strict
 
 #include <manual.mqh>
-//#include <Sessions.mqh>
 #include <Class\PipFractal.mqh>
-#include <Class\Sessions-v1.mqh>
+#include <Class\SessionArray.mqh>
 
 input string EAHeader                = "";    //+---- Application Options -------+
 input int    inpMaxVolume            = 30;    // Maximum volume
@@ -31,7 +30,6 @@ input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
 
 input string SessionHeader           = "";    //+---- Session Hours -------+
 input int    inpNewDay               = 0;     // New day market open hour
-input int    inpEndDay               = 0;    // End of day hour
 input int    inpAsiaOpen             = 1;     // Asian market open hour
 input int    inpAsiaClose            = 10;    // Asian market close hour
 input int    inpEuropeOpen           = 8;     // Europe market open hour
@@ -40,16 +38,70 @@ input int    inpUSOpen               = 14;    // US market open hour
 input int    inpUSClose              = 23;    // US market close hour
 
 //--- Class defs
-  CFractal           *fractal        = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
-  CSessions          *sessions       = new CSessions();
+  CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
+  CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
+  CSessionArray      *session[SessionTypes];
+  
+  string              udEvents[];
+  bool                udActiveEvent;
+
+void AddEvents(SessionType Type)
+  {
+    if (session[Type].ActiveEvent())
+    {
+      ArrayResize(udEvents,ArraySize(udEvents)+1);
+      udEvents[ArraySize(udEvents)-1]   = "\n  "+EnumToString(Type)+"\n";
+     
+      for (EventType type=0;type<EventTypes;type++)
+        if (session[Type].Event(type))
+        {
+          ArrayResize(udEvents,ArraySize(udEvents)+1);
+          udEvents[ArraySize(udEvents)-1]   = "    "+EnumToString(type)+"\n";
+        }
+
+      udActiveEvent    = true;
+    }
+  }
+
+string DisplayEvents(void)
+  {
+    string deEvents  = "";
+    
+    for (int event=0;event<ArraySize(udEvents);event++)
+      deEvents   += udEvents[event];
+      
+    return (deEvents);
+  }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    int      rsClearEvents       = true;
     
+    ArrayResize(udEvents,1);
+    udEvents[0]                  = "Session Events";
+    udActiveEvent                = false;
+
+    for (SessionType type=Asia; type<SessionTypes; type++)
+    {
+      AddEvents(type);
+              
+      UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
+      UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
+//      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
+    }
+    
+    if (udActiveEvent)
+      Pause(DisplayEvents(),"Event() Issue");
+//    if (session[T.Event(NewHigh))
+//      UpdateLabel("lbAlert","New High",clrLawnGreen,14);
+//    else
+//    if (session.Event(NewLow)))
+//      UpdateLabel("lbAlert","New Low",clrRed,14);
+//    else
+//      UpdateLabel("lbAlert","",clrBlack,14);
   }
 
 //+------------------------------------------------------------------+
@@ -63,10 +115,11 @@ void GetData(void)
     fractal.Update();
     pfractal.Update();
 
-//    UpdateSessions();
+    for (SessionType type=Asia;type<SessionTypes;type++)
+      session[type].Update();
     
-    if (IsChanged(gdPivotDir,pfractal.Direction(Pivot)))
-      Pause("New Pivot Breakout\nDirection: "+DirText(pfractal.Direction(Range)),"ptrRangeDir() Issue");
+//    if (IsChanged(gdPivotDir,pfractal.Direction(Pivot)))
+//      Pause("New Pivot Breakout\nDirection: "+DirText(pfractal.Direction(Range)),"ptrRangeDir() Issue");
 //    if (pfractal.Age(Tick)==1)
   }
 
@@ -131,12 +184,25 @@ void OnTick()
 int OnInit()
   {
     ManualInit();
-//    InitSessions();
         
-    sessions.SetSessionHours(Daily,inpNewDay,inpEndDay);
-    sessions.SetSessionHours(Asia,inpAsiaOpen,inpAsiaClose);
-    sessions.SetSessionHours(Europe,inpEuropeOpen,inpEuropeClose);
-    sessions.SetSessionHours(US,inpUSOpen,inpUSClose);
+    session[Daily]      = new CSessionArray(inpNewDay);
+    session[Asia]       = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]     = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
+    
+    NewLabel("lbSessAsia","Asia",30,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessEurope","Europe",30,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessUS","US",30,29,clrDarkGray,SCREEN_LR);
+    
+    NewLabel("lbDirAsia","",10,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirEurope","",10,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirUS","",10,29,clrDarkGray,SCREEN_LR);
+
+    NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
+
+    NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);    
 
     return(INIT_SUCCEEDED);
   }
@@ -148,5 +214,7 @@ void OnDeinit(const int reason)
   {
     delete fractal;
     delete pfractal;
-    delete sessions;
+    
+    for (SessionType type=Asia;type<SessionTypes;type++)
+      delete session[type];
   }

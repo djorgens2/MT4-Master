@@ -33,7 +33,8 @@ protected:
                   NewAggregate,
                   NewBreakout,
                   NewReversal,
-                  InsideReversal,
+                  NewRally,
+                  NewPullback,
                   SessionOpen,
                   SessionClose,
                   NewDay,
@@ -42,16 +43,28 @@ protected:
                 
 private:
 
-      bool Events[EventTypes];
+      bool eEvents[EventTypes];
 
 public:
                      CEvent(){};
                     ~CEvent(){};
 
-      void           SetEvent(EventType Event)   {Events[Event]=true;}
-      void           ClearEvent(EventType Event) {Events[Event]=false;}
-      void           ClearEvents(void)           {ArrayInitialize(Events,false);}
+      void           SetEvent(EventType Event)   {eEvents[Event]=true;}
+      void           ClearEvent(EventType Event) {eEvents[Event]=false;}
+      void           ClearEvents(void)           {ArrayInitialize(eEvents,false);}
+      bool           ActiveEvent(void);
 
-      bool           operator[](const EventType Event) const {return(Events[Event]);}
+      bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
   };
+
+bool CEvent::ActiveEvent(void)
+  {
+    bool aeEvent   = false;
+    
+    for (EventType event=NewDirection;event<EventTypes;event++)
+      if (eEvents[event])
+        return (true);
+        
+    return (false);
+  }

@@ -84,6 +84,25 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
 
 //--- Common terminology; global constants
 
+       enum     TrendState
+                {
+                  LongTrend         =  7,    //--- Greater than pegged resistance
+                  LongBreakout      =  6,    //--- Greater than unpegged resistance
+                  LongTerm          =  5,    //--- Between fibo 50 & 100 on open
+                  LongRally         =  4,    //--- After pullback, +2 long fibo
+                  LongPullback      =  3,    //--- Less than long fibo 50
+                  LongCorrection    =  2,    //--- Less than long fibo 23
+                  LongReversal      =  1,    //--- Less than long fibo -23 (trap)
+                  NoState           =  0,    //--- Initial state
+                  ShortReversal     = -1,    //--- Greater than short fibo -23 (trap)
+                  ShortCorrection   = -2,    //--- Less than short fibo 23
+                  ShortRally        = -3,    //--- Less than short fibo 50
+                  ShortPullback     = -4,    //--- After rally, +2 short fibo
+                  ShortTerm         = -5,    //--- Between fibo 50 & 100 on open
+                  ShortBreakout     = -6,    //--- Less than unpegged support
+                  ShortTrend        = -7,    //--- Less than pegged support
+                };
+
        enum     Operation
                 {
                   Add,
@@ -521,6 +540,18 @@ double fdiv(double Dividend, double Divisor, int Precision=0)
   }
 
 //+------------------------------------------------------------------+
+//| lpad - left pads a value with the character and length supplied  |
+//+------------------------------------------------------------------+
+string lpad(string Value, string Pad, int Length)
+  {
+    if (StringLen(Value)<Length)
+      for (int idx=Length-StringLen(Value);idx>0;idx--)
+        Value = Pad+Value;
+    
+    return (Value);
+  }
+
+//+------------------------------------------------------------------+
 //| Swap - swaps one double value for the other with precision       |
 //+------------------------------------------------------------------+
 void Swap(double &Value1, double &Value2, int Precision=0.00)
@@ -600,20 +631,67 @@ void Append(string &Source, string Text, string Separator=" ")
   }
 
 //+------------------------------------------------------------------+
-//| DirectionAction - translates price direction into order action   |
+//| Action - translates price direction into order action            |
 //+------------------------------------------------------------------+
-int DirectionAction(int Direction, bool Contrarian=false)
+int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
   {
-    switch (Direction)
+    const int NoAction        = 0;
+    const int dInverseState   = 3;
+    int       dContrarian     = BoolToInt(Contrarian,-1,1);
+    
+    switch (ValueType)
     {
-      case DirectionUp:   if (Contrarian)
-                            return (OP_SELL);
-                          return (OP_BUY);
-                          
-      case DirectionDown: if (Contrarian)
-                            return (OP_BUY);
-                          return (OP_SELL);
+      case InDirection:   Value         *= dContrarian;
+                          break;
+      case InState:       if (fabs(Value)<dInverseState)
+                            Value        = DirectionNone;
+                          else
+                            Value       *= dContrarian;
+                          break;
+      case InAction:      if (Value==OP_BUY)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==OP_SELL)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = DirectionNone;
     }
     
-    return NoValue;
+    if (IsLower(DirectionNone,Value))  return (OP_BUY);
+    if (IsHigher(DirectionNone,Value)) return (OP_SELL);
+    
+    return (NoAction);
+  }
+
+//+------------------------------------------------------------------+
+//| Direction - order action translates into price direction         |
+//+------------------------------------------------------------------+
+int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
+  {
+    const int NoAction        = 0;
+    const int dInverseState   = 3;
+    int       dContrarian     = BoolToInt(Contrarian,-1,1);
+    
+    switch (ValueType)
+    {
+      case InDirection:   Value         *= dContrarian;
+                          break;
+      case InState:       if (fabs(Value)<dInverseState)
+                            Value        = DirectionNone;
+                          else
+                            Value       *= dContrarian;
+                          break;
+      case InAction:      if (Value==OP_BUY)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==OP_SELL)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = DirectionNone;
+    }
+    
+    if (IsLower(DirectionNone,Value))  return (DirectionUp);
+    if (IsHigher(DirectionNone,Value)) return (DirectionDown);
+    
+    return (DirectionNone);
   }

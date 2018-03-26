@@ -195,7 +195,10 @@ void CFractal::CalcOrigin(void)
         if (f[Expansion].Price>fmax(dOrigin.Top,dOrigin.Price) || f[Expansion].Price<fmin(dOrigin.Bottom,dOrigin.Price))
           fEvents.SetEvent(NewOrigin);
         else
-          fEvents.SetEvent(InsideReversal);
+        if (f[Expansion].Direction==DirectionUp)
+          fEvents.SetEvent(NewRally);
+        else
+          fEvents.SetEvent(NewPullback);
       else
       if (f[Expansion].Direction!=dOrigin.Direction)
       {
@@ -206,7 +209,7 @@ void CFractal::CalcOrigin(void)
           fEvents.SetEvent(NewOrigin);
       }
 
-    if (Event(InsideReversal))
+    if (Event(NewRally)||Event(NewPullback))
     {
       if (dOrigin.State == Retrace)
         dOrigin.State            = Trap;
