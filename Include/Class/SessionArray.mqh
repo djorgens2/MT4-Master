@@ -17,8 +17,19 @@ class CSessionArray
   {
 
 public:
+             //-- Session Record Definition
+             struct SessionRec
+             {
+               int         TermDir;
+               double      Open;
+               double      High;
+               double      Low;
+               double      Close;
+               int         BoundaryCount;
+               TrendState  State;
+             };
 
-             //-- Session Types`
+             //-- Session Types
              enum SessionType
              {
                Asia,
@@ -29,7 +40,7 @@ public:
              };
 
              CSessionArray(SessionType Type, int HourOpen, int HourClose);
-             CSessionArray(int NewDay);
+             CSessionArray(SessionType Type);
             ~CSessionArray();
 
              bool          SessionIsOpen(void);
@@ -37,6 +48,8 @@ public:
              bool          ActiveEvent(void)     {return (sEvent.ActiveEvent());}
              double        Support(void)         {return (sSupport);}
              double        Resistance(void)      {return (sResistance);}
+             SessionRec    Active(void)          {return (srActive);}
+             SessionRec    History(int Shift)    {return (srHistory[Shift]);}
 
              int           Direction(RetraceType Type);
              void          Update(void);
@@ -45,21 +58,9 @@ public:
 private:
 
              //--- Private Class properties
-             struct SessionRec
-             {
-               int         sTermDir;
-               double      sOpen;
-               double      sHigh;
-               double      sLow;
-               double      sClose;
-               int         sBoundaryCount;
-               TrendState  sState;
-             };
-
              SessionType   sType;
              
              bool          sSessionIsOpen;
-             int           sPreviousHour;
 
              int           sTrendDir;
              bool          sTrendPeg;
@@ -81,20 +82,38 @@ private:
              void OpenSession(void);
              void CloseSession(void);
              void LoadHistory(void);
+             bool NewDay(void);
   };
+
+//+------------------------------------------------------------------+
+//| NewDay - Sets the NewDay event based on the new day start hour   |
+//+------------------------------------------------------------------+
+bool CSessionArray::NewDay(void)
+  {
+     static int ndSaveHour  = 0;
+     
+     if (IsChanged(ndSaveHour,TimeHour(Time[sBar])))
+       if (ndSaveHour==sHourOpen)
+       {
+         sEvent.SetEvent(NewDay);
+         return (true);
+       }
+     
+     return (false);
+  }
 
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
 //+------------------------------------------------------------------+
 void CSessionArray::OpenSession(void)
   {
-     srActive.sTermDir               = DirectionNone;
-     srActive.sOpen                  = Open[sBar];
-     srActive.sHigh                  = High[sBar];
-     srActive.sLow                   = Low[sBar];
-     srActive.sClose                 = NoValue;
-     srActive.sBoundaryCount         = NoValue;
-     srActive.sState                 = NoState;
+     srActive.TermDir                = DirectionNone;
+     srActive.Open                   = Open[sBar];
+     srActive.High                   = High[sBar];
+     srActive.Low                    = Low[sBar];
+     srActive.Close                  = NoValue;
+     srActive.BoundaryCount          = NoValue;
+     srActive.State                  = NoState;
      
      sEvent.SetEvent(SessionOpen);
   }
@@ -104,30 +123,30 @@ void CSessionArray::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSessionArray::CloseSession(void)
   {
-     srActive.sClose                 = Close[sBar+1];
+     srActive.Close                   = Close[sBar+1];
 
      sEvent.SetEvent(SessionClose);
      
-     if (srActive.sState==NoState)
+     if (srActive.State==NoState)
      {
-       if (srActive.sTermDir==DirectionUp)
-         srActive.sState             = LongTerm;
+       if (srActive.TermDir==DirectionUp)
+         srActive.State              = LongTerm;
 
-       if (srActive.sTermDir==DirectionDown)
-         srActive.sState             = ShortTerm;
+       if (srActive.TermDir==DirectionDown)
+         srActive.State              = ShortTerm;
 
-       sTrendDir                     = srActive.sTermDir;
+       sTrendDir                     = srActive.TermDir;
      }
      
-     sSupport                        = srActive.sLow;
-     sResistance                     = srActive.sHigh;
+     sSupport                        = srActive.Low;
+     sResistance                     = srActive.High;
      
      ArrayResize(srHistory,ArraySize(srHistory)+1);
      srHistory[ArraySize(srHistory)-1] = srActive;
   }
 
 //+------------------------------------------------------------------+
-//| Session Class Constructor for non-daily                          |
+//| LoadHistory - Loads history from the first session open          |
 //+------------------------------------------------------------------+
 void CSessionArray::LoadHistory(void)
   {
@@ -139,7 +158,6 @@ void CSessionArray::LoadHistory(void)
     
     sBar                   = iBarShift(Symbol(),PERIOD_H1,StrToTime(TimeToStr(Time[Bars-24], TIME_DATE)+" "+lpad(IntegerToString(sHourOpen),"0",2)+":00"));
     sStartTime             = Time[sBar];
-    sPreviousHour          = TimeHour(Time[sBar]);
     
     for (sBar=sBar;sBar>0;sBar--)
       Update();
@@ -155,7 +173,6 @@ CSessionArray::CSessionArray(SessionType Type, int HourOpen, int HourClose)
     sTrendDir              = DirectionNone;
     sHourOpen              = HourOpen;
     sHourClose             = HourClose;
-    sPreviousHour          = HourOpen;
     
     LoadHistory();    
   }
@@ -163,14 +180,15 @@ CSessionArray::CSessionArray(SessionType Type, int HourOpen, int HourClose)
 //+------------------------------------------------------------------+
 //| Session Class Constructor for daily                              |
 //+------------------------------------------------------------------+
-CSessionArray::CSessionArray(int NewDay)
+CSessionArray::CSessionArray(SessionType NewDay)
   {
+    const int NewDayHour   = 0;
+    
     //--- Init global session values
     sType                  = Daily;
     sTrendDir              = DirectionNone;
-    sHourOpen              = NewDay;
-    sHourClose             = NewDay;
-    sPreviousHour          = NewDay;
+    sHourOpen              = NewDayHour;
+    sHourClose             = NewDayHour;
     
     LoadHistory();
   }
@@ -192,11 +210,7 @@ void CSessionArray::Update(void)
     sEvent.ClearEvents();
         
     //--- Handle New Day
-    if (IsChanged(sPreviousHour,TimeHour(Time[sBar])))
-      if (sPreviousHour==sHourNewDay)
-        sEvent.SetEvent(NewDay);
-        
-    if (sType==Daily && sEvent[NewDay])
+    if (sType==Daily && NewDay())
       CloseSession();
     else
     
@@ -207,12 +221,12 @@ void CSessionArray::Update(void)
         OpenSession();
         
       //--- Test for session high
-      if (IsHigher(High[sBar],srActive.sHigh))
+      if (IsHigher(High[sBar],srActive.High))
       {
         sEvent.SetEvent(NewHigh);
         sEvent.SetEvent(NewBoundary);
         
-        if (IsChanged(srActive.sTermDir,DirectionUp))
+        if (IsChanged(srActive.TermDir,DirectionUp))
         {
           sEvent.SetEvent(NewDirection);
           sEvent.SetEvent(NewTerm);
@@ -220,12 +234,12 @@ void CSessionArray::Update(void)
       }
         
       //--- Test for session low
-      if (IsLower(Low[sBar],srActive.sLow))
+      if (IsLower(Low[sBar],srActive.Low))
       {
         sEvent.SetEvent(NewLow);
         sEvent.SetEvent(NewBoundary);
 
-        if (IsChanged(srActive.sTermDir,DirectionDown))
+        if (IsChanged(srActive.TermDir,DirectionDown))
         {
           sEvent.SetEvent(NewDirection);
           sEvent.SetEvent(NewTerm);
@@ -266,7 +280,7 @@ int CSessionArray::Direction(RetraceType Type)
     switch (Type)
     {
       case Trend:   return(Direction(sResistance-sSupport));
-      case Term:    return(srActive.sTermDir);
+      case Term:    return(srActive.TermDir);
     }
     
     return (DirectionNone);

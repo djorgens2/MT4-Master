@@ -45,20 +45,39 @@ input int    inpUSClose              = 23;    // US market close hour
   string              udEvents[];
   bool                udActiveEvent;
 
+void ClearSessionInfo(void)
+  {
+    ArrayResize(udEvents,1);
+    udEvents[0]                  = "Session Data";
+    udActiveEvent                = false;
+  }
+
 void AddEvents(SessionType Type)
   {
     if (session[Type].ActiveEvent())
     {
-      ArrayResize(udEvents,ArraySize(udEvents)+1);
-      udEvents[ArraySize(udEvents)-1]   = "\n  "+EnumToString(Type)+"\n";
+      ArrayResize(udEvents,ArraySize(udEvents)+2);
+      udEvents[ArraySize(udEvents)-2]   = "\n  "+EnumToString(Type);
+      udEvents[ArraySize(udEvents)-1]   = "\n    Events"+EnumToString(Type)+"\n";
      
       for (EventType type=0;type<EventTypes;type++)
         if (session[Type].Event(type))
         {
           ArrayResize(udEvents,ArraySize(udEvents)+1);
-          udEvents[ArraySize(udEvents)-1]   = "    "+EnumToString(type)+"\n";
+          udEvents[ArraySize(udEvents)-1]   = "      "+EnumToString(type)+"\n";
         }
 
+      ArrayResize(udEvents,ArraySize(udEvents)+1);
+      udEvents[ArraySize(udEvents)-1]   = "\n    Data\n";
+      
+      ArrayResize(udEvents,ArraySize(udEvents)+1);
+      udEvents[ArraySize(udEvents)-1]   = "\n      OHLC: "
+          +DoubleToStr(session[Type].Active().Open,Digits)+":"
+          +DoubleToStr(session[Type].Active().High,Digits)+":"
+          +DoubleToStr(session[Type].Active().Low,Digits)+":"
+          +DoubleToStr(session[Type].Active().Close,Digits)+":"
+          +"\n";
+     
       udActiveEvent    = true;
     }
   }
@@ -78,15 +97,11 @@ string DisplayEvents(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    int      rsClearEvents       = true;
+    AddEvents(Daily);
     
-    ArrayResize(udEvents,1);
-    udEvents[0]                  = "Session Events";
-    udActiveEvent                = false;
-
     for (SessionType type=Asia; type<SessionTypes; type++)
     {
-      AddEvents(type);
+      //AddEvents(type);
               
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
@@ -185,7 +200,7 @@ int OnInit()
   {
     ManualInit();
         
-    session[Daily]      = new CSessionArray(inpNewDay);
+    session[Daily]      = new CSessionArray(Daily);
     session[Asia]       = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
     session[Europe]     = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
