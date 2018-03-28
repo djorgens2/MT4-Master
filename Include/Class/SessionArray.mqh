@@ -63,7 +63,6 @@ private:
              bool          sSessionIsOpen;
 
              int           sTrendDir;
-             bool          sTrendPeg;
              int           sHourOpen;
              int           sHourClose;
              int           sBar;
@@ -138,11 +137,18 @@ void CSessionArray::CloseSession(void)
        sTrendDir                     = srActive.TermDir;
      }
      
+     sSessionIsOpen                  = false;
      sSupport                        = srActive.Low;
      sResistance                     = srActive.High;
      
      ArrayResize(srHistory,ArraySize(srHistory)+1);
      srHistory[ArraySize(srHistory)-1] = srActive;
+
+     //--- Set Active to OffSession
+     srActive.Open                   = Open[sBar];
+     srActive.High                   = High[sBar];
+     srActive.Low                    = Low[sBar];
+     srActive.Close                  = NoValue;
   }
 
 //+------------------------------------------------------------------+
@@ -252,10 +258,17 @@ void CSessionArray::Update(void)
       }    
     }
     else
-
-    //--- Handle Session Close
-    if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
-      CloseSession();    
+    {
+      //--- Handle Session Close
+      if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
+        CloseSession();
+      else
+      
+      //--- Handle off session events
+      {
+        
+      }
+    }
   }
   
 //+------------------------------------------------------------------+
@@ -279,8 +292,9 @@ int CSessionArray::Direction(RetraceType Type)
   {    
     switch (Type)
     {
-      case Trend:   return(Direction(sResistance-sSupport));
-      case Term:    return(srActive.TermDir);
+      case Trend:   return (Direction(sResistance-sSupport));
+      case Term:    return (srActive.TermDir);
+      case Prior:   return (srHistory[ArraySize(srHistory)-1].TermDir);
     }
     
     return (DirectionNone);

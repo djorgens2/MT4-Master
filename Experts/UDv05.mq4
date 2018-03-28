@@ -58,25 +58,24 @@ void AddEvents(SessionType Type)
     {
       ArrayResize(udEvents,ArraySize(udEvents)+2);
       udEvents[ArraySize(udEvents)-2]   = "\n  "+EnumToString(Type);
-      udEvents[ArraySize(udEvents)-1]   = "\n    Events"+EnumToString(Type)+"\n";
+      udEvents[ArraySize(udEvents)-1]   = "\n     Events\n";
      
       for (EventType type=0;type<EventTypes;type++)
         if (session[Type].Event(type))
         {
           ArrayResize(udEvents,ArraySize(udEvents)+1);
-          udEvents[ArraySize(udEvents)-1]   = "      "+EnumToString(type)+"\n";
+          udEvents[ArraySize(udEvents)-1]   = "         "+EnumToString(type)+"\n";
         }
 
       ArrayResize(udEvents,ArraySize(udEvents)+1);
-      udEvents[ArraySize(udEvents)-1]   = "\n    Data\n";
+      udEvents[ArraySize(udEvents)-1]   = "      Data\n";
       
       ArrayResize(udEvents,ArraySize(udEvents)+1);
-      udEvents[ArraySize(udEvents)-1]   = "\n      OHLC: "
+      udEvents[ArraySize(udEvents)-1]   = "         OHLC: "
           +DoubleToStr(session[Type].Active().Open,Digits)+":"
           +DoubleToStr(session[Type].Active().High,Digits)+":"
           +DoubleToStr(session[Type].Active().Low,Digits)+":"
-          +DoubleToStr(session[Type].Active().Close,Digits)+":"
-          +"\n";
+          +BoolToStr(IsEqual(session[Type].Active().Close,NoValue),"Pending",DoubleToStr(session[Type].Active().Close,Digits))+"\n";
      
       udActiveEvent    = true;
     }
@@ -97,11 +96,11 @@ string DisplayEvents(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    AddEvents(Daily);
+    ClearSessionInfo();
     
     for (SessionType type=Asia; type<SessionTypes; type++)
     {
-      //AddEvents(type);
+      AddEvents(type);
               
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
