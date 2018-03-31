@@ -84,7 +84,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
 
 //--- Common terminology; global constants
 
-       enum     TrendState
+       enum     StateType
                 {
                   LongTrend         =  7,    //--- Greater than fibo 161
                   LongBreakout      =  6,    //--- Greater than fibo 100
@@ -200,7 +200,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Inversion,          //--- Current Convergent retrace
                   Conversion,         //--- Current reversal retrace; trend resumption
                   Actual,             //--- Lead retrace - retrace on the major leg
-                  RetraceTypeMembers  //--- DO NOT REPOSITION -- used to report total count of enums
+                  RetraceTypes        //--- DO NOT REPOSITION -- used to report total count of enums
                 };
   
 //+------------------------------------------------------------------+

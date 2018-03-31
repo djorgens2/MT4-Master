@@ -25,8 +25,15 @@ public:
                double      High;
                double      Low;
                double      Close;
-               int         BoundaryCount;
-               TrendState  State;
+             };
+
+             //-- State Record Definition
+             struct StateRec
+             {
+               StateType   State;
+               int         StateDir;
+               double      Base;
+               double      Root;
              };
 
              //-- Session Types
@@ -71,15 +78,22 @@ private:
              
              double        sSupport;
              double        sResistance;
+             int           sBoundaryCount;
 
              //--- Private class collections
+             double        sTrend[RetraceTypes];
              SessionRec    srActive;
              SessionRec    srHistory[];
+
              CEvent       *sEvent;
              
              //--- Private Methods
              void OpenSession(void);
              void CloseSession(void);
+             void CalcActive(void);
+             void CalcState(void);
+             void SetFractalBase(int TermDir, double PriceHigh, double PriceLow);
+
              void LoadHistory(void);
              bool NewDay(void);
   };
@@ -102,18 +116,38 @@ bool CSessionArray::NewDay(void)
   }
 
 //+------------------------------------------------------------------+
+//| SetFractalBase - Updates the fractal points array                |
+//+------------------------------------------------------------------+
+void CSessionArray::SetFractalBase(int TermDir, double PriceHigh, double PriceLow)
+  {
+    static int sfbDir   = DirectionNone;
+    
+    
+  }
+  
+//+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
 //+------------------------------------------------------------------+
 void CSessionArray::OpenSession(void)
   {
+     if (sTrendState==NoState)
+     {
+       SetFractalBase(srActive.TermDir,srActive.High,srActive.Low);
+     }
+     else
+     {
+//       if (Active
+     }
+     
      srActive.TermDir                = DirectionNone;
+     srActive.TermState              = NoState;
      srActive.Open                   = Open[sBar];
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
      srActive.Close                  = NoValue;
-     srActive.BoundaryCount          = NoValue;
-     srActive.State                  = NoState;
      
+     sBoundaryCount                  = NoValue;
+
      sEvent.SetEvent(SessionOpen);
   }
 
@@ -126,15 +160,16 @@ void CSessionArray::CloseSession(void)
 
      sEvent.SetEvent(SessionClose);
      
-     if (srActive.State==NoState)
+     if (srActive.TermState==NoState)
      {
        if (srActive.TermDir==DirectionUp)
-         srActive.State              = LongTerm;
+         srActive.TermState          = LongTerm;
 
        if (srActive.TermDir==DirectionDown)
-         srActive.State              = ShortTerm;
+         srActive.TermState          = ShortTerm;
 
        sTrendDir                     = srActive.TermDir;
+       sTrendState                   = srActive.TermState;
      }
      
      sSessionIsOpen                  = false;
@@ -149,6 +184,48 @@ void CSessionArray::CloseSession(void)
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
      srActive.Close                  = NoValue;
+  }
+
+//+------------------------------------------------------------------+
+//| CalcState - Calculates the trend/term session states             |
+//+------------------------------------------------------------------+
+void CSessionArray::CalcState(void)
+  {
+    if (sEvent[NewBoundary])
+    {
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateActive - Updates active pricing and sets events            |
+//+------------------------------------------------------------------+
+void CSessionArray::CalcActive(void)
+  {
+      //--- Test for session high
+      if (IsHigher(High[sBar],srActive.High))
+      {
+        sEvent.SetEvent(NewHigh);
+        sEvent.SetEvent(NewBoundary);
+        
+        if (IsChanged(srActive.TermDir,DirectionUp))
+        {
+          sEvent.SetEvent(NewDirection);
+          sEvent.SetEvent(NewTerm);
+        }
+      }
+        
+      //--- Test for session low
+      if (IsLower(Low[sBar],srActive.Low))
+      {
+        sEvent.SetEvent(NewLow);
+        sEvent.SetEvent(NewBoundary);
+
+        if (IsChanged(srActive.TermDir,DirectionDown))
+        {
+          sEvent.SetEvent(NewDirection);
+          sEvent.SetEvent(NewTerm);
+        }
+      }  
   }
 
 //+------------------------------------------------------------------+
@@ -225,37 +302,13 @@ void CSessionArray::Update(void)
     {
       if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
         OpenSession();
-        
-      //--- Test for session high
-      if (IsHigher(High[sBar],srActive.High))
-      {
-        sEvent.SetEvent(NewHigh);
-        sEvent.SetEvent(NewBoundary);
-        
-        if (IsChanged(srActive.TermDir,DirectionUp))
-        {
-          sEvent.SetEvent(NewDirection);
-          sEvent.SetEvent(NewTerm);
-        }
-      }
-        
-      //--- Test for session low
-      if (IsLower(Low[sBar],srActive.Low))
-      {
-        sEvent.SetEvent(NewLow);
-        sEvent.SetEvent(NewBoundary);
-
-        if (IsChanged(srActive.TermDir,DirectionDown))
-        {
-          sEvent.SetEvent(NewDirection);
-          sEvent.SetEvent(NewTerm);
-        }
-      }
-      
+      else
+        CalcActive();
+                  
       //--- Test for session trend changes
       if (sTrendDir!=DirectionNone)
       {
-      }    
+      }
     }
     else
     {
@@ -266,9 +319,12 @@ void CSessionArray::Update(void)
       
       //--- Handle off session events
       {
-        
+        CalcActive();
+     
       }
     }
+    
+    CalcState();
   }
   
 //+------------------------------------------------------------------+

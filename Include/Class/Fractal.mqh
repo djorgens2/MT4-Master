@@ -43,7 +43,7 @@ private:
          datetime      Updated;
        };
 
-       FractalRec    f[RetraceTypeMembers];
+       FractalRec    f[RetraceTypes];
        FractalRec    fOrigin;               //--- Actual origin data
        OriginRec     dOrigin;               //--- Derived origin data
 
@@ -136,7 +136,7 @@ void CFractal::BarUpdate(void)
     fBarHigh++;
     fBarLow++;
     
-    for (RetraceType type=Trend;type<RetraceTypeMembers;type++)
+    for (RetraceType type=Trend;type<RetraceTypes;type++)
       if (f[type].Bar>NoValue)
         f[type].Bar++;
               
@@ -299,7 +299,7 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
     double lastRangeTrend    = 0.0;
     double lastRangeTerm     = fRange;
   
-    for (RetraceType type=Type;type<RetraceTypeMembers;type++)
+    for (RetraceType type=Type;type<RetraceTypes;type++)
     {    
       //--- Initialize retrace data by type
       f[type].Direction      = DirectionNone;
@@ -345,7 +345,7 @@ void CFractal::CalcRetrace(void)
     RetraceType crStateMinor    = Expansion;
     
     //--- calc interior retraces    
-    for (RetraceType type=Expansion;type<RetraceTypeMembers;type++)
+    for (RetraceType type=Expansion;type<RetraceTypes;type++)
     {
       if (this.Direction(type) == DirectionUp)
         if (f[type].Bar == NoValue)
@@ -616,7 +616,7 @@ CFractal::CFractal(int Range, int MinRange)
     dOrigin.Bar           = NoValue;
     dOrigin.Direction     = DirectionNone;
         
-    for (RetraceType Type=Trend;Type<RetraceTypeMembers;Type++)
+    for (RetraceType Type=Trend;Type<RetraceTypes;Type++)
       UpdateRetrace(Type,NoValue);
 
     for (fBarNow=Bars-1; fBarNow>0; fBarNow--)
@@ -1174,7 +1174,7 @@ void CFractal::RefreshScreen(void)
   {
     string           rsReport    = "";
     string           rsFlag      = "";
-    const  string    rsSeg[RetraceTypeMembers] = {"tr","tm","p","b","r","e","d","c","iv","cv","a"};
+    const  string    rsSeg[RetraceTypes] = {"tr","tm","p","b","r","e","d","c","iv","cv","a"};
     
     if (dOrigin.Bar == NoValue)
       rsReport   += "\n  Origin: No Long Term Data\n";
