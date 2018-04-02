@@ -629,6 +629,7 @@ CFractal::CFractal(int Range, int MinRange)
 CFractal::~CFractal(void)
   {
     delete fBuffer;
+    delete fEvents;
   }
   
 //+------------------------------------------------------------------+

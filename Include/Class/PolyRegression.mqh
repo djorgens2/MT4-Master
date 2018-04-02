@@ -501,6 +501,7 @@ CPolyRegression::CPolyRegression(int Degree, int Periods, int MAPeriods)
 //+------------------------------------------------------------------+
 CPolyRegression::~CPolyRegression()
   {
+    delete prEvents;
   }
     
 //+------------------------------------------------------------------+

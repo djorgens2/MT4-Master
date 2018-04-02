@@ -13,7 +13,6 @@
 #include <Class\SessionArray.mqh>
 
 input string EAHeader                = "";    //+---- Application Options -------+
-input int    inpMaxVolume            = 30;    // Maximum volume
 input double inpDailyTarget          = 3.6;   // Daily target
 
 input string fractalHeader           = "";    //+------ Fractal Options ---------+
@@ -42,8 +41,12 @@ input int    inpUSClose              = 23;    // US market close hour
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CSessionArray      *session[SessionTypes];
   
+  //--- Operational collections
   string              udEvents[];
   bool                udActiveEvent;
+  
+  //--- Operational variables
+  int                 udPlan                 = OP_NO_ACTION;
 
 void ClearSessionInfo(void)
   {
@@ -57,7 +60,7 @@ void AddEvents(SessionType Type)
     if (session[Type].ActiveEvent())
     {
       ArrayResize(udEvents,ArraySize(udEvents)+2);
-      udEvents[ArraySize(udEvents)-2]   = "\n  "+EnumToString(Type);
+      udEvents[ArraySize(udEvents)-2]   = "\n  "+EnumToString(Type)+BoolToStr(session[Type].SessionIsOpen(),""," (Off-Session)");
       udEvents[ArraySize(udEvents)-1]   = "\n     Events\n";
      
       for (EventType type=0;type<EventTypes;type++)
@@ -104,11 +107,15 @@ void RefreshScreen(void)
               
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
+      UpdatePriceLabel("lblPipMAPivot",pfractal.Pivot(Price));
+      UpdateLabel("lblPlan",ActionText(udPlan)+" ("+ActionText(Action(pfractal.Direction(Pivot)))+")");
+      UpdateLabel("lblEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
 //      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
     }
     
-    if (udActiveEvent)
-      Pause(DisplayEvents(),"Event() Issue");
+//    if (udActiveEvent)
+      Comment(DisplayEvents());
+      //Pause(DisplayEvents(),"Event() Issue");
 //    if (session[T.Event(NewHigh))
 //      UpdateLabel("lbAlert","New High",clrLawnGreen,14);
 //    else
@@ -131,10 +138,6 @@ void GetData(void)
 
     for (SessionType type=Asia;type<SessionTypes;type++)
       session[type].Update();
-    
-//    if (IsChanged(gdPivotDir,pfractal.Direction(Pivot)))
-//      Pause("New Pivot Breakout\nDirection: "+DirText(pfractal.Direction(Range)),"ptrRangeDir() Issue");
-//    if (pfractal.Age(Tick)==1)
   }
 
 //+------------------------------------------------------------------+
@@ -142,21 +145,39 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void CalcDailyPlan(void)
   {
+    Pause("New Day - What's the game plan?","NewDay()");
     
   }
 
 //+------------------------------------------------------------------+
-//| Execute                                                          |
+//| CalcDailyPlan                                                    |
+//+------------------------------------------------------------------+
+void ManageTrades(void)
+  {
+    if (LotCount()==0)
+    {
+      if (udPlan==Action(pfractal.Direction(Pivot)))
+        OpenOrder(udPlan,"Opening Trade");
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| Execute - Acts on events to execute trades                       |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-//    if (opNewDay)
-//    {
-//      Pause("New Day - What's the game plan?","NewDay()");
-      
+    if (session[Daily].Event(NewDay))
       CalcDailyPlan();
-//    }
+          
+    if (pfractal.Event(NewPivot))
+      Pause("We have a new pipMA Pivot","NewPivot()");
     
+    if (pfractal.Event(NewPivotDirection))
+    {
+      Pause("We have a new pipMA Pivot Direction","NewPivot()");
+      ManageTrades();
+    }
+
   }
 
 //+------------------------------------------------------------------+
@@ -164,6 +185,11 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    if (Command[0]=="PLAN")
+    {
+      udPlan       = ActionCode(Command[1]);
+//      UpdateLabel("lblPlan",ActionText(udPlan)+" ... "+pfractal.Pivot(Direction)); //" ("+ActionText(Action(pfractal.Pivot(Direction)))+")");
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -216,8 +242,12 @@ int OnInit()
     NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
     NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
 
-    NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);    
+    NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);
 
+    NewPriceLabel("lblPipMAPivot");
+    NewLabel("lblPlan","",5,16,clrWhite,SCREEN_LL);
+    NewLabel("lblEquity","",5,5,clrWhite,SCREEN_LL);
+    
     return(INIT_SUCCEEDED);
   }
 

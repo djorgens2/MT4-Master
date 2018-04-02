@@ -19,6 +19,8 @@ protected:
                 {
                   NewDirection,
                   NewFractal,
+                  NewPivot,
+                  NewPivotDirection,
                   NewOrigin,
                   NewMajor,
                   NewMinor,

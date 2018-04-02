@@ -34,6 +34,9 @@ public:
                int         StateDir;
                double      Base;
                double      Root;
+               int         FiboPeg;
+               double      FiboMin;
+               double      FIboMax;
              };
 
              //-- Session Types
@@ -81,7 +84,7 @@ private:
              int           sBoundaryCount;
 
              //--- Private class collections
-             double        sTrend[RetraceTypes];
+             StateRec      srTrend[RetraceTypes];
              SessionRec    srActive;
              SessionRec    srHistory[];
 
@@ -130,17 +133,16 @@ void CSessionArray::SetFractalBase(int TermDir, double PriceHigh, double PriceLo
 //+------------------------------------------------------------------+
 void CSessionArray::OpenSession(void)
   {
-     if (sTrendState==NoState)
-     {
-       SetFractalBase(srActive.TermDir,srActive.High,srActive.Low);
-     }
-     else
-     {
+//     if (sTrendState==NoState)
+//     {
+//       SetFractalBase(srActive.TermDir,srActive.High,srActive.Low);
+//     }
+//     else
+//     {
 //       if (Active
-     }
+//     }
      
      srActive.TermDir                = DirectionNone;
-     srActive.TermState              = NoState;
      srActive.Open                   = Open[sBar];
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
@@ -159,18 +161,6 @@ void CSessionArray::CloseSession(void)
      srActive.Close                   = Close[sBar+1];
 
      sEvent.SetEvent(SessionClose);
-     
-     if (srActive.TermState==NoState)
-     {
-       if (srActive.TermDir==DirectionUp)
-         srActive.TermState          = LongTerm;
-
-       if (srActive.TermDir==DirectionDown)
-         srActive.TermState          = ShortTerm;
-
-       sTrendDir                     = srActive.TermDir;
-       sTrendState                   = srActive.TermState;
-     }
      
      sSessionIsOpen                  = false;
      sSupport                        = srActive.Low;
