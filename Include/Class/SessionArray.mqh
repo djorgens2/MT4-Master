@@ -17,6 +17,7 @@ class CSessionArray
   {
 
 public:
+
              //-- Session Record Definition
              struct SessionRec
              {
@@ -25,18 +26,10 @@ public:
                double      High;
                double      Low;
                double      Close;
-             };
-
-             //-- State Record Definition
-             struct StateRec
-             {
-               StateType   State;
-               int         StateDir;
-               double      Base;
-               double      Root;
-               int         FiboPeg;
-               double      FiboMin;
-               double      FIboMax;
+               double      Support;
+               double      Resistance;
+               double      OffSession;
+               int         BoundaryCount;
              };
 
              //-- Session Types
@@ -56,8 +49,7 @@ public:
              bool          SessionIsOpen(void);
              bool          Event(EventType Type) {return (sEvent[Type]);}
              bool          ActiveEvent(void)     {return (sEvent.ActiveEvent());}
-             double        Support(void)         {return (sSupport);}
-             double        Resistance(void)      {return (sResistance);}
+
              SessionRec    Active(void)          {return (srActive);}
              SessionRec    History(int Shift)    {return (srHistory[Shift]);}
 
@@ -79,12 +71,7 @@ private:
              
              datetime      sStartTime;
              
-             double        sSupport;
-             double        sResistance;
-             int           sBoundaryCount;
-
              //--- Private class collections
-             StateRec      srTrend[RetraceTypes];
              SessionRec    srActive;
              SessionRec    srHistory[];
 
@@ -95,7 +82,6 @@ private:
              void CloseSession(void);
              void CalcActive(void);
              void CalcState(void);
-             void SetFractalBase(int TermDir, double PriceHigh, double PriceLow);
 
              void LoadHistory(void);
              bool NewDay(void);
@@ -119,36 +105,17 @@ bool CSessionArray::NewDay(void)
   }
 
 //+------------------------------------------------------------------+
-//| SetFractalBase - Updates the fractal points array                |
-//+------------------------------------------------------------------+
-void CSessionArray::SetFractalBase(int TermDir, double PriceHigh, double PriceLow)
-  {
-    static int sfbDir   = DirectionNone;
-    
-    
-  }
-  
-//+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
 //+------------------------------------------------------------------+
 void CSessionArray::OpenSession(void)
   {
-//     if (sTrendState==NoState)
-//     {
-//       SetFractalBase(srActive.TermDir,srActive.High,srActive.Low);
-//     }
-//     else
-//     {
-//       if (Active
-//     }
-     
+       srActive.OffSession        = fdiv(srActive
      srActive.TermDir                = DirectionNone;
      srActive.Open                   = Open[sBar];
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
      srActive.Close                  = NoValue;
-     
-     sBoundaryCount                  = NoValue;
+     srActive.BoundaryCount          = NoValue;
 
      sEvent.SetEvent(SessionOpen);
   }
@@ -163,8 +130,8 @@ void CSessionArray::CloseSession(void)
      sEvent.SetEvent(SessionClose);
      
      sSessionIsOpen                  = false;
-     sSupport                        = srActive.Low;
-     sResistance                     = srActive.High;
+     srActive.Support                = srActive.Low;
+     srActive.Resistance             = srActive.High;
      
      ArrayResize(srHistory,ArraySize(srHistory)+1);
      srHistory[ArraySize(srHistory)-1] = srActive;
@@ -174,16 +141,6 @@ void CSessionArray::CloseSession(void)
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
      srActive.Close                  = NoValue;
-  }
-
-//+------------------------------------------------------------------+
-//| CalcState - Calculates the trend/term session states             |
-//+------------------------------------------------------------------+
-void CSessionArray::CalcState(void)
-  {
-    if (sEvent[NewBoundary])
-    {
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -222,10 +179,7 @@ void CSessionArray::CalcActive(void)
 //| LoadHistory - Loads history from the first session open          |
 //+------------------------------------------------------------------+
 void CSessionArray::LoadHistory(void)
-  {
-    sSupport               = NoValue;
-    sResistance            = NoValue;
-    
+  {    
     sEvent                 = new CEvent();
     sEvent.ClearEvents();
     
@@ -338,7 +292,7 @@ int CSessionArray::Direction(RetraceType Type)
   {    
     switch (Type)
     {
-      case Trend:   return (Direction(sResistance-sSupport));
+      case Trend:   return (sTrendDir);
       case Term:    return (srActive.TermDir);
       case Prior:   return (srHistory[ArraySize(srHistory)-1].TermDir);
     }
