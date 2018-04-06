@@ -29,7 +29,7 @@ public:
                double      Support;
                double      Resistance;
                double      OffSession;
-               int         BoundaryCount;
+               int         ReversalCount;
              };
 
              //-- Session Types
@@ -81,7 +81,6 @@ private:
              void OpenSession(void);
              void CloseSession(void);
              void CalcActive(void);
-             void CalcState(void);
 
              void LoadHistory(void);
              bool NewDay(void);
@@ -109,13 +108,14 @@ bool CSessionArray::NewDay(void)
 //+------------------------------------------------------------------+
 void CSessionArray::OpenSession(void)
   {
-       srActive.OffSession        = fdiv(srActive
+     srActive.OffSession             = fdiv(srActive.High+srActive.Low,2,Digits);
+     srAct
      srActive.TermDir                = DirectionNone;
      srActive.Open                   = Open[sBar];
      srActive.High                   = High[sBar];
      srActive.Low                    = Low[sBar];
      srActive.Close                  = NoValue;
-     srActive.BoundaryCount          = NoValue;
+     srActive.ReversalCount          = NoValue;
 
      sEvent.SetEvent(SessionOpen);
   }
@@ -180,13 +180,53 @@ void CSessionArray::CalcActive(void)
 //+------------------------------------------------------------------+
 void CSessionArray::LoadHistory(void)
   {    
-    sEvent                 = new CEvent();
+    int lhOpenBar   = iBarShift(Symbol(),PERIOD_H1,StrToTime(TimeToStr(Time[Bars-24], TIME_DATE)+" "+lpad(IntegerToString(sHourOpen),"0",2)+":00"));
+    int lhCloseBar  = Bars-1;
+    
+    sEvent                    = new CEvent();
     sEvent.ClearEvents();
     
-    sBar                   = iBarShift(Symbol(),PERIOD_H1,StrToTime(TimeToStr(Time[Bars-24], TIME_DATE)+" "+lpad(IntegerToString(sHourOpen),"0",2)+":00"));
-    sStartTime             = Time[sBar];
+    sStartTime                = Time[sBar];
     
-    for (sBar=sBar;sBar>0;sBar--)
+    srActive.TermDir          = DirectionNone;
+    srActive.Open             = NoValue;
+    srActive.High             = NoValue;
+    srActive.Low              = NoValue;
+    srActive.Close            = NoValue;
+    srActive.Support          = NoValue;
+    srActive.Resistance       = NoValue;
+    srActive.OffSession       = NoValue;
+    srActive.ReversalCount    = NoValue;
+
+    for (sBar=lhCloseBar;sBar>lhOpenBar;sBar--)
+      if (SessionIsOpen())
+        continue;
+      else
+      if (srActive.TermDir==DirectionNone)
+      {
+        if (Open[sBar]>Close[sBar])
+          srActive.TermDir    = DirectionUp;
+          
+        if (Open[sBar]<Close[sBar])
+          srActive.TermDir    = DirectionDown;
+          
+        srActive.Open         = Open[sBar];
+        srActive.High         = High[sBar];
+        srActive.Low          = Low[sBar];
+      }
+      else
+      {
+        if (IsHigher(High[sBar],srActive.High))
+          srActive.TermDir    = DirectionUp;
+          
+        if (IsLower(Low[sBar],srActive.Low))
+          srActive.TermDir    = DirectionDown;
+      }
+    
+    srActive.Support          = srActive.Low;
+    srActive.Resistance       = srActive.High;
+
+    for (sBar=lhOpenBar;sBar>0;sBar--)
       Update();
   }
 
@@ -267,8 +307,6 @@ void CSessionArray::Update(void)
      
       }
     }
-    
-    CalcState();
   }
   
 //+------------------------------------------------------------------+
