@@ -28,7 +28,6 @@ input int    inpPipPeriods           = 200;   // Trade analysis periods (PipMA)
 input int    inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
 
 input string SessionHeader           = "";    //+---- Session Hours -------+
-input int    inpNewDay               = 0;     // New day market open hour
 input int    inpAsiaOpen             = 1;     // Asian market open hour
 input int    inpAsiaClose            = 10;    // Asian market close hour
 input int    inpEuropeOpen           = 8;     // Europe market open hour
@@ -48,19 +47,14 @@ input int    inpUSClose              = 23;    // US market close hour
   //--- Operational variables
   int                 udPlan                 = OP_NO_ACTION;
 
-void ClearSessionInfo(void)
-  {
-    ArrayResize(udEvents,1);
-    udEvents[0]                  = "Session Data";
-    udActiveEvent                = false;
-  }
-
 void AddEvents(SessionType Type)
   {
     if (session[Type].ActiveEvent())
     {
       ArrayResize(udEvents,ArraySize(udEvents)+2);
-      udEvents[ArraySize(udEvents)-2]   = "\n  "+EnumToString(Type)+BoolToStr(session[Type].SessionIsOpen(),""," (Off-Session)");
+      udEvents[ArraySize(udEvents)-2]   = "\n  "
+        + EnumToString(Type)+" ("
+        + BoolToStr(session[Type].SessionIsOpen(),proper(ActionText(session[Type].TradeBias())),"Off-Session")+")";
       udEvents[ArraySize(udEvents)-1]   = "\n     Events\n";
      
       for (EventType type=0;type<EventTypes;type++)
@@ -75,10 +69,8 @@ void AddEvents(SessionType Type)
       
       ArrayResize(udEvents,ArraySize(udEvents)+1);
       udEvents[ArraySize(udEvents)-1]   = "         OHLC: "
-          +DoubleToStr(session[Type].Active().Open,Digits)+":"
-          +DoubleToStr(session[Type].Active().High,Digits)+":"
-          +DoubleToStr(session[Type].Active().Low,Digits)+":"
-          +BoolToStr(IsEqual(session[Type].Active().Close,NoValue),"Pending",DoubleToStr(session[Type].Active().Close,Digits))+"\n";
+          +DoubleToStr(session[Type].Active().TermHigh,Digits)+":"
+          +DoubleToStr(session[Type].Active().TermLow,Digits)+"\n";
      
       udActiveEvent    = true;
     }
@@ -99,22 +91,33 @@ string DisplayEvents(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    ClearSessionInfo();
+    //--- Clear the session data array
+    ArrayResize(udEvents,1);
+    udEvents[0]                  = "Session Data";
+    udActiveEvent                = false;
     
+    //--- Load the session data array
     for (SessionType type=Asia; type<SessionTypes; type++)
     {
       AddEvents(type);
               
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
-      UpdatePriceLabel("lblPipMAPivot",pfractal.Pivot(Price));
-      UpdateLabel("lblPlan",ActionText(udPlan)+" ("+ActionText(Action(pfractal.Direction(Pivot)))+")");
-      UpdateLabel("lblEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
+      UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price));
+      UpdateLabel("lbPlan",ActionText(udPlan)+" ("+ActionText(Action(pfractal.Direction(Pivot)))+")");
+      UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
 //      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
     }
     
-//    if (udActiveEvent)
+      UpdateLine("lnActive",fdiv(session[Asia].Active().TermHigh+session[Daily].Active().TermLow,2),STYLE_DASHDOT,clrLawnGreen);
+      UpdateLine("lnOff",session[Asia].Active().OffMid,STYLE_DASHDOT,clrDarkGray);
+      UpdateLine("lnPrior",session[Asia].Active().PriorMid,STYLE_DASHDOT,clrYellow);
+
+    if (udActiveEvent)
+    {
       Comment(DisplayEvents());
+      Pause("Event Validation","Event Check");
+    }
       //Pause(DisplayEvents(),"Event() Issue");
 //    if (session[T.Event(NewHigh))
 //      UpdateLabel("lbAlert","New High",clrLawnGreen,14);
@@ -129,15 +132,13 @@ void RefreshScreen(void)
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
-  {
-    static int    gdPivotDir   = DirectionNone;
-    static double gdPivotPrice = 0.00;
-    
+  {    
     fractal.Update();
     pfractal.Update();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
       session[type].Update();
+//      session[Daily].Update();
   }
 
 //+------------------------------------------------------------------+
@@ -169,14 +170,14 @@ void Execute(void)
     if (session[Daily].Event(NewDay))
       CalcDailyPlan();
           
-    if (pfractal.Event(NewPivot))
-      Pause("We have a new pipMA Pivot","NewPivot()");
+//    if (pfractal.Event(NewPivot))
+//      Pause("We have a new pipMA Pivot","NewPivot()");
     
-    if (pfractal.Event(NewPivotDirection))
-    {
-      Pause("We have a new pipMA Pivot Direction","NewPivot()");
-      ManageTrades();
-    }
+//    if (pfractal.Event(NewPivotDirection))
+//    {
+//      Pause("We have a new pipMA Pivot Direction","NewPivot()");
+//      ManageTrades();
+//    }
 
   }
 
@@ -188,7 +189,7 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="PLAN")
     {
       udPlan       = ActionCode(Command[1]);
-//      UpdateLabel("lblPlan",ActionText(udPlan)+" ... "+pfractal.Pivot(Direction)); //" ("+ActionText(Action(pfractal.Pivot(Direction)))+")");
+//      UpdateLabel("lbPlan",ActionText(udPlan)+" ... "+pfractal.Pivot(Direction)); //" ("+ActionText(Action(pfractal.Pivot(Direction)))+")");
     }
   }
 
@@ -225,7 +226,7 @@ int OnInit()
   {
     ManualInit();
         
-    session[Daily]      = new CSessionArray(Daily);
+    session[Daily]      = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
     session[Asia]       = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
     session[Europe]     = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
@@ -244,9 +245,15 @@ int OnInit()
 
     NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);
 
-    NewPriceLabel("lblPipMAPivot");
-    NewLabel("lblPlan","",5,16,clrWhite,SCREEN_LL);
-    NewLabel("lblEquity","",5,5,clrWhite,SCREEN_LL);
+    NewPriceLabel("lbPipMAPivot");
+    NewLabel("lbPlan","",5,16,clrWhite,SCREEN_LL);
+    NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);
+    
+    NewLine("lnSupport");
+    NewLine("lnResistance");
+    NewLine("lnActive");
+    NewLine("lnOff");
+    NewLine("lnPrior");
     
     return(INIT_SUCCEEDED);
   }
