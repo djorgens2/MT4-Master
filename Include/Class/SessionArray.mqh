@@ -185,19 +185,23 @@ void CSessionArray::CalcEvents(void)
       if (sBarHour==ndNewDay)
         sEvent.SetEvent(NewDay);
 
-    //--- Handle Session Open
+    //--- Calc events based on opening, closing, off/active sessions
     if (this.SessionIsOpen())
     {
+
+      //--- Handle Session Open
       if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
         sEvent.SetEvent(SessionOpen);
     }
     else
 
-    //--- Handle Session Close
     {
+      //--- Handle Session Close
       if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
         sEvent.SetEvent(SessionClose);
       else
+
+      //--- Handle off/active session events
       {    
         //--- Test for session high
         if (IsHigher(High[sBar],srActive.TermHigh))
@@ -368,17 +372,17 @@ CSessionArray::CSessionArray(SessionType Type, int HourOpen, int HourClose)
     sTrendDir                 = DirectionNone;
     sTrendState               = NoState;
     
-    sFractalDir               = DirectionNone;
-    sFractalOrigin            = new CArrayDouble(0);
-    sFractalOrigin.Truncate   = false;
-    sFractalOrigin.SetPrecision(Digits);
-    
-    
     sHourOpen                 = HourOpen;
     sHourClose                = HourClose;
     
     ArrayInitialize(sFractal,0.00);
     ArrayInitialize(sTrendPeg,false);
+    
+    sFractalDir               = DirectionNone;
+    sFractalOrigin            = new CArrayDouble(0);
+    sFractalOrigin.Truncate   = false;
+    sFractalOrigin.AutoExpand = true;
+    sFractalOrigin.SetPrecision(Digits);
     
     sOffMidBuffer             = new CArrayDouble(Bars);
     sOffMidBuffer.Truncate    = false;
@@ -401,6 +405,7 @@ CSessionArray::~CSessionArray()
     delete sEvent;
     delete sOffMidBuffer;
     delete sPriorMidBuffer;
+    delete sFractalOrigin;
   }
 
 //+------------------------------------------------------------------+
