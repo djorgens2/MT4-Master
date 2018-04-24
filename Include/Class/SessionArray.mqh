@@ -29,6 +29,7 @@ public:
                double      Resistance;
                double      PriorMid;
                double      OffMid;
+               int         OpenTradeBias;
                int         ReversalCount;
              };
 
@@ -55,7 +56,9 @@ public:
              int           Direction(RetraceType Type);
              void          Update(void);
              void          Update(double &OffMidBuffer[], double &PriorMidBuffer[]);
-             int           TradeBias(int TimePeriod=State);
+             int           TradeBias(int TimePeriod=History);
+             double        ActiveMid(void);
+
                     
 private:
 
@@ -65,21 +68,17 @@ private:
              bool          sSessionIsOpen;
 
              int           sTrendDir;
+             int           sTrendCount;
              StateType     sTrendState;
-             bool          sTrendPeg[RetraceTypes];
-             double        sFractal[RetraceTypes];
-             RetraceType   sActiveFractal;
-             int           sFractalDir;
 
              int           sHourOpen;
              int           sHourClose;
              int           sBar;
+             int           sBars;
              int           sBarHour;
              
              datetime      sStartTime;
              
-             double        ActiveMid(void);
-
              
              //--- Private class collections
              SessionRec    srActive;
@@ -88,34 +87,28 @@ private:
              CArrayDouble *sPriorMidBuffer;
              
              CEvent       *sEvent;
-             CArrayDouble *sFractalOrigin;
              
              //--- Private Methods
              void          OpenSession(void);
              void          CloseSession(void);
              void          CalcEvents(void);
              void          CalcState(void);
-             void          CalcFractal(void);
              void          ProcessEvents(void);
              void          LoadHistory(void);
              void          UpdateHistory(void);
+             void          UpdateBuffers(void);
+
+             //--- Private Properties
+             bool          HistoryIsLoaded(void) {return (ArraySize(srHistory)>0);}
   };
 
-//+------------------------------------------------------------------+
-//| ActiveMid - returns the current active mid price (Fibo50)        |
-//+------------------------------------------------------------------+
-double CSessionArray::ActiveMid(void)
-  {
-    return(fdiv(srActive.TermHigh+srActive.TermLow,2,Digits));
-  }
-  
 //+------------------------------------------------------------------+
 //| UpdateHistory - Manages history changes and the history array    |
 //+------------------------------------------------------------------+
 void CSessionArray::UpdateHistory(void)
   {
     SessionRec uhHistory[];
-        
+
     ArrayCopy(uhHistory,srHistory);
     ArrayResize(srHistory,ArraySize(srHistory)+1);
     ArrayCopy(srHistory,uhHistory,1);
@@ -129,8 +122,13 @@ void CSessionArray::UpdateHistory(void)
 void CSessionArray::OpenSession(void)
   {
     srActive.OffMid                 = ActiveMid();
-    srActive.Resistance             = srActive.TermHigh;
-    srActive.Support                = srActive.TermLow;
+    srActive.OpenTradeBias          = TradeBias();
+    
+    if (HistoryIsLoaded())
+    {
+      srActive.Resistance           = fmax(srActive.TermHigh,srHistory[0].TermHigh);
+      srActive.Support              = fmin(srActive.TermLow,srHistory[0].TermLow);
+    }
 
     srActive.TermHigh               = High[sBar];
     srActive.TermLow                = Low[sBar];
@@ -138,16 +136,8 @@ void CSessionArray::OpenSession(void)
 
     sSessionIsOpen                  = True;
     
-    if (sBar==0)
-    {
-      sOffMidBuffer.Add(srActive.OffMid);
-      sPriorMidBuffer.Add(srActive.PriorMid);
-    }
-    else
-    {
-      sOffMidBuffer.SetValue(sBar,srActive.OffMid);
-      sPriorMidBuffer.SetValue(sBar,srActive.PriorMid);
-    }
+    sOffMidBuffer.SetValue(sBar,srActive.OffMid);
+    sPriorMidBuffer.SetValue(sBar,srActive.PriorMid);
   }
 
 //+------------------------------------------------------------------+
@@ -155,17 +145,17 @@ void CSessionArray::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSessionArray::CloseSession(void)
   {
-    CalcFractal();
-    
     srActive.PriorMid               = ActiveMid();
-    srActive.Resistance             = srActive.TermHigh;
-    srActive.Support                = srActive.TermLow;
      
     UpdateHistory();
     
     //--- Set Active to OffSession
+//    srActive.Resistance             = srActive.TermHigh;
+//    srActive.Support                = srActive.TermLow;
+
     srActive.TermHigh               = High[sBar];
     srActive.TermLow                = Low[sBar];
+    srActive.ReversalCount          = NoValue;    
 
     sSessionIsOpen                  = false;
   }
@@ -185,58 +175,64 @@ void CSessionArray::CalcEvents(void)
       if (sBarHour==ndNewDay)
         sEvent.SetEvent(NewDay);
 
-    //--- Calc events based on opening, closing, off/active sessions
-    if (this.SessionIsOpen())
-    {
-
-      //--- Handle Session Open
-      if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
+    //--- Calc events session open/close
+    if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
+      if (sSessionIsOpen)
         sEvent.SetEvent(SessionOpen);
-    }
-    else
-
-    {
-      //--- Handle Session Close
-      if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
+      else
         sEvent.SetEvent(SessionClose);
+    
+    //--- Test for session high
+    if (IsHigher(High[sBar],srActive.TermHigh))
+    {
+      sEvent.SetEvent(NewHigh);
+      sEvent.SetEvent(NewBoundary);
+
+      if (IsChanged(srActive.TermDir,DirectionUp))
+      {
+        sEvent.SetEvent(NewDirection);
+        sEvent.SetEvent(NewTerm);
+      }
+    }
+        
+    //--- Test for session low
+    if (IsLower(Low[sBar],srActive.TermLow))
+    {
+      sEvent.SetEvent(NewLow);
+      sEvent.SetEvent(NewBoundary);
+
+      if (IsChanged(srActive.TermDir,DirectionDown))
+      {
+        sEvent.SetEvent(NewDirection);
+        sEvent.SetEvent(NewTerm);
+      }
+    }
+
+    //--- Test boundary breakouts
+    if (sEvent[NewBoundary])
+    {
+      if (IsHigher(Close[sBar],srActive.Resistance) || IsLower(Close[sBar],srActive.Support))
+      {
+        if (sEvent[NewDirection])
+          sEvent.SetEvent(NewReversal);
+        else
+        if (srActive.ReversalCount==NoValue)
+          sEvent.SetEvent(NewBreakout);
+      }    
       else
 
-      //--- Handle off/active session events
-      {    
-        //--- Test for session high
-        if (IsHigher(High[sBar],srActive.TermHigh))
+      if (srActive.ReversalCount==NoValue)
+      {
+        if (HistoryIsLoaded())
         {
-          sEvent.SetEvent(NewHigh);
-          sEvent.SetEvent(NewBoundary);
-
-          if (IsChanged(srActive.TermDir,DirectionUp))
-          {
-            sEvent.SetEvent(NewDirection);
-            sEvent.SetEvent(NewTerm);
-          }
+          if (IsHigher(Close[sBar],srHistory[0].TermHigh,NoUpdate))
+            if (srActive.TermDir==DirectionUp)
+              sEvent.SetEvent(NewRally);
+          
+          if (IsLower(Close[sBar],srHistory[0].TermLow,NoUpdate))
+            if (srActive.TermDir==DirectionDown)
+              sEvent.SetEvent(NewPullback);
         }
-        
-        //--- Test for session low
-        if (IsLower(Low[sBar],srActive.TermLow))
-        {
-          sEvent.SetEvent(NewLow);
-          sEvent.SetEvent(NewBoundary);
-
-          if (IsChanged(srActive.TermDir,DirectionDown))
-          {
-            sEvent.SetEvent(NewDirection);
-            sEvent.SetEvent(NewTerm);
-          }
-        }
-
-        //--- Test boundary breakouts
-        if (sEvent[NewBoundary])
-          if (IsHigher(High[sBar],srActive.Resistance) || IsLower(Low[sBar],srActive.Support))
-            if (sEvent[NewDirection])
-              sEvent.SetEvent(NewReversal);
-            else
-            if (srActive.ReversalCount==NoValue)
-              sEvent.SetEvent(NewBreakout);
       }
     }
   }
@@ -246,42 +242,6 @@ void CSessionArray::CalcEvents(void)
 //+------------------------------------------------------------------+
 void CSessionArray::CalcState(void)
   {
-  }
-
-//+------------------------------------------------------------------+
-//| CalcFractal - Calculates selected fractals for fibo analysis     |
-//+------------------------------------------------------------------+
-void CSessionArray::CalcFractal(void)
-  {
-    int    cfFractalDir           = sFractalDir;
-    
-    if (sEvent[SessionClose])
-    //--- On session close calcs
-    {
-      //--- Initialization Pass
-      if (sFractalDir==DirectionNone)
-      {
-        sFractal[Root]            = srActive.PriorMid;
-        sFractal[Expansion]       = ActiveMid();
-
-        sFractalOrigin.Insert(0,sFractal[Root]);
-        
-        if (IsHigher(sFractal[Expansion],sFractal[Root],NoUpdate,Digits))
-          sFractalDir             = DirectionUp;
-
-        if (IsLower(sFractal[Expansion],sFractal[Root],NoUpdate,Digits))
-          sFractalDir             = DirectionDown;
-      }
-      else
-      
-      //--- Continuation pass
-      {
-      }
-    }
-    
-    //--- Non-opening (active) calcs
-    else
-    {};
   }
 
 //+------------------------------------------------------------------+
@@ -305,6 +265,21 @@ void CSessionArray::ProcessEvents(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateBuffers - updates indicator buffer values                  |
+//+------------------------------------------------------------------+
+void CSessionArray::UpdateBuffers(void)
+  {
+    if (Bars<sBars)
+      Print("History exception; need to reload");
+    else
+      for (sBars=sBars;sBars<Bars;sBars++)
+      {
+        sOffMidBuffer.Insert(0,0.00);
+        sPriorMidBuffer.Insert(0,0.00);
+      }
+  }
+
+//+------------------------------------------------------------------+
 //| LoadHistory - Loads history from the first session open          |
 //+------------------------------------------------------------------+
 void CSessionArray::LoadHistory(void)
@@ -312,10 +287,10 @@ void CSessionArray::LoadHistory(void)
     int lhOpenBar   = iBarShift(Symbol(),PERIOD_H1,StrToTime(TimeToStr(Time[Bars-24], TIME_DATE)+" "+lpad(IntegerToString(sHourOpen),"0",2)+":00"));
     int lhCloseBar  = Bars-1;
     
-    sEvent                    = new CEvent();
     sEvent.ClearEvents();
     
     sBar                      = lhCloseBar;
+    sBarHour                  = NoValue;
     sStartTime                = Time[sBar];
     
     srActive.TermDir          = DirectionNone;
@@ -326,10 +301,6 @@ void CSessionArray::LoadHistory(void)
     srActive.PriorMid         = ActiveMid();
     srActive.OffMid           = ActiveMid();
     srActive.ReversalCount    = NoValue;
-    
-    sActiveFractal            = Expansion;
-    sFractal[sActiveFractal]  = ActiveMid();
-    sBarHour                  = NoValue;
 
     for (sBar=lhCloseBar;sBar>lhOpenBar;sBar--)
       if (SessionIsOpen())
@@ -371,26 +342,22 @@ CSessionArray::CSessionArray(SessionType Type, int HourOpen, int HourClose)
     sType                     = Type;
     sTrendDir                 = DirectionNone;
     sTrendState               = NoState;
+    sBars                     = Bars;
     
     sHourOpen                 = HourOpen;
     sHourClose                = HourClose;
     
-    ArrayInitialize(sFractal,0.00);
-    ArrayInitialize(sTrendPeg,false);
-    
-    sFractalDir               = DirectionNone;
-    sFractalOrigin            = new CArrayDouble(0);
-    sFractalOrigin.Truncate   = false;
-    sFractalOrigin.AutoExpand = true;
-    sFractalOrigin.SetPrecision(Digits);
-    
+    sEvent                    = new CEvent();
+
     sOffMidBuffer             = new CArrayDouble(Bars);
     sOffMidBuffer.Truncate    = false;
+    sOffMidBuffer.AutoExpand  = true;    
     sOffMidBuffer.SetPrecision(Digits);
     sOffMidBuffer.Initialize(0.00);
     
     sPriorMidBuffer           = new CArrayDouble(Bars);
     sPriorMidBuffer.Truncate  = false;
+    sPriorMidBuffer.AutoExpand   = true;
     sPriorMidBuffer.SetPrecision(Digits);
     sPriorMidBuffer.Initialize(0.00);
     
@@ -405,7 +372,6 @@ CSessionArray::~CSessionArray()
     delete sEvent;
     delete sOffMidBuffer;
     delete sPriorMidBuffer;
-    delete sFractalOrigin;
   }
 
 //+------------------------------------------------------------------+
@@ -413,8 +379,10 @@ CSessionArray::~CSessionArray()
 //+------------------------------------------------------------------+
 void CSessionArray::Update(void)
   {
+    UpdateBuffers();
     CalcEvents();
     ProcessEvents();
+    CalcState();
   }
   
 //+------------------------------------------------------------------+
@@ -442,15 +410,16 @@ bool CSessionArray::SessionIsOpen(void)
 //+------------------------------------------------------------------+
 //| TradeBias - returns the trade bias based on Time Period          |
 //+------------------------------------------------------------------+
-int CSessionArray::TradeBias(int TimePeriod=State)
+int CSessionArray::TradeBias(int TimePeriod=History)
   {    
     switch (TimePeriod)
     {
-      case State:   if (IsHigher(srActive.OffMid,srActive.PriorMid,NoUpdate,Digits))
+      case History: if (IsHigher(srActive.OffMid,srActive.PriorMid,NoUpdate,Digits))
                       return(OP_BUY);
                     if (IsLower(srActive.OffMid,srActive.PriorMid,NoUpdate,Digits))
                       return(OP_SELL);
                     break;
+
       case Active:  if (IsHigher(ActiveMid(),srActive.PriorMid,NoUpdate,Digits))
                       return(OP_BUY);
                     if (IsLower(ActiveMid(),srActive.PriorMid,NoUpdate,Digits))
@@ -471,8 +440,16 @@ int CSessionArray::Direction(RetraceType Type)
       case Trend:   return (sTrendDir);
       case Term:    return (srActive.TermDir);
       case Prior:   return (srHistory[0].TermDir);
-//      case Expansion: return
     }
     
     return (DirectionNone);
   }
+  
+//+------------------------------------------------------------------+
+//| ActiveMid - returns the current active mid price (Fibo50)        |
+//+------------------------------------------------------------------+
+double CSessionArray::ActiveMid(void)
+  {
+    return(fdiv(srActive.TermHigh+srActive.TermLow,2,Digits));
+  }
+  

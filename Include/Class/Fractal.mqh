@@ -1130,7 +1130,10 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                                            else
                                                              fibonacci = FiboPercent(Fibo100);
                                                            break;
-                                         case Prior:       
+
+                                         case Prior:       fibonacci = fdiv(f[Expansion].Price-f[Root].Price,f[Expansion].Price-f[Prior].Price,3);
+                                                           break;
+
                                          case Root:        fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-this.Price(Type,Bottom),3);
                                                            break;
 
@@ -1152,7 +1155,10 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
                                                            else
                                                              fibonacci = FiboPercent(Fibo100);
                                                            break;
-                                         case Prior:       
+
+                                         case Prior:       fibonacci = fdiv(f[Root].Price-f[Expansion].Price,f[Prior].Price-f[Expansion].Price,3);
+                                                           break;
+
                                          case Root:        fibonacci = fdiv(f[Expansion].Price-this.Price(Divergent),f[Expansion].Price-this.Price(Type,Top),3);
                                                            break;
 

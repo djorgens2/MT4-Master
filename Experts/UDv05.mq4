@@ -41,34 +41,32 @@ input int    inpUSClose              = 23;    // US market close hour
   CSessionArray      *session[SessionTypes];
   
   //--- Operational collections
-  string              udEvents[];
+  string              udEventDisplay[];
   bool                udActiveEvent;
+  CEvent             *udEvents               = new CEvent();
   
-  //--- Operational variables
-  int                 udPlan                 = OP_NO_ACTION;
-
 void AddEvents(SessionType Type)
   {
     if (session[Type].ActiveEvent())
     {
-      ArrayResize(udEvents,ArraySize(udEvents)+2);
-      udEvents[ArraySize(udEvents)-2]   = "\n  "
+      ArrayResize(udEventDisplay,ArraySize(udEventDisplay)+2);
+      udEventDisplay[ArraySize(udEventDisplay)-2]   = "\n  "
         + EnumToString(Type)+" ("
         + BoolToStr(session[Type].SessionIsOpen(),proper(ActionText(session[Type].TradeBias())),"Off-Session")+")";
-      udEvents[ArraySize(udEvents)-1]   = "\n     Events\n";
+      udEventDisplay[ArraySize(udEventDisplay)-1]   = "\n     Events\n";
      
       for (EventType type=0;type<EventTypes;type++)
         if (session[Type].Event(type))
         {
-          ArrayResize(udEvents,ArraySize(udEvents)+1);
-          udEvents[ArraySize(udEvents)-1]   = "         "+EnumToString(type)+"\n";
+          ArrayResize(udEventDisplay,ArraySize(udEventDisplay)+1);
+          udEventDisplay[ArraySize(udEventDisplay)-1]   = "         "+EnumToString(type)+"\n";
         }
 
-      ArrayResize(udEvents,ArraySize(udEvents)+1);
-      udEvents[ArraySize(udEvents)-1]   = "      Data\n";
+      ArrayResize(udEventDisplay,ArraySize(udEventDisplay)+1);
+      udEventDisplay[ArraySize(udEventDisplay)-1]   = "      Data\n";
       
-      ArrayResize(udEvents,ArraySize(udEvents)+1);
-      udEvents[ArraySize(udEvents)-1]   = "         OHLC: "
+      ArrayResize(udEventDisplay,ArraySize(udEventDisplay)+1);
+      udEventDisplay[ArraySize(udEventDisplay)-1]   = "         OHLC: "
           +DoubleToStr(session[Type].Active().TermHigh,Digits)+":"
           +DoubleToStr(session[Type].Active().TermLow,Digits)+"\n";
      
@@ -80,8 +78,8 @@ string DisplayEvents(void)
   {
     string deEvents  = "";
     
-    for (int event=0;event<ArraySize(udEvents);event++)
-      deEvents   += udEvents[event];
+    for (int event=0;event<ArraySize(udEventDisplay);event++)
+      deEvents   += udEventDisplay[event];
       
     return (deEvents);
   }
@@ -92,8 +90,8 @@ string DisplayEvents(void)
 void RefreshScreen(void)
   {
     //--- Clear the session data array
-    ArrayResize(udEvents,1);
-    udEvents[0]                  = "Session Data";
+    ArrayResize(udEventDisplay,1);
+    udEventDisplay[0]            = "Session Data";
     udActiveEvent                = false;
     
     //--- Load the session data array
@@ -104,28 +102,21 @@ void RefreshScreen(void)
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
       UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price));
-      UpdateLabel("lbPlan",ActionText(udPlan)+" ("+ActionText(Action(pfractal.Direction(Pivot)))+")");
       UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
 //      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
     }
     
-      UpdateLine("lnActive",fdiv(session[Asia].Active().TermHigh+session[Daily].Active().TermLow,2),STYLE_DASHDOT,clrLawnGreen);
-      UpdateLine("lnOff",session[Asia].Active().OffMid,STYLE_DASHDOT,clrDarkGray);
-      UpdateLine("lnPrior",session[Asia].Active().PriorMid,STYLE_DASHDOT,clrYellow);
-
+Comment("");
     if (udActiveEvent)
     {
       Comment(DisplayEvents());
-      Pause("Event Validation","Event Check");
+      
+//      if (udEvents[NewBreakout] || udEvents[NewReversal] || udEvents[NewRally] || udEvents[NewPullback])
+//      if (udEvents.ActiveEvent())
+//      if (session[US].ActiveEvent())
+      if (udEvents[SessionOpen])
+        Pause("Event Validation","Event Check");
     }
-      //Pause(DisplayEvents(),"Event() Issue");
-//    if (session[T.Event(NewHigh))
-//      UpdateLabel("lbAlert","New High",clrLawnGreen,14);
-//    else
-//    if (session.Event(NewLow)))
-//      UpdateLabel("lbAlert","New Low",clrRed,14);
-//    else
-//      UpdateLabel("lbAlert","",clrBlack,14);
   }
 
 //+------------------------------------------------------------------+
@@ -133,11 +124,20 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void GetData(void)
   {    
+    udEvents.ClearEvents();
+    
     fractal.Update();
     pfractal.Update();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
+    {
       session[type].Update();
+      
+      if (session[type].ActiveEvent())
+        for (EventType event=0;event<EventTypes;event++)
+          if (session[type].Event(event))
+            udEvents.SetEvent(event);
+    }
 //      session[Daily].Update();
   }
 
@@ -146,20 +146,10 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void CalcDailyPlan(void)
   {
-    Pause("New Day - What's the game plan?","NewDay()");
-    
-  }
-
-//+------------------------------------------------------------------+
-//| CalcDailyPlan                                                    |
-//+------------------------------------------------------------------+
-void ManageTrades(void)
-  {
-    if (LotCount()==0)
-    {
-      if (udPlan==Action(pfractal.Direction(Pivot)))
-        OpenOrder(udPlan,"Opening Trade");
-    }
+//    if (session[Daily].Event(NewDay))
+//      Pause("New Day - What's the game plan?","NewDay()");
+//    if (session[Asia].Event(SessionOpen))
+//      Pause ("What''s the plan?","Asia Session Open");  
   }
 
 //+------------------------------------------------------------------+
@@ -167,18 +157,13 @@ void ManageTrades(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    if (session[Daily].Event(NewDay))
-      CalcDailyPlan();
-          
-//    if (pfractal.Event(NewPivot))
-//      Pause("We have a new pipMA Pivot","NewPivot()");
+    int eAction;
     
-//    if (pfractal.Event(NewPivotDirection))
-//    {
-//      Pause("We have a new pipMA Pivot Direction","NewPivot()");
-//      ManageTrades();
-//    }
-
+    CalcDailyPlan();
+    
+    if (pfractal.Event(NewLow))
+      if (
+          
   }
 
 //+------------------------------------------------------------------+
@@ -186,11 +171,6 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
-    if (Command[0]=="PLAN")
-    {
-      udPlan       = ActionCode(Command[1]);
-//      UpdateLabel("lbPlan",ActionText(udPlan)+" ... "+pfractal.Pivot(Direction)); //" ("+ActionText(Action(pfractal.Pivot(Direction)))+")");
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -246,14 +226,7 @@ int OnInit()
     NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);
 
     NewPriceLabel("lbPipMAPivot");
-    NewLabel("lbPlan","",5,16,clrWhite,SCREEN_LL);
     NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);
-    
-    NewLine("lnSupport");
-    NewLine("lnResistance");
-    NewLine("lnActive");
-    NewLine("lnOff");
-    NewLine("lnPrior");
     
     return(INIT_SUCCEEDED);
   }

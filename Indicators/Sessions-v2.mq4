@@ -26,7 +26,7 @@
 #property indicator_style1  STYLE_SOLID
 #property indicator_width1  1
 
-#property indicator_label2  "indOfffMid"
+#property indicator_label2  "indOffMid"
 #property indicator_type2   DRAW_LINE;
 #property indicator_color2  clrYellow;
 #property indicator_style2  STYLE_DOT;
@@ -37,154 +37,130 @@ double indOffMidBuffer[];
 
 
 //--- Operational Inputs
-input SessionType    inpType       = SessionTypes; // Indicator session
-input int            inpHourOpen   = NoValue;      // Session Opening Hour
-input int            inpHourClose  = NoValue;      // Session Closing Hour
+input SessionType    inpType         = SessionTypes;    // Indicator session
+input int            inpHourOpen     = NoValue;         // Session Opening Hour
+input int            inpHourClose    = NoValue;         // Session Closing Hour
+input bool           inpShowSession  = true;            // Display session ranges
 
-CSessionArray *session             = new CSessionArray(inpType,inpHourOpen,inpHourClose);
+const color          AsiaColor       = C'0,32,0';       // Asia session box color
+const color          EuropeColor     = C'48,0,0';       // Europe session box color
+const color          USColor         = C'0,0,56';       // US session box color
+const color          DailyColor      = C'64,64,0';      // US session box color
+
+CSessionArray       *session         = new CSessionArray(inpType,inpHourOpen,inpHourClose);
+
+bool                 sessionOpen     = false;
+int                  sessionRange    = 0;
+const int            sessionEOD      = 0;               // Session End-of-Day hour
+
+datetime             sessionOpenTime;
+double               sessionHigh;
+double               sessionLow;
+
+//+------------------------------------------------------------------+
+//| SessionColor - Returns the color for session ranges              |
+//+------------------------------------------------------------------+
+color SessionColor(void)
+  {
+    switch (inpType)
+    {
+      case Asia:    return(AsiaColor);
+      case Europe:  return(EuropeColor);
+      case US:      return(USColor);
+      case Daily:   return(DailyColor);
+    }
+    
+    return (clrBlack);
+  }
+
+//+------------------------------------------------------------------+
+//| CreateRange - Paints the session boxes                           |
+//+------------------------------------------------------------------+
+void CreateRange(int Bar=0)
+ {
+   string crRangeId;
+   
+   if (sessionOpen)
+     return;
+   else
+   {
+     crRangeId          = EnumToString(inpType)+IntegerToString(++sessionRange);
+     
+     sessionOpen        = true;
+   
+     sessionOpenTime    = Time[Bar];
+     sessionHigh        = High[Bar];
+     sessionLow         = Low[Bar];
+   
+     ObjectCreate(crRangeId,OBJ_RECTANGLE,0,sessionOpenTime,sessionHigh,sessionOpenTime,sessionLow);
+   
+     ObjectSet(crRangeId, OBJPROP_STYLE, STYLE_SOLID);
+     ObjectSet(crRangeId, OBJPROP_COLOR, SessionColor());
+     ObjectSet(crRangeId, OBJPROP_BACK, true);
+   }
+ }
+
+//+------------------------------------------------------------------+
+//| UpdateRange - Repaints the session box                           |
+//+------------------------------------------------------------------+
+void UpdateRange(int Bar=0)
+ {
+   string urRangeId       = EnumToString(inpType)+IntegerToString(sessionRange);
+
+   if (TimeHour(Time[Bar])==sessionEOD)
+     sessionOpen          = false;
+     
+   if (TimeHour(Time[Bar])==inpHourClose)
+   {
+     if (sessionOpen)
+       ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
+
+     sessionOpen          = false;
+   }
+
+   if (sessionOpen)
+   {
+     if (IsHigher(High[Bar],sessionHigh))
+       ObjectSet(urRangeId,OBJPROP_PRICE1,sessionHigh);
+     
+     if (IsLower(Low[Bar],sessionLow))
+       ObjectSet(urRangeId,OBJPROP_PRICE2,sessionLow);
+
+     ObjectSet(urRangeId,OBJPROP_TIME1,sessionOpenTime);
+     ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
+   }
+ }
+
+//+------------------------------------------------------------------+
+//| DeleteRanges - Removes all objects created by the indicator      |
+//+------------------------------------------------------------------+
+void DeleteRanges()
+  {
+    for (int doRangeId=0;doRangeId<=sessionRange;doRangeId++)
+      ObjectDelete(EnumToString(inpType)+IntegerToString(doRangeId));
+  }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints on screen information                   |
 //+------------------------------------------------------------------+
-void RefreshScreen(void)
- {
- }
-
-//+------------------------------------------------------------------+
-//| CreateObjects - Paints the session boxes                         |
-//| Usage:                                                           |
-//|   no - Unique identifier for the painted session                 |
-//|   cl - Color for the supplied session                            |
-//+------------------------------------------------------------------+
-void CreateObjects(string no, color cl)
- {
-   ObjectCreate(no, OBJ_RECTANGLE, 0, 0,0, 0,0);
-   ObjectSet(no, OBJPROP_STYLE, STYLE_SOLID);
-   ObjectSet(no, OBJPROP_COLOR, cl);
-   ObjectSet(no, OBJPROP_BACK, True);
- }
-
-//+------------------------------------------------------------------+
-//| DeleteObjects - Removes all objects created by the indicator     |
-//+------------------------------------------------------------------+
-void DeleteObjects()
+void RefreshScreen(int Bar=0)
   {
-    //ObjectDelete("AS"+IntegerToString(i));
-    //ObjectDelete("ASup");
-    //ObjectDelete("ASdn");
+    //Comment("Session is "+BoolToStr(sessionOpen,"Open","Closed")
+    //        +"/"+BoolToStr(session.SessionIsOpen(),"Open","Closed")
+    //        +"\nLow:  "+DoubleToStr(session.Active().TermLow,Digits)
+    //        +"\nHigh: "+DoubleToStr(session.Active().TermHigh,Digits));
+    
+    if (inpShowSession)
+      if (TimeHour(Time[Bar])==inpHourOpen)
+        CreateRange(Bar);
+      else
+        UpdateRange(Bar);
+        
+    UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
+    UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrYellow);
+    UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
+    UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
   }
-
-//+------------------------------------------------------------------+
-//| DrawObjects - Repaints the session boxes                         |
-//| Usage:                                                           |
-//|   dt - Date/Time of the session to repaint                       |
-//|   no - Unique session identifier                                 |
-//|   tb - Session begin time                                        |
-//|   te - Session end time                                          |
-//+------------------------------------------------------------------+
-void DrawObjects(datetime dt, string no, string tb, string te)
- {
-   datetime t1, t2;
-   double   p1, p2;
-   int      b1, b2;
-
-   t1=StrToTime(TimeToStr(dt, TIME_DATE)+" "+tb);
-   t2=StrToTime(TimeToStr(dt, TIME_DATE)+" "+te);
-   b1=iBarShift(NULL, 0, t1);
-   b2=iBarShift(NULL, 0, t2);
-   p1=High[Highest(NULL, 0, MODE_HIGH, b1-b2, b2)];
-   p2=Low [Lowest (NULL, 0, MODE_LOW , b1-b2, b2)];
-
-   ObjectSet(no, OBJPROP_TIME1 , t1);
-   ObjectSet(no, OBJPROP_PRICE1, p1);
-   ObjectSet(no, OBJPROP_TIME2 , t2);
-   ObjectSet(no, OBJPROP_PRICE2, p2);
- }
-
-//+------------------------------------------------------------------+
-//| DrawPrices - paints the session prices (optional)                |
-//| Usage:                                                           |
-//|   dt - Date/Time of the session to repaint                       |
-//|   no - Unique session identifier                                 |
-//|   tb - Session begin time                                        |
-//|   te - Session end time                                          |
-//+------------------------------------------------------------------+
-void DrawPrices(datetime dt, string no, string tb, string te)
- {
-//   datetime t1, t2;
-//   double   p1, p2;
-//   int      b1, b2;
-//
-//   t1=StrToTime(TimeToStr(dt, TIME_DATE)+" "+tb);
-//   t2=StrToTime(TimeToStr(dt, TIME_DATE)+" "+te);
-//   b1=iBarShift(NULL, 0, t1);
-//   b2=iBarShift(NULL, 0, t2);
-//   p1=High[Highest(NULL, 0, MODE_HIGH, b1-b2, b2)];
-//   p2=Low [Lowest (NULL, 0, MODE_LOW , b1-b2, b2)];
-//
-//   if (ObjectFind(no+"up")<0)
-//     ObjectCreate(no+"up", OBJ_TEXT, 0, 0,0);
-//
-//   ObjectSet(no+"up", OBJPROP_TIME1   , t2);
-//   ObjectSet(no+"up", OBJPROP_PRICE1  , p1+OffSet*Point);
-//   ObjectSet(no+"up", OBJPROP_COLOR   , clFont);
-//   ObjectSet(no+"up", OBJPROP_FONTSIZE, SizeFont);
-//   ObjectSetText(no+"up", DoubleToStr(p1+Ask-Bid, Digits));
-//
-//   if (ObjectFind(no+"dn")<0)
-//     ObjectCreate(no+"dn", OBJ_TEXT, 0, 0,0);
-//
-//   ObjectSet(no+"dn", OBJPROP_TIME1   , t2);
-//   ObjectSet(no+"dn", OBJPROP_PRICE1  , p2);
-//   ObjectSet(no+"dn", OBJPROP_COLOR   , clFont);
-//   ObjectSet(no+"dn", OBJPROP_FONTSIZE, SizeFont);
-//   ObjectSetText(no+"dn", DoubleToStr(p2, Digits));
- }
-
-//+------------------------------------------------------------------+
-//| decDateTradeDay - Calculate the trade day                        |
-//| Usage:                                                           |
-//|   dt - Date/Time of trade day supplied                           |
-//+------------------------------------------------------------------+
-datetime decDateTradeDay (datetime dt)
- {
-   int ty=TimeYear(dt);
-   int tm=TimeMonth(dt);
-   int td=TimeDay(dt);
-   int th=TimeHour(dt);
-   int ti=TimeMinute(dt);
-
-   td--;
-
-   if (td==0)
-   {
-     tm--;
-
-     if (tm==0)
-     {
-       ty--;
-       tm=12;
-     }
-
-     //--- Months containing 31 days
-     if (tm==1 || tm==3 || tm==5 || tm==7 || tm==8 || tm==10 || tm==12)
-       td=31;
-     else
-     
-     //--- February leap year calc
-     if (tm==2)
-       if (fmod(ty, 4)==0)
-         td=29;
-       else td=28;
-     else
-
-     //--- Months containing 31 days
-     if (tm==4 || tm==6 || tm==9 || tm==11)
-       td=30;
-   }
-
-   return(StrToTime(IntegerToString(ty)+"."+IntegerToString(tm)+"."+IntegerToString(td)+" "+IntegerToString(th)+":"+IntegerToString(ti)));
- }
  
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
@@ -199,23 +175,7 @@ int OnCalculate(const int rates_total,
                 const long &tick_volume[],
                 const long &volume[],
                 const int &spread[])
- {
-   datetime dt=TimeCurrent();
-  
-//   for (int i=0; i<NumberOfDays; i++)
-//   {
-//     if (ShowPrice && i==0)
-//       DrawPrices(dt, "AS", AsiaBegin, AsiaEnd);
-//
-//     DrawObjects(dt, "AS"+IntegerToString(i), AsiaBegin, AsiaEnd);
-//
-//     dt=decDateTradeDay(dt);
-//
-//     while (TimeDayOfWeek(dt)>5)
-//       dt=decDateTradeDay(dt);
-//   }
-   
-//    if(prev_calculated==0)
+  {
     session.Update(indOffMidBuffer,indPriorMidBuffer);
     
     RefreshScreen();
@@ -228,7 +188,7 @@ int OnCalculate(const int rates_total,
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
 int OnInit()
- {
+  {
     SetIndexBuffer(0,indPriorMidBuffer);
     SetIndexEmptyValue(0, 0.00);
     SetIndexStyle(0,DRAW_SECTION);
@@ -236,21 +196,29 @@ int OnInit()
     SetIndexBuffer(1,indOffMidBuffer);
     SetIndexEmptyValue(1, 0.00);
     SetIndexStyle(1,DRAW_SECTION);
+    
+    NewLine("lnActiveMid");
+    NewLine("lnPriorMid");
+    NewLine("lnResistance");
+    NewLine("lnSupport");
+    
+    DeleteRanges();
 
-//   DeleteObjects();
-
-//   CreateObjects("AS"+IntegerToString(i), AsiaColor);
+    for (int bar=Bars-24;bar>0;bar--)
+      RefreshScreen(bar);
       
-   if (Period()<PERIOD_D1)
-     return (INIT_SUCCEEDED);
+    if (Period()<PERIOD_D1)
+      return (INIT_SUCCEEDED);
 
-   return (INIT_FAILED);   
- }
+    return (INIT_FAILED);   
+  }
 
 //+------------------------------------------------------------------+
-//| Custor indicator deinitialization function                       |
+//| Custom indicator deinitialization function                       |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
- {
-   DeleteObjects();
- }
+  {
+    DeleteRanges();
+    
+    delete session;    
+  }
