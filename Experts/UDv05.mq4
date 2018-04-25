@@ -44,6 +44,7 @@ input int    inpUSClose              = 23;    // US market close hour
   string              udEventDisplay[];
   bool                udActiveEvent;
   CEvent             *udEvents               = new CEvent();
+  SessionType         udLeadSession;
   
 void AddEvents(SessionType Type)
   {
@@ -114,8 +115,6 @@ Comment("");
 //      if (udEvents[NewBreakout] || udEvents[NewReversal] || udEvents[NewRally] || udEvents[NewPullback])
 //      if (udEvents.ActiveEvent())
 //      if (session[US].ActiveEvent())
-      if (udEvents[SessionOpen])
-        Pause("Event Validation","Event Check");
     }
   }
 
@@ -137,8 +136,10 @@ void GetData(void)
         for (EventType event=0;event<EventTypes;event++)
           if (session[type].Event(event))
             udEvents.SetEvent(event);
+            
+      if (session[type].Event(SessionOpen))
+        udLeadSession    = type;
     }
-//      session[Daily].Update();
   }
 
 //+------------------------------------------------------------------+
@@ -146,18 +147,19 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void CalcOrderPlan(void)
   {
-//    if (session[Daily].Event(NewDay))
-//      Pause("New Day - What's the game plan?","NewDay()");
-//    if (session[Asia].Event(SessionOpen))
-//      Pause ("What''s the plan?","Asia Session Open");
+    if (session[Daily].Event(NewDay))
+      Pause("New Day - What's the game plan?","NewDay()");
+
+    if (session[udLeadSession].Event(SessionOpen))
+      Pause ("What''s the plan?",EnumToString(udLeadSession)+" Session Open");
   }
 
 //+------------------------------------------------------------------+
-//| CalcOrderMargin - Computes open order margins for risk management|
+//| ExecuteTrades - Opens new trades based on the pipMA trigger      |
 //+------------------------------------------------------------------+
-void CalcOrderMargin(void)
+void ExecuteTrades(void)
   {
-
+    Pause("New trade?","Trade Execution");
   }
 
 //+------------------------------------------------------------------+
@@ -165,14 +167,21 @@ void CalcOrderMargin(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    int eAction;
+    int eAction    = OP_NO_ACTION;
     
-    CalcOrderMargin();
     CalcOrderPlan();
     
-//    if (pfractal.Event(NewLow))
-//      if (
-          
+    if (pfractal.Event(NewLow))
+      eAction    = OP_BUY;
+    else
+    if (pfractal.Event(NewHigh))
+      eAction    = OP_SELL;
+    else
+    if (eAction>OP_NO_ACTION)
+    {
+      ExecuteTrades();
+      eAction    = OP_NO_ACTION;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -247,6 +256,7 @@ void OnDeinit(const int reason)
   {
     delete fractal;
     delete pfractal;
+    delete udEvents;
     
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];
