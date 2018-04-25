@@ -137,8 +137,9 @@ void GetData(void)
           if (session[type].Event(event))
             udEvents.SetEvent(event);
             
-      if (session[type].Event(SessionOpen))
-        udLeadSession    = type;
+      if (type<Daily)
+        if (session[type].Event(SessionOpen))
+          udLeadSession    = type;
     }
   }
 
@@ -167,7 +168,7 @@ void ExecuteTrades(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    int eAction    = OP_NO_ACTION;
+    static int eAction    = OP_NO_ACTION;
     
     CalcOrderPlan();
     
