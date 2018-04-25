@@ -142,14 +142,22 @@ void GetData(void)
   }
 
 //+------------------------------------------------------------------+
-//| CalcDailyPlan                                                    |
+//| CalcOrderPlan - Computes order limits/direction                  |
 //+------------------------------------------------------------------+
-void CalcDailyPlan(void)
+void CalcOrderPlan(void)
   {
 //    if (session[Daily].Event(NewDay))
 //      Pause("New Day - What's the game plan?","NewDay()");
 //    if (session[Asia].Event(SessionOpen))
-//      Pause ("What''s the plan?","Asia Session Open");  
+//      Pause ("What''s the plan?","Asia Session Open");
+  }
+
+//+------------------------------------------------------------------+
+//| CalcOrderMargin - Computes open order margins for risk management|
+//+------------------------------------------------------------------+
+void CalcOrderMargin(void)
+  {
+
   }
 
 //+------------------------------------------------------------------+
@@ -159,10 +167,11 @@ void Execute(void)
   {
     int eAction;
     
-    CalcDailyPlan();
+    CalcOrderMargin();
+    CalcOrderPlan();
     
-    if (pfractal.Event(NewLow))
-      if (
+//    if (pfractal.Event(NewLow))
+//      if (
           
   }
 

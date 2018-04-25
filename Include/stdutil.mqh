@@ -40,18 +40,20 @@
 #define InDecimal             4      //--- Return in decimal, raw calculation
 #define InDollar              5      //--- Stated in dollars
 #define InEquity              6      //--- Stated as a percent of equity
-#define InDirection           7      //--- Stated as a Direction
-#define InAction              8      //--- Stated as a Direction
-#define InState               9      //--- State definition
+#define InMargin              7      //--- Stated as a value of margin
+#define InDirection           8      //--- Stated as a Direction
+#define InAction              9      //--- Stated as an Action
+#define InState              10      //--- State definition
+
 
 //--- Boolean format defines
-#define InTrueFalse          10      //--- Stated as True or False
-#define InYesNo              11      //--- Stated as Yes or No
+#define InTrueFalse          11      //--- Stated as True or False
+#define InYesNo              12      //--- Stated as Yes or No
 
 //--- String format defines
-#define InUpper              12      //--- Returns in Upper
-#define InLower              13      //--- Returns in Lower
-#define InProper             14      //--- Returns in Proper
+#define InUpper              13      //--- Returns in Upper
+#define InLower              14      //--- Returns in Lower
+#define InProper             15      //--- Returns in Proper
 
 //--- Option type defs
 #define InContrarian       true      //--- Return as contrarian direction/action
