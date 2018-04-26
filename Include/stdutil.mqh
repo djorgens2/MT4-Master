@@ -86,25 +86,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
 
 //--- Common terminology; global constants
 
-       enum     StateType
-                {
-                  LongTrend         =  7,    //--- Greater than fibo 161
-                  LongBreakout      =  6,    //--- Greater than fibo 100
-                  LongTerm          =  5,    //--- Between fibo 50 & 100 on open
-                  LongRally         =  4,    //--- After pullback, +2 long fibo
-                  LongPullback      =  3,    //--- Less than long fibo 50
-                  LongCorrection    =  2,    //--- Less than long fibo 23
-                  LongReversal      =  1,    //--- Less than long fibo -23 (trap)
-                  NoState           =  0,    //--- Initial state
-                  ShortReversal     = -1,    //--- Greater than short fibo -23 (trap)
-                  ShortCorrection   = -2,    //--- Less than short fibo 23
-                  ShortRally        = -3,    //--- Less than short fibo 50
-                  ShortPullback     = -4,    //--- After rally, +2 short fibo
-                  ShortTerm         = -5,    //--- Between fibo 50 & 100 on open
-                  ShortBreakout     = -6,    //--- Greater than fibo 100
-                  ShortTrend        = -7,    //--- Greater than fibo 161
-                };
-
        enum     Operation
                 {
                   Add,
@@ -131,6 +112,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Default,
                   Size,
                   State,
+                  NoState,
                   Dominant,
                   Direction,
                   Bar,
@@ -185,6 +167,8 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Retrace,
                   Reversal,
                   Breakout,
+                  Rally,
+                  Pullback,
                   Trap,
                   Recovery,
                   Continuation,

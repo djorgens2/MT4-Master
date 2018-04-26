@@ -145,11 +145,6 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
-    //Comment("Session is "+BoolToStr(sessionOpen,"Open","Closed")
-    //        +"/"+BoolToStr(session.SessionIsOpen(),"Open","Closed")
-    //        +"\nLow:  "+DoubleToStr(session.Active().TermLow,Digits)
-    //        +"\nHigh: "+DoubleToStr(session.Active().TermHigh,Digits));
-    
     if (inpShowSession)
       if (TimeHour(Time[Bar])==inpHourOpen)
         CreateRange(Bar);
@@ -157,7 +152,6 @@ void RefreshScreen(int Bar=0)
         UpdateRange(Bar);
         
     UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrYellow);
     UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
     UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
   }
@@ -198,7 +192,6 @@ int OnInit()
     SetIndexStyle(1,DRAW_SECTION);
     
     NewLine("lnActiveMid");
-    NewLine("lnPriorMid");
     NewLine("lnResistance");
     NewLine("lnSupport");
     

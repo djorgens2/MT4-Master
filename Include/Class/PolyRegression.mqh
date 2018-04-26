@@ -15,8 +15,8 @@
 //--- Expanded directional defines (for amplitudes)
 #define  ShortCorrection     -4
 #define  ShortReversal       -3
-#define  Pullback            -2
-#define  Rally                2
+#define  MarketPullback      -2
+#define  MarketRally          2
 #define  LongReversal         3
 #define  LongCorrection       4
 

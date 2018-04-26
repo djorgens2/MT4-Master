@@ -102,11 +102,13 @@ void RefreshScreen(void)
               
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
+      UpdateLabel("lbState"+EnumToString(type),proper(DirText(session[type].Direction(Trend)))+" "+EnumToString(session[type].State()));
+
       UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price));
       UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
-//      UpdateLabel("lbState"+EnumToString(rsId),SessionNow[rsId].State,rsSessionColor,8,"Symbol");
     }
-    
+
+
 Comment("");
     if (udActiveEvent)
     {
@@ -148,11 +150,19 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void CalcOrderPlan(void)
   {
+    static ReservedWords dailystate = NoState;
+    
     if (session[Daily].Event(NewDay))
       Pause("New Day - What's the game plan?","NewDay()");
+      
+    if (session[Daily].State()!=dailystate)
+    {
+      Pause("Daily State Change","State() Check");
+      dailystate = session[Daily].State();
+    }
 
-    if (session[udLeadSession].Event(SessionOpen))
-      Pause ("What''s the plan?",EnumToString(udLeadSession)+" Session Open");
+//    if (session[udLeadSession].Event(SessionOpen))
+//      Pause ("What''s the plan?",EnumToString(udLeadSession)+" Session Open");
   }
 
 //+------------------------------------------------------------------+
@@ -160,7 +170,7 @@ void CalcOrderPlan(void)
 //+------------------------------------------------------------------+
 void ExecuteTrades(void)
   {
-    Pause("New trade?","Trade Execution");
+//    Pause("New trade?","Trade Execution");
   }
 
 //+------------------------------------------------------------------+
@@ -230,19 +240,20 @@ int OnInit()
     session[Europe]     = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
     
-    NewLabel("lbSessAsia","Asia",30,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessEurope","Europe",30,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessUS","US",30,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessDaily","Daily",105,62,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
     
-    NewLabel("lbDirAsia","",10,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirEurope","",10,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirUS","",10,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirDaily","",85,62,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
 
+    NewLabel("lbStateDaily","",5,62,clrDarkGray,SCREEN_LR);
     NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
     NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
     NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
-
-    NewLabel("lbAlert","",5,5,clrDarkGray,SCREEN_LR);
 
     NewPriceLabel("lbPipMAPivot");
     NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);

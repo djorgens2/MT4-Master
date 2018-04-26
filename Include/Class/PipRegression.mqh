@@ -407,11 +407,11 @@ string CPipRegression::Text(int Type)
     {
       case ShortCorrection:     return("Correction(S)");
       case ShortReversal:       return("Reversal(S)");
-      case Pullback:            return("Pullback");
+      case MarketPullback:      return("Pullback");
       case DirectionDown:       return("Short");
       case DirectionNone:       return("None");
       case DirectionUp:         return("Long");
-      case Rally:               return("Rally");
+      case MarketRally:         return("Rally");
       case LongReversal:        return("Reversal(L)");
       case LongCorrection:      return("Correction(L)");
       default:                  return("Bad Direction Code");
