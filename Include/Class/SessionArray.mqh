@@ -234,7 +234,7 @@ void CSessionArray::CalcEvents(void)
 
         //--- Test Rallys/Pullbacks
         {
-            double cePivotPrice   = srActive.PriorMid;
+          double cePivotPrice   = srActive.PriorMid;
             
           if (sSessionIsOpen)
             cePivotPrice        = srActive.OffMid;
@@ -289,15 +289,17 @@ void CSessionArray::ProcessEvents(void)
       if (sEvent[event])
         switch (event)
         {
+          case NewBreakout:     
+          case NewReversal:     //--SetBoundaries
           case NewRally:
-          case NewPullback:
-          case NewBreakout:
-          case NewReversal:     sEventState  = event;
+          case NewPullback:     sEventState  = event;
                                 break;
           case NewHigh:
           case NewLow:
           case NewBoundary:     break;
 
+          case NewTrend:        //--Set trend pivots
+                                break;
           case SessionOpen:     OpenSession();
                                 break;
 

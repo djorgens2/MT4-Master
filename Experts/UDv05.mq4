@@ -106,8 +106,10 @@ void RefreshScreen(void)
 
       UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price));
       UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
-    }
 
+      if (session[type].Event(SessionOpen))
+        UpdateLabel("lbTradeBias",proper(ActionText(session[type].TradeBias())),clrWhite,12);
+    }
 
 Comment("");
     if (udActiveEvent)
@@ -152,12 +154,15 @@ void CalcOrderPlan(void)
   {
     static ReservedWords dailystate = NoState;
     
-    if (session[Daily].Event(NewDay))
-      Pause("New Day - What's the game plan?","NewDay()");
+//    if (session[Daily].Event(NewDay))
+//      Pause("New Day - What's the game plan?","NewDay()");
+      
+    if (session[Daily].Event(SessionOpen))
+      Pause("New Daily Open - What's the game plan?","NewDay()");
       
     if (session[Daily].State()!=dailystate)
     {
-      Pause("Daily State Change","State() Check");
+//      Pause("Daily State Change","State() Check");
       dailystate = session[Daily].State();
     }
 
@@ -241,20 +246,22 @@ int OnInit()
     session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
     
     NewLabel("lbSessDaily","Daily",105,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
     
     NewLabel("lbDirDaily","",85,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
 
     NewLabel("lbStateDaily","",5,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
+    //NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
 
+    NewLabel("lbTradeBias","",5,18,clrDarkGray,SCREEN_LR);
+    
     NewPriceLabel("lbPipMAPivot");
     NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);
     
