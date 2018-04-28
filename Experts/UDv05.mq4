@@ -12,6 +12,14 @@
 #include <Class\PipFractal.mqh>
 #include <Class\SessionArray.mqh>
 
+//--- Display constants
+enum DisplayConstants
+{
+  udDisplayEvents,      // Display setting for application comments
+  udDisplayFractal,     // Display setting for fractal comments
+  udDisplayPipMA        // Display setting for PipMA comments
+};
+
 input string EAHeader                = "";    //+---- Application Options -------+
 input double inpDailyTarget          = 3.6;   // Daily target
 
@@ -33,9 +41,9 @@ input int    inpAsiaClose            = 10;    // Asian market close hour
 input int    inpEuropeOpen           = 8;     // Europe market open hour
 input int    inpEuropeClose          = 18;    // Europe market close hour
 input int    inpUSOpen               = 14;    // US market open hour
-input int    inpUSClose              = 23;    // US market close hour
+input int    inpUSClose              = 23;    // US market close hour  
 
-//--- Class defs
+  //--- Class defs
   CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CSessionArray      *session[SessionTypes];
@@ -45,7 +53,13 @@ input int    inpUSClose              = 23;    // US market close hour
   bool                udActiveEvent;
   CEvent             *udEvents               = new CEvent();
   SessionType         udLeadSession;
+
+  //--- Operational variables
+  int                 udDisplay              = udDisplayEvents;
   
+//+------------------------------------------------------------------+
+//| AddEvents - Creates the text string to display events            |
+//+------------------------------------------------------------------+
 void AddEvents(SessionType Type)
   {
     if (session[Type].ActiveEvent())
@@ -70,19 +84,26 @@ void AddEvents(SessionType Type)
       udEventDisplay[ArraySize(udEventDisplay)-1]   = "         OHLC: "
           +DoubleToStr(session[Type].Active().TermHigh,Digits)+":"
           +DoubleToStr(session[Type].Active().TermLow,Digits)+"\n";
-     
-      udActiveEvent    = true;
     }
   }
 
-string DisplayEvents(void)
+//+------------------------------------------------------------------+
+//| DisplayEvents - Displays events and other session data           |
+//+------------------------------------------------------------------+
+void DisplayEvents(void)
   {
     string deEvents  = "";
     
-    for (int event=0;event<ArraySize(udEventDisplay);event++)
-      deEvents   += udEventDisplay[event];
+    if (udDisplay == udDisplayEvents)
+    {
+      Comment("");
+
+      for (int event=0;event<ArraySize(udEventDisplay);event++)
+        deEvents   += udEventDisplay[event];
       
-    return (deEvents);
+      if (udActiveEvent)
+        Comment(deEvents);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -111,14 +132,13 @@ void RefreshScreen(void)
         UpdateLabel("lbTradeBias",proper(ActionText(session[type].TradeBias())),clrWhite,12);
     }
 
-Comment("");
-    if (udActiveEvent)
+    switch(udDisplay)
     {
-      Comment(DisplayEvents());
-      
-//      if (udEvents[NewBreakout] || udEvents[NewReversal] || udEvents[NewRally] || udEvents[NewPullback])
-//      if (udEvents.ActiveEvent())
-//      if (session[US].ActiveEvent())
+      case udDisplayEvents:   DisplayEvents();
+                              break;
+      case udDisplayFractal:  fractal.RefreshScreen();
+                              break;
+      case udDisplayPipMA:    pfractal.RefreshScreen();
     }
   }
 
@@ -137,9 +157,13 @@ void GetData(void)
       session[type].Update();
       
       if (session[type].ActiveEvent())
+      {
+        udActiveEvent    = true;
+
         for (EventType event=0;event<EventTypes;event++)
           if (session[type].Event(event))
             udEvents.SetEvent(event);
+      }
             
       if (type<Daily)
         if (session[type].Event(SessionOpen))
@@ -153,6 +177,7 @@ void GetData(void)
 void CalcOrderPlan(void)
   {
     static ReservedWords dailystate = NoState;
+    int    copFractalDir            = fractal.Direction(Expansion);
     
 //    if (session[Daily].Event(NewDay))
 //      Pause("New Day - What's the game plan?","NewDay()");
@@ -205,6 +230,17 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    if (Command[0]=="SHOW")
+    {
+      if (Command[1]=="FRACTAL") udDisplay=udDisplayFractal;
+      if (Command[1]=="FIBO")    udDisplay=udDisplayFractal;
+      if (Command[1]=="FIB")     udDisplay=udDisplayFractal;
+      if (Command[1]=="PIPMA")   udDisplay=udDisplayPipMA;
+      if (Command[1]=="PIP")     udDisplay=udDisplayPipMA;
+      if (Command[1]=="EVENTS")  udDisplay=udDisplayEvents;
+      if (Command[1]=="EVENT")   udDisplay=udDisplayEvents;
+      if (Command[1]=="EV")      udDisplay=udDisplayEvents;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -246,19 +282,19 @@ int OnInit()
     session[US]         = new CSessionArray(US,inpUSOpen,inpUSClose);
     
     NewLabel("lbSessDaily","Daily",105,62,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
     
     NewLabel("lbDirDaily","",85,62,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
 
     NewLabel("lbStateDaily","",5,62,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
-    //NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
+    NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
 
     NewLabel("lbTradeBias","",5,18,clrDarkGray,SCREEN_LR);
     
