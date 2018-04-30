@@ -134,8 +134,8 @@ void RefreshScreen(void)
       case udDisplayPipMA:    pfractal.RefreshScreen();
     }
    
-    if (pfractal.Event(NewPivot))
-      Pause("New PipMA Pivot hit\nDirection: "+DirText(pfractal.Direction(Pivot)),"Event() Check");
+//    if (pfractal.Event(NewPivot))
+//      Pause("New PipMA Pivot hit\nDirection: "+DirText(pfractal.Direction(Pivot)),"Event() Check");
 
 //    if (udEvent[NewPullback] || udEvent[NewRally])
 //      Pause("New Pullback/Rally detected","Pullback/Rally Check");
@@ -180,6 +180,7 @@ void UpdateTradePlan(void)
     bool csoTradeDispute    = false;
     
     for (SessionType type=Asia;type<SessionTypes;type++)
+    {
       if (session[type].Event(SessionOpen))
         switch (type)
         {
@@ -197,6 +198,21 @@ void UpdateTradePlan(void)
                          csoTradeDispute   = IsChanged(csoTradeBias,session[type].TradeBias());
                        break;
         }
+        
+      if (session[type].Event(SessionClose))
+        switch (type)
+        {
+          case Daily:  //--- Reset boundaries; validate open positions
+                       udTradePrice[OP_BUY]  = session[Daily].Active().Resistance;
+                       udTradePrice[OP_SELL] = session[Daily].Active().Support;
+                       break;
+
+          case Asia:   //--- Set asian boundaries and limits;
+                       udTradePrice[OP_BUY]  = session[Daily].Active().Resistance;
+                       udTradePrice[OP_SELL] = session[Daily].Active().Support;
+                       break;
+        }
+    }
 
     if (csoTradeDispute)
       Pause("To trade or not to trade?","TradeDispute() Verification");

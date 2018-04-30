@@ -60,14 +60,14 @@
 #define NoUpdate          false      //--- Return without update
 
 //--- Fibo Defines
-       enum     FiboFormats
+       enum     FiboFormat
                 {
                   Unsigned,
                   Signed,
                   Extended
                 };
 
-       enum     FibonacciLevels
+       enum     FibonacciLevel
                 {
                   FiboRoot,
                   Fibo23,
@@ -245,7 +245,7 @@ int FiboSign(int Level)
 //+------------------------------------------------------------------+
 //| FiboPrice - linear fibonacci price for the supplied level        |
 //+------------------------------------------------------------------+
-double FiboPrice(int Level, double Base, double Root, int Method=Expansion)
+double FiboPrice(FibonacciLevel Level, double Base, double Root, int Method=Expansion)
   {
     if (Level == 0 || fabs(Level) == 10)
     {
@@ -264,7 +264,7 @@ double FiboPrice(int Level, double Base, double Root, int Method=Expansion)
 //+------------------------------------------------------------------+
 //| FiboLevel - returns the level id for the supplied fibo value     |
 //+------------------------------------------------------------------+
-int FiboLevel(double Fibonacci, FiboFormats Format=Extended)
+int FiboLevel(double Fibonacci, FiboFormat Format=Extended)
   {
     int    flFibo;
     
@@ -324,9 +324,11 @@ double FiboPercent(int Level, int Format=InPoints, bool Signed=true)
 //+------------------------------------------------------------------+
 double Pip(double Value, int Type=InPips)
   {
+    //--- Convert points into pips
     if (Type==InPips)
       return (NormalizeDouble(Value*pow(10, Digits-1),1));
 
+    //--- Convert pips into points
     return (NormalizeDouble(Value / pow(10, Digits-1), Digits));
   }
 

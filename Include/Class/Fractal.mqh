@@ -99,6 +99,9 @@ public:
        
        double        Price(RetraceType Type, ReservedWords Measure=Now);                             //--- Current retrace type price by measure
        double        Price(ReservedWords Type, ReservedWords Measure=Now);                           //--- Current origin price by measure
+       double        Price(RetraceType Type, FibonacciLevel Level);                                  //--- Forecasted non-origin fibonacci price
+       double        Price(ReservedWords Type, FibonacciLevel Level);                                //--- Forecasted origin fibonacci price
+       
 
        double        Range(RetraceType Type, ReservedWords Measure=Max, int Format=InPoints);        //--- For each retrace type
        double        Range(ReservedWords Type, ReservedWords Measure=Max, int Format=InPoints);      //--- For Origin
@@ -669,6 +672,37 @@ RetraceType CFractal::State(ReservedWords Level=Now)
   }
 
 //+------------------------------------------------------------------+
+//| Price - Returns the forecasted Non-Origin fibonacci price        |
+//+------------------------------------------------------------------+
+double CFractal::Price(ReservedWords Type, FibonacciLevel Level)
+  {
+    if (Type==Origin)
+    {
+      if (this.Origin(Direction)==DirectionUp)
+        return (NormalizeDouble(FiboPrice(Level,this.Price(Type,Top),this.Price(Type,Bottom)),Digits));
+
+      if (this.Origin(Direction)==DirectionDown)
+        return (NormalizeDouble(FiboPrice(Level,this.Price(Type,Bottom),this.Price(Type,Top)),Digits));
+    }
+  
+    return (NoValue);
+  }
+  
+//+------------------------------------------------------------------+
+//| Price - Returns the forecasted Non-Origin fibonacci price        |
+//+------------------------------------------------------------------+
+double CFractal::Price(RetraceType Type, FibonacciLevel Level)
+  {
+    if (this.Direction(Type)==DirectionUp)
+      return (NormalizeDouble(FiboPrice(Level,this.Price(Type),this.Price(Type,Bottom)),Digits));
+
+    if (this.Direction(Type)==DirectionDown)
+      return (NormalizeDouble(FiboPrice(Level,this.Price(Type),this.Price(Type,Top)),Digits));
+      
+    return (NoValue);
+  }
+  
+//+------------------------------------------------------------------+
 //| Price - Returns the origin derived price                         |
 //+------------------------------------------------------------------+
 double CFractal::Price(ReservedWords Type, ReservedWords Measure=Now)
@@ -702,35 +736,35 @@ double CFractal::Price(RetraceType Type, ReservedWords Measure=Now)
   {
     switch (Measure)
     {
-      case Top:    switch(Type)
-                   {
-                     case Trend:  return (NormalizeDouble(fmax(this.Price(Trend,Previous),fmax(f[Trend].Price,this.Price(Term,Top))),Digits));
-                     case Term:   return (NormalizeDouble(fmax(f[Term].Price,this.Price(Prior,Top)),Digits));
-                     case Prior:  if (f[Prior].Direction == DirectionUp)
-                                    return (NormalizeDouble(fmax(f[Prior].Price,f[Root].Price),Digits));
-                                  if (f[Prior].Direction == DirectionDown)
-                                    return (NormalizeDouble(fmax(f[Base].Price,f[Expansion].Price),Digits));
-                                  return (NormalizeDouble(0.00,Digits));
-                     case Base:
-                     case Root:   return (NormalizeDouble(fmax(f[Root].Price,f[Expansion].Price),Digits));
-                     default:     return (NormalizeDouble(fmax(this.Price(Type),this.Price(Type,Previous)),Digits));
-                   }
-                   break;
+      case Top:       switch(Type)
+                      {
+                        case Trend:  return (NormalizeDouble(fmax(this.Price(Trend,Previous),fmax(f[Trend].Price,this.Price(Term,Top))),Digits));
+                        case Term:   return (NormalizeDouble(fmax(f[Term].Price,this.Price(Prior,Top)),Digits));
+                        case Prior:  if (f[Prior].Direction == DirectionUp)
+                                       return (NormalizeDouble(fmax(f[Prior].Price,f[Root].Price),Digits));
+                                     if (f[Prior].Direction == DirectionDown)
+                                       return (NormalizeDouble(fmax(f[Base].Price,f[Expansion].Price),Digits));
+                                     return (NormalizeDouble(0.00,Digits));
+                        case Base:
+                        case Root:   return (NormalizeDouble(fmax(f[Root].Price,f[Expansion].Price),Digits));
+                        default:     return (NormalizeDouble(fmax(this.Price(Type),this.Price(Type,Previous)),Digits));
+                      }
+                      break;
                    
-      case Bottom: switch(Type)
-                   {
-                     case Trend:  return (NormalizeDouble(fmin(this.Price(Trend,Previous),fmin(f[Trend].Price,this.Price(Term,Bottom))),Digits));
-                     case Term:   return (NormalizeDouble(fmin(f[Term].Price,this.Price(Prior,Bottom)),Digits));
-                     case Prior:  if (f[Prior].Direction == DirectionUp)
-                                    return (NormalizeDouble(fmin(f[Base].Price,f[Expansion].Price),Digits));
-                                  if (f[Prior].Direction == DirectionDown)
-                                    return (NormalizeDouble(fmin(f[Prior].Price,f[Root].Price),Digits));
-                                  return (NormalizeDouble(0.00,Digits));
-                     case Base:
-                     case Root:   return (NormalizeDouble(fmin(f[Root].Price,f[Expansion].Price),Digits));
-                     default:     return (NormalizeDouble(fmin(this.Price(Type),this.Price(Type,Previous)),Digits));
-                   }
-                   break;
+      case Bottom:    switch(Type)
+                      {
+                        case Trend:  return (NormalizeDouble(fmin(this.Price(Trend,Previous),fmin(f[Trend].Price,this.Price(Term,Bottom))),Digits));
+                        case Term:   return (NormalizeDouble(fmin(f[Term].Price,this.Price(Prior,Bottom)),Digits));
+                        case Prior:  if (f[Prior].Direction == DirectionUp)
+                                       return (NormalizeDouble(fmin(f[Base].Price,f[Expansion].Price),Digits));
+                                     if (f[Prior].Direction == DirectionDown)
+                                       return (NormalizeDouble(fmin(f[Prior].Price,f[Root].Price),Digits));
+                                     return (NormalizeDouble(0.00,Digits));
+                        case Base:
+                        case Root:   return (NormalizeDouble(fmin(f[Root].Price,f[Expansion].Price),Digits));
+                        default:     return (NormalizeDouble(fmin(this.Price(Type),this.Price(Type,Previous)),Digits));
+                      }
+                      break;
                    
       case Previous:  if (Type == Trend)
                         if (IsEqual(fOrigin.Price,0.00))

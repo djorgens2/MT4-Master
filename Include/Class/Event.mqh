@@ -28,6 +28,7 @@ protected:
                   TrendWane,
                   TrendNone,
                   TrendResume,
+                  NewState,
                   NewTerm,
                   NewTrend,
                   NewOffSessionPivot,

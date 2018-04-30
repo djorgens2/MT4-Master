@@ -29,6 +29,7 @@ public:
                double      Resistance;
                double      PriorMid;
                double      OffMid;
+               int         TrendAge;
              };
 
              //-- Session Types
@@ -94,26 +95,11 @@ private:
              void          CalcEvents(void);
              void          ProcessEvents(void);
              void          LoadHistory(void);
-             void          UpdateHistory(void);
              void          UpdateBuffers(void);
 
              //--- Private Properties
              bool          HistoryIsLoaded(void) {return (ArraySize(srHistory)>0);}
   };
-
-//+------------------------------------------------------------------+
-//| UpdateHistory - Manages history changes and the history array    |
-//+------------------------------------------------------------------+
-void CSessionArray::UpdateHistory(void)
-  {
-    SessionRec uhHistory[];
-
-    ArrayCopy(uhHistory,srHistory);
-    ArrayResize(srHistory,ArraySize(srHistory)+1);
-    ArrayCopy(srHistory,uhHistory,1);
-
-    srHistory[0]                    = srActive;  
-  }
 
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
@@ -143,12 +129,50 @@ void CSessionArray::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSessionArray::CloseSession(void)
   {
-    UpdateHistory();
+    SessionRec uhHistory[];
+
+    ArrayCopy(uhHistory,srHistory);
+    ArrayResize(srHistory,ArraySize(srHistory)+1);
+    ArrayCopy(srHistory,uhHistory,1);
+
+    srHistory[0]                    = srActive;
+    
+    if (sEvent[NewTrend])
+      srActive.TrendAge             = 0;
 
     srActive.TermHigh               = High[sBar];
     srActive.TermLow                = Low[sBar];
+    srActive.TrendAge++;
 
     sSessionIsOpen                  = false;
+  }
+
+//+------------------------------------------------------------------+
+//| ProcessEvents - Reviews active events; updates critical elements |
+//+------------------------------------------------------------------+
+void CSessionArray::ProcessEvents(void)
+  {    
+    for (EventType event=NewDirection;event<EventTypes;event++)
+      if (sEvent[event])
+        switch (event)
+        {
+          case NewBreakout:     
+          case NewReversal:     //--SetBoundaries
+          case NewRally:
+          case NewPullback:     sEventState  = event;
+                                break;
+          case NewHigh:
+          case NewLow:
+          case NewBoundary:     break;
+
+          case NewTrend:        //--Set trend pivots
+                                break;
+          case SessionOpen:     OpenSession();
+                                break;
+
+          case SessionClose:    CloseSession();
+                                break;
+        }
   }
 
 //+------------------------------------------------------------------+
@@ -226,10 +250,14 @@ void CSessionArray::CalcEvents(void)
       if (sEvent[NewBoundary])
       {
         if (IsHigher(Close[sBar],srActive.Resistance) || IsLower(Close[sBar],srActive.Support))
+        {
+          sEvent.SetEvent(NewState);
+          
           if (srActive.TermDir==sTrendDir)
             sEvent.SetEvent(NewBreakout);
           else
             sEvent.SetEvent(NewReversal);
+        }
         else
 
         //--- Test Rallys/Pullbacks
@@ -241,11 +269,17 @@ void CSessionArray::CalcEvents(void)
 
           if (sEvent[NewHigh])
             if (IsHigher(Close[sBar],cePivotPrice,NoUpdate))
+            {
+              sEvent.SetEvent(NewState);
               sEvent.SetEvent(NewRally);
+            }
           
           if (sEvent[NewLow])
             if (IsLower(Close[sBar],cePivotPrice,NoUpdate))
+            {
+              sEvent.SetEvent(NewState);
               sEvent.SetEvent(NewPullback);
+            }
         }
       }
     }
@@ -278,34 +312,6 @@ ReservedWords CSessionArray::State(void)
       }
       
     return (NoState);
-  }
-
-//+------------------------------------------------------------------+
-//| ProcessEvents - Reviews active events; updates critical elements |
-//+------------------------------------------------------------------+
-void CSessionArray::ProcessEvents(void)
-  {    
-    for (EventType event=NewDirection;event<EventTypes;event++)
-      if (sEvent[event])
-        switch (event)
-        {
-          case NewBreakout:     
-          case NewReversal:     //--SetBoundaries
-          case NewRally:
-          case NewPullback:     sEventState  = event;
-                                break;
-          case NewHigh:
-          case NewLow:
-          case NewBoundary:     break;
-
-          case NewTrend:        //--Set trend pivots
-                                break;
-          case SessionOpen:     OpenSession();
-                                break;
-
-          case SessionClose:    CloseSession();
-                                break;
-        }
   }
 
 //+------------------------------------------------------------------+
@@ -344,6 +350,7 @@ void CSessionArray::LoadHistory(void)
     srActive.Resistance       = srActive.TermHigh;
     srActive.PriorMid         = ActiveMid();
     srActive.OffMid           = ActiveMid();
+    srActive.TrendAge         = 0;
 
     sTrendDir                 = DirectionNone;
     sOffDir                   = DirectionNone;
