@@ -67,6 +67,18 @@ input int    inpUSClose              = 23;    // US market close hour
   bool                udTradePending         = false;
   
 //+------------------------------------------------------------------+
+//| IsChanged - Compares events to determine if a change occurred    |
+//+------------------------------------------------------------------+
+bool IsChanged(EventType &Compare, EventType Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
+  
+//+------------------------------------------------------------------+
 //| DisplayEvents - Displays events and other session data           |
 //+------------------------------------------------------------------+
 void DisplayEvents(void)
@@ -271,7 +283,24 @@ bool PriceOOB(void)
 //+------------------------------------------------------------------+
 void ExecuteTrades(void)
   {
-    if (PriceOOB())
+    static EventType   etEvent  = EventTypes;
+    
+    if (udEvent[NewDay])
+      etEvent                   = EventTypes;
+//      Pause ("We have a new day!","New Day");
+      
+    if (session[Asia].Event(SessionClose))
+      Pause ("We have closure!","Asia Breakout Strategy");
+      
+    if (session[Europe].Event(NewBreakout))
+      if (IsChanged(etEvent,NewBreakout))
+        Pause ("We have a Euro Break!","What session does the breakout occur?");      
+
+    if (session[Europe].Event(NewReversal))
+      if (IsChanged(etEvent,NewReversal))
+        Pause ("We have a Euro Reversal!","What session does the reversal occur?");      
+
+/*    if (PriceOOB())
     {
       udTradePending                = true;
       Pause("I'm OOB\n Top: "+DoubleToStr(udTradePrice[OP_SELL],Digits)+"\n Bottom: "
@@ -294,6 +323,7 @@ void ExecuteTrades(void)
               }
       }
     }
+*/
   }
 
 //+------------------------------------------------------------------+

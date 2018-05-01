@@ -30,6 +30,7 @@ public:
                double      PriorMid;
                double      OffMid;
                int         TrendAge;
+               int         State;
              };
 
              //-- Session Types
@@ -58,7 +59,7 @@ public:
              double        ActiveMid(void);
              int           TradeBias(void);
              int           Direction(RetraceType Type);
-             ReservedWords State(void);
+             ReservedWords State(RetraceType Type);
                                  
 private:
 
@@ -70,7 +71,8 @@ private:
              int           sTrendDir;             
              int           sOffDir;
 
-             EventType     sEventState;
+             int           sState;
+             int           sStateDir;
 
              int           sHourOpen;
              int           sHourClose;
@@ -140,6 +142,9 @@ void CSessionArray::CloseSession(void)
     if (sEvent[NewTrend])
       srActive.TrendAge             = 0;
 
+    srActive.Resistance           = srActive.TermHigh;
+    srActive.Support              = srActive.TermLow;
+
     srActive.TermHigh               = High[sBar];
     srActive.TermLow                = Low[sBar];
     srActive.TrendAge++;
@@ -159,7 +164,7 @@ void CSessionArray::ProcessEvents(void)
           case NewBreakout:     
           case NewReversal:     //--SetBoundaries
           case NewRally:
-          case NewPullback:     sEventState  = event;
+          case NewPullback:     srActive.State  = State(Term);
                                 break;
           case NewHigh:
           case NewLow:
@@ -288,28 +293,26 @@ void CSessionArray::CalcEvents(void)
 //+------------------------------------------------------------------+
 //| State - Returns the trend state based on the last active event   |
 //+------------------------------------------------------------------+
-ReservedWords CSessionArray::State(void)
+ReservedWords CSessionArray::State(RetraceType Type)
   {
-    //--- Long session states
-    if (sTrendDir==DirectionUp)
-      switch (sEventState)
-      {
-        case NewReversal:     return(Reversal);
-        case NewBreakout:     return(Breakout);
-        case NewRally:        return(Rally);
-        case NewPullback:     return(Pullback);
-      }
-    else
+    int state;
     
-    //--- Short session states
-    if (sTrendDir==DirectionDown)
-      switch (sEventState)
-      {
-        case NewReversal:     return(Reversal);
-        case NewBreakout:     return(Breakout);
-        case NewRally:        return(Rally);
-        case NewPullback:     return(Pullback);
-      }
+    switch (Type)
+    {
+      case Trend:      state = sState;
+                       break;
+      case Term:       state = srActive.State;
+                       break;
+      default:         return (NoState);
+    }
+    
+    switch (state)
+    {
+      case NewReversal:     return(Reversal);
+      case NewBreakout:     return(Breakout);
+      case NewRally:        return(Rally);
+      case NewPullback:     return(Pullback);
+    }
       
     return (NoState);
   }
@@ -351,9 +354,11 @@ void CSessionArray::LoadHistory(void)
     srActive.PriorMid         = ActiveMid();
     srActive.OffMid           = ActiveMid();
     srActive.TrendAge         = 0;
+    srActive.State            = NoState;
 
     sTrendDir                 = DirectionNone;
     sOffDir                   = DirectionNone;
+    sBars                     = Bars;
     
     for (sBar=lhCloseBar;sBar>lhOpenBar;sBar--)
       if (SessionIsOpen())
@@ -393,9 +398,6 @@ CSessionArray::CSessionArray(SessionType Type, int HourOpen, int HourClose)
   {
     //--- Init global session values
     sType                     = Type;
-    sTrendDir                 = DirectionNone;
-    sBars                     = Bars;
-    
     sHourOpen                 = HourOpen;
     sHourClose                = HourClose;
     

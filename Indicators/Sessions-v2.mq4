@@ -41,6 +41,7 @@ input SessionType    inpType         = SessionTypes;    // Indicator session
 input int            inpHourOpen     = NoValue;         // Session Opening Hour
 input int            inpHourClose    = NoValue;         // Session Closing Hour
 input bool           inpShowSession  = true;            // Display session ranges
+input bool           inpShowBuffer   = true;            // Display trend lines?
 
 const color          AsiaColor       = C'0,32,0';       // Asia session box color
 const color          EuropeColor     = C'48,0,0';       // Europe session box color
@@ -170,7 +171,10 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    session.Update(indOffMidBuffer,indPriorMidBuffer);
+    if (inpShowBuffer)
+      session.Update(indOffMidBuffer,indPriorMidBuffer);
+    else
+      session.Update();
     
     RefreshScreen();
 
