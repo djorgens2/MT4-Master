@@ -155,6 +155,8 @@ void RefreshScreen(int Bar=0)
     UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
     UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
     UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
+    UpdateLine("lnActiveRetrace",session.Retrace(Active),STYLE_DOT,clrGray);
+    UpdateLine("lnPriorRetrace",session.Retrace(Prior),STYLE_SOLID,clrDarkGray);
   }
  
 //+------------------------------------------------------------------+
@@ -198,6 +200,8 @@ int OnInit()
     NewLine("lnActiveMid");
     NewLine("lnResistance");
     NewLine("lnSupport");
+    NewLine("lnActiveRetrace");
+    NewLine("lnPriorRetrace");
     
     DeleteRanges();
 

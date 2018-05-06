@@ -124,16 +124,16 @@ void RefreshScreen(void)
     {
       UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
-      UpdateLabel("lbState"+EnumToString(type),proper(DirText(session[type].Direction(Trend)))+" "+EnumToString(session[type].State()));
+      UpdateLabel("lbState"+EnumToString(type),proper(DirText(session[type].Direction(Trend)))+" "+EnumToString(session[type].State(Trend)));
     }
   
     if (session[udLeadSession].Event(SessionOpen))
       UpdateLabel("lbTradeBias",proper(ActionText(session[udLeadSession].TradeBias())),clrWhite,12);
     
     UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price),DirColor(pfractal.Direction(Pivot)));
-    UpdateLine("lnTradeEntry",udTradeEntryPrice,STYLE_SOLID,DirColor(Direction(udTradeAction)));
-    UpdateLine("lnTradePriceSell",udTradePrice[OP_SELL],STYLE_SOLID,clrMaroon);
-    UpdateLine("lnTradePriceBuy",udTradePrice[OP_BUY],STYLE_SOLID,clrForestGreen);
+    //UpdateLine("lnTradeEntry",udTradeEntryPrice,STYLE_SOLID,DirColor(Direction(udTradeAction)));
+    //UpdateLine("lnTradePriceSell",udTradePrice[OP_SELL],STYLE_SOLID,clrMaroon);
+    //UpdateLine("lnTradePriceBuy",udTradePrice[OP_BUY],STYLE_SOLID,clrForestGreen);
     
 //      UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
 
@@ -179,8 +179,13 @@ void GetData(void)
             
       if (type<Daily)
         if (session[type].Event(SessionOpen))
-          udLeadSession    = type;
+          udLeadSession    = type;          
     }
+
+    UpdateLine("lnTrSupport",session[Asia].Trend().Support,STYLE_SOLID,clrMaroon);
+    UpdateLine("lnTrResistance",session[Asia].Trend().Resistance,STYLE_SOLID,clrForestGreen);
+    UpdateLine("lnTrPullback",session[Asia].Trend().Pullback,STYLE_DOT,clrMaroon);
+    UpdateLine("lnTrRally",session[Asia].Trend().Rally,STYLE_DOT,clrForestGreen);
   }
 
 //+------------------------------------------------------------------+
@@ -412,9 +417,13 @@ int OnInit()
 
     NewLabel("lbTradeBias","",5,10,clrDarkGray,SCREEN_LR);
     
-    NewLine("lnTradeEntry");
-    NewLine("lnTradePriceSell");
-    NewLine("lnTradePriceBuy");
+//    NewLine("lnTradeEntry");
+//    NewLine("lnTradePriceSell");
+//    NewLine("lnTradePriceBuy");
+    NewLine("lnTrSupport");
+    NewLine("lnTrResistance");
+    NewLine("lnTrPullback");
+    NewLine("lnTrRally");
     
     NewPriceLabel("lbPipMAPivot");
     NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);
