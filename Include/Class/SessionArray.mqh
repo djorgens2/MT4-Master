@@ -36,6 +36,7 @@ public:
              struct SessionRec
              {
                int            TermDir;
+               int            TermAge;
                double         TermHigh;
                double         TermLow;
                double         Support;
@@ -106,7 +107,7 @@ private:
              //--- Private Methods
              void          OpenSession(void);
              void          CloseSession(void);
-             void          ResetTrend(void);
+             void          SetTrendState(ReservedWords State);
              void          CalcEvents(void);
              void          ProcessEvents(void);
              void          LoadHistory(void);
@@ -116,6 +117,40 @@ private:
              bool          HistoryIsLoaded(void) {return (ArraySize(srHistory)>0);}
   };
 
+//+------------------------------------------------------------------+
+//| SetTrendState - Sets trend state and updates support/resistance  |
+//+------------------------------------------------------------------+
+void CSessionArray::SetTrendState(ReservedWords State)
+  {
+    srTrend.State           = State;
+    
+    switch (State)
+    {
+      case Breakout:   
+      case Reversal:  srTrend.Age             = srActive.TermAge;
+    
+                      if (srTrend.TrendDir==DirectionUp)
+                      {
+                        srTrend.Support       = srTrend.Pullback;
+                        srTrend.Rally         = ActiveMid();
+                      }
+                      
+                      if (srTrend.TrendDir==DirectionDown)
+                      {
+                        srTrend.Resistance    = srTrend.Rally;
+                        srTrend.Pullback      = ActiveMid();
+                      }
+                      break;
+                      
+       case Rally:
+       case Pullback: if (srTrend.TrendDir==DirectionUp)
+                        srTrend.Rally         = ActiveMid();
+
+                      if (srTrend.TrendDir==DirectionDown)
+                        srTrend.Pullback      = ActiveMid();
+     }
+  }
+  
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
 //+------------------------------------------------------------------+
@@ -153,45 +188,29 @@ void CSessionArray::CloseSession(void)
     srHistory[0]              = srActive;
     
     if (sEvent[NewTrend])
-    {
-      if (sEvent[NewBreakout])
-      {
-        srTrend.State         = Breakout;
-        srTrend.Age           = 0;
+      srActive.TermAge        = 0;
 
-        if (srTrend.TrendDir==DirectionUp)
-          srTrend.Support     = srTrend.Pullback;
-
-        if (srTrend.TrendDir==DirectionDown)
-          srTrend.Resistance  = srTrend.Rally;
-      }
+    if (sEvent[NewBreakout])
+      SetTrendState(Breakout);
+    else
+    if (sEvent[NewReversal])
+      SetTrendState(Reversal);
+    else
+    if (sEvent[NewRally])
+      SetTrendState(Rally);
+    else
+    if (sEvent[NewPullback])
+      SetTrendState(Pullback);
       
-      if (sEvent[NewReversal])
-      {
-        srTrend.State         = Reversal;
-        srTrend.Age           = 0;
-
-        if (srTrend.TrendDir==DirectionUp)
-          srTrend.Support     = srTrend.Pullback;
-
-        if (srTrend.TrendDir==DirectionDown)
-          srTrend.Resistance  = srTrend.Rally;
-      }
-
-      if (srTrend.Age>0)
-      {
-        if (sr
-        srTrend.Rally         = ActiveMid();
-        srTrend.Pullback      = ActiveMid();
-      }
-    }
-
     srActive.Resistance       = srActive.TermHigh;
     srActive.Support          = srActive.TermLow;
 
     srActive.TermHigh         = High[sBar];
     srActive.TermLow          = Low[sBar];
 
+    srActive.TermAge++;
+    srTrend.Age++;
+    
     sSessionIsOpen            = false;
     
     if (sType==Asia)
@@ -202,11 +221,12 @@ void CSessionArray::CloseSession(void)
           Append(csEvent,EnumToString(event),":");
         
       Print("The close at "+TimeToStr(Time[sBar])
-             +" s:"+DoubleToStr(srTrend.Support,Digits)
-             +" r:"+DoubleToStr(srTrend.Resistance,Digits)
-             +" pb:"+DoubleToStr(srTrend.Pullback,Digits)
-             +" rl:"+DoubleToStr(srTrend.Rally,Digits)
-             +")  Events ("+csEvent+")"
+             +" s: "+DoubleToStr(srTrend.Support,Digits)
+             +" r: "+DoubleToStr(srTrend.Resistance,Digits)
+             +" pb: "+DoubleToStr(srTrend.Pullback,Digits)
+             +" rl: "+DoubleToStr(srTrend.Rally,Digits)
+             +" Events ("+csEvent+")"
+             +" Trend:"+BoolToStr(srTrend.TrendDir==DirectionUp,"Long","Short")
            );
     }
   }
@@ -285,17 +305,16 @@ void CSessionArray::CalcEvents(void)
             else
               sEvent.SetEvent(NewBreakout);
           else
-            if (IsHigher(ActiveMid(),srTrend.Rally))
-              sEvent.SetEvent(NewRally);
+            sEvent.SetEvent(NewRally);
 
+        if (srTrend.TrendDir==DirectionDown)
           if (IsLower(ActiveMid(),srTrend.Support))
             if (IsChanged(srTrend.OriginDir,srTrend.TrendDir))
               sEvent.SetEvent(NewReversal);
             else
               sEvent.SetEvent(NewBreakout);
           else
-            if (IsLower(ActiveMid(),srTrend.Pullback))
-              sEvent.SetEvent(NewPullback);
+            sEvent.SetEvent(NewPullback);
       }
     else
     

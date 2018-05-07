@@ -152,11 +152,11 @@ void RefreshScreen(int Bar=0)
       else
         UpdateRange(Bar);
         
-    UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
-    UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
-    UpdateLine("lnActiveRetrace",session.Retrace(Active),STYLE_DOT,clrGray);
-    UpdateLine("lnPriorRetrace",session.Retrace(Prior),STYLE_SOLID,clrDarkGray);
+    //UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
+    //UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
+    //UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
+    //UpdateLine("lnActiveRetrace",session.Retrace(Active),STYLE_DOT,clrGray);
+    //UpdateLine("lnPriorRetrace",session.Retrace(Prior),STYLE_SOLID,clrDarkGray);
   }
  
 //+------------------------------------------------------------------+
