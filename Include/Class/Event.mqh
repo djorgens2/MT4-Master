@@ -9,8 +9,9 @@
 #property strict
 
 #include <stdutil.mqh>
+
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Event Class - Indicator stack used to flag a named event         |
 //+------------------------------------------------------------------+
 class CEvent
   {
@@ -74,3 +75,16 @@ bool CEvent::ActiveEvent(void)
         
     return (false);
   }
+  
+//+------------------------------------------------------------------+
+//| IsChanged - Compares events to determine if a change occurred    |
+//+------------------------------------------------------------------+
+bool IsChanged(EventType &Compare, EventType Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
+

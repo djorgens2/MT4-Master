@@ -12,7 +12,7 @@
 #include <Class/ArrayDouble.mqh>
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| SessionArray Class - Collects session data, states, and events   |
 //+------------------------------------------------------------------+
 class CSessionArray
   {

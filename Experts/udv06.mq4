@@ -67,18 +67,6 @@ input int    inpUSClose              = 23;    // US market close hour
   bool                udTradePending         = false;
   
 //+------------------------------------------------------------------+
-//| IsChanged - Compares events to determine if a change occurred    |
-//+------------------------------------------------------------------+
-bool IsChanged(EventType &Compare, EventType Value)
-  {
-    if (Compare==Value)
-      return (false);
-      
-    Compare = Value;
-    return (true);
-  }
-  
-//+------------------------------------------------------------------+
 //| DisplayEvents - Displays events and other session data           |
 //+------------------------------------------------------------------+
 void DisplayEvents(void)
