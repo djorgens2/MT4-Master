@@ -55,10 +55,11 @@ public:
                Daily,
                SessionTypes
              };
-
+             
              CSessionArray(SessionType Type, int HourOpen, int HourClose);
             ~CSessionArray();
 
+             SessionType   Type(void)            {return (sType);}
              bool          SessionIsOpen(void);
              bool          Event(EventType Type) {return (sEvent[Type]);}
              bool          ActiveEvent(void)     {return (sEvent.ActiveEvent());}
@@ -74,6 +75,7 @@ public:
 
              int           TradeBias(void);
              int           Direction(RetraceType Type);
+             int           SessionHour(void);
              ReservedWords State(RetraceType Type);
                                  
 private:
@@ -84,6 +86,7 @@ private:
              bool          sSessionIsOpen;
 
              int           sOffDir;
+             ReservedWords sOffState;
 
              int           sHourOpen;
              int           sHourClose;
@@ -161,6 +164,12 @@ void CSessionArray::OpenSession(void)
     {
       srActive.Resistance           = fmax(srActive.TermHigh,srHistory[0].TermHigh);
       srActive.Support              = fmin(srActive.TermLow,srHistory[0].TermLow);
+      
+      if (IsHigher(ActiveMid(),srHistory[0].OffMid,NoUpdate))
+        sOffState                   = Rally;
+
+      if (IsLower(ActiveMid(),srHistory[0].OffMid,NoUpdate))
+        sOffState                   = Pullback;
     }
 
     //-- Reset term range and open session flag
@@ -212,23 +221,6 @@ void CSessionArray::CloseSession(void)
     srTrend.Age++;
     
     sSessionIsOpen            = false;
-    
-    if (sType==Asia)
-    {
-      string csEvent="";
-      for (EventType event=0;event<EventTypes;event++)
-        if (sEvent[event])
-          Append(csEvent,EnumToString(event),":");
-        
-      Print("The close at "+TimeToStr(Time[sBar])
-             +" s: "+DoubleToStr(srTrend.Support,Digits)
-             +" r: "+DoubleToStr(srTrend.Resistance,Digits)
-             +" pb: "+DoubleToStr(srTrend.Pullback,Digits)
-             +" rl: "+DoubleToStr(srTrend.Rally,Digits)
-             +" Events ("+csEvent+")"
-             +" Trend:"+BoolToStr(srTrend.TrendDir==DirectionUp,"Long","Short")
-           );
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -582,6 +574,17 @@ int CSessionArray::Direction(RetraceType Type)
   }
 
 //+------------------------------------------------------------------+
+//| SessionHour - Returns the hour of open session trading           |
+//+------------------------------------------------------------------+
+int CSessionArray::SessionHour(void)
+  {    
+    if (sSessionIsOpen)
+      return (TimeHour(Time[sBar])-sHourOpen+1);
+    
+    return (NoValue);
+  }
+
+//+------------------------------------------------------------------+
 //| State - Returns the trend state based on the last active event   |
 //+------------------------------------------------------------------+
 ReservedWords CSessionArray::State(RetraceType Type)
@@ -590,6 +593,7 @@ ReservedWords CSessionArray::State(RetraceType Type)
     {
       case Trend:      return(srTrend.State);
       case Term:       return(srActive.State);
+      case Prior:      return(sOffState);
     }
     
     return (NoState);

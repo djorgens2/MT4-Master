@@ -71,8 +71,13 @@ input int    inpUSClose              = 23;    // US market close hour
 //+------------------------------------------------------------------+
 void DisplayEvents(void)
   {
-    string deEvents  = "\n------ Action ------";
+    string deEvents;
 
+    deEvents        += "\n------ Factors ------";
+    deEvents        += "\n";
+
+    deEvents        += "\n------ Action ------";
+        
     if (udTradeAction==OP_NO_ACTION)
       deEvents      += "\n  Waiting\n";
     else
@@ -89,8 +94,9 @@ void DisplayEvents(void)
         if (session[type].ActiveEvent())
         {
           deEvents +="\n "
-                   + EnumToString(type)+" ("
-                   + BoolToStr(session[type].SessionIsOpen(),proper(ActionText(session[type].TradeBias())),"Off-Session")+")";
+                   + EnumToString(type)+"\n"
+                   + "  Bias: "+proper(ActionText(session[type].TradeBias()))+"\n"
+                   + "  State: "+EnumToString(session[type].State(Prior))+"\n";
      
           for (EventType event=0;event<EventTypes;event++)
             if (session[type].Event(event))
@@ -108,22 +114,17 @@ void DisplayEvents(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    string  rsLeadText       = EnumToString(session[udLeadSession].Type())+" "+proper(ActionText(session[Daily].TradeBias()));
+    
     for (SessionType type=Asia; type<SessionTypes; type++)
     {
-      UpdateLabel("lbSess"+EnumToString(type),EnumToString(type),BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
+      UpdateLabel("lbSess"+EnumToString(type),EnumToString(type)+" ("+IntegerToString(BoolToInt(session[type].SessionIsOpen(),session[type].SessionHour()))+")",BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
       UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
       UpdateLabel("lbState"+EnumToString(type),proper(DirText(session[type].Direction(Trend)))+" "+EnumToString(session[type].State(Trend)));
     }
   
-    if (session[udLeadSession].Event(SessionOpen))
-      UpdateLabel("lbTradeBias",proper(ActionText(session[udLeadSession].TradeBias())),clrWhite,12);
-    
+    UpdateLabel("lbTradeBias",rsLeadText,BoolToInt(session[udLeadSession].SessionIsOpen(),clrWhite,clrDarkGray),12);
     UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price),DirColor(pfractal.Direction(Pivot)));
-    //UpdateLine("lnTradeEntry",udTradeEntryPrice,STYLE_SOLID,DirColor(Direction(udTradeAction)));
-    //UpdateLine("lnTradePriceSell",udTradePrice[OP_SELL],STYLE_SOLID,clrMaroon);
-    //UpdateLine("lnTradePriceBuy",udTradePrice[OP_BUY],STYLE_SOLID,clrForestGreen);
-    
-//      UpdateLabel("lbEquity","Low:"+DoubleToStr(LotValue(OP_NO_ACTION,Lowest),1)+"  High:"+DoubleToStr(LotValue(OP_NO_ACTION,Highest),1));
 
     switch(udDisplay)
     {
@@ -147,8 +148,10 @@ void RefreshScreen(void)
 void GetData(void)
   {    
     udEvent.ClearEvents();
+
     udActiveEvent         = false;
-    
+    udLeadSession         = Daily;
+        
     fractal.Update();
     pfractal.Update();
 
@@ -166,7 +169,7 @@ void GetData(void)
       }
             
       if (type<Daily)
-        if (session[type].Event(SessionOpen))
+        if (session[type].SessionIsOpen())
           udLeadSession    = type;          
     }
 
@@ -287,11 +290,11 @@ void ExecuteTrades(void)
       
     if (session[Europe].Event(NewBreakout))
       if (IsChanged(etEvent,NewBreakout))
-        Pause ("We have a Euro Break!","What session does the breakout occur?");      
+        Pause ("We have a Euro Break!","What session does the breakout occur?");
 
     if (session[Europe].Event(NewReversal))
       if (IsChanged(etEvent,NewReversal))
-        Pause ("We have a Euro Reversal!","What session does the reversal occur?");      
+        Pause ("We have a Euro Reversal!","What session does the reversal occur?");
 
 /*    if (PriceOOB())
     {
@@ -405,9 +408,6 @@ int OnInit()
 
     NewLabel("lbTradeBias","",5,10,clrDarkGray,SCREEN_LR);
     
-//    NewLine("lnTradeEntry");
-//    NewLine("lnTradePriceSell");
-//    NewLine("lnTradePriceBuy");
     NewLine("lnTrSupport");
     NewLine("lnTrResistance");
     NewLine("lnTrPullback");
