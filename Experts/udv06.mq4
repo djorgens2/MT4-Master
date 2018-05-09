@@ -180,73 +180,6 @@ void GetData(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTradePlan - Analyzes events/boundaries; sets trade action  |
-//+------------------------------------------------------------------+
-void UpdateTradePlan(void)
-  {
-    int  csoTradeBias       = udTradeBias;
-    bool csoTradeDispute    = false;
-    
-    for (SessionType type=Asia;type<SessionTypes;type++)
-    {
-      if (session[type].Event(SessionOpen))
-        switch (type)
-        {
-          case Daily:  //--- Reset boundaries; validate open positions
-                       if (csoTradeBias==OP_NO_ACTION)
-                         csoTradeBias      = session[type].TradeBias();
-                       else  
-                         csoTradeDispute   = IsChanged(csoTradeBias,session[type].TradeBias());
-                       break;
-
-          case Asia:   //--- Set asian boundaries and limits;
-                       if (csoTradeBias==OP_NO_ACTION)
-                         csoTradeBias      = session[type].TradeBias();
-                       else  
-                         csoTradeDispute   = IsChanged(csoTradeBias,session[type].TradeBias());
-                       break;
-        }
-        
-      if (session[type].Event(SessionClose))
-        switch (type)
-        {
-          case Daily:  //--- Reset boundaries; validate open positions
-                       udTradePrice[OP_BUY]  = session[Daily].Active().Resistance;
-                       udTradePrice[OP_SELL] = session[Daily].Active().Support;
-                       break;
-
-          case Asia:   //--- Set asian boundaries and limits;
-                       udTradePrice[OP_BUY]  = session[Daily].Active().Resistance;
-                       udTradePrice[OP_SELL] = session[Daily].Active().Support;
-                       break;
-        }
-    }
-
-    if (csoTradeDispute)
-      Pause("To trade or not to trade?","TradeDispute() Verification");
-      
-    if (IsChanged(udTradeBias,csoTradeBias))
-      Pause("To manage risk or not to manage risk\nChanged to "+ActionText(csoTradeBias),"Trade Action Change() Verification");
-
-    if (udEvent[NewPullback])
-      udTradeAction    = OP_BUY;
-
-    if (udEvent[NewRally])
-      udTradeAction    = OP_SELL;
-
-    if (udEvent[NewBreakout] || udEvent[NewReversal])
-    {
-      if (udEvent[NewHigh])
-        udTradeAction  = OP_BUY;
-      if (udEvent[NewLow])
-        udTradeAction  = OP_SELL;
-    }
-
-    if (pfractal.Event(NewPivot))
-      udTradePrice[Action(pfractal.Direction(Pivot))] = pfractal.Pivot(Price);
-  }
-
-//+------------------------------------------------------------------+
 //| ExecuteTrades - Opens new trades based on the pipMA trigger      |
 //+------------------------------------------------------------------+
 bool SafeMargin(int Action)
@@ -279,47 +212,16 @@ bool PriceOOB(void)
 //+------------------------------------------------------------------+
 void ExecuteTrades(void)
   {
-    static EventType   etEvent  = EventTypes;
-    
-    if (udEvent[NewDay])
-      etEvent                   = EventTypes;
-//      Pause ("We have a new day!","New Day");
-      
-    if (session[Asia].Event(SessionClose))
-      Pause ("We have closure!","Asia Breakout Strategy");
-      
-    if (session[Europe].Event(NewBreakout))
-      if (IsChanged(etEvent,NewBreakout))
-        Pause ("We have a Euro Break!","What session does the breakout occur?");
+  }
 
-    if (session[Europe].Event(NewReversal))
-      if (IsChanged(etEvent,NewReversal))
-        Pause ("We have a Euro Reversal!","What session does the reversal occur?");
-
-/*    if (PriceOOB())
-    {
-      udTradePending                = true;
-      Pause("I'm OOB\n Top: "+DoubleToStr(udTradePrice[OP_SELL],Digits)+"\n Bottom: "
-                             +DoubleToStr(udTradePrice[OP_BUY],Digits),"OOB() Issue");
-    }
-      
-    if (udTradePending)
-    {
-      //--- In-Bias trades
-      if (udTradeBias==udTradeAction)
-      {
-        if (udTradeAction==OP_BUY)
-          if (SafeMargin(OP_BUY))
-            if (IsHigher(Ask,udTradeEntryPrice))
-              if (OpenOrder(OP_BUY,"Safe Margin"))
-              {
-                udTradeEntryPrice   = NoValue;
-                udTradeAction       = OP_NO_ACTION;
-                udTradePending      = false;
-              }
-      }
-    }
-*/
+//+------------------------------------------------------------------+
+//| UpdateTradePlan - Analyzes events/boundaries; sets trade action  |
+//+------------------------------------------------------------------+
+void UpdateTradePlan(void)
+  {
+    if (session[udLeadSession].SessionHour()>3)
+      if (udEvent[NewDirection])
+        Pause("Term change after mid","New Term Direction");
   }
 
 //+------------------------------------------------------------------+
