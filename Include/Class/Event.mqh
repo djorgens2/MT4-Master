@@ -20,6 +20,7 @@ protected:
                 {
                   NewDirection,
                   NewFractal,
+                  NewFibonacci,
                   NewPivot,
                   NewPivotDirection,
                   NewOrigin,
@@ -27,7 +28,6 @@ protected:
                   NewMajor,
                   NewMinor,
                   TrendWane,
-                  TrendNone,
                   TrendResume,
                   NewState,
                   NewTerm,

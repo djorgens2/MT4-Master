@@ -17,15 +17,14 @@ enum DisplayConstants
 {
   udDisplayEvents,      // Display setting for application comments
   udDisplayFractal,     // Display setting for fractal comments
-  udDisplayPipMA        // Display setting for PipMA comments
+  udDisplayPipMA,       // Display setting for PipMA comments
+  udDisplayOrders       // Display setting for Order comments
 };
 
 input string EAHeader                = "";    //+---- Application Options -------+
 input double inpDailyTarget          = 3.6;   // Daily target
 input int    inpMaxMargin            = 40;    // Maximum trade margin (volume)
-input int    inpMaxVolatilityHour    = 10;    // Most volatile trading hour
-input int    inpReversalHour         = 16;    // Most common reversal trading hour
-
+  
 input string fractalHeader           = "";    //+------ Fractal Options ---------+
 input int    inpRangeMin             = 60;    // Minimum fractal pip range
 input int    inpRangeMax             = 120;   // Maximum fractal pip range
@@ -44,27 +43,72 @@ input int    inpAsiaClose            = 10;    // Asian market close hour
 input int    inpEuropeOpen           = 8;     // Europe market open hour
 input int    inpEuropeClose          = 18;    // Europe market close hour
 input int    inpUSOpen               = 14;    // US market open hour
-input int    inpUSClose              = 23;    // US market close hour  
+input int    inpUSClose              = 23;    // US market close hour
 
+  //--- Strategy enums
+  enum Strategy
+  {
+    NoStrategy,
+    Hedge,
+    Recapture,
+    Build,
+    Reduce
+  };
+
+  struct OpenOrderRec
+  {
+    int               Action;
+    int               Ticket;
+    double            Lots;
+    double            Margin;
+    double            MaxEquity;
+    double            MinEquity;
+    int               EquityDir;
+  };
+  
   //--- Class defs
   CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CSessionArray      *session[SessionTypes];
-  
-  //--- Operational collections
   CEvent             *udEvent                = new CEvent();
-  SessionType         udLeadSession;
-  bool                udActiveEvent;
+  CEvent             *udOrderEvent           = new CEvent();
+  
 
   //--- Operational variables
   int                 udDisplay              = udDisplayEvents;
+  SessionType         udLeadSession;
+  bool                udActiveEvent;
+  bool                udSessionClosing;
+  OpenOrderRec        udOpenOrders[];
   
   //--- Trade Execution operationals
-  int                 udTradeBias            = OP_NO_ACTION;
   int                 udTradeAction          = OP_NO_ACTION;
-  double              udTradePrice[2]        = {NoValue,NoValue};
-  double              udTradeEntryPrice      = NoValue;
+  Strategy            udStrategy             = NoStrategy;
   bool                udTradePending         = false;
+  
+//+------------------------------------------------------------------+
+//| DisplayOrders - Displays open order data                         |
+//+------------------------------------------------------------------+
+void DisplayOrders(void)
+  {
+    string doOrders = "";
+    
+    if (ArraySize(udOpenOrders)>0)
+    {
+      doOrders       = "\nOrders\n";
+      
+      for (int ord=0;ord<ArraySize(udOpenOrders);ord++)
+         doOrders   += ActionText(udOpenOrders[ord].Action)+" "
+                    +  IntegerToString(udOpenOrders[ord].Ticket)+" "
+                    +  DoubleToStr(udOpenOrders[ord].Lots,2)+" "
+                    +  DoubleToStr(udOpenOrders[ord].Margin,1)+" "
+                    +  DoubleToStr(udOpenOrders[ord].MaxEquity,1)+" "
+                    +  DoubleToStr(udOpenOrders[ord].MinEquity,1)+" "
+                    +  DirText(udOpenOrders[ord].EquityDir)+"\n";
+    }
+    
+    Comment(doOrders);
+  }
   
 //+------------------------------------------------------------------+
 //| DisplayEvents - Displays events and other session data           |
@@ -74,6 +118,7 @@ void DisplayEvents(void)
     string deEvents;
 
     deEvents        += "\n------ Factors ------";
+
     deEvents        += "\n";
 
     deEvents        += "\n------ Action ------";
@@ -83,21 +128,23 @@ void DisplayEvents(void)
     else
       deEvents      += "\n  "+ActionText(udTradeAction)
                     + " "+BoolToStr(udTradePending,"Triggered","Inactive")
+                    + "\n  "+BoolToStr(udTradeAction==session[Daily].TradeBias(),"","CONFLICT")
                     + "\n";
 
     //--- Format event display
     if (udActiveEvent)
     {
-      deEvents  += "\n------ Events ------";
-
       for (SessionType type=Asia; type<SessionTypes; type++)
         if (session[type].ActiveEvent())
         {
           deEvents +="\n "
                    + EnumToString(type)+"\n"
                    + "  Bias: "+proper(ActionText(session[type].TradeBias()))+"\n"
-                   + "  State: "+EnumToString(session[type].State(Prior))+"\n";
+                   + "  State: "+EnumToString(session[type].State(Prior))
+                   + "("+IntegerToString(session[type].Active().TermAge)+")"+"\n";
      
+          deEvents += "\n------ Events ------";
+
           for (EventType event=0;event<EventTypes;event++)
             if (session[type].Event(event))
                deEvents  += "\n    "+EnumToString(event);
@@ -133,6 +180,8 @@ void RefreshScreen(void)
       case udDisplayFractal:  fractal.RefreshScreen();
                               break;
       case udDisplayPipMA:    pfractal.RefreshScreen();
+                              break;
+      case udDisplayOrders:   DisplayOrders();
     }
    
 //    if (pfractal.Event(NewPivot))
@@ -150,6 +199,7 @@ void GetData(void)
     udEvent.ClearEvents();
 
     udActiveEvent         = false;
+    udSessionClosing      = false;
     udLeadSession         = Daily;
         
     fractal.Update();
@@ -170,13 +220,11 @@ void GetData(void)
             
       if (type<Daily)
         if (session[type].SessionIsOpen())
-          udLeadSession    = type;          
+          udLeadSession    = type;
     }
 
-    UpdateLine("lnTrSupport",session[Asia].Trend().Support,STYLE_SOLID,clrMaroon);
-    UpdateLine("lnTrResistance",session[Asia].Trend().Resistance,STYLE_SOLID,clrForestGreen);
-    UpdateLine("lnTrPullback",session[Asia].Trend().Pullback,STYLE_DOT,clrMaroon);
-    UpdateLine("lnTrRally",session[Asia].Trend().Rally,STYLE_DOT,clrForestGreen);
+    if (TimeHour(Time[0])>session[udLeadSession].SessionHour()-4)
+      udSessionClosing     = true;
   }
 
 //+------------------------------------------------------------------+
@@ -188,25 +236,101 @@ bool SafeMargin(int Action)
   }
 
 //+------------------------------------------------------------------+
-//| PriceOOB - returns true if the market price is out-of-bounds     |
+//| CalcFiboEvents - Analyzes fibo level and sets fibo change events |
 //+------------------------------------------------------------------+
-bool PriceOOB(void)
+void CalcFiboEvents(void)
   {
-    if (IsHigher(Bid,udTradePrice[OP_SELL]))
+    static int cfeFiboLevel  = FiboRoot;
+    
+    if (fractal.Fibonacci(Expansion,Expansion,Now)<FiboPercent(Fibo23))
     {
-      udTradeEntryPrice      = udTradePrice[OP_SELL]-Pip(1,InPoints);
-      return true;
+      if (IsChanged(cfeFiboLevel,Fibo23))
+        udEvent.SetEvent(NewFibonacci);
     }
-
-    if (IsLower(Ask,udTradePrice[OP_BUY]))
+    else
+    if (fractal.Fibonacci(Expansion,Retrace,Now)>FiboPercent(Fibo61))
     {
-      udTradeEntryPrice      = udTradePrice[OP_BUY]+Pip(1,InPoints);
-      return true;
+      if (IsChanged(cfeFiboLevel,Fibo61))
+        udEvent.SetEvent(NewFibonacci);
     }
-      
-    return (false);
+    else
+    if (fractal.Fibonacci(Expansion,Retrace,Now)>FiboPercent(Fibo50))
+      if (IsChanged(cfeFiboLevel,Fibo50))
+        udEvent.SetEvent(NewFibonacci);
   }
 
+//+------------------------------------------------------------------+
+//| CalcOrderEvents - Analyzes open positions; sets order events     |
+//+------------------------------------------------------------------+
+void CalcOrderEvents(void)
+  {
+    double ocOrderMajor     = ordEQMinTarget;
+    double ocOrderMinor     = ordEQMinProfit;
+    
+    OpenOrderRec   ocOpenOrders[];
+    
+    udOrderEvent.ClearEvents();
+    
+    for (int ord=0;ord<OrdersTotal();ord++)
+      if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
+        if (OrderSymbol()==Symbol())
+          if (OrderType()==OP_BUY || OrderType()==OP_SELL)
+          {
+            ArrayResize(ocOpenOrders,ArraySize(ocOpenOrders)+1);
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].Action      = OrderType();
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].Ticket      = OrderTicket();
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].Lots        = OrderLots();
+
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].Margin      = TicketValue(OrderTicket(),InMargin);
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].MaxEquity   = TicketValue(OrderTicket(),InEquity);
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].MinEquity   = TicketValue(OrderTicket(),InEquity);
+            ocOpenOrders[ArraySize(ocOpenOrders)-1].EquityDir   = DirectionNone;
+
+            for (int ticket=0;ticket<ArraySize(udOpenOrders);ticket++)
+              if (udOpenOrders[ticket].Ticket==OrderTicket())
+              {
+                //--- Handle equity increase changes
+                if (IsHigher(TicketValue(OrderTicket(),InEquity),udOpenOrders[ticket].MaxEquity))
+                  if (IsHigher(udOpenOrders[ticket].MaxEquity,ocOrderMajor,NoUpdate,3))
+                    udOrderEvent.SetEvent(NewMajor);
+                  else
+                  if (IsHigher(udOpenOrders[ticket].MaxEquity,ocOrderMinor,NoUpdate,3))
+                    udOrderEvent.SetEvent(NewMinor);
+                  else
+                    udOrderEvent.SetEvent(NewHigh);
+
+                //--- Handle equity decrease changes
+                if (IsLower(TicketValue(OrderTicket(),InEquity),udOpenOrders[ticket].MinEquity))
+                  if (IsHigher(fabs(udOpenOrders[ticket].MinEquity),ocOrderMajor,NoUpdate,3))
+                    udOrderEvent.SetEvent(NewMajor);
+                  else
+                  if (IsHigher(fabs(udOpenOrders[ticket].MinEquity),ocOrderMinor,NoUpdate,3))
+                    udOrderEvent.SetEvent(NewMinor);
+                  else
+                    udOrderEvent.SetEvent(NewLow);
+                    
+                //--- Handle equity direction changes
+                if (IsHigher(TicketValue(OrderTicket(),InEquity),ocOrderMinor,NoUpdate,3))
+                {
+                  if (IsChanged(udOpenOrders[ticket].EquityDir,DirectionUp))
+                    udOrderEvent.SetEvent(NewDirection);
+                }
+                else
+                if (IsHigher(fabs(TicketValue(OrderTicket(),InEquity)),ocOrderMinor,NoUpdate,3))
+                {
+                  if (IsChanged(udOpenOrders[ticket].EquityDir,DirectionDown))
+                    udOrderEvent.SetEvent(NewDirection);                 
+                }
+             
+                //--- Post updated equity change record
+                ocOpenOrders[ArraySize(ocOpenOrders)-1]=udOpenOrders[ticket];
+              }
+          }
+
+    ArrayResize(udOpenOrders,ArraySize(ocOpenOrders));
+    ArrayCopy(udOpenOrders,ocOpenOrders);
+  }
+  
 //+------------------------------------------------------------------+
 //| ExecuteTrades - Opens new trades based on the pipMA trigger      |
 //+------------------------------------------------------------------+
@@ -215,21 +339,76 @@ void ExecuteTrades(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTradePlan - Analyzes events/boundaries; sets trade action  |
+//| CalcStrategy - Analyzes events/boundaries; sets trade action     |
 //+------------------------------------------------------------------+
-void UpdateTradePlan(void)
+void CalcStrategy(void)
   {
+    static bool           csSessionClosing;
+
+    static EventType      csSessionEvent;
+    static EventType      csOrderEvent;
+    static EventType      csFractalEvent;
+
+    string                csEventText   = "";
+        
+    if (session[Daily].Event(NewDay))
+      Append(csEventText,"End of Trading Day","\n");
+
+    if (session[Asia].Event(SessionOpen))
+      Append(csEventText,"Asia Market Open","\n");
+    
     if (session[udLeadSession].SessionHour()>3)
-      if (udEvent[NewDirection])
-        Pause("Term change after mid","New Term Direction");
+      if (session[udLeadSession].Event(NewDirection))
+        Append(csEventText,"Term change after mid\nLead Session:"+EnumToString(session[udLeadSession].Type()),"\n");
+
+    if (IsChanged(csSessionClosing,udSessionClosing))
+      Append(csEventText,"Session close warning","\n");
+      
+    if (udEvent[NewBreakout])
+      if (IsChanged(csSessionEvent,NewBreakout))
+        Append(csEventText,"Breakout Checkpoint","\n");
+
+    if (udEvent[NewReversal])
+      if (IsChanged(csSessionEvent,NewReversal))
+        Append(csEventText,"Reversal Checkpoint","\n");
+
+    if (udOrderEvent[NewMinor])
+      if (IsChanged(csOrderEvent,NewMinor))
+        Append(csEventText,"New Order Minor","\n");
+        
+    if (udOrderEvent[NewDirection])
+      Append(csEventText,"Order direction reversal","\n");
+
+    if (udOrderEvent[NewMajor])
+      if (IsChanged(csOrderEvent,NewMajor))
+        Append(csEventText,"New Order Major","\n");
+
+    if (fractal.Event(NewMinor))
+      if (IsChanged(csFractalEvent,NewMinor))
+        Append(csEventText,"New Fractal Minor","\n");
+    
+    if (fractal.Event(NewMajor))
+      if (IsChanged(csFractalEvent,NewMajor))
+        Append(csEventText,"New Fractal Major","\n");
+        
+    if (fractal.Event(NewFibonacci))
+      Append(csEventText,"New Fibonacci Level","\n");
+
+//    if (pfractal.Event(NewPivot))
+//      Pause("Pivot Price Change","Hmmm...");
+
+    if (csEventText!="")
+      Pause(csEventText,"Event()");
   }
 
 //+------------------------------------------------------------------+
 //| Execute - Acts on events to execute trades                       |
 //+------------------------------------------------------------------+
 void Execute(void)
-  {    
-    UpdateTradePlan();
+  {
+    CalcFiboEvents();
+    CalcOrderEvents();
+    CalcStrategy();
     ExecuteTrades(); 
   }
 
@@ -248,6 +427,9 @@ void ExecAppCommands(string &Command[])
       if (Command[1]=="EVENTS")  udDisplay=udDisplayEvents;
       if (Command[1]=="EVENT")   udDisplay=udDisplayEvents;
       if (Command[1]=="EV")      udDisplay=udDisplayEvents;
+      if (Command[1]=="ORD")     udDisplay=udDisplayOrders;
+      if (Command[1]=="ORDER")   udDisplay=udDisplayOrders;
+      if (Command[1]=="ORDERS")  udDisplay=udDisplayOrders;
     }
   }
 
@@ -290,9 +472,6 @@ int OnInit()
     session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
     
     //--- Initialize trade boundaries
-    udTradePrice[OP_SELL]  = session[Daily].Active().Resistance;
-    udTradePrice[OP_BUY]   = session[Daily].Active().Support;
-    
     NewLabel("lbSessDaily","Daily",105,62,clrDarkGray,SCREEN_LR);
     NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
     NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
@@ -329,6 +508,7 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete udEvent;
+    delete udOrderEvent;
     
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];
