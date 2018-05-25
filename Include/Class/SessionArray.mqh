@@ -36,14 +36,14 @@ public:
              struct SessionRec
              {
                int            TermDir;
-               int            TermAge;
+               int            Age;
+               ReservedWords  State;
                double         TermHigh;
                double         TermLow;
                double         Support;
                double         Resistance;
                double         PriorMid;
                double         OffMid;
-               ReservedWords  State;
              };
 
              //-- Session Types
@@ -130,7 +130,7 @@ void CSessionArray::SetTrendState(ReservedWords State)
     switch (State)
     {
       case Breakout:   
-      case Reversal:  srTrend.Age             = srActive.TermAge;
+      case Reversal:  srTrend.Age             = srActive.Age;
     
                       if (srTrend.TrendDir==DirectionUp)
                       {
@@ -197,7 +197,7 @@ void CSessionArray::CloseSession(void)
     srHistory[0]              = srActive;
     
     if (sEvent[NewTrend])
-      srActive.TermAge        = 0;
+      srActive.Age            = 0;
 
     if (sEvent[NewBreakout])
       SetTrendState(Breakout);
@@ -217,7 +217,7 @@ void CSessionArray::CloseSession(void)
     srActive.TermHigh         = High[sBar];
     srActive.TermLow          = Low[sBar];
 
-    srActive.TermAge++;
+    srActive.Age++;
     srTrend.Age++;
     
     sSessionIsOpen            = false;
@@ -343,12 +343,13 @@ void CSessionArray::CalcEvents(void)
       {
         if (IsHigher(High[sBar],srActive.Resistance) || IsLower(Low[sBar],srActive.Support))
         {
-          sEvent.SetEvent(NewState);
-          
           if (srActive.TermDir==srTrend.TrendDir)
-            sEvent.SetEvent(NewBreakout);
-          else
-            sEvent.SetEvent(NewReversal);
+            if (IsChanged(srActive.State,Breakout))
+              sEvent.SetEvent(NewBreakout);
+          
+          if (srActive.TermDir!=srTrend.TrendDir)
+            if (IsChanged(srActive.State,Reversal))
+              sEvent.SetEvent(NewReversal);
         }
         else
 

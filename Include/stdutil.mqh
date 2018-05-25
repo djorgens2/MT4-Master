@@ -94,6 +94,12 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Delete
                 };
 
+       enum     OnOffType
+                {
+                  On,
+                  Off
+                };
+
        //--- Quantitative measure types
        enum     MeasureType
                 { 
@@ -107,6 +113,23 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   MeasureTypes
                 };
                 
+       //--- Numbered position measure types
+       enum     PositionType
+                { 
+                  None,
+                  First,
+                  Second,                
+                  Third,
+                  Fourth,
+                  Fifth,
+                  Sixth,
+                  Seventh,
+                  Eighth,
+                  Ninth,
+                  Tenth,
+                  PositionTypes
+                };
+
        enum     ReservedWords
                 {
                   Default,
@@ -130,7 +153,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   All,
                   Next,
                   Last,
-                  First,
                   Previous,
                   Above,
                   Below,
@@ -437,6 +459,20 @@ bool IsChanged(bool &Check, bool Compare, bool Update=true)
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
 bool IsChanged(uchar &Check, uchar Compare, bool Update=true)
+  {
+    if (Check == Compare)
+      return (false);
+   
+    if (Update) 
+      Check   = Compare;
+  
+    return (true);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(ReservedWords &Check, ReservedWords Compare, bool Update=true)
   {
     if (Check == Compare)
       return (false);

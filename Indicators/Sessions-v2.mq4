@@ -35,28 +35,40 @@
 double indPriorMidBuffer[];
 double indOffMidBuffer[];
 
+enum DataPosition
+  {
+    dpNone    = None,      //None
+    dpFirst   = First,    //First
+    dpSecond  = Second,   //Second
+    dpThird   = Third,    //Third
+    dpFourth  = Fourth   //Fourth
+  };
 
 //--- Operational Inputs
-input SessionType    inpType         = SessionTypes;    // Indicator session
-input int            inpHourOpen     = NoValue;         // Session Opening Hour
-input int            inpHourClose    = NoValue;         // Session Closing Hour
-input bool           inpShowSession  = true;            // Display session ranges
-input bool           inpShowBuffer   = true;            // Display trend lines?
+input SessionType    inpType            = SessionTypes;    // Indicator session
+input int            inpHourOpen        = NoValue;         // Session Opening Hour
+input int            inpHourClose       = NoValue;         // Session Closing Hour
+input bool           inpShowRange       = true;            // Display session ranges?
+input bool           inpShowBuffer      = true;            // Display trend lines?
+input bool           inpShowPriceLines  = true;            // Show price Lines?
+input DataPosition   inpShowData        = dpNone;          // Indicator data position
 
-const color          AsiaColor       = C'0,32,0';       // Asia session box color
-const color          EuropeColor     = C'48,0,0';       // Europe session box color
-const color          USColor         = C'0,0,56';       // US session box color
-const color          DailyColor      = C'64,64,0';      // US session box color
+const color          AsiaColor          = C'0,32,0';       // Asia session box color
+const color          EuropeColor        = C'48,0,0';       // Europe session box color
+const color          USColor            = C'0,0,56';       // US session box color
+const color          DailyColor         = C'64,64,0';      // US session box color
 
-CSessionArray       *session         = new CSessionArray(inpType,inpHourOpen,inpHourClose);
+CSessionArray       *session            = new CSessionArray(inpType,inpHourOpen,inpHourClose);
 
-bool                 sessionOpen     = false;
-int                  sessionRange    = 0;
-const int            sessionEOD      = 0;               // Session End-of-Day hour
+bool                 sessionOpen        = false;
+int                  sessionRange       = 0;
+const int            sessionEOD         = 0;               // Session End-of-Day hour
 
 datetime             sessionOpenTime;
 double               sessionHigh;
 double               sessionLow;
+string               sessionIndex       = IntegerToString(inpShowData);
+int                  sessionOffset      = inpShowData*40;
 
 //+------------------------------------------------------------------+
 //| SessionColor - Returns the color for session ranges              |
@@ -146,17 +158,63 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
-    if (inpShowSession)
+    if (inpShowRange)
+    {
       if (TimeHour(Time[Bar])==inpHourOpen)
         CreateRange(Bar);
+
+      UpdateRange(Bar);
+    }
+
+    if (inpShowPriceLines)
+    {
+      UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
+    
+      if (session.SessionIsOpen())
+      {
+        UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrGray);
+        UpdateLine("lnOffMid",session.Active().OffMid,STYLE_SOLID,clrGoldenrod);
+      }
       else
-        UpdateRange(Bar);
+      {
+        UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrGoldenrod);
+        UpdateLine("lnOffMid",session.Active().OffMid,STYLE_SOLID,clrGray);
+      }    
+
+      UpdateLine("lnSupport",session.Active().Support,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnResistance",session.Active().Resistance,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnPullback",session.Trend().Pullback,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnRally",session.Trend().Rally,STYLE_DOT,clrForestGreen);
+    }
+    
+    if (inpShowData>dpNone)
+    {
+      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TradeBias())),BoolToInt(session.SessionIsOpen(),clrWhite,clrDarkGray),16);
+      UpdateDirection("lbTermDir"+sessionIndex,session.Active().TermDir,DirColor(session.Active().TermDir),20);
+      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
+      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend().OriginDir,DirColor(session.Trend().OriginDir),20);
+
+      if (session.SessionIsOpen())
+        if (TimeHour(Time[0])>inpHourClose-3)
+          UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
+        else
+        if (session.SessionHour()>3)
+          UpdateLabel("lbSessionTime"+sessionIndex,"Mid Session ("+IntegerToString(session.SessionHour())+")",clrYellow);
+        else
+          UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
+      else
+        UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
+
+      if (session.Event(NewBreakout) || session.Event(NewReversal))
+        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrYellow);
+      else
+      if (session.Event(NewRally) || session.Event(NewPullback))
+        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrWhite);
+      else
+        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrDarkGray);
         
-    //UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
-    //UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
-    //UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
-    //UpdateLine("lnActiveRetrace",session.Retrace(Active),STYLE_DOT,clrGray);
-    //UpdateLine("lnPriorRetrace",session.Retrace(Prior),STYLE_SOLID,clrDarkGray);
+      UpdateLabel("lbTrendState"+sessionIndex,EnumToString(session.State(Trend)),clrDarkGray);
+    }
   }
  
 //+------------------------------------------------------------------+
@@ -197,11 +255,35 @@ int OnInit()
     SetIndexEmptyValue(1, 0.00);
     SetIndexStyle(1,DRAW_SECTION);
     
-    NewLine("lnActiveMid");
-    NewLine("lnResistance");
-    NewLine("lnSupport");
-    NewLine("lnActiveRetrace");
-    NewLine("lnPriorRetrace");
+    if (inpShowPriceLines)
+    {
+      NewLine("lnActiveMid");
+      NewLine("lnPriorMid");
+      NewLine("lnOffMid");
+      NewLine("lnSupport");
+      NewLine("lnResistance");
+      NewLine("lnPullback");
+      NewLine("lnRally");
+    }
+    
+    if (inpShowData==dpFirst)
+    {
+      NewLabel("lbhSession","Session",280,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhTerm","Term",180,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhTrend","Trend",100,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhOrigin","Origin",20,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+    }
+    
+    if (inpShowData>dpNone)
+    {
+      NewLabel("lbSessionType"+sessionIndex,"",260,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermDir"+sessionIndex,"",150,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendDir"+sessionIndex,"",70,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginDir"+sessionIndex,"",10,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionTime"+sessionIndex,"",260,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermState"+sessionIndex,"",150,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendState"+sessionIndex,"",70,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+    }
     
     DeleteRanges();
 
@@ -222,4 +304,12 @@ void OnDeinit(const int reason)
     DeleteRanges();
     
     delete session;    
+
+    ObjectDelete("lnActiveMid");
+    ObjectDelete("lnPriorMid");
+    ObjectDelete("lnOffMid");
+    ObjectDelete("lnSupport");
+    ObjectDelete("lnResistance");
+    ObjectDelete("lnPullback");
+    ObjectDelete("lnRally");
   }

@@ -46,7 +46,7 @@ input int    inpUSOpen               = 14;    // US market open hour
 input int    inpUSClose              = 23;    // US market close hour
 
   //--- Strategy enums
-  enum Strategy
+  enum StrategyType
   {
     NoStrategy,
     Hedge,
@@ -55,6 +55,16 @@ input int    inpUSClose              = 23;    // US market close hour
     Reduce
   };
 
+  struct TradePlanRec
+  {
+    StrategyType      Strategy;
+    int               Action;
+    double            EntryPrice;
+    double            ExitPrice;
+    double            LossPrice;
+    bool              Executed;
+  }
+  
   struct OpenOrderRec
   {
     int               Action;
@@ -64,6 +74,7 @@ input int    inpUSClose              = 23;    // US market close hour
     double            MaxEquity;
     double            MinEquity;
     int               EquityDir;
+    EventType         EquityEvent;
   };
   
   //--- Class defs
@@ -79,7 +90,11 @@ input int    inpUSClose              = 23;    // US market close hour
   SessionType         udLeadSession;
   bool                udActiveEvent;
   bool                udSessionClosing;
+  int                 udFiboLevel            = FiboRoot;
+  
+  //--- Collections
   OpenOrderRec        udOpenOrders[];
+  TradePlanRec        udTradePlan[24];
   
   //--- Trade Execution operationals
   int                 udTradeAction          = OP_NO_ACTION;
@@ -141,7 +156,7 @@ void DisplayEvents(void)
                    + EnumToString(type)+"\n"
                    + "  Bias: "+proper(ActionText(session[type].TradeBias()))+"\n"
                    + "  State: "+EnumToString(session[type].State(Prior))
-                   + "("+IntegerToString(session[type].Active().TermAge)+")"+"\n";
+                   + "("+IntegerToString(session[type].Active().Age)+")"+"\n";
      
           deEvents += "\n------ Events ------";
 
@@ -240,23 +255,27 @@ bool SafeMargin(int Action)
 //+------------------------------------------------------------------+
 void CalcFiboEvents(void)
   {
-    static int cfeFiboLevel  = FiboRoot;
-    
+    if (fractal.Event(NewReversal) || fractal.Event(NewBreakout) || fractal.Fibonacci(Base,Expansion,Now)>FiboPercent(Fibo100))
+      udFiboLevel           = FiboRoot;
+    else
     if (fractal.Fibonacci(Expansion,Expansion,Now)<FiboPercent(Fibo23))
     {
-      if (IsChanged(cfeFiboLevel,Fibo23))
-        udEvent.SetEvent(NewFibonacci);
+      if (udFiboLevel==Fibo61)
+        if (IsChanged(udFiboLevel,Fibo23))
+          udEvent.SetEvent(NewFibonacci);
     }
     else
     if (fractal.Fibonacci(Expansion,Retrace,Now)>FiboPercent(Fibo61))
     {
-      if (IsChanged(cfeFiboLevel,Fibo61))
-        udEvent.SetEvent(NewFibonacci);
+      if (udFiboLevel==Fibo50)
+        if (IsChanged(udFiboLevel,Fibo61))
+          udEvent.SetEvent(NewFibonacci);
     }
     else
     if (fractal.Fibonacci(Expansion,Retrace,Now)>FiboPercent(Fibo50))
-      if (IsChanged(cfeFiboLevel,Fibo50))
-        udEvent.SetEvent(NewFibonacci);
+      if (udFiboLevel==FiboRoot)
+        if (IsChanged(udFiboLevel,Fibo50))
+          udEvent.SetEvent(NewFibonacci);
   }
 
 //+------------------------------------------------------------------+
@@ -264,10 +283,10 @@ void CalcFiboEvents(void)
 //+------------------------------------------------------------------+
 void CalcOrderEvents(void)
   {
-    double ocOrderMajor     = ordEQMinTarget;
-    double ocOrderMinor     = ordEQMinProfit;
+    double        coeOrderMajor     = ordEQMinTarget;
+    double        coeOrderMinor     = ordEQMinProfit;
     
-    OpenOrderRec   ocOpenOrders[];
+    OpenOrderRec  coeOpenOrders[];
     
     udOrderEvent.ClearEvents();
     
@@ -276,65 +295,75 @@ void CalcOrderEvents(void)
         if (OrderSymbol()==Symbol())
           if (OrderType()==OP_BUY || OrderType()==OP_SELL)
           {
-            ArrayResize(ocOpenOrders,ArraySize(ocOpenOrders)+1);
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].Action      = OrderType();
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].Ticket      = OrderTicket();
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].Lots        = OrderLots();
+            ArrayResize(coeOpenOrders,ArraySize(coeOpenOrders)+1);
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].Action      = OrderType();
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].Ticket      = OrderTicket();
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].Lots        = OrderLots();
 
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].Margin      = TicketValue(OrderTicket(),InMargin);
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].MaxEquity   = TicketValue(OrderTicket(),InEquity);
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].MinEquity   = TicketValue(OrderTicket(),InEquity);
-            ocOpenOrders[ArraySize(ocOpenOrders)-1].EquityDir   = DirectionNone;
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].Margin      = TicketValue(OrderTicket(),InMargin);
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].MaxEquity   = TicketValue(OrderTicket(),InEquity);
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].MinEquity   = TicketValue(OrderTicket(),InEquity);
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].EquityDir   = DirectionNone;
+            coeOpenOrders[ArraySize(coeOpenOrders)-1].EquityEvent = NoEvent;
 
             for (int ticket=0;ticket<ArraySize(udOpenOrders);ticket++)
               if (udOpenOrders[ticket].Ticket==OrderTicket())
               {
-                //--- Handle equity increase changes
+                //--- Handle equity boundary alerts
                 if (IsHigher(TicketValue(OrderTicket(),InEquity),udOpenOrders[ticket].MaxEquity))
-                  if (IsHigher(udOpenOrders[ticket].MaxEquity,ocOrderMajor,NoUpdate,3))
-                    udOrderEvent.SetEvent(NewMajor);
-                  else
-                  if (IsHigher(udOpenOrders[ticket].MaxEquity,ocOrderMinor,NoUpdate,3))
-                    udOrderEvent.SetEvent(NewMinor);
-                  else
-                    udOrderEvent.SetEvent(NewHigh);
-
-                //--- Handle equity decrease changes
-                if (IsLower(TicketValue(OrderTicket(),InEquity),udOpenOrders[ticket].MinEquity))
-                  if (IsHigher(fabs(udOpenOrders[ticket].MinEquity),ocOrderMajor,NoUpdate,3))
-                    udOrderEvent.SetEvent(NewMajor);
-                  else
-                  if (IsHigher(fabs(udOpenOrders[ticket].MinEquity),ocOrderMinor,NoUpdate,3))
-                    udOrderEvent.SetEvent(NewMinor);
-                  else
-                    udOrderEvent.SetEvent(NewLow);
+                  udOrderEvent.SetEvent(NewHigh);
                     
-                //--- Handle equity direction changes
-                if (IsHigher(TicketValue(OrderTicket(),InEquity),ocOrderMinor,NoUpdate,3))
+                if (IsLower(TicketValue(OrderTicket(),InEquity),udOpenOrders[ticket].MinEquity))
+                  udOrderEvent.SetEvent(NewLow);
+                            
+                //--- Handle major equity alerts
+                if (IsHigher(fabs(TicketValue(OrderTicket(),InEquity)),coeOrderMajor,NoUpdate,3))
                 {
-                  if (IsChanged(udOpenOrders[ticket].EquityDir,DirectionUp))
+                  if (IsChanged(udOpenOrders[ticket].EquityDir,Direction(TicketValue(OrderTicket(),InEquity))))
+                  {
                     udOrderEvent.SetEvent(NewDirection);
+                    udOrderEvent.SetEvent(NewMajor);
+                  }
+
+                  if (IsChanged(udOpenOrders[ticket].EquityEvent,NewMajor))
+                    udOrderEvent.SetEvent(NewMajor);                  
                 }
                 else
-                if (IsHigher(fabs(TicketValue(OrderTicket(),InEquity)),ocOrderMinor,NoUpdate,3))
+
+                //--- Handle minor equity alerts
+                if (IsHigher(fabs(TicketValue(OrderTicket(),InEquity)),coeOrderMinor,NoUpdate,3))
                 {
-                  if (IsChanged(udOpenOrders[ticket].EquityDir,DirectionDown))
-                    udOrderEvent.SetEvent(NewDirection);                 
+                  if (IsChanged(udOpenOrders[ticket].EquityDir,Direction(TicketValue(OrderTicket(),InEquity))))
+                  {
+                    udOrderEvent.SetEvent(NewDirection);
+                    udOrderEvent.SetEvent(NewMinor);
+                  }
+
+                  if (udOpenOrders[ticket].EquityEvent!=NewMajor)
+                    if (IsChanged(udOpenOrders[ticket].EquityEvent,NewMinor))
+                      udOrderEvent.SetEvent(NewMinor);                  
                 }
-             
+                
                 //--- Post updated equity change record
-                ocOpenOrders[ArraySize(ocOpenOrders)-1]=udOpenOrders[ticket];
+                coeOpenOrders[ArraySize(coeOpenOrders)-1]=udOpenOrders[ticket];
               }
           }
 
-    ArrayResize(udOpenOrders,ArraySize(ocOpenOrders));
-    ArrayCopy(udOpenOrders,ocOpenOrders);
+    ArrayResize(udOpenOrders,ArraySize(coeOpenOrders));
+    ArrayCopy(udOpenOrders,coeOpenOrders);
   }
   
 //+------------------------------------------------------------------+
 //| ExecuteTrades - Opens new trades based on the pipMA trigger      |
 //+------------------------------------------------------------------+
 void ExecuteTrades(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| CreateTradePlan - Sets the daily trade strategy up               |
+//+------------------------------------------------------------------+
+void CreateTradePlan(void)
   {
   }
 
@@ -355,15 +384,26 @@ void CalcStrategy(void)
       Append(csEventText,"End of Trading Day","\n");
 
     if (session[Asia].Event(SessionOpen))
+    {
       Append(csEventText,"Asia Market Open","\n");
+      CreateTradePlan();
+    }
     
-    if (session[udLeadSession].SessionHour()>3)
+    if (udEvent[NewDirection])
       if (session[udLeadSession].Event(NewDirection))
-        Append(csEventText,"Term change after mid\nLead Session:"+EnumToString(session[udLeadSession].Type()),"\n");
-
-    if (IsChanged(csSessionClosing,udSessionClosing))
-      Append(csEventText,"Session close warning","\n");
+      {
+        if (session[udLeadSession].SessionHour()>3)
+          Append(csEventText,"Term Change After Mid (Lead Session:"+EnumToString(session[udLeadSession].Type()),")\n");
+      }
+      else
+        Append(csEventText,"Term Change After Mid (Off-Session)","\n");
       
+    if (IsChanged(csSessionClosing,udSessionClosing))
+      Append(csEventText,"Session Close Warning","\n");
+      
+    if (udEvent[NewDivergence])
+      Append(csEventText,"Session Divergence Warning","\n");   
+
     if (udEvent[NewBreakout])
       if (IsChanged(csSessionEvent,NewBreakout))
         Append(csEventText,"Breakout Checkpoint","\n");
@@ -374,14 +414,14 @@ void CalcStrategy(void)
 
     if (udOrderEvent[NewMinor])
       if (IsChanged(csOrderEvent,NewMinor))
-        Append(csEventText,"New Order Minor","\n");
+        Append(csEventText,"Minor Order Change","\n");
         
     if (udOrderEvent[NewDirection])
-      Append(csEventText,"Order direction reversal","\n");
+      Append(csEventText,"Order Equity Change","\n");
 
     if (udOrderEvent[NewMajor])
       if (IsChanged(csOrderEvent,NewMajor))
-        Append(csEventText,"New Order Major","\n");
+        Append(csEventText,"Major Order Event","\n");
 
     if (fractal.Event(NewMinor))
       if (IsChanged(csFractalEvent,NewMinor))
@@ -391,11 +431,11 @@ void CalcStrategy(void)
       if (IsChanged(csFractalEvent,NewMajor))
         Append(csEventText,"New Fractal Major","\n");
         
-    if (fractal.Event(NewFibonacci))
-      Append(csEventText,"New Fibonacci Level","\n");
+    if (udEvent[NewFibonacci])
+      Append(csEventText,"New Fibonacci Level: "+DoubleToStr(FiboPercent(udFiboLevel,InPercent),1),"%\n");
 
-//    if (pfractal.Event(NewPivot))
-//      Pause("Pivot Price Change","Hmmm...");
+    if (pfractal.Event(NewPivot))
+      Append(csEventText,"Pivot Price Change");
 
     if (csEventText!="")
       Pause(csEventText,"Event()");

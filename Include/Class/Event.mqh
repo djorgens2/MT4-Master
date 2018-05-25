@@ -45,6 +45,7 @@ protected:
                   SessionOpen,
                   SessionClose,
                   NewDay,
+                  NoEvent,
                   EventTypes
                 };
                 
