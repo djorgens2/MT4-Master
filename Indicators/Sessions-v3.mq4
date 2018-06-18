@@ -37,39 +37,41 @@ double indOffMidBuffer[];
 
 
 //--- Operational Inputs
-input int            inpAsiaOpen     = 1;          // Asia Session Opening Hour
-input int            inpAsiaClose    = 10;         // Asia Session Closing Hour
-input int            inpEuropeOpen   = 8;          // Europe Session Opening Hour
-input int            inpEuropeClose  = 18;         // Europe Session Closing Hour
-input int            inpUSOpen       = 14;         // US Session Opening Hour
-input int            inpUSClose      = 23;         // US Session Closing Hour
-input SessionType    inpSessionBars  = SessionTypes;    // Indicator session
+input int            inpAsiaOpen     = 1;            // Asia Session Opening Hour
+input int            inpAsiaClose    = 10;           // Asia Session Closing Hour
+input int            inpEuropeOpen   = 8;            // Europe Session Opening Hour
+input int            inpEuropeClose  = 18;           // Europe Session Closing Hour
+input int            inpUSOpen       = 14;           // US Session Opening Hour
+input int            inpUSClose      = 23;           // US Session Closing Hour
+input YesNoType      inpShowSRLines  = No;           // Display Support/Resistance Lines
+input YesNoType      inpShowMidLines = No;           // Display Mid-Price Lines
 
+const color          AsiaColor       = C'0,32,0';    // Asia session box color
+const color          EuropeColor     = C'48,0,0';    // Europe session box color
+const color          USColor         = C'0,0,56';    // US session box color
+const color          DailyColor      = C'64,64,0';   // US session box color
 
-const color          AsiaColor       = C'0,32,0';       // Asia session box color
-const color          EuropeColor     = C'48,0,0';       // Europe session box color
-const color          USColor         = C'0,0,56';       // US session box color
-const color          DailyColor      = C'64,64,0';      // US session box color
+struct SessionData
+  {
+     bool            IsOpen;
+     int             Range;
+     datetime        OpenTime;
+     double          PriceHigh;
+     double          PriceLow;
+  };
+  
+const int            sessionEOD      = 0;            // Session End-of-Day hour
+const int            sessionOffset   = 40;           // Display offset
 
-CSessionArray       *ca_asia         = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
-CSessionArray       *ca_europe       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
-CSessionArray       *ca_us           = new CSessionArray(US,inpUSOpen,inpUSClose);
-CSessionArray       *ca_daily        = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
-
-bool                 sessionOpen     = false;
-int                  sessionRange    = 0;
-const int            sessionEOD      = 0;               // Session End-of-Day hour
-
-datetime             sessionOpenTime;
-double               sessionHigh;
-double               sessionLow;
+CSessionArray       *session[SessionTypes];
+SessionData          data[SessionTypes];
 
 //+------------------------------------------------------------------+
 //| SessionColor - Returns the color for session ranges              |
 //+------------------------------------------------------------------+
-color SessionColor(void)
+color SessionColor(SessionType Type)
   {
-    switch (inpType)
+    switch (Type)
     {
       case Asia:    return(AsiaColor);
       case Europe:  return(EuropeColor);
@@ -83,26 +85,25 @@ color SessionColor(void)
 //+------------------------------------------------------------------+
 //| CreateRange - Paints the session boxes                           |
 //+------------------------------------------------------------------+
-void CreateRange(int Bar=0)
+void CreateRange(SessionType Type, int Bar=0)
  {
    string crRangeId;
    
-   if (sessionOpen)
+   if (data[Type].IsOpen)
      return;
    else
    {
-     crRangeId          = EnumToString(inpType)+IntegerToString(++sessionRange);
+     crRangeId                = EnumToString(Type)+IntegerToString(++data[Type].Range);
      
-     sessionOpen        = true;
+     data[Type].IsOpen        = true;
+     data[Type].OpenTime      = Time[Bar];
+     data[Type].PriceHigh     = High[Bar];
+     data[Type].PriceLow      = Low[Bar];
    
-     sessionOpenTime    = Time[Bar];
-     sessionHigh        = High[Bar];
-     sessionLow         = Low[Bar];
-   
-     ObjectCreate(crRangeId,OBJ_RECTANGLE,0,sessionOpenTime,sessionHigh,sessionOpenTime,sessionLow);
+     ObjectCreate(crRangeId,OBJ_RECTANGLE,0,data[Type].OpenTime,data[Type].PriceHigh,data[Type].OpenTime,data[Type].PriceLow);
    
      ObjectSet(crRangeId, OBJPROP_STYLE, STYLE_SOLID);
-     ObjectSet(crRangeId, OBJPROP_COLOR, SessionColor());
+     ObjectSet(crRangeId, OBJPROP_COLOR, SessionColor(Type));
      ObjectSet(crRangeId, OBJPROP_BACK, true);
    }
  }
@@ -110,30 +111,30 @@ void CreateRange(int Bar=0)
 //+------------------------------------------------------------------+
 //| UpdateRange - Repaints the session box                           |
 //+------------------------------------------------------------------+
-void UpdateRange(int Bar=0)
+void UpdateRange(SessionType Type, int Bar=0)
  {
-   string urRangeId       = EnumToString(inpType)+IntegerToString(sessionRange);
+   string urRangeId       = EnumToString(Type)+IntegerToString(data[Type].Range);
 
    if (TimeHour(Time[Bar])==sessionEOD)
-     sessionOpen          = false;
+     data[Type].IsOpen    = false;
      
-   if (TimeHour(Time[Bar])==inpHourClose)
+   if (TimeHour(Time[Bar])==session[Type].SessionHour(SessionClose))
    {
-     if (sessionOpen)
+     if (data[Type].IsOpen)
        ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
 
-     sessionOpen          = false;
+     data[Type].IsOpen    = false;
    }
 
-   if (sessionOpen)
+   if (data[Type].IsOpen)
    {
-     if (IsHigher(High[Bar],sessionHigh))
-       ObjectSet(urRangeId,OBJPROP_PRICE1,sessionHigh);
+     if (IsHigher(High[Bar],data[Type].PriceHigh))
+       ObjectSet(urRangeId,OBJPROP_PRICE1,data[Type].PriceHigh);
      
-     if (IsLower(Low[Bar],sessionLow))
-       ObjectSet(urRangeId,OBJPROP_PRICE2,sessionLow);
+     if (IsLower(Low[Bar],data[Type].PriceLow))
+       ObjectSet(urRangeId,OBJPROP_PRICE2,data[Type].PriceLow);
 
-     ObjectSet(urRangeId,OBJPROP_TIME1,sessionOpenTime);
+     ObjectSet(urRangeId,OBJPROP_TIME1,data[Type].OpenTime);
      ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
    }
  }
@@ -143,8 +144,9 @@ void UpdateRange(int Bar=0)
 //+------------------------------------------------------------------+
 void DeleteRanges()
   {
-    for (int doRangeId=0;doRangeId<=sessionRange;doRangeId++)
-      ObjectDelete(EnumToString(inpType)+IntegerToString(doRangeId));
+    for (SessionType type=Asia;type<Daily;type++)
+      for (int doRangeId=0;doRangeId<=data[type].Range;doRangeId++)
+        ObjectDelete(EnumToString(type)+IntegerToString(doRangeId));
   }
 
 //+------------------------------------------------------------------+
@@ -152,15 +154,55 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
-    if (inpShowSession)
-      if (TimeHour(Time[Bar])==inpHourOpen)
-        CreateRange(Bar);
+    for (SessionType type=Asia;type<Daily;type++)
+    {
+      if (TimeHour(Time[Bar])==session[type].SessionHour(SessionOpen))
+        CreateRange(type,Bar);
+
+      UpdateRange(type,Bar);
+    }
+
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].TradeBias())),BoolToInt(session[type].SessionIsOpen(),clrWhite,clrDarkGray),16);
+      UpdateDirection("lbTermDir"+EnumToString(type),session[type].Active().TermDir,DirColor(session[type].Active().TermDir),20);
+      UpdateDirection("lbTrendDir"+EnumToString(type),session[type].Trend().TrendDir,DirColor(session[type].Trend().TrendDir),20);
+      UpdateDirection("lbOriginDir"+EnumToString(type),session[type].Trend().OriginDir,DirColor(session[type].Trend().OriginDir),20);
+
+      if (session[type].SessionIsOpen())
+        if (TimeHour(Time[0])>session[type].SessionHour(SessionClose)-3)
+          UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
+        else
+        if (session[type].SessionHour()>3)
+          UpdateLabel("lbSessionTime"+EnumToString(type),"Mid Session ("+IntegerToString(session[type].SessionHour())+")",clrYellow);
+        else
+          UpdateLabel("lbSessionTime"+EnumToString(type),"Early Session ("+IntegerToString(session[type].SessionHour())+")",clrLawnGreen);
       else
-        UpdateRange(Bar);
+        UpdateLabel("lbSessionTime"+EnumToString(type),"Session Is Closed",clrDarkGray);
+
+      if (session[type].Event(NewBreakout) || session[type].Event(NewReversal))
+        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrYellow);
+      else
+      if (session[type].Event(NewRally) || session[type].Event(NewPullback))
+        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrWhite);
+      else
+        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrDarkGray);
         
-    UpdateLine("lnActiveMid",session.ActiveMid(),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("lnResistance",session.Active().Resistance,STYLE_DASHDOT,clrSteelBlue);
-    UpdateLine("lnSupport",session.Active().Support,STYLE_DASHDOT,clrYellow);
+      UpdateLabel("lbTrendState"+EnumToString(type),EnumToString(session[type].State(Trend)),clrDarkGray);
+    }
+
+    if (inpShowSRLines==Yes)
+    {
+      UpdateLine("lnSupport",session[Daily].Active().Support,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnResistance",session[Daily].Active().Resistance,STYLE_SOLID,clrForestGreen);
+    }
+
+    if (inpShowMidLines==Yes)
+    {
+      UpdateLine("lnActiveMid",session[Daily].ActiveMid(),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnPriorMid",session[Daily].Active().PriorMid,STYLE_SOLID,DirColor(Direction(session[Daily].ActiveMid()-session[Daily].Active().PriorMid)));
+      UpdateLine("lnOffMid",session[Daily].Active().OffMid,STYLE_DASHDOT,clrSteelBlue);
+    }
   }
  
 //+------------------------------------------------------------------+
@@ -177,7 +219,10 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    session.Update(indOffMidBuffer,indPriorMidBuffer);
+    session[Daily].Update(indOffMidBuffer,indPriorMidBuffer);
+    session[Asia].Update();
+    session[Europe].Update();
+    session[US].Update();
     
     RefreshScreen();
 
@@ -199,11 +244,39 @@ int OnInit()
     SetIndexStyle(1,DRAW_SECTION);
     
     NewLine("lnActiveMid");
-    NewLine("lnResistance");
+    NewLine("lnPriorMid");
+    NewLine("lnOffMid");
+    
     NewLine("lnSupport");
+    NewLine("lnResistance");
+    
+    
+    session[Daily]        = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
+    session[Asia]         = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
     
     DeleteRanges();
+    
+    NewLabel("lbhSession","Session",280,200,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhTerm","Term",180,200,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhTrend","Trend",100,200,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhOrigin","Origin",20,200,clrGoldenrod,SCREEN_UR,0);
 
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      data[type].IsOpen   = false;
+      data[type].Range    = 0;
+      
+      NewLabel("lbSessionType"+EnumToString(type),"",260,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermDir"+EnumToString(type),"",150,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendDir"+EnumToString(type),"",70,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginDir"+EnumToString(type),"",10,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionTime"+EnumToString(type),"",260,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermState"+EnumToString(type),"",150,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendState"+EnumToString(type),"",70,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+    }
+    
     for (int bar=Bars-24;bar>0;bar--)
       RefreshScreen(bar);
       
@@ -220,5 +293,28 @@ void OnDeinit(const int reason)
   {
     DeleteRanges();
     
-    delete session;    
+    ObjectDelete("lnActiveMid");
+    ObjectDelete("lnPriorMid");
+    ObjectDelete("lnOffMid");
+
+    ObjectDelete("lnSupport");
+    ObjectDelete("lnResistance");
+
+    ObjectDelete("lbhSession");
+    ObjectDelete("lbhTerm");
+    ObjectDelete("lbhTrend");
+    ObjectDelete("lbhOrigin");
+    
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      delete session[type];
+      
+      ObjectDelete("lbSessionType"+EnumToString(type));
+      ObjectDelete("lbTermDir"+EnumToString(type));
+      ObjectDelete("lbTrendDir"+EnumToString(type));
+      ObjectDelete("lbOriginDir"+EnumToString(type));
+      ObjectDelete("lbSessionTime"+EnumToString(type));
+      ObjectDelete("lbTermState"+EnumToString(type));
+      ObjectDelete("lbTrendState"+EnumToString(type));
+    }
   }

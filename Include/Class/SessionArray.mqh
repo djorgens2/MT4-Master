@@ -75,7 +75,7 @@ public:
 
              int           TradeBias(void);
              int           Direction(RetraceType Type);
-             int           SessionHour(void);
+             int           SessionHour(int Measure=Now);
              ReservedWords State(RetraceType Type);
                                  
 private:
@@ -577,10 +577,15 @@ int CSessionArray::Direction(RetraceType Type)
 //+------------------------------------------------------------------+
 //| SessionHour - Returns the hour of open session trading           |
 //+------------------------------------------------------------------+
-int CSessionArray::SessionHour(void)
+int CSessionArray::SessionHour(int Measure=Now)
   {    
-    if (sSessionIsOpen)
-      return (TimeHour(Time[sBar])-sHourOpen+1);
+    switch (Measure)
+    {
+      case SessionOpen:   return(sHourOpen);
+      case SessionClose:  return(sHourClose);
+      case Now:           if (sSessionIsOpen)
+                            return (TimeHour(Time[sBar])-sHourOpen+1);
+    }
     
     return (NoValue);
   }

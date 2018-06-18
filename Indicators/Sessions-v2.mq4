@@ -37,11 +37,11 @@ double indOffMidBuffer[];
 
 enum DataPosition
   {
-    dpNone    = None,      //None
+    dpNone    = None,     //None
     dpFirst   = First,    //First
     dpSecond  = Second,   //Second
     dpThird   = Third,    //Third
-    dpFourth  = Fourth   //Fourth
+    dpFourth  = Fourth    //Fourth
   };
 
 //--- Operational Inputs
@@ -312,4 +312,16 @@ void OnDeinit(const int reason)
     ObjectDelete("lnResistance");
     ObjectDelete("lnPullback");
     ObjectDelete("lnRally");
+    
+    ObjectDelete("lbhSession");
+    ObjectDelete("lbhTerm");
+    ObjectDelete("lbhTrend");
+    ObjectDelete("lbhOrigin");
+    ObjectDelete("lbSessionType"+sessionIndex);
+    ObjectDelete("lbTermDir"+sessionIndex);
+    ObjectDelete("lbTrendDir"+sessionIndex);
+    ObjectDelete("lbOriginDir"+sessionIndex);
+    ObjectDelete("lbSessionTime"+sessionIndex);
+    ObjectDelete("lbTermState"+sessionIndex);
+    ObjectDelete("lbTrendState"+sessionIndex);
   }

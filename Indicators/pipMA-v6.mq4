@@ -84,7 +84,10 @@ void RefreshScreen()
     if (pfractal.FOCDirection()!=lastDir)
       SetIndexStyle(1,DRAW_LINE,STYLE_SOLID,1,DirColor(pfractal.FOCDirection(),clrYellow,clrRed));
 
-    SetIndexStyle(2,DRAW_LINE,STYLE_DOT,1,DirColor(pfractal.Direction(Polyline)));
+    if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)) || IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+      SetIndexStyle(2,DRAW_LINE,STYLE_SOLID,1,DirColor(pfractal.Direction(Polyline)));
+    else
+      SetIndexStyle(2,DRAW_LINE,STYLE_DOT,1,DirColor(pfractal.Direction(Polyline)));
     
     UpdateLabel("lrFOCNow",NegLPad(pfractal.FOC(Now),1),DirColor(pfractal.FOCDirection()),15);
     UpdateLabel("lrFOCPivDev",NegLPad(Pip(pfractal.Pivot(Deviation)),1),DirColor(pfractal.Direction(Pivot)),15);

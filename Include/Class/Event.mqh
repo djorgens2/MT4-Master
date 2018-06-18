@@ -66,6 +66,9 @@ public:
 
   };
 
+//+------------------------------------------------------------------+
+//| ActiveEvent - Returns true if an active event was triggered      |
+//+------------------------------------------------------------------+
 bool CEvent::ActiveEvent(void)
   {
     bool aeEvent   = false;

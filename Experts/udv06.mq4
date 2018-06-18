@@ -57,19 +57,21 @@ input int    inpUSClose              = 23;    // US market close hour
 
   struct TradePlanRec
   {
-    StrategyType      Strategy;
-    int               Action;
-    double            EntryPrice;
-    double            ExitPrice;
-    double            LossPrice;
-    bool              Executed;
-  }
+    StrategyType      Strategy;          //--- Strategy to execute
+    double            TargetPrice;       //--- Forecasted target
+    double            BreakoutPrice;     //--- Forecasted breakout price
+    double            KeyEntryPrice[3];  //--- Active Mid, Fibo 50,61
+    double            ReversalPrice;     //--- Forecasted reversal price
+    double            LossPrice;         //--- Fibo 23
+    bool              Executed;          //--- Strategy executed?
+  };
   
   struct OpenOrderRec
   {
     int               Action;
     int               Ticket;
     double            Lots;
+    StrategyType      Strategy;
     double            Margin;
     double            MaxEquity;
     double            MinEquity;
@@ -91,6 +93,8 @@ input int    inpUSClose              = 23;    // US market close hour
   bool                udActiveEvent;
   bool                udSessionClosing;
   int                 udFiboLevel            = FiboRoot;
+  OnOffType           udScalper              = Off;
+
   
   //--- Collections
   OpenOrderRec        udOpenOrders[];
@@ -98,7 +102,7 @@ input int    inpUSClose              = 23;    // US market close hour
   
   //--- Trade Execution operationals
   int                 udTradeAction          = OP_NO_ACTION;
-  Strategy            udStrategy             = NoStrategy;
+  StrategyType        udStrategy             = NoStrategy;
   bool                udTradePending         = false;
   
 //+------------------------------------------------------------------+
@@ -114,12 +118,14 @@ void DisplayOrders(void)
       
       for (int ord=0;ord<ArraySize(udOpenOrders);ord++)
          doOrders   += ActionText(udOpenOrders[ord].Action)+" "
-                    +  IntegerToString(udOpenOrders[ord].Ticket)+" "
-                    +  DoubleToStr(udOpenOrders[ord].Lots,2)+" "
-                    +  DoubleToStr(udOpenOrders[ord].Margin,1)+" "
-                    +  DoubleToStr(udOpenOrders[ord].MaxEquity,1)+" "
-                    +  DoubleToStr(udOpenOrders[ord].MinEquity,1)+" "
-                    +  DirText(udOpenOrders[ord].EquityDir)+"\n";
+                    +  EnumToString(udOpenOrders[ord].Strategy)+" "
+                    +  "#"+IntegerToString(udOpenOrders[ord].Ticket)+" "
+                    +  "Lots:"+DoubleToStr(udOpenOrders[ord].Lots,2)+" "
+                    +  "Margin:"+DoubleToStr(udOpenOrders[ord].Margin,1)+" "
+                    +  "Equity: ("+DirText(udOpenOrders[ord].EquityDir)+":"
+                    +  DoubleToStr(udOpenOrders[ord].MinEquity,1)+":"
+                    +  DoubleToStr(udOpenOrders[ord].MaxEquity,1)+") "
+                    +"\n";
     }
     
     Comment(doOrders);
@@ -176,18 +182,6 @@ void DisplayEvents(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string  rsLeadText       = EnumToString(session[udLeadSession].Type())+" "+proper(ActionText(session[Daily].TradeBias()));
-    
-    for (SessionType type=Asia; type<SessionTypes; type++)
-    {
-      UpdateLabel("lbSess"+EnumToString(type),EnumToString(type)+" ("+IntegerToString(BoolToInt(session[type].SessionIsOpen(),session[type].SessionHour()))+")",BoolToInt(session[type].SessionIsOpen(),clrYellow,clrDarkGray));
-      UpdateDirection("lbDir"+EnumToString(type),session[type].Direction(Term),DirColor(session[type].Direction(Term)));
-      UpdateLabel("lbState"+EnumToString(type),proper(DirText(session[type].Direction(Trend)))+" "+EnumToString(session[type].State(Trend)));
-    }
-  
-    UpdateLabel("lbTradeBias",rsLeadText,BoolToInt(session[udLeadSession].SessionIsOpen(),clrWhite,clrDarkGray),12);
-    UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price),DirColor(pfractal.Direction(Pivot)));
-
     switch(udDisplay)
     {
       case udDisplayEvents:   DisplayEvents();
@@ -198,56 +192,8 @@ void RefreshScreen(void)
                               break;
       case udDisplayOrders:   DisplayOrders();
     }
-   
-//    if (pfractal.Event(NewPivot))
-//      Pause("New PipMA Pivot hit\nDirection: "+DirText(pfractal.Direction(Pivot)),"Event() Check");
 
-//    if (udEvent[NewPullback] || udEvent[NewRally])
-//      Pause("New Pullback/Rally detected","Pullback/Rally Check");
-  }
-
-//+------------------------------------------------------------------+
-//| GetData                                                          |
-//+------------------------------------------------------------------+
-void GetData(void)
-  {    
-    udEvent.ClearEvents();
-
-    udActiveEvent         = false;
-    udSessionClosing      = false;
-    udLeadSession         = Daily;
-        
-    fractal.Update();
-    pfractal.Update();
-
-    for (SessionType type=Asia;type<SessionTypes;type++)
-    {
-      session[type].Update();
-      
-      if (session[type].ActiveEvent())
-      {
-        udActiveEvent    = true;
-
-        for (EventType event=0;event<EventTypes;event++)
-          if (session[type].Event(event))
-            udEvent.SetEvent(event);
-      }
-            
-      if (type<Daily)
-        if (session[type].SessionIsOpen())
-          udLeadSession    = type;
-    }
-
-    if (TimeHour(Time[0])>session[udLeadSession].SessionHour()-4)
-      udSessionClosing     = true;
-  }
-
-//+------------------------------------------------------------------+
-//| ExecuteTrades - Opens new trades based on the pipMA trigger      |
-//+------------------------------------------------------------------+
-bool SafeMargin(int Action)
-  {
-    return true;
+    UpdatePriceLabel("lbPipMAPivot",pfractal.Pivot(Price),DirColor(pfractal.Direction(Pivot)));
   }
 
 //+------------------------------------------------------------------+
@@ -354,17 +300,17 @@ void CalcOrderEvents(void)
   }
   
 //+------------------------------------------------------------------+
-//| ExecuteTrades - Opens new trades based on the pipMA trigger      |
+//| GetData                                                          |
 //+------------------------------------------------------------------+
-void ExecuteTrades(void)
+void SetScalper(OnOffType Switch)
   {
-  }
+    udScalper = Switch;
 
-//+------------------------------------------------------------------+
-//| CreateTradePlan - Sets the daily trade strategy up               |
-//+------------------------------------------------------------------+
-void CreateTradePlan(void)
-  {
+    if (udScalper==On)
+      UpdateLabel("lbScalper","Scalper",clrLawnGreen,24);
+
+    if (udScalper==Off)
+      UpdateLabel("lbScalper","Scalper",clrDarkGray,24);
   }
 
 //+------------------------------------------------------------------+
@@ -384,10 +330,7 @@ void CalcStrategy(void)
       Append(csEventText,"End of Trading Day","\n");
 
     if (session[Asia].Event(SessionOpen))
-    {
       Append(csEventText,"Asia Market Open","\n");
-      CreateTradePlan();
-    }
     
     if (udEvent[NewDirection])
       if (session[udLeadSession].Event(NewDirection))
@@ -404,11 +347,11 @@ void CalcStrategy(void)
     if (udEvent[NewDivergence])
       Append(csEventText,"Session Divergence Warning","\n");   
 
-    if (udEvent[NewBreakout])
+    if (session[udLeadSession].Event(NewBreakout))
       if (IsChanged(csSessionEvent,NewBreakout))
         Append(csEventText,"Breakout Checkpoint","\n");
 
-    if (udEvent[NewReversal])
+    if (session[udLeadSession].Event(NewReversal))
       if (IsChanged(csSessionEvent,NewReversal))
         Append(csEventText,"Reversal Checkpoint","\n");
 
@@ -442,14 +385,105 @@ void CalcStrategy(void)
   }
 
 //+------------------------------------------------------------------+
+//| GetData                                                          |
+//+------------------------------------------------------------------+
+void GetData(void)
+  {    
+    udEvent.ClearEvents();
+
+    udActiveEvent         = false;
+    udSessionClosing      = false;
+    udLeadSession         = Daily;
+        
+    fractal.Update();
+    pfractal.Update();
+
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      session[type].Update();
+      
+      if (session[type].ActiveEvent())
+      {
+        udActiveEvent    = true;
+
+        for (EventType event=0;event<EventTypes;event++)
+          if (session[type].Event(event))
+            udEvent.SetEvent(event);
+      }
+            
+      if (type<Daily)
+        if (session[type].SessionIsOpen())
+          udLeadSession    = type;
+    }
+
+    if (TimeHour(Time[0])>session[udLeadSession].SessionHour()-4)
+      udSessionClosing     = true;
+      
+    CalcFiboEvents();
+    CalcOrderEvents();
+  }
+
+//+------------------------------------------------------------------+
+//| ExecuteTrades - Opens new trades based on the pipMA trigger      |
+//+------------------------------------------------------------------+
+bool SafeMargin(int Action)
+  {
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| ExecuteTrades - Opens new trades based on the pipMA trigger      |
+//+------------------------------------------------------------------+
+void ExecuteTrades(void)
+  {
+    if (udScalper==On)
+    {
+      if (udOrderEvent.ActiveEvent())
+      {}
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| CreateTradePlan                                                  |
+//+------------------------------------------------------------------+
+void CreateTradePlan(void)
+  {
+    
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateStrategy                                                   |
+//+------------------------------------------------------------------+
+void UpdateStrategy(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| GetData                                                          |
+//+------------------------------------------------------------------+
+void CheckPerformance(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
 //| Execute - Acts on events to execute trades                       |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    CalcFiboEvents();
-    CalcOrderEvents();
-    CalcStrategy();
-    ExecuteTrades(); 
+    static int gdHour  = 0;
+
+    ExecuteTrades();
+    
+    if (IsChanged(gdHour,TimeHour(Time[0])))
+    {
+      if (gdHour==inpAsiaOpen)
+        CreateTradePlan();
+        
+      UpdateStrategy();
+    }
+
+    CheckPerformance();  
+
   }
 
 //+------------------------------------------------------------------+
@@ -469,8 +503,18 @@ void ExecAppCommands(string &Command[])
       if (Command[1]=="EV")      udDisplay=udDisplayEvents;
       if (Command[1]=="ORD")     udDisplay=udDisplayOrders;
       if (Command[1]=="ORDER")   udDisplay=udDisplayOrders;
-      if (Command[1]=="ORDERS")  udDisplay=udDisplayOrders;
+      if (Command[1]=="ORDERS")  udDisplay=udDisplayOrders;      
     }
+
+    if (Command[0]=="SCALP" || Command[0]=="SCALPER" || Command[0]=="SC")
+    {
+      if (Command[1]=="ON")
+        SetScalper(On);
+        
+      if (Command[1]=="OFF")
+        SetScalper(Off);
+    }
+    
   }
 
 //+------------------------------------------------------------------+
@@ -511,31 +555,9 @@ int OnInit()
     session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
     
-    //--- Initialize trade boundaries
-    NewLabel("lbSessDaily","Daily",105,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessAsia","Asia",105,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessEurope","Europe",105,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbSessUS","US",105,29,clrDarkGray,SCREEN_LR);
-    
-    NewLabel("lbDirDaily","",85,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirAsia","",85,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirEurope","",85,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbDirUS","",85,29,clrDarkGray,SCREEN_LR);
-
-    NewLabel("lbStateDaily","",5,62,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateAsia","",5,51,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateEurope","",5,40,clrDarkGray,SCREEN_LR);
-    NewLabel("lbStateUS","",5,29,clrDarkGray,SCREEN_LR);
-
-    NewLabel("lbTradeBias","",5,10,clrDarkGray,SCREEN_LR);
-    
-    NewLine("lnTrSupport");
-    NewLine("lnTrResistance");
-    NewLine("lnTrPullback");
-    NewLine("lnTrRally");
-    
     NewPriceLabel("lbPipMAPivot");
-    NewLabel("lbEquity","",5,5,clrWhite,SCREEN_LL);
+    NewLabel("lbScalper","Scalper",1200,5,clrDarkGray);
+
     
     return(INIT_SUCCEEDED);
   }

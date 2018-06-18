@@ -122,8 +122,8 @@ public:
        bool          IsConvergent(void)              { if (this.IsMajor(Convergent))  return (true); return (false); }
        bool          IsInvergent(void)               { if (this.IsMajor(Inversion))   return (true); return (false); }
        
-       bool          IsReversal(void)                { if (this[Base].Reversal) return (true); return (false); }
-       bool          IsBreakout(void)                { if (this[Base].Breakout) return (true); return (false); }
+       bool          IsReversal(RetraceType Type)    { if (this[Type].Reversal) return (true); return (false); }
+       bool          IsBreakout(RetraceType Type)    { if (this[Type].Breakout) return (true); return (false); }
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
        
@@ -365,8 +365,11 @@ void CFractal::CalcRetrace(void)
           UpdateRetrace(type,fBarNow,Low[fBarNow]);
           
       if (this.IsMajor(type))
+      {
         crStateMajor            = type;
-
+        crStateMinor            = type;
+      }
+      
       if (this.IsMinor(type))
         crStateMinor            = type;
 
@@ -579,13 +582,6 @@ void CFractal::CalcFractal(void)
         }
       }
 
-      //--- Upgrade root peg
-      if (this.Fibonacci(Base,Expansion,Max)>FiboPercent(Fibo161))
-      {
-        f[Root].Breakout      = true;
-        f[Root].Reversal      = false;
-      }
-      
       //--- Calc retrace and origin
       CalcRetrace();
       CalcOrigin();

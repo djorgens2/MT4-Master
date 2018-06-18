@@ -100,6 +100,12 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Off
                 };
 
+       enum     YesNoType
+                {
+                  Yes,
+                  No
+                };
+
        //--- Quantitative measure types
        enum     MeasureType
                 { 
@@ -134,6 +140,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                 {
                   Default,
                   Size,
+                  Active,
                   State,
                   NoState,
                   Dominant,
@@ -166,6 +173,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Negative,
                   MeanNegative,
                   MeanPositive,
+                  Aggregate,
                   Amplitude,
                   FOCAmplitude,
                   FOCAmpMean,
@@ -193,9 +201,10 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Pullback,
                   Trap,
                   Recovery,
+                  Contrarian,
                   Continuation,
-                  Active,
-                  Aggregate
+                  Correction,
+                  Scalp
               };
 
        enum     RetraceType
