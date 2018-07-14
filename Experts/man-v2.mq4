@@ -115,19 +115,19 @@ void GetData(void)
     
     if (pfractal.HistoryLoaded())
     {
+     if (pfractal.Event(NewHigh))
        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
          if (IsChanged(mvActiveDir,DirectionUp))
          {
            mvActiveBounds[OP_BUY]=High[0];
-           NewArrow(SYMBOL_ARROWUP,clrYellow,"upper",Close[0]);
 //           CallPause("New pipMA poly up");
          }
          
+     if (pfractal.Event(NewLow))
        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
          if (IsChanged(mvActiveDir,DirectionDown))
          {
            mvActiveBounds[OP_SELL]=Low[0];
-           NewArrow(SYMBOL_ARROWDOWN,clrCrimson,"lower",Close[0]);
 //           CallPause("New pipMA poly down");
          }
     }
