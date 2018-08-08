@@ -9,6 +9,7 @@
 #property strict
 
 #include <Class\Array.mqh>
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -53,6 +54,7 @@ public:
    
    //--- methods of using the array
    int               Find(const double element);
+   void              Sort(int beg,int end);
    void              Add(const double element);
    void              Insert(const int index, const double element);
    void              Delete(const int index);
@@ -332,4 +334,58 @@ void CArrayDouble::Compute()
         adMeanAbsMid  =  NormalizeDouble(adMeanAbs,arrPrecision)/2;
       }
     }
+  }
+
+//+------------------------------------------------------------------+
+//| Sort                                                 |
+//+------------------------------------------------------------------+
+void CArrayDouble::Sort(int beg,int end)
+  {
+   int    i,j;
+   double p_double,t_double;
+
+//--- check
+   if(beg<0 || end<0)
+      return;
+
+//--- sort
+   i=beg;
+   j=end;
+   
+   while(i<end)
+     {
+      //--- ">>1" is quick division by 2
+      p_double=dblArray[(beg+end)>>1];
+      while(i<j)
+        {
+         while(dblArray[i]<p_double)
+           {
+            //--- control the output of the array bounds
+            if(i==end)
+               break;
+            i++;
+           }
+         while(dblArray[j]>p_double)
+           {
+            //--- control the output of the array bounds
+            if(j==0)
+               break;
+            j--;
+           }
+         if(i<=j)
+           {
+            t_double=dblArray[i];
+            dblArray[i++]=dblArray[j];
+            dblArray[j]=t_double;
+            //--- control the output of the array bounds
+            if(j==0)
+               break;
+            j--;
+           }
+        }
+      if(beg<j)
+         Sort(beg,j);
+      beg=i;
+      j=end;
+     }
   }

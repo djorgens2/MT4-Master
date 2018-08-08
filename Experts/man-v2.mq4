@@ -8,13 +8,12 @@
 #property version   "1.00"
 #property strict
 
+
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
 #include <Class\SessionArray.mqh>
 
 input string   EAHeader                = "";    //+---- Application Options -------+
-input double   inpDailyTarget          = 25;   // Daily target
-input int      inpMaxMargin            = 60;    // Maximum trade margin (volume)
   
 input string   fractalHeader           = "";    //+------ Fractal Options ---------+
 input int      inpRangeMin             = 60;    // Minimum fractal pip range
@@ -36,35 +35,36 @@ input int      inpEuropeClose          = 18;    // Europe market close hour
 input int      inpUSOpen               = 14;    // US market open hour
 input int      inpUSClose              = 23;    // US market close hour
 
-  //--- Records
-  struct OpenOrderRec
-  {
-    int               Action;
-    int               Ticket;
-    double            Lots;
-    double            Margin;
-    double            MaxEquity;
-    double            MinEquity;
-    int               EquityDir;
-    EventType         EquityEvent;
-  };
 
   //--- Class Objects
   CSessionArray      *session[SessionTypes];
   CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CEvent             *events                 = new CEvent();
-  
-  OnOffType           mvScalper              = Off;
-  bool                mvAlert                = false;
-  double              mvAlertPrice           = 0.00;
-  int                 mvAlertDir             = DirectionNone;
 
+  CArrayDouble       *sbounds                = new CArrayDouble(6);
+  CSessionArray      *leadSession;
   
-  SessionType         mvLeadSession;
-  ReservedWords       mvStrategy;
-  double              mvActiveBounds[2];
-  int                 mvActiveDir            = DirectionNone;
+  //--- Enum Defs
+  enum ActionProtocol {
+                        NoProtocol,
+                        CoverBreakout,
+                        CoverReversal,
+                        Hedging,
+                        PullbackEntry,
+                        RallyEntry,
+                        DCAExit,
+                        LossExit,
+                        ActionProtocols
+                      };
+    
+  ActionProtocol      opProtocol;
+  int                 pfPolyDir;
+  double              pfPolyBounds[2];
+  int                 fTrendAction;
+  int                 sDailyAction;
+  int                 sBoundsCount;
+  
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -72,17 +72,6 @@ input int      inpUSClose              = 23;    // US market close hour
 void CallPause(string Message)
   {
     Pause(Message,"Event Trapper");
-  }
-  
-//+------------------------------------------------------------------+
-//| CallAlert - Alerts and resets                                    |
-//+------------------------------------------------------------------+
-void CallAlert(void)
-  {
-    Pause("Price Target Hit","Price Alert");
-    mvAlert           = false;
-    mvAlertPrice      = 0.00;
-    mvAlertDir        = DirectionNone;
   }
   
 //+------------------------------------------------------------------+
@@ -110,26 +99,20 @@ void GetData(void)
 //            
       if (type<Daily)
         if (session[type].SessionIsOpen())
-          mvLeadSession    = type;
+          leadSession    = session[type];
     }
     
     if (pfractal.HistoryLoaded())
     {
      if (pfractal.Event(NewHigh))
        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
-         if (IsChanged(mvActiveDir,DirectionUp))
-         {
-           mvActiveBounds[OP_BUY]=High[0];
-//           CallPause("New pipMA poly up");
-         }
+         if (IsChanged(pfPolyDir,DirectionUp))
+           pfPolyBounds[OP_BUY]=High[0];
          
      if (pfractal.Event(NewLow))
        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
-         if (IsChanged(mvActiveDir,DirectionDown))
-         {
-           mvActiveBounds[OP_SELL]=Low[0];
-//           CallPause("New pipMA poly down");
-         }
+         if (IsChanged(pfPolyDir,DirectionDown))
+           pfPolyBounds[OP_SELL]=Low[0];
     }
   }
 
@@ -138,164 +121,85 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdatePriceLabel("mvUpperBound",mvActiveBounds[OP_BUY],clrYellow);
-    UpdatePriceLabel("mvLowerBound",mvActiveBounds[OP_SELL],clrRed);
-    UpdateDirection("lbActiveDir",mvActiveDir,DirColor(mvActiveDir),16);
-  }
-
-//+------------------------------------------------------------------+
-//| SetScalper - Signals Scalping begin/end                          |
-//+------------------------------------------------------------------+
-void SetScalper(OnOffType Switch)
-  {
-    mvScalper = Switch;
-
-    if (mvScalper==On)
-      CallPause("Scalper Enabled");
-  }
-
-//+------------------------------------------------------------------+
-//| SetAlert - Sets an alert for the supplied target price           |
-//+------------------------------------------------------------------+
-void SetAlert(double Target)
-  {
-    mvAlert       = true;
-    mvAlertPrice  = Target;
-    mvAlertDir    = DirectionDown;
-    
-    if (IsHigher(Bid,Target,NoUpdate))
-      mvAlertDir  = DirectionUp;
-      
+    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
+    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
+    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
   }
 
 //+------------------------------------------------------------------+
 //| SetTrend - Signals short term/long term trend                    |
 //+------------------------------------------------------------------+
-void SetTrend(ReservedWords Strategy, int Direction)
+void SetTrend(ActionProtocol Protocol, int Direction)
   {
-    mvStrategy     = Strategy;
+    opProtocol     = Protocol;
     
-    switch (Strategy)
+    switch (Protocol)
     {
       default:        /* do something */;
     }
      
-    UpdateLabel("lbScalper",EnumToString(Strategy),BoolToInt(mvScalper==On,clrGoldenrod,DirColor(Direction)),24);    
+    UpdateLabel("lbStrategy",EnumToString(Protocol),clrGoldenrod,24);    
   }
   
 //+------------------------------------------------------------------+
-//| SetTradePlan                                                     |
+//| SetDailyAction - sets the trend hold/hedge parameters            |
 //+------------------------------------------------------------------+
-void SetTradePlan(void)
+void SetDailyAction(void)
   {  
-    if (fractal.State(Major)==Expansion)
+    sBoundsCount        = 0;
+    
+    //--- Set Daily Bias and Limits
+    sDailyAction        = Action(session[Daily].TradeBias(),InDirection);
+
+    sbounds.Initialize(NoValue);
+
+    for (SessionType type=Asia;type<Daily;type++)
     {
-      //-- Set up for trend
-      if (fractal.IsBreakout(Expansion))
-        SetTrend(Breakout,fractal[Expansion].Direction);
-        
-      if (fractal.IsReversal(Expansion))
-        SetTrend(Reversal,fractal[Expansion].Direction);
-    }
-    else
-    if (fractal.Fibonacci(Divergent,Expansion,Max)>1-FiboPercent(Fibo23))
-    {
-      //--- Set up for Reversal
-      SetTrend(Correction,Direction(fractal[fractal.State(Major)].Direction));
-    }
-    else
-    if (fractal.Fibonacci(Convergent,Expansion,Max)>1-(FiboPercent(Fibo23)))
-    {
-      //--- Set up for Trend Continuation
-      SetTrend(Continuation,Direction(fractal[fractal.State(Major)].Direction));
-    }
-    else
-    {
-      //--- Set up for Convergence/Divergence
-      SetTrend(Contrarian,Direction(fractal[fractal.State(Major)].Direction,InContrarian));
+      if (sbounds.Find(session[type].History(0).TermHigh)==NoValue)
+        sbounds.SetValue(sBoundsCount++,session[type].History(0).TermHigh);
+
+      if (sbounds.Find(session[type].History(0).TermLow)==NoValue)
+        sbounds.SetValue(sBoundsCount++,session[type].History(0).TermLow);
     }
     
-    //--- Set up for scalping
-    if (fractal.State(Major)==fractal.State(Minor))
-      SetScalper(Off);
-    else
-      SetScalper(On);
+    sbounds.Sort(0,sBoundsCount-1);
+    
+    for (int x=0;x<6;x++)
+      UpdateLine("sbounds"+IntegerToString(x),sbounds[x],STYLE_SOLID,clrAzure);
+    
+    //--- Set Fractal Direction and Limits
+    
+    //--- Set Hedging Indicator and Limits
   }
 
 //+------------------------------------------------------------------+
-//| GetData                                                          |
+//| CheckPerformance - verifies that the trade plan is working       |
 //+------------------------------------------------------------------+
 void CheckPerformance(void)
   {
-    if (IsHigher(High[0],mvActiveBounds[OP_BUY]))
+    if (IsHigher(High[0],pfPolyBounds[OP_BUY]))
       events.SetEvent(NewHigh);
          
-    if (IsLower(Low[0],mvActiveBounds[OP_SELL]))
+    if (IsLower(Low[0],pfPolyBounds[OP_SELL]))
       events.SetEvent(NewLow);    
   }
 
-//+------------------------------------------------------------------+
-//| GetData                                                          |
-//+------------------------------------------------------------------+
-void ExecuteScalper(void)
-  {
-    static bool esTrigger     = false;
-    
-    if (pfractal.HistoryLoaded())
-    {
-      if (events[NewHigh] || events[NewLow])
-        esTrigger               = true;
-      
-      if (esTrigger)
-      {
-        if (pfractal.Direction(Polyline)!=mvActiveDir)
-          //if (mvTradeAction==Action(mvActiveDir))
-          {
-//            CallPause("Order!");
-//            OpenOrder(Action(mvActiveDir),"Scalper");
-          }
-
-        if (OrderFulfilled(Action(mvActiveDir)))
-          esTrigger             = false;
-      }
-    }
-    
-    UpdateLabel("lbScalper",EnumToString(mvStrategy),BoolToInt(esTrigger,clrGoldenrod,DirColor(mvActiveDir)),24);    
-  }
-  
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    static int gdHour  = 0;
-    
-    if (IsChanged(gdHour,TimeHour(Time[0])))
-    {
-      if (gdHour==inpAsiaOpen)
-        SetTradePlan();
+    if (session[Daily].Event(SessionOpen))
+      SetDailyAction();
       
-      if (gdHour==4||gdHour==11||gdHour==17)
-        CallPause("Mid-Session Reversal or Profit Taking");
-    }
+    if (leadSession.Event(SessionOpen))
+      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
     CheckPerformance();
     
-    if (mvAlert)
+    switch (opProtocol)
     {
-      if (mvAlertDir==DirectionUp)
-        if (IsHigher(Bid,mvAlertPrice,NoUpdate))
-          CallAlert();
-
-      if (mvAlertDir==DirectionDown)
-        if (IsLower(Bid,mvAlertPrice,NoUpdate))
-          CallAlert();
-    }
-        
-    switch (mvStrategy)
-    {
-      case Scalp:  ExecuteScalper();
-                   break;
+      case NoProtocol:  break;
     }
   }
 
@@ -304,18 +208,6 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
-    if (Command[0]=="SCALP" || Command[0]=="SCALPER" || Command[0]=="SC")
-    {
-      if (Command[1]=="ON")
-        SetScalper(On);
-        
-      if (Command[1]=="OFF")
-        SetScalper(Off);
-    }
-    
-    if (Command[0]=="ALERT")
-      SetAlert(StrToDouble(Command[1]));
-
   }
 
 //+------------------------------------------------------------------+
@@ -355,10 +247,15 @@ int OnInit()
     session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
     
-    NewLabel("lbScalper","Scalper",1200,5,clrDarkGray);
+    leadSession           = session[Daily];
+    
+    NewLabel("lbStrategy","Scalper",1200,5,clrDarkGray);
     NewLabel("lbActiveDir","",1175,5,clrDarkGray);
-    NewPriceLabel("mvUpperBound");
-    NewPriceLabel("mvLowerBound");
+    NewPriceLabel("pfUpperBound");
+    NewPriceLabel("pfLowerBound");
+
+    for (int x=0;x<6;x++)
+      NewLine("sbounds"+IntegerToString(x));
 
     return(INIT_SUCCEEDED);
   }
@@ -371,10 +268,14 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete events;
+    delete sbounds;
     
     ObjectDelete("mvUpperBound");
     ObjectDelete("mvLowerBound");
     
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];
+      
+    for (int x=0;x<6;x++)
+      ObjectDelete("sbounds"+IntegerToString(x));
   }
