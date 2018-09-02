@@ -48,6 +48,7 @@ input int      inpUSClose              = 23;    // US market close hour
   //--- Enum Defs
   enum ActionProtocol {
                         NoProtocol,
+                        Positioning,
                         CoverBreakout,
                         CoverReversal,
                         Hedging,
@@ -57,13 +58,25 @@ input int      inpUSClose              = 23;    // US market close hour
                         LossExit,
                         ActionProtocols
                       };
-    
+  
+  enum DisplayData    {
+                        Fractal,
+                        PipMA,
+                        Application,
+                        Session,
+                        NoData
+                      };
+                      
+  int                 appShowData;
   ActionProtocol      opProtocol;
-  int                 pfPolyDir;
+  
+  int                 pfPolyAction      = OP_NO_ACTION;
+  int                 pfPolyDir         = DirectionNone;
   double              pfPolyBounds[2];
   int                 fTrendAction;
   
-  int                 dbAction;
+  int                 dbAction          = OP_NO_ACTION;
+  int                 dbDir             = DirectionNone;
   int                 dbCount;
   int                 dbZone;
   int                 dbUpper;
@@ -92,31 +105,9 @@ void GetData(void)
     {
       session[type].Update();
       
-//      if (session[type].ActiveEvent())
-//      {
-//        udActiveEvent    = true;
-//
-//        for (EventType event=0;event<EventTypes;event++)
-//          if (session[type].Event(event))
-//            udEvent.SetEvent(event);
-//      }
-//            
       if (type<Daily)
         if (session[type].SessionIsOpen())
           leadSession    = session[type];
-    }
-    
-    if (pfractal.HistoryLoaded())
-    {
-     if (pfractal.Event(NewHigh))
-       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
-         if (IsChanged(pfPolyDir,DirectionUp))
-           pfPolyBounds[OP_BUY]=High[0];
-         
-     if (pfractal.Event(NewLow))
-       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
-         if (IsChanged(pfPolyDir,DirectionDown))
-           pfPolyBounds[OP_SELL]=Low[0];
     }
   }
 
@@ -127,10 +118,18 @@ void RefreshScreen(void)
   {
     UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
     UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
-    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
-    UpdateLabel("lbStrategy",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,24);
+
+//    NewLabel("lbFAction","",560,27,clrDarkGray);
+//    NewLabel("lbFDir","",540,27,clrDarkGray);
+//    NewLabel("lbPFAction","",560,38,clrDarkGray);
+//    NewLabel("lbPFDir","",540,38,clrDarkGray);
     
-    for (int bound=0;bound<dbCount-1;bound++)
+    UpdateDirection("lbDBDir",dbDir,DirColor(dbDir),16);
+    UpdateLabel("lbDBAction",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,16);
+    UpdateDirection("lbPolyDir",pfPolyDir,DirColor(pfPolyDir),16);
+    UpdateLabel("lbPolyAction",ActionText(pfPolyAction),DirColor(pfPolyDir),16);
+    
+    for (int bound=0;bound<dbCount;bound++)
       if (dbZone==NoValue&&bound==0)  //--- Breakout lower
         UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrFireBrick);
       else
@@ -139,7 +138,7 @@ void RefreshScreen(void)
       else
       {
         if (bound==dbZone)
-          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrAzure);
+          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrAzure);
         else
         if (bound==dbUpper)
           UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrForestGreen);
@@ -149,6 +148,17 @@ void RefreshScreen(void)
         else
           UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrDarkGray);
       }
+      
+    switch (appShowData)
+    {
+      case Fractal:      fractal.RefreshScreen();
+                         break;
+      case PipMA:        pfractal.RefreshScreen();
+                         break;
+      case Application:  break;
+      case Session:      break;
+      default:           Comment("");
+    };
 
   }
 
@@ -161,6 +171,7 @@ void SetTrend(ActionProtocol Protocol, int Direction)
     
     switch (Protocol)
     {
+      case Positioning:
       default:        /* do something */;
     }
      
@@ -174,7 +185,8 @@ void SetDailyAction(void)
     dbCount             = 0;
     
     //--- Set Daily Bias and Limits
-    dbAction            = Action(session[Daily].TradeBias(),InDirection);
+    dbAction            = session[Daily].TradeBias();
+    dbDir               = Direction(dbAction,InAction);
 
     sbounds.Initialize(NoValue);
 
@@ -193,24 +205,58 @@ void SetDailyAction(void)
       if (sbounds[dbZone]>Close[0])
         break;
 
-    dbUpper             = dbZone--;
-    dbLower             = dbZone-1;
-    
+    switch (dbAction)
+    {
+      case OP_SELL:    dbUpper  = dbZone--;
+                       dbLower  = dbZone-1;
+                       break;
+      case OP_BUY:     dbUpper  = dbZone+1;
+                       dbLower  = dbZone-1;
+      default:         break;
+                       dbUpper  = dbZone--;
+                       dbLower  = dbZone-1;
+    }
     //--- Set Fractal Direction and Limits
     
     //--- Set Hedging Indicator and Limits
   }
 
 //+------------------------------------------------------------------+
-//| CheckPerformance - verifies that the trade plan is working       |
+//| CheckAlerts - verifies trade plan and sets alerts                |
 //+------------------------------------------------------------------+
-void CheckPerformance(void)
+void CheckAlerts(void)
   {
+    if (pfractal.HistoryLoaded())
+    {
+     if (pfractal.Event(NewHigh))
+       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
+         if (IsChanged(pfPolyDir,DirectionUp))
+         {
+           pfPolyBounds[OP_BUY]=High[0];
+           events.SetEvent(NewRally);
+         }
+         
+     if (pfractal.Event(NewLow))
+       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+         if (IsChanged(pfPolyDir,DirectionDown))
+         {
+           pfPolyBounds[OP_SELL]=Low[0];
+           events.SetEvent(NewPullback);
+         }
+    }
+  
     if (IsHigher(High[0],pfPolyBounds[OP_BUY]))
       events.SetEvent(NewHigh);
          
     if (IsLower(Low[0],pfPolyBounds[OP_SELL]))
-      events.SetEvent(NewLow);    
+      events.SetEvent(NewLow);
+      
+    if (events[NewDirection])
+      if (pfPolyAction==dbAction)
+        pfPolyAction   = Action(pfPolyDir,InDirection);        
+      else
+        pfPolyAction   = OP_HEDGE;
+    
   }
 
 //+------------------------------------------------------------------+
@@ -218,14 +264,27 @@ void CheckPerformance(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    string eEvents;
+    
     if (session[Daily].Event(SessionOpen))
       SetDailyAction();
       
     if (leadSession.Event(SessionOpen))
       CallPause("Lead session open: "+EnumToString(leadSession.Type()));
+      
+    if (fractal.ActiveEvent())
+    {
+      eEvents                 = "Fractal Events\n________________________\n";
+      for (EventType event=0;event<EventTypes;event++)
+        if (fractal.Event(event))
+          Append(eEvents,EnumToString(event),"\n");
+      Pause(eEvents,"Fractal Event");
+    }
 
-    CheckPerformance();
+    CheckAlerts();
     
+    if (events[NewDirection])
+      Pause("New Poly direction","Change in PipMA Poly");
     switch (opProtocol)
     {
       case NoProtocol:  break;
@@ -237,6 +296,20 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    if (Command[0]=="SHOW")
+      if (Command[1]=="FRACTAL")
+        appShowData    = Fractal;
+      else
+      if (Command[1]=="PIPMA")
+        appShowData    = PipMA;
+      else
+      if (Command[1]=="APPLICATION")
+        appShowData    = Application;
+      else
+      if (Command[1]=="SESSION")
+        appShowData    = Session;
+      else
+        appShowData    = None;
   }
 
 //+------------------------------------------------------------------+
@@ -278,8 +351,14 @@ int OnInit()
     
     leadSession           = session[Daily];
     
-    NewLabel("lbStrategy","",1200,5,clrDarkGray);
-    NewLabel("lbActiveDir","",1175,5,clrDarkGray);
+    NewLabel("lbDBAction","",560,5,clrDarkGray);
+    NewLabel("lbDBDir","",540,5,clrDarkGray);
+    NewLabel("lbPolyAction","",560,25,clrDarkGray);
+    NewLabel("lbPolyDir","",540,25,clrDarkGray);
+    NewLabel("lbFAction","",560,35,clrDarkGray);
+    NewLabel("lbFDir","",540,35,clrDarkGray);
+    NewLabel("lbPFAction","",560,45,clrDarkGray);
+    NewLabel("lbPFDir","",540,45,clrDarkGray);
     NewPriceLabel("pfUpperBound");
     NewPriceLabel("pfLowerBound");
 
