@@ -5,462 +5,224 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "1.01"
+#property version   "1.41"
 #property strict
 
-#include <Class\PipFractal.mqh>
-#include <Class\TrendRegression.mqh>
+
 #include <manual.mqh>
+#include <Class\PipFractal.mqh>
+#include <Class\SessionArray.mqh>
 
-input string appHeader               = "";    //+------ App Inputs -------+
-input bool   inpShowFiboLines        = false; // Display Fibonacci Lines
-input double inpTrendWane            = 3.6;   // Trend wane retention factor
-input double inpTrailFactor          = 3.6;   // Trailing factor for Stops/Limits/MITs
-
-input string prHeader                = "";    //+---- Regression Inputs -----+
-input int    inpDegree               = 6;     // Degree of poly regression
-input int    inpSTPeriods            = 200;   // Short Term (Pip) periods
-input int    inpMTPeriods            = 60;    // Mid Term (Trend) periods
-input int    inpLTPeriods            = 120;   // Long Term (Trend) periods
-input int    inpSmoothFactor         = 3;     // Moving Average smoothing factor
-input double inpTolerance            = 0.5;   // Trend change sensitivity
-
-input string fractalHeader           = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax             = 30;    // Maximum fractal pip range
-input int    inpRangeMin             = 15;    // Minimum fractal pip range
-
-//--- Class defs
-  CFractal         *fractal          = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal         = new CPipFractal(inpDegree,inpSTPeriods,inpTolerance,fractal);
-  CTrendRegression *trendLT          = new CTrendRegression(inpDegree,inpLTPeriods,inpSmoothFactor);
-  CTrendRegression *trendMT          = new CTrendRegression(inpDegree,inpMTPeriods,inpSmoothFactor);
-
-//--- Screen data show/hide flags
-  string rsComment                   = "";
-  bool   rsShowFractalData           = false;
-  bool   rsShowPipMAData             = false;
+input string   EAHeader                = "";    //+---- Application Options -------+
   
-//--- Operational variables
-  int    alStdDevDir                 = DirectionNone;
-  double alStdDevPrice               = 0.00;
-  double alStdDevLevel               = 0.00;
-  double alStdDevTop                 = 0.00;
-  double alStdDevBottom              = 0.00;
+input string   fractalHeader           = "";    //+------ Fractal Options ---------+
+input int      inpRangeMin             = 60;    // Minimum fractal pip range
+input int      inpRangeMax             = 120;   // Maximum fractal pip range
+input int      inpPeriodsLT            = 240;   // Long term regression periods
 
-  double alPolyCrossPrice[2]         = {0.00,0.00};
-  int    alPolyCrossDir              = DirectionNone;
-  int    alTradeDir                  = DirectionNone;
-  bool   alCounterTrend              = false;
-  bool   alCounterPush               = false;
-  bool   alAlertTrendWane            = false;
-  bool   alAlertTrendDir             = false;
-   
-  bool   pmProfitTakes[RetraceTypeMembers];
-  int    pmProfitDir                 = DirectionNone;
-  int    pmProfitAction              = OP_NO_ACTION;
-  bool   pmProfitMode                = false;
+input string   RegressionHeader        = "";    //+------ Regression Options ------+
+input int      inpDegree               = 6;     // Degree of poly regression
+input int      inpSmoothFactor         = 3;     // MA Smoothing factor
+input double   inpTolerance            = 0.5;   // Directional sensitivity
+input int      inpPipPeriods           = 200;   // Trade analysis periods (PipMA)
+input int      inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
 
-  int    omTradeDir                  = DirectionNone;
-  int    omTradeAction               = OP_NO_ACTION;
-  bool   omOrderMode                 = false;
+input string   SessionHeader           = "";    //+---- Session Hours -------+
+input int      inpAsiaOpen             = 1;     // Asian market open hour
+input int      inpAsiaClose            = 10;    // Asian market close hour
+input int      inpEuropeOpen           = 8;     // Europe market open hour
+input int      inpEuropeClose          = 18;    // Europe market close hour
+input int      inpUSOpen               = 14;    // US market open hour
+input int      inpUSClose              = 23;    // US market close hour
+
+
+  //--- Class Objects
+  CSessionArray      *session[SessionTypes];
+  CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
+  CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
+  CEvent             *events                 = new CEvent();
+
+  CArrayDouble       *sbounds                = new CArrayDouble(6);
+  CSessionArray      *leadSession;
   
-  bool   rmStopsOn                   = true;
-
+  //--- Enum Defs
+  enum ActionProtocol {
+                        NoProtocol,
+                        CoverBreakout,
+                        CoverReversal,
+                        Hedging,
+                        PullbackEntry,
+                        RallyEntry,
+                        DCAExit,
+                        LossExit,
+                        ActionProtocols
+                      };
+    
+  ActionProtocol      opProtocol;
+  int                 pfPolyDir;
+  double              pfPolyBounds[2];
+  int                 fTrendAction;
   
+  int                 dbAction;
+  int                 dbCount;
+  int                 dbZone;
+  int                 dbUpper;
+  int                 dbLower;
+  
+
 //+------------------------------------------------------------------+
-//| ShowStdDevChannel                                                |
+//| CallPause                                                        |
 //+------------------------------------------------------------------+
-void ShowStdDevChannel(void)
+void CallPause(string Message)
   {
-    static string steArrowName  = "";
-    static double steArrowPrice = Close[0];
-    static int    steArrowCode  = SYMBOL_CHECKSIGN;
-    static int    steStdDevDir  = DirectionNone;
-    
-    if (IsChanged(steStdDevDir,alStdDevDir))
-    {
-      steArrowPrice     = Close[0];
-      steArrowCode      = BoolToInt(alStdDevDir==DirectionDown,SYMBOL_ARROWDOWN,SYMBOL_ARROWUP);
-      steArrowName      = NewArrow(steArrowCode,DirColor(steStdDevDir),DirText(steStdDevDir),steArrowPrice);
-    }    
-  }
-
-//+------------------------------------------------------------------+
-//| ShowPipMAData                                                    |
-//+------------------------------------------------------------------+
-void ShowPipMAData(void)
-  { 
-    rsComment += "\n*--- PipFractal ---*\n"
-           +"Term: "+DirText(pfractal[Term].Direction)
-           +"  (rt): "+DoubleToStr(pfractal.Fibonacci(Term,pfractal.Direction(Term),Retrace,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Term,pfractal.Direction(Term),Retrace,Max,InPercent),1)+"%"
-           +"  (e): "+DoubleToStr(pfractal.Fibonacci(Term,pfractal.Direction(Term),Expansion,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Term,pfractal.Direction(Term),Expansion,Max,InPercent),1)+"%\n"
-           +"Trend: "+DirText(pfractal[Trend].Direction)
-           +"  (rt): "+DoubleToStr(pfractal.Fibonacci(Trend,pfractal.Direction(Trend),Retrace,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Trend,pfractal.Direction(Trend),Retrace,Max,InPercent),1)+"%"
-           +"  (e): "+DoubleToStr(pfractal.Fibonacci(Trend,pfractal.Direction(Trend),Expansion,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Trend,pfractal.Direction(Trend),Expansion,Max,InPercent),1)+"%\n"
-           +"Origin: "+DirText(pfractal.Direction(Origin))
-           +"  (rt): "+DoubleToStr(pfractal.Fibonacci(Origin,pfractal.Direction(Origin),Retrace,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Origin,pfractal.Direction(Origin),Retrace,Max,InPercent),1)+"%"
-           +"  (e): "+DoubleToStr(pfractal.Fibonacci(Origin,pfractal.Direction(Origin),Expansion,Now,InPercent),1)+"%"
-           +"  "+DoubleToStr(pfractal.Fibonacci(Origin,pfractal.Direction(Origin),Expansion,Max,InPercent),1)+"%\n";
-    rsComment += "Age: "+IntegerToString(pfractal.Count(Range))+"\n";
-  
-  }
-
-//+------------------------------------------------------------------+
-//| ShowFractalData                                                  |
-//+------------------------------------------------------------------+
-void ShowFractalData(void)
-  { 
-    const string  rsSeg[RetraceTypeMembers] = {"tr","tm","p","b","r","e","d","c","iv","cv","a"};
- 
-    rsComment   += "\n--- Fractal ---";
-    rsComment   += "\n  Origin:\n";
-    rsComment   +="      (o): "+BoolToStr(fractal.Origin().Direction==DirectionUp,"Long","Short");
-
-    Append(rsComment,BoolToStr(fractal.Origin().Peg,"Peg"));
-    Append(rsComment,BoolToStr(fractal.Origin().Breakout,"Breakout"));
-    Append(rsComment,BoolToStr(fractal.Origin().Reversal,"Reversal"));
-
-    rsComment   +="  Bar: "+IntegerToString(fractal.Origin().Bar)
-                +"  Top: "+DoubleToStr(fractal.Origin().Top,Digits)
-                +"  Bottom: "+DoubleToStr(fractal.Origin().Bottom,Digits)
-                +"  Price: "+DoubleToStr(fractal.Origin().Price,Digits)+"\n";
-                   
-    rsComment   +="             Retrace: "+DoubleToString(fractal.Origin(Now).Retrace*100,1)+"%"
-                +" "+DoubleToString(fractal.Origin(Max).Retrace*100,1)+"%"
-                +"  Expansion: " +DoubleToString(fractal.Origin(Now).Expansion*100,1)+"%"
-                +" "+DoubleToString(fractal.Origin(Max).Expansion*100,1)+"%"
-                +"  Leg: (c) "+DoubleToString(Pip(fractal.Origin().Range),1)+" (a) "+DoubleToString(Pip(fractal.Origin(Max).Range),1)+"\n";
-      
-    for (RetraceType type=Trend;type<=fractal.State();type++)
-      if (fractal[type].Bar>NoValue)
-      {
-        if (type == fractal.Dominant(Trend))
-          rsComment  += "\n  Trend:\n";
-        else
-        if (type == fractal.Dominant(Term))
-          rsComment  += "\n  Term:\n";
-        else
-        if (type == fractal.State())
-          if (type < Actual)
-            rsComment+= "\n  Actual:\n";
-
-        rsComment    +="      ("+rsSeg[type]+"): "+BoolToStr(fractal.Direction(type)==DirectionUp,"Long","Short")
-                     +BoolToStr(fractal.Leg(type,Peg) == Tick,"","  "+EnumToString(fractal.Leg(type,Peg)));
-
-        rsComment    +="  Bar: ";
-        rsComment    += BoolToStr(type==Trend,IntegerToString(fractal.Origin(Actual).Bar),IntegerToString(fractal[type].Bar));
-
-        rsComment    +="  Top: "+DoubleToStr(fractal.Range(type,Top),Digits)
-                     +"  Bottom: "+DoubleToStr(fractal.Range(type,Bottom),Digits)
-                     +"  Price: ";
-                       
-        rsComment    += BoolToStr(type==Trend,DoubleToStr(fractal.Origin(Actual).Price,Digits),DoubleToStr(fractal.Price(type),Digits))+"\n";
-        rsComment    +="             Retrace: "+DoubleToString(fractal.Fibonacci(type,Retrace,Now,InPercent),1)+"%"
-                     +" "+DoubleToString(fractal.Fibonacci(type,Retrace,Max,InPercent),1)+"%"
-                     +"  Expansion: " +DoubleToString(fractal.Fibonacci(type,Expansion,Now,InPercent),1)+"%"
-                     +" "+DoubleToString(fractal.Fibonacci(type,Expansion,Max,InPercent),1)+"%"
-                     +"  Leg: (c) "+DoubleToString(fractal.Range(type,Now,InPips),1)+" (a) "+DoubleToString(fractal.Range(type,Max,InPips),1)+"\n";
-      } else break;
+    Pause(Message,"Event Trapper");
   }
   
-//+------------------------------------------------------------------+
-//| RefreshScreen                                                    |
-//+------------------------------------------------------------------+
-void RefreshScreen(void)
-  {
-    rsComment   = "";
-      
-    rsComment     += "--- Alerts ---\n"
-                  +  BoolToStr(fractal.Event(Trap23),"  Reversal (Fibo23)\n")
-                  +  BoolToStr(fractal.Event(NewFractal),"  New Fractal\n")
-                  +  BoolToStr(fractal.Event(NewMajor),"  New Major\n")
-                  +  BoolToStr(fractal.Event(NewMinor),"  New Minor\n")
-                  +  BoolToStr(alAlertTrendWane,"  Trend (Wane)\n")
-                  +  BoolToStr(omOrderMode,"  Order Time! ("+DoubleToStr(fractal.Fibonacci(Expansion,Retrace,Now,InPercent),1)+"%)\n")
-                  +  BoolToStr(pmProfitMode,"  Profit Time!\n");
-                         
-    if (rsShowFractalData)
-      ShowFractalData();
-
-    if (rsShowPipMAData)      
-      ShowPipMAData();
-      
-    //--- Standard Deviation channel lines    
-    UpdateRay("stdDevHigh",trendMT.Trendline(Tail)+trendMT.StdDev(Positive),inpMTPeriods-1,trendMT.Trendline(Head)+trendMT.StdDev(Positive),0,STYLE_DOT,clrYellow);
-    UpdateRay("stdDevLow",trendMT.Trendline(Tail)+trendMT.StdDev(Negative),inpMTPeriods-1,trendMT.Trendline(Head)+trendMT.StdDev(Negative),0,STYLE_DOT,clrRed);
-
-    //--- Poly Cross price labels
-    //UpdatePriceLabel("alPolyCrossShort",alPolyCrossPrice[OP_SELL],BoolToInt(alPolyCrossDir==DirectionDown,clrRed,clrMaroon));
-    //UpdatePriceLabel("alPolyCrossLong",alPolyCrossPrice[OP_BUY],BoolToInt(alPolyCrossDir==DirectionUp,clrLawnGreen,clrForestGreen));
-    UpdatePriceLabel("alStdDevPrice",alStdDevPrice,DirColor(trendLT.Direction(StdDev)));
-    UpdatePriceLabel("alLTMA",trendLT.MA(Mean),DirColor(trendLT.Direction(StdDev)));
-    
-    UpdateDirection("alStdDevDir",alStdDevDir,DirColor(alStdDevDir));
-    UpdateDirection("alPolyCrossDir",alPolyCrossDir,DirColor(alPolyCrossDir));
-
-    if (alCounterPush)
-      UpdateLine("alCounterTrend",alStdDevLevel,STYLE_DASHDOTDOT,clrWhite);
-    else
-    if (alCounterTrend)
-      UpdateLine("alCounterTrend",alStdDevLevel,STYLE_DASHDOTDOT,clrYellow);
-    else
-      UpdateLine("alCounterTrend",alStdDevLevel,STYLE_DASHDOTDOT,clrGray);
-
-    UpdateLine("alTrendPivot",fractal.Price(Trend),STYLE_SOLID,clrGoldenrod);
-    
-    ShowStdDevChannel();
-
-    Comment(rsComment);
-  }
-
-//+------------------------------------------------------------------+
-//| AnalyzeMarket                                                    |
-//+------------------------------------------------------------------+
-void AnalyzeMarket(void)
-  {
-    static int amMinorDir = DirectionNone;
-
-    alStdDevTop           = trendMT.Trendline(Head)+trendMT.StdDev(Positive);
-    alStdDevBottom        = trendMT.Trendline(Head)+trendMT.StdDev(Negative);
-    alStdDevPrice         = trendMT.Trendline(Head)+trendMT.StdDev(Now);
-        
-    //--- Pauses for testing
-    if (fractal.Event(NewFractal))
-      Pause("New Fractal!","Fractal.Event()");
-    else
-    
-    if (fractal.Event(NewMajor))
-      Pause("New Major!","Fractal.Event()");
-    else
-    
-    if (fractal.Event(NewMinor))
-      if (IsChanged(amMinorDir,fractal.Direction(fractal.State(Minor))))
-        Pause("New Minor!","Fractal.Event()");
-    //---------------------
-
-    if (IsChanged(alStdDevDir,trendMT.Direction(StdDev)))
-      if (trendMT.Direction(Trendline)==alStdDevDir)
-      {
-        alCounterTrend             = false;
-        alCounterPush              = false;
-      }
-      else
-      {
-        alCounterTrend             = true;
-        alStdDevLevel              = BoolToDouble(alStdDevDir==DirectionUp,alStdDevBottom,alStdDevTop);
-      }
-      
-    if (alCounterTrend)
-    {
-      if (alStdDevDir==DirectionDown)
-      {
-        alStdDevLevel              = fmin(alStdDevTop,alStdDevLevel);
-        
-        if (IsHigher(Close[0],alStdDevLevel))
-          alCounterPush            = true;
-      }
-      else
-      if (alStdDevDir==DirectionUp)
-      {
-        alStdDevLevel              = fmax(alStdDevBottom,alStdDevLevel);
-
-        if (IsLower(Close[0],alStdDevLevel))
-          alCounterPush            = true;
-      }
-    }      
-        
-    if (trendMT.Direction(Polyline)==trendLT.Direction(Polyline))
-    {
-      alAlertTrendDir              = true;
-      alTradeDir                   = trendMT.Direction(Polyline);
-
-      if (IsChanged(alPolyCrossDir,trendMT.Direction(Polyline)))
-        alPolyCrossPrice[DirAction(alPolyCrossDir)] = Close[0];
-    }    
-    else
-    {
-      if (alAlertTrendDir)
-        alAlertTrendDir            = false;
-      else
-        alTradeDir                 = DirectionNone;
-    }
-    
-    //--- Compute wane flags and trend alerts
-    if (fabs(trendLT.FOC(Retrace))>FiboPercent(Fibo50))
-      alAlertTrendWane               = true;
-    
-    if (fabs(trendLT.FOC(Retrace))<FiboPercent(Fibo38))
-      alAlertTrendWane               = false;
-  }
-
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    events.ClearEvents();
+        
     fractal.Update();
     pfractal.Update();
-    trendLT.Update();
-    trendMT.Update();
-
-    AnalyzeMarket();
+    
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      session[type].Update();
+      
+//      if (session[type].ActiveEvent())
+//      {
+//        udActiveEvent    = true;
+//
+//        for (EventType event=0;event<EventTypes;event++)
+//          if (session[type].Event(event))
+//            udEvent.SetEvent(event);
+//      }
+//            
+      if (type<Daily)
+        if (session[type].SessionIsOpen())
+          leadSession    = session[type];
+    }    
   }
 
 //+------------------------------------------------------------------+
-//| NewOrder                                                         |
+//| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
-void NewOrder(void)
+void RefreshScreen(void)
   {
-    static const double noTrail    = Pip(inpTrailFactor,InPoints);
-  
-    if (fractal.State(Major)==Divergent)
-    {
-      if (fractal.Direction(Divergent)==DirectionUp)
+    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
+    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
+    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
+    UpdateLabel("lbStrategy",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,24);
+    
+    for (int bound=0;bound<dbCount-1;bound++)
+      if (dbZone==NoValue&&bound==0)  //--- Breakout lower
+        UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrFireBrick);
+      else
+      if (dbZone==dbCount&&bound==dbZone)
+        UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrForestGreen);
+      else
       {
-        if (alStdDevTop>fractal.Price(Divergent))
-          if (Close[0]<alStdDevPrice)
-            OpenLimitOrder(OP_SELL,alStdDevPrice,0.00,0.00,noTrail,"Short(StdDev)");
-
-        //if (trendMT.Direction(Polyline)==fractal.Direction())
-        //  if (Close[0]<trendMT.Poly(Head))
-        //    if (Close[0]<alStdDevPrice)
-        //      OpenLimitOrder(OP_SELL,alStdDevPrice,0.00,0.00,noTrail,"Short(Poly)");
+        if (bound==dbZone)
+          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrAzure);
+        else
+        if (bound==dbUpper)
+          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrForestGreen);
+        else
+        if (bound==dbLower)
+          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrFireBrick);
+        else
+          UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrDarkGray);
       }
-      
-      if (fractal.Direction(Divergent)==DirectionDown)
-      {
-        if (alStdDevBottom<fractal.Price(Divergent))
-          if (Close[0]>alStdDevPrice)
-            OpenLimitOrder(OP_BUY,alStdDevPrice,0.00,0.00,noTrail,"Long(StdDev)");
 
-        if (trendMT.Direction(Polyline)==fractal.Direction())
-          if (Close[0]>trendMT.Poly(Head))
-            if (Close[0]>alStdDevPrice)
-              OpenLimitOrder(OP_BUY,alStdDevPrice,0.00,0.00,noTrail,"Long(Poly)");
-      }
+  }
+
+//+------------------------------------------------------------------+
+//| SetTrend - Signals short term/long term trend                    |
+//+------------------------------------------------------------------+
+void SetTrend(ActionProtocol Protocol, int Direction)
+  {
+    opProtocol     = Protocol;
+    
+    switch (Protocol)
+    {
+      default:        /* do something */;
     }
-    else
-    
-    if (fractal.State(Major)==Convergent)
-    {}
-    
+     
   }
   
 //+------------------------------------------------------------------+
-//| OrderManager                                                     |
+//| SetDailyAction - sets the trend hold/hedge parameters            |
 //+------------------------------------------------------------------+
-void OrderManager(void)
-  {
-    if (OrderFulfilled())
-      omOrderMode      = false;
-      
-    if (fractal.Event(NewFractal))
-      omOrderMode      = false;
-    else
+void SetDailyAction(void)
+  {  
+    dbCount             = 0;
     
-    if (fractal.Event(NewMajor))
-      omOrderMode      = true;
-    else
-    
-    if (fractal.Event(NewMinor))
+    //--- Set Daily Bias and Limits
+    dbAction            = Action(session[Daily].TradeBias(),InDirection);
+
+    sbounds.Initialize(NoValue);
+
+    for (SessionType type=Asia;type<Daily;type++)
     {
+      if (sbounds.Find(session[type].History(0).TermHigh)==NoValue)
+        sbounds.SetValue(dbCount++,session[type].History(0).TermHigh);
+
+      if (sbounds.Find(session[type].History(0).TermLow)==NoValue)
+        sbounds.SetValue(dbCount++,session[type].History(0).TermLow);
     }
     
-    if (omOrderMode)
-      NewOrder();
-  }
-
-//+------------------------------------------------------------------+
-//| RiskManager                                                      |
-//+------------------------------------------------------------------+
-void RiskManager(void)
-  {
-    int           rmRiskAction      = fractal.Direction(Expansion,false,InAction);
+    sbounds.Sort(0,dbCount-1);
     
-    //--- Protective stop
-    if (rmStopsOn)
+    for (dbZone=0;dbZone<6;dbZone++)
+      if (sbounds[dbZone]>Close[0])
+        break;
+
+    dbUpper             = dbZone--;
+    dbLower             = dbZone-1;
+    
+    //--- Set Fractal Direction and Limits
+    
+    //--- Set Hedging Indicator and Limits
+  }
+
+//+------------------------------------------------------------------+
+//| CheckPerformance - verifies that the trade plan is working       |
+//+------------------------------------------------------------------+
+void CheckPerformance(void)
+  {
+    if (pfractal.HistoryLoaded())
     {
-      if (fractal.Fibonacci(Base,Expansion,Now)>FiboPercent(Fibo100))
-        SetStopPrice(rmRiskAction,FiboPrice(FiboRoot,fractal[Root].Price,fractal[Expansion].Price,Retrace));
+     if (pfractal.Event(NewHigh))
+       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
+         if (IsChanged(pfPolyDir,DirectionUp))
+         {
+           pfPolyBounds[OP_BUY]=High[0];
+           events.SetEvent(NewRally);
+         }
+         
+     if (pfractal.Event(NewLow))
+       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+         if (IsChanged(pfPolyDir,DirectionDown))
+         {
+           pfPolyBounds[OP_SELL]=Low[0];
+           events.SetEvent(NewPullback);
+         }
     }
-    else
-    {
-      SetStopPrice(OP_BUY);
-      SetStopPrice(OP_SELL);
-    }  
-  }
-
-//+------------------------------------------------------------------+
-//| ExecuteTakeProfit                                                |
-//+------------------------------------------------------------------+
-void ShowTakeProfit(RetraceType Type, string ProfitReason="")
-  {
-    string etpComment    = "WTF?!? "+EnumToString(Type)+":"+ProfitReason+"\n";
-          
-    for (RetraceType flag=0;flag<Expansion; flag++)
-      etpComment += EnumToString(flag)+": "
-                   +BoolToStr(pmProfitTakes[flag],"Completed","Pending")
-                   +" ("+DoubleToStr(fractal.Fibonacci(flag,Expansion,Now,InPercent),1)+"%)"
-                   +"\n";
-          
-//    Pause(etpComment,"Why do I prematurely profit?");
-  }
-
-//+------------------------------------------------------------------+
-//| ExecuteTakeProfit                                                |
-//+------------------------------------------------------------------+
-bool ExecuteTakeProfit(string ProfitReason="")
-  {
-    for (RetraceType type=0; type<Expansion; type++)
-      if (fractal.Fibonacci(type,Expansion,Now)>FiboPercent(Fibo161))
-        if (!pmProfitTakes[type])
-        {
-          pmProfitTakes[type]       = true;
-          ShowTakeProfit(type, ProfitReason);
-          return (CloseOrders(CloseConditional,pmProfitAction,ProfitReason));
-        }            
-        
-    return (false);
-  }
   
-//+------------------------------------------------------------------+
-//| ProfitManager                                                    |
-//+------------------------------------------------------------------+
-void ProfitManager(void)
-  {
-    pmProfitDir                     = fractal.Direction(Expansion);
-    pmProfitAction                  = DirAction(pmProfitDir);
-    
-    if (fractal.Event(NewFractal))
-    {
-      ArrayInitialize(pmProfitTakes,false);
-
-      for (RetraceType type=0; type<Expansion; type++)
-        if (fractal.Fibonacci(type,Expansion,Max)>FiboPercent(Fibo161))
-          pmProfitTakes[type]       = true;
-
-      pmProfitMode                  = false;
-    }
+    if (IsHigher(High[0],pfPolyBounds[OP_BUY]))
+      events.SetEvent(NewHigh);
+         
+    if (IsLower(Low[0],pfPolyBounds[OP_SELL]))
+      events.SetEvent(NewLow);
       
-    for (RetraceType type=0; type<Expansion; type++)
-      if (fractal.Fibonacci(type,Expansion,Now)>FiboPercent(Fibo161))
-        if (!pmProfitTakes[type])
-          if (!pmProfitMode)
-            if (LotCount(pmProfitAction)>0.00)
-              pmProfitMode            = true;
-    
-    if (trendLT.FOC(Deviation)<inpTrendWane)
-    {
-      if (pfractal.Event(TrendWane))
-        ExecuteTakeProfit("Trend Hold");
-    }
-    else
-      ExecuteTakeProfit("Trend Immediate");
+    if (events[NewRally] || events[NewHigh])
+       CallPause("New rally");
+       
+    if (events[NewPullback] || events[NewLow])
+       CallPause("New pullback");    
   }
 
 //+------------------------------------------------------------------+
@@ -468,15 +230,18 @@ void ProfitManager(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    static int eOK    = IDOK;
+    if (session[Daily].Event(SessionOpen))
+      SetDailyAction();
+      
+    if (leadSession.Event(SessionOpen))
+      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
-    if (pfractal.Event(HistoryLoaded))
-      if (eOK == IDOK)
-        eOK    = Pause("PipMA History Loaded. Resume next tick?","History Load Complete",MB_ICONQUESTION|MB_OKCANCEL|MB_DEFBUTTON2);        
-
-    OrderManager();
-    RiskManager();
-    ProfitManager();      
+    CheckPerformance();
+    
+    switch (opProtocol)
+    {
+      case NoProtocol:  break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -484,62 +249,6 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
-    string eacComment = "";
-    
-    if (Command[0]=="SHOW")
-    {
-      if (Command[1]=="PROFIT")
-      {
-        if (Command[2]=="FLAGS")
-        {
-          for (RetraceType flag=0;flag<Expansion; flag++)
-            eacComment += EnumToString(flag)+": "
-                         +BoolToStr(pmProfitTakes[flag],"Completed","Pending")
-                         +"\n";
-          Pause(eacComment,"Profit Take Status");
-        }
-      }
-      else
-
-      if (InStr(Command[1],"FIB"))
-        rsShowFractalData     = true;
-      else
-      
-      if (InStr(Command[1],"PIP"))
-        rsShowPipMAData       = true;
-    }
-    else
-
-    if (Command[0]=="HIDE")
-    {
-      if (InStr(Command[1],"FIB"))
-        rsShowFractalData     = false;
-      else
-
-      if (InStr(Command[1],"PIP"))
-        rsShowPipMAData       = false;
-    }
-    else    
-
-    if (StringSubstr(Command[0],0,3)=="ORD") //--- application order command
-    {
-      if (InStr(Command[1],"STOP"))
-        rmStopsOn             = true;      
-    }
-    else    
-
-    if (StringSubstr(Command[0],0,2)=="EN") //--- Enable command
-    {
-      if (InStr(Command[1],"STOP"))
-        rmStopsOn             = true;      
-    }
-    else    
-
-    if (StringSubstr(Command[0],0,3)=="DIS") //--- Disable command
-    {
-      if (InStr(Command[1],"STOP"))
-        rmStopsOn             = false;      
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -574,22 +283,20 @@ int OnInit()
   {
     ManualInit();
     
-    NewRay("stdDevHigh",false);
-    NewRay("stdDevLow",false);
+    session[Daily]        = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
+    session[Asia]         = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
     
-    NewLine("alCounterTrend");
-    NewLine("alTrendPivot");
-
-//    NewPriceLabel("alPolyCrossShort");
-//    NewPriceLabel("alPolyCrossLong");
-    NewPriceLabel("alLTMA");
-    NewPriceLabel("alStdDevPrice");
+    leadSession           = session[Daily];
     
-    NewLabel("StdDev:","StdDev:",25,16,clrLightGray,SCREEN_LR,0);
-    NewLabel("PolyCross:","PolyCross:",25,5,clrLightGray,SCREEN_LR,0);
+    NewLabel("lbStrategy","",1200,5,clrDarkGray);
+    NewLabel("lbActiveDir","",1175,5,clrDarkGray);
+    NewPriceLabel("pfUpperBound");
+    NewPriceLabel("pfLowerBound");
 
-    NewLabel("alStdDevDir","",5,16,clrLightGray,SCREEN_LR,0);
-    NewLabel("alPolyCrossDir","",5,5,clrLightGray,SCREEN_LR,0);
+    for (int x=0;x<6;x++)
+      NewLine("sbounds"+IntegerToString(x));
 
     return(INIT_SUCCEEDED);
   }
@@ -600,7 +307,16 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete fractal;
-    delete trendMT;
-    delete trendLT;
     delete pfractal;
+    delete events;
+    delete sbounds;
+    
+    ObjectDelete("mvUpperBound");
+    ObjectDelete("mvLowerBound");
+    
+    for (SessionType type=Asia;type<SessionTypes;type++)
+      delete session[type];
+      
+    for (int x=0;x<6;x++)
+      ObjectDelete("sbounds"+IntegerToString(x));
   }
