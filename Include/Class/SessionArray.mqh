@@ -19,7 +19,17 @@ class CSessionArray
 
 public:
 
-             //-- Session Record Definition
+             //-- Origin Record Definition
+             struct OriginInfo
+             {
+               int            OriginDir;
+               double         OriginPrice;
+               int            Age;
+               ReservedWords  State;
+               RetraceType    Retrace[RetraceTypes];
+             };
+
+             //-- Trend Record Definition
              struct TrendRec
              {
                int            TrendDir;
@@ -267,18 +277,21 @@ void CSessionArray::CalcEvents(void)
     //--- Calc events session open/close
     if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
       if (sSessionIsOpen)
+      //--- Calc session open events      
       {
         sEvent.SetEvent(SessionOpen);
 
         if (IsLower(ActiveMid(),srActive.OffMid))
           if (IsChanged(sOffDir,DirectionDown))
-            sEvent.SetEvent(NewDivergence);
+            sEvent.SetEvent(NewDirection);
         
         if (IsHigher(ActiveMid(),srActive.OffMid))
           if (IsChanged(sOffDir,DirectionUp))
-            sEvent.SetEvent(NewDivergence);
+            sEvent.SetEvent(NewDirection);
       }
       else
+
+      //--- Calc session close events
       {
         sEvent.SetEvent(SessionClose);
 

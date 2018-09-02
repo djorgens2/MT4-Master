@@ -35,6 +35,7 @@
 #define OP_PEND               -6  //--- Pend trading until automation send resume
 #define OP_RESUME             -7  //--- Resume trading
 #define OP_ALERT              -8  //--- Event action that causes an alert
+#define OP_HEDGE              -9  //--- Contrarian action opportunity
 
 
 //---- Format Constants
@@ -187,6 +188,7 @@ int ActionCode(string Action)
     if (Action == "PEND")      return (OP_PEND);
     if (Action == "RESUME")    return (OP_RESUME);
     if (Action == "ALERT")     return (OP_ALERT);
+    if (Action == "HEDGE")     return (OP_HEDGE);
     
     return (OP_NO_ACTION);
   }
@@ -222,6 +224,7 @@ string ActionText(int Action, int Format=IN_ACTION)
       case OP_HALT          : return("HALT");          //--- Close action to kill opens and suspend trading
       case OP_PEND          : return("PENDING");       //--- No action until a resume is submitted
       case OP_RESUME        : return("RESUME");        //--- Resume Action to begin trading after a halt, close, or pend
+      case OP_HEDGE         : return("HEDGE");         //--- Contrarian action opportunity
     
       default            : return("BAD ACTION CODE");
     }

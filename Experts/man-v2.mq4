@@ -42,7 +42,7 @@ input int      inpUSClose              = 23;    // US market close hour
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CEvent             *events                 = new CEvent();
 
-  CArrayDouble       *sbounds                = new CArrayDouble(6);
+  CArrayDouble       *dbBounds               = new CArrayDouble(6);
   CSessionArray      *leadSession;
   
   //--- Enum Defs
@@ -62,9 +62,12 @@ input int      inpUSClose              = 23;    // US market close hour
   int                 pfPolyDir;
   double              pfPolyBounds[2];
   int                 fTrendAction;
-  int                 sDailyAction;
-  int                 sBoundsCount;
   
+  int                 dbDailyAction;
+  int                 dbBoundsCount;
+  int                 dbPriceZone;
+  int                 dbUpperBound;
+  int                 dbLowerBound;
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -124,6 +127,21 @@ void RefreshScreen(void)
     UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
     UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
     UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
+    
+    for (int bound=0;bound<6;bound++)
+      if (dbPriceZone==0 || dbPriceZone==dbBoundsCount)
+        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_SOLID,clrGoldenrod);
+      else
+      if (bound==dbUpperBound)
+        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrForestGreen);
+      else
+      if (bound==dbLowerBound)
+        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrFireBrick);
+      else
+      if (bound==dbPriceZone)
+        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrGoldenrod);
+      else
+        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrDarkGray);
   }
 
 //+------------------------------------------------------------------+
@@ -146,27 +164,33 @@ void SetTrend(ActionProtocol Protocol, int Direction)
 //+------------------------------------------------------------------+
 void SetDailyAction(void)
   {  
-    sBoundsCount        = 0;
+    dbBoundsCount        = 0;
     
     //--- Set Daily Bias and Limits
-    sDailyAction        = Action(session[Daily].TradeBias(),InDirection);
+    dbDailyAction        = Action(session[Daily].TradeBias(),InDirection);
 
-    sbounds.Initialize(NoValue);
+    dbBounds.Initialize(NoValue);
 
     for (SessionType type=Asia;type<Daily;type++)
     {
-      if (sbounds.Find(session[type].History(0).TermHigh)==NoValue)
-        sbounds.SetValue(sBoundsCount++,session[type].History(0).TermHigh);
+      if (dbBounds.Find(session[type].History(0).TermHigh)==NoValue)
+        dbBounds.SetValue(dbBoundsCount++,session[type].History(0).TermHigh);
 
-      if (sbounds.Find(session[type].History(0).TermLow)==NoValue)
-        sbounds.SetValue(sBoundsCount++,session[type].History(0).TermLow);
+      if (dbBounds.Find(session[type].History(0).TermLow)==NoValue)
+        dbBounds.SetValue(dbBoundsCount++,session[type].History(0).TermLow);
     }
     
-    sbounds.Sort(0,sBoundsCount-1);
+    dbBounds.Sort(0,dbBoundsCount-1);
+        
+    for (dbPriceZone=0;dbPriceZone<6;dbPriceZone++)
+      if (Close[0]<dbBounds[dbPriceZone])
+        break;
+
+    dbUpperBound        = dbPriceZone;
+    dbLowerBound        = --dbPriceZone-1;
     
-    for (int x=0;x<6;x++)
-      UpdateLine("sbounds"+IntegerToString(x),sbounds[x],STYLE_SOLID,clrAzure);
-    
+      
+    Print("PZ: "+IntegerToString(dbPriceZone)+" Close: "+DoubleToStr(Close[0],Digits));
     //--- Set Fractal Direction and Limits
     
     //--- Set Hedging Indicator and Limits
@@ -255,7 +279,7 @@ int OnInit()
     NewPriceLabel("pfLowerBound");
 
     for (int x=0;x<6;x++)
-      NewLine("sbounds"+IntegerToString(x));
+      NewLine("dbBounds"+IntegerToString(x));
 
     return(INIT_SUCCEEDED);
   }
@@ -268,7 +292,7 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete events;
-    delete sbounds;
+    delete dbBounds;
     
     ObjectDelete("mvUpperBound");
     ObjectDelete("mvLowerBound");
@@ -277,5 +301,5 @@ void OnDeinit(const int reason)
       delete session[type];
       
     for (int x=0;x<6;x++)
-      ObjectDelete("sbounds"+IntegerToString(x));
+      ObjectDelete("dbBounds"+IntegerToString(x));
   }

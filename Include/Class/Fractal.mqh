@@ -126,6 +126,7 @@ public:
        bool          IsBreakout(RetraceType Type)    { if (this[Type].Breakout) return (true); return (false); }
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
+       bool          ActiveEvent(void)               { return (fEvents.ActiveEvent()); }
        
        FractalRec operator[](const RetraceType Type) const { return(f[Type]); }
   };
