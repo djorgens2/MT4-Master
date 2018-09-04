@@ -114,10 +114,20 @@ void RefreshScreen(void)
   {
     UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
     UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
-    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
+    
+//    NewLabel("lbFAction","",560,27,clrDarkGray);
+//    NewLabel("lbFDir","",540,27,clrDarkGray);
+//    NewLabel("lbPFAction","",560,38,clrDarkGray);
+//    NewLabel("lbPFDir","",540,38,clrDarkGray);
+    
+    UpdateDirection("lbDBDir",dbDir,DirColor(dbDir),16);
+    UpdateLabel("lbDBAction",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,16);
+    UpdateDirection("lbPolyDir",pfPolyDir,DirColor(pfPolyDir),16);
+    UpdateLabel("lbPolyAction",ActionText(pfPolyAction),DirColor(pfPolyDir),16);
+
     UpdateLabel("lbStrategy",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,24);
     
-    for (int bound=0;bound<dbCount-1;bound++)
+    for (int bound=0;bound<dbCount;bound++)
       if (dbZone==NoValue&&bound==0)  //--- Breakout lower
         UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrFireBrick);
       else
@@ -161,7 +171,7 @@ void SetDailyAction(void)
     dbCount             = 0;
     
     //--- Set Daily Bias and Limits
-    dbAction            = Action(session[Daily].TradeBias(),InDirection);
+    dbAction            = session[Daily].TradeBias();
 
     sbounds.Initialize(NoValue);
 
@@ -216,13 +226,19 @@ void CheckPerformance(void)
       events.SetEvent(NewHigh);
          
     if (IsLower(Low[0],pfPolyBounds[OP_SELL]))
-      events.SetEvent(NewLow);
-      
-    if (events[NewRally] || events[NewHigh])
-       CallPause("New rally");
+      events.SetEvent(NewLow);      
+  }
+
+//+------------------------------------------------------------------+
+//| ExecTrades - Analyzes new position alerts and opens trades       |
+//+------------------------------------------------------------------+
+void ExecTrades(void)
+  {
+    if (events[NewRally])
+      OpenTrade(OP_BUY);
        
-    if (events[NewPullback] || events[NewLow])
-       CallPause("New pullback");    
+    if (events[NewPullback])
+      OpenTrade(OP_SELL);
   }
 
 //+------------------------------------------------------------------+
@@ -236,12 +252,9 @@ void Execute(void)
     if (leadSession.Event(SessionOpen))
       CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
-    CheckPerformance();
-    
-    switch (opProtocol)
-    {
-      case NoProtocol:  break;
-    }
+    CheckAlerts();
+    ExecTrades();
+    ExecProfit();
   }
 
 //+------------------------------------------------------------------+
@@ -290,8 +303,15 @@ int OnInit()
     
     leadSession           = session[Daily];
     
-    NewLabel("lbStrategy","",1200,5,clrDarkGray);
-    NewLabel("lbActiveDir","",1175,5,clrDarkGray);
+    NewLabel("lbDBAction","",560,5,clrDarkGray);
+    NewLabel("lbDBDir","",540,5,clrDarkGray);
+    NewLabel("lbPolyAction","",560,25,clrDarkGray);
+    NewLabel("lbPolyDir","",540,25,clrDarkGray);
+    NewLabel("lbFAction","",560,35,clrDarkGray);
+    NewLabel("lbFDir","",540,35,clrDarkGray);
+    NewLabel("lbPFAction","",560,45,clrDarkGray);
+    NewLabel("lbPFDir","",540,45,clrDarkGray);
+
     NewPriceLabel("pfUpperBound");
     NewPriceLabel("pfLowerBound");
 

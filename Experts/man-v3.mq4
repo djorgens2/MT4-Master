@@ -205,17 +205,17 @@ void SetDailyAction(void)
       if (sbounds[dbZone]>Close[0])
         break;
 
-    switch (dbAction)
+    if (dbAction==OP_BUY)
     {
-      case OP_SELL:    dbUpper  = dbZone--;
-                       dbLower  = dbZone-1;
-                       break;
-      case OP_BUY:     dbUpper  = dbZone+1;
-                       dbLower  = dbZone-1;
-      default:         break;
-                       dbUpper  = dbZone--;
-                       dbLower  = dbZone-1;
+      dbUpper  = dbZone+1;
+      dbLower  = dbZone-1;
     }
+    else
+    {
+      dbUpper  = dbZone--;
+      dbLower  = dbZone-1;
+    }
+    
     //--- Set Fractal Direction and Limits
     
     //--- Set Hedging Indicator and Limits
