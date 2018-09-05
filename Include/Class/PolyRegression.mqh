@@ -53,7 +53,8 @@ public:
        void     SetMAPeriods(int MAPeriods) { maPeriods = MAPeriods; }
        
     //--- Event methods
-       bool     Event(EventType Event) { return (prEvents[Event]); }    //-- returns the event signal for the specified event
+       bool     Event(EventType Event) { return (prEvents[Event]); }        //-- returns the event signal for the specified event
+       bool     ActiveEvent(void)      { return (prEvents.ActiveEvent()); } //-- returns true on active event
 
     //--- Poly properties
        double   MA(int Measure);

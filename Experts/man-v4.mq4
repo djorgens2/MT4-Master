@@ -59,11 +59,13 @@ input int      inpUSClose              = 23;    // US market close hour
                       };
     
   ActionProtocol      opProtocol;
+  int                 pfPolyAction;
   int                 pfPolyDir;
   double              pfPolyBounds[2];
   int                 fTrendAction;
   
   int                 dbAction;
+  int                 dbDir;
   int                 dbCount;
   int                 dbZone;
   int                 dbUpper;
@@ -83,8 +85,6 @@ void CallPause(string Message)
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    events.ClearEvents();
-        
     fractal.Update();
     pfractal.Update();
     
@@ -199,10 +199,25 @@ void SetDailyAction(void)
   }
 
 //+------------------------------------------------------------------+
-//| CheckPerformance - verifies that the trade plan is working       |
+//| CheckEvents - analyzes price action and sets alerts              |
 //+------------------------------------------------------------------+
-void CheckPerformance(void)
+void CheckEvents(void)
   {
+    events.ClearEvents();
+
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+//      if (session[type].ActiveEvent())
+//      {
+//        udActiveEvent    = true;
+//
+//        for (EventType event=0;event<EventTypes;event++)
+//          if (session[type].Event(event))
+//            udEvent.SetEvent(event);
+//      }
+//
+    }
+
     if (pfractal.HistoryLoaded())
     {
      if (pfractal.Event(NewHigh))
@@ -230,15 +245,58 @@ void CheckPerformance(void)
   }
 
 //+------------------------------------------------------------------+
-//| ExecTrades - Analyzes new position alerts and opens trades       |
+//| ManageTrades - opens trades based on alerts received             |
 //+------------------------------------------------------------------+
-void ExecTrades(void)
+void ManageTrades(int Action)
   {
-    if (events[NewRally])
-      OpenTrade(OP_BUY);
-       
-    if (events[NewPullback])
-      OpenTrade(OP_SELL);
+  }
+
+//+------------------------------------------------------------------+
+//| ManageProfit - Takes profit based on alerts received             |
+//+------------------------------------------------------------------+
+void ManageProfit(int Action)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| ManageRisk - Manages Risk, dollar cost averaging, hedging        |
+//+------------------------------------------------------------------+
+void ManageRisk(int Action)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| ManageEvent - Manages positional open/close events               |
+//+------------------------------------------------------------------+
+void ManageEvent(int Action)
+  {
+    ManageTrades(Action);
+    ManageProfit(Action);
+    ManageRisk(Action);
+    
+    //-- CheckPerformance
+    // ...
+  }
+
+//+------------------------------------------------------------------+
+//| CheckFractalEvent - Manages fractal event (long-term)            |
+//+------------------------------------------------------------------+
+void CheckFractalEvent(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| CheckPipFractalEvent - Manages fractal event (short-term)       |
+//+------------------------------------------------------------------+
+void CheckPipFractalEvent(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| ManageSessionEvent - Manages session level events                |
+//+------------------------------------------------------------------+
+void CheckSessionEvent(CSessionArray &Session)
+  {
   }
 
 //+------------------------------------------------------------------+
@@ -252,9 +310,23 @@ void Execute(void)
     if (leadSession.Event(SessionOpen))
       CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
-    CheckAlerts();
-    ExecTrades();
-    ExecProfit();
+    CheckEvents();
+    
+    for (EventType event=0;event<EventTypes;event++)
+      switch (event)
+      {
+        case NewRally:       ManageEvent(OP_BUY);
+                             break;
+        case NewPullback:    ManageEvent(OP_SELL);
+                             break;
+        default:             if (leadSession.ActiveEvent())
+                               CheckSessionEvent(leadSession);
+                             if (fractal.ActiveEvent())
+                               CheckFractalEvent();
+                             if (pfractal.ActiveEvent())
+                               CheckPipFractalEvent();
+                             
+      }
   }
 
 //+------------------------------------------------------------------+
