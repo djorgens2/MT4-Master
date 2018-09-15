@@ -127,6 +127,7 @@ void RefreshScreen(void)
 
     UpdateLabel("lbStrategy",ActionText(dbAction)+" ("+IntegerToString(dbZone)+")",clrGoldenrod,24);
     
+/*    
     for (int bound=0;bound<dbCount;bound++)
       if (dbZone==NoValue&&bound==0)  //--- Breakout lower
         UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_SOLID,clrFireBrick);
@@ -146,7 +147,7 @@ void RefreshScreen(void)
         else
           UpdateLine("sbounds"+IntegerToString(bound),sbounds[bound],STYLE_DOT,clrDarkGray);
       }
-
+*/
   }
 
 //+------------------------------------------------------------------+
@@ -161,6 +162,14 @@ void SetTrend(ActionProtocol Protocol, int Direction)
       default:        /* do something */;
     }
      
+  }
+
+//+------------------------------------------------------------------+
+//| SetSessionLimits - Updates the price limits based on actual      |
+//+------------------------------------------------------------------+
+void SetSessionLimits(void)
+  {
+
   }
   
 //+------------------------------------------------------------------+
@@ -199,24 +208,25 @@ void SetDailyAction(void)
   }
 
 //+------------------------------------------------------------------+
-//| CheckEvents - analyzes price action and sets alerts              |
+//| SetEvents - analyzes price action and sets alerts                |
 //+------------------------------------------------------------------+
-void CheckEvents(void)
+void SetEvents(void)
   {
+    string seEvents  = "";
+    
     events.ClearEvents();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
-    {
-//      if (session[type].ActiveEvent())
-//      {
-//        udActiveEvent    = true;
-//
-//        for (EventType event=0;event<EventTypes;event++)
-//          if (session[type].Event(event))
-//            udEvent.SetEvent(event);
-//      }
-//
-    }
+      if (session[type].ActiveEvent())
+      {
+        seEvents    += EnumToString(session[type].Type())+BoolToStr(session[type]==leadSession," (Lead)\n");
+        for (EventType event=0;event<EventTypes;event++)
+          if (session[type].Event(event))
+          {
+            events.SetEvent(event);
+            seEvents += "  "+EnumToString(event)+"\n";
+          }
+      }
 
     if (pfractal.HistoryLoaded())
     {
@@ -236,7 +246,10 @@ void CheckEvents(void)
            events.SetEvent(NewPullback);
          }
     }
-  
+
+    if (events.ActiveEvent())
+      CallPause(seEvents);
+        
     if (IsHigher(High[0],pfPolyBounds[OP_BUY]))
       events.SetEvent(NewHigh);
          
@@ -266,9 +279,9 @@ void ManageRisk(int Action)
   }
 
 //+------------------------------------------------------------------+
-//| ManageEvent - Manages positional open/close events               |
+//| ProcessActionEvent - Manages positional open/close events        |
 //+------------------------------------------------------------------+
-void ManageEvent(int Action)
+void ProcessActionEvent(int Action)
   {
     ManageTrades(Action);
     ManageProfit(Action);
@@ -279,23 +292,23 @@ void ManageEvent(int Action)
   }
 
 //+------------------------------------------------------------------+
-//| CheckFractalEvent - Manages fractal event (long-term)            |
+//| ProcessSessionEvent - Manages session level events               |
 //+------------------------------------------------------------------+
-void CheckFractalEvent(void)
+void ProcessSessionEvent(CSessionArray &Session)
   {
   }
 
 //+------------------------------------------------------------------+
-//| CheckPipFractalEvent - Manages fractal event (short-term)       |
+//| ProcessFractalEvent - Manages fractal event (long-term)          |
 //+------------------------------------------------------------------+
-void CheckPipFractalEvent(void)
+void ProcessFractalEvent(void)
   {
   }
 
 //+------------------------------------------------------------------+
-//| ManageSessionEvent - Manages session level events                |
+//| ProcessPipFractalEvent - Manages fractal event (short-term)      |
 //+------------------------------------------------------------------+
-void CheckSessionEvent(CSessionArray &Session)
+void ProcessPipFractalEvent(void)
   {
   }
 
@@ -304,28 +317,35 @@ void CheckSessionEvent(CSessionArray &Session)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    if (session[Daily].Event(SessionOpen))
-      SetDailyAction();
-      
-    if (leadSession.Event(SessionOpen))
-      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
-
-    CheckEvents();
+    SetEvents();
     
-    for (EventType event=0;event<EventTypes;event++)
-      switch (event)
-      {
-        case NewRally:       ManageEvent(OP_BUY);
-                             break;
-        case NewPullback:    ManageEvent(OP_SELL);
-                             break;
-        default:             if (leadSession.ActiveEvent())
-                               CheckSessionEvent(leadSession);
-                             if (fractal.ActiveEvent())
-                               CheckFractalEvent();
-                             if (pfractal.ActiveEvent())
-                               CheckPipFractalEvent();
-                             
+    if (events[SessionOpen])
+    {
+      if (session[Daily].Event(SessionOpen))
+        SetDailyAction();
+
+      SetSessionLimits();
+      
+      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
+    }
+      
+    if (events[NewRally])
+      ProcessActionEvent(OP_BUY);
+    else
+    if (events[NewPullback])
+      ProcessActionEvent(OP_SELL);
+    else
+    {
+      for (SessionType type=Asia;type<SessionTypes;type++)
+        if (session[type].ActiveEvent())
+          for (EventType event=0;event<EventTypes;event++)
+            ProcessSessionEvent(session[type]);
+
+      if (fractal.ActiveEvent())
+        ProcessFractalEvent();
+          
+      if (pfractal.ActiveEvent())
+        ProcessPipFractalEvent();
       }
   }
 
@@ -403,8 +423,8 @@ void OnDeinit(const int reason)
     delete events;
     delete sbounds;
     
-    ObjectDelete("mvUpperBound");
-    ObjectDelete("mvLowerBound");
+    ObjectDelete("pfUpperBound");
+    ObjectDelete("pfLowerBound");
     
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];

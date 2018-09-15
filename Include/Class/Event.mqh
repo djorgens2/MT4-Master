@@ -45,6 +45,7 @@ protected:
                   SessionOpen,
                   SessionClose,
                   NewDay,
+                  NewHour,
                   NoEvent,
                   EventTypes
                 };
@@ -52,32 +53,53 @@ protected:
 private:
 
       bool eEvents[EventTypes];
+      bool eActiveEvent;
 
 public:
                      CEvent(){};
                     ~CEvent(){};
 
-      void           SetEvent(EventType Event)   {eEvents[Event]=true;}
-      void           ClearEvent(EventType Event) {eEvents[Event]=false;}
-      void           ClearEvents(void)           {ArrayInitialize(eEvents,false);}
-      bool           ActiveEvent(void);
+      void           SetEvent(EventType Event);
+      void           ClearEvent(EventType Event);
+      void           ClearEvents(void);
+      bool           ActiveEvent(void)  {return(eActiveEvent);}
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
   };
 
 //+------------------------------------------------------------------+
-//| ActiveEvent - Returns true if an active event was triggered      |
+//| SetEvent - Sets the triggering event to true                     |
 //+------------------------------------------------------------------+
-bool CEvent::ActiveEvent(void)
+void CEvent::SetEvent(EventType Event)
   {
-    bool aeEvent   = false;
+    eEvents[Event] = true;
+    eActiveEvent   = true;
+  }
+  
+//+------------------------------------------------------------------+
+//| ClearEvent - Sets a specific event to false                      |
+//+------------------------------------------------------------------+
+void CEvent::ClearEvent(EventType Event)
+  {
+    eActiveEvent   = false;
+    eEvents[Event] = false;
     
     for (EventType event=NewDirection;event<EventTypes;event++)
       if (eEvents[event])
-        return (true);
-        
-    return (false);
+      {
+        eActiveEvent   = true;
+        break;
+      }
+  }
+  
+//+------------------------------------------------------------------+
+//| ClearEvents - Initializes all events to false                    |
+//+------------------------------------------------------------------+
+void CEvent::ClearEvents(void)
+  {
+    ArrayInitialize(eEvents,false);
+    eActiveEvent   = false;
   }
   
 //+------------------------------------------------------------------+

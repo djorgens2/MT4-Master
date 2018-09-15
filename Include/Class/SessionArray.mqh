@@ -269,10 +269,12 @@ void CSessionArray::CalcEvents(void)
     //--- Clear events
     sEvent.ClearEvents();
 
-    //--- Test for New Day
+    //--- Test for New Day/New Hour
     if (IsChanged(sBarHour,TimeHour(Time[sBar])))
       if (sBarHour==ndNewDay)
         sEvent.SetEvent(NewDay);
+      else
+        sEvent.SetEvent(NewHour);
 
     //--- Calc events session open/close
     if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
