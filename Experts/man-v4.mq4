@@ -219,7 +219,7 @@ void SetEvents(void)
     for (SessionType type=Asia;type<SessionTypes;type++)
       if (session[type].ActiveEvent())
       {
-        seEvents    += EnumToString(session[type].Type())+BoolToStr(session[type]==leadSession," (Lead)\n");
+        seEvents    += EnumToString(session[type].Type())+BoolToStr(session[type]==leadSession," (Lead)")+"\n";
         for (EventType event=0;event<EventTypes;event++)
           if (session[type].Event(event))
           {
