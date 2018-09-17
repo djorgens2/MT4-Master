@@ -106,7 +106,7 @@ void GetData(void)
       session[type].Update();
       
       if (type<Daily)
-        if (session[type].SessionIsOpen())
+        if (session[type].IsOpen())
           leadSession    = session[type];
     }
   }

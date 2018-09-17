@@ -19,16 +19,6 @@ class CSessionArray
 
 public:
 
-             //-- Origin Record Definition
-             struct OriginInfo
-             {
-               int            OriginDir;
-               double         OriginPrice;
-               int            Age;
-               ReservedWords  State;
-               RetraceType    Retrace[RetraceTypes];
-             };
-
              //-- Trend Record Definition
              struct TrendRec
              {
@@ -70,7 +60,7 @@ public:
             ~CSessionArray();
 
              SessionType   Type(void)            {return (sType);}
-             bool          SessionIsOpen(void);
+             bool          IsOpen(void);
              bool          Event(EventType Type) {return (sEvent[Type]);}
              bool          ActiveEvent(void)     {return (sEvent.ActiveEvent());}
 
@@ -102,6 +92,7 @@ private:
              int           sHourClose;
              int           sBar;
              int           sBars;
+             int           sBarDay;
              int           sBarHour;
              
              datetime      sStartTime;
@@ -264,20 +255,18 @@ void CSessionArray::ProcessEvents(void)
 //+------------------------------------------------------------------+
 void CSessionArray::CalcEvents(void)
   {
-    const  int ndNewDay    = 0;
-
     //--- Clear events
     sEvent.ClearEvents();
 
     //--- Test for New Day/New Hour
+    if (IsChanged(sBarDay,TimeDay(Time[sBar])))
+      sEvent.SetEvent(NewDay);
+    
     if (IsChanged(sBarHour,TimeHour(Time[sBar])))
-      if (sBarHour==ndNewDay)
-        sEvent.SetEvent(NewDay);
-      else
-        sEvent.SetEvent(NewHour);
+      sEvent.SetEvent(NewHour);
 
     //--- Calc events session open/close
-    if (IsChanged(sSessionIsOpen,this.SessionIsOpen()))
+    if (IsChanged(sSessionIsOpen,this.IsOpen()))
       if (sSessionIsOpen)
       //--- Calc session open events      
       {
@@ -420,6 +409,7 @@ void CSessionArray::LoadHistory(void)
     
     //--- Initialize period operationals
     sBar                      = lhCloseBar;
+    sBarDay                   = NoValue;
     sBarHour                  = NoValue;
     sStartTime                = Time[sBar];
     sBars                     = Bars;
@@ -445,7 +435,7 @@ void CSessionArray::LoadHistory(void)
     srTrend.Pullback          = ActiveMid();
     
     for (sBar=lhCloseBar;sBar>lhOpenBar;sBar--)
-      if (SessionIsOpen())
+      if (IsOpen())
         continue;
       else
       if (srActive.TermDir==DirectionNone)
@@ -536,7 +526,7 @@ void CSessionArray::Update(double &OffMidBuffer[], double &PriorMidBuffer[])
 //+------------------------------------------------------------------+
 //| SessionIsOpen - Returns true if session is open for trade        |
 //+------------------------------------------------------------------+
-bool CSessionArray::SessionIsOpen(void)
+bool CSessionArray::IsOpen(void)
   {
     if (TimeHour(Time[sBar])>=sHourOpen && TimeHour(Time[sBar])<sHourClose)
       return (true);

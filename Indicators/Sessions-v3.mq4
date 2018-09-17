@@ -164,12 +164,12 @@ void RefreshScreen(int Bar=0)
 
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
-      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].TradeBias())),BoolToInt(session[type].SessionIsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].TradeBias())),BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbTermDir"+EnumToString(type),session[type].Active().TermDir,DirColor(session[type].Active().TermDir),20);
       UpdateDirection("lbTrendDir"+EnumToString(type),session[type].Trend().TrendDir,DirColor(session[type].Trend().TrendDir),20);
       UpdateDirection("lbOriginDir"+EnumToString(type),session[type].Trend().OriginDir,DirColor(session[type].Trend().OriginDir),20);
 
-      if (session[type].SessionIsOpen())
+      if (session[type].IsOpen())
         if (TimeHour(Time[0])>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
         else

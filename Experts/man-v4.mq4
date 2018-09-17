@@ -11,7 +11,7 @@
 
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
-#include <Class\SessionArray.mqh>
+#include <Class\Sessions.mqh>
 
 input string   EAHeader                = "";    //+---- Application Options -------+
   
@@ -37,13 +37,13 @@ input int      inpUSClose              = 23;    // US market close hour
 
 
   //--- Class Objects
-  CSessionArray      *session[SessionTypes];
+  CSessions          *session[SessionTypes];
   CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CEvent             *events                 = new CEvent();
 
   CArrayDouble       *sbounds                = new CArrayDouble(6);
-  CSessionArray      *leadSession;
+  CSessions          *leadSession;
   
   //--- Enum Defs
   enum ActionProtocol {
@@ -91,18 +91,9 @@ void GetData(void)
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
       session[type].Update();
-      
-//      if (session[type].ActiveEvent())
-//      {
-//        udActiveEvent    = true;
-//
-//        for (EventType event=0;event<EventTypes;event++)
-//          if (session[type].Event(event))
-//            udEvent.SetEvent(event);
-//      }
-//            
+
       if (type<Daily)
-        if (session[type].SessionIsOpen())
+        if (session[type].IsOpen())
           leadSession    = session[type];
     }    
   }
@@ -169,7 +160,7 @@ void SetTrend(ActionProtocol Protocol, int Direction)
 //+------------------------------------------------------------------+
 void SetSessionLimits(void)
   {
-
+//    CallPause("Lead session open: "+EnumToString(leadSession.Type()));
   }
   
 //+------------------------------------------------------------------+
@@ -212,20 +203,42 @@ void SetDailyAction(void)
 //+------------------------------------------------------------------+
 void SetEvents(void)
   {
-    string seEvents  = "";
-    
+    string seEvents     = TimeToStr(Time[0])+"\n";
+    string seEventsTerm = "";
+         
     events.ClearEvents();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
       if (session[type].ActiveEvent())
       {
-        seEvents    += EnumToString(session[type].Type())+BoolToStr(session[type]==leadSession," (Lead)")+"\n";
+        seEvents    += "\n"+EnumToString(session[type].Type());
+        
+        if (session[type]==leadSession)
+          Append(seEvents,"Lead");
+        else
+          Append(seEvents,BoolToStr(session[type].IsOpen(),"Open","Closed"));
+          
+        Append(seEvents,EnumToString(session[type].State(Term))+"\n");
+          
         for (EventType event=0;event<EventTypes;event++)
-          if (session[type].Event(event))
+          if (session[type].Event()[event])
           {
             events.SetEvent(event);
-            seEvents += "  "+EnumToString(event)+"\n";
+            
+            if (event!=NewTerm)
+              seEvents += "  "+EnumToString(event)+"\n";
           }
+          
+        if (session[type].Event()[NewTerm])
+        {
+          seEventsTerm    = "\n  ***Term("+EnumToString(type)+")***\n";
+          
+          for (EventType event=0;event<EventTypes;event++)
+            if (session[type].Event(Term)[event])
+              seEventsTerm += "    "+EnumToString(event)+"\n";
+              
+          seEvents += seEventsTerm;
+        }
       }
 
     if (pfractal.HistoryLoaded())
@@ -294,7 +307,7 @@ void ProcessActionEvent(int Action)
 //+------------------------------------------------------------------+
 //| ProcessSessionEvent - Manages session level events               |
 //+------------------------------------------------------------------+
-void ProcessSessionEvent(CSessionArray &Session)
+void ProcessSessionEvent(CSessions &Session)
   {
   }
 
@@ -324,9 +337,7 @@ void Execute(void)
       if (session[Daily].Event(SessionOpen))
         SetDailyAction();
 
-      SetSessionLimits();
-      
-      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
+      SetSessionLimits();      
     }
       
     if (events[NewRally])
@@ -388,10 +399,10 @@ int OnInit()
   {
     ManualInit();
     
-    session[Daily]        = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
-    session[Asia]         = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
-    session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
-    session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
+    session[Daily]        = new CSessions(Daily,inpAsiaOpen,inpUSClose);
+    session[Asia]         = new CSessions(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]       = new CSessions(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]           = new CSessions(US,inpUSOpen,inpUSClose);
     
     leadSession           = session[Daily];
     

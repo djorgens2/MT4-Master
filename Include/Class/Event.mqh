@@ -42,11 +42,11 @@ protected:
                   NewRally,
                   NewPullback,
                   NewRetrace,
+                  MarketCorrection,
                   SessionOpen,
                   SessionClose,
                   NewDay,
                   NewHour,
-                  NoEvent,
                   EventTypes
                 };
                 

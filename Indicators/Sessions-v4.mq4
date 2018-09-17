@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                  Sessions-v2.mq4 |
+//|                                                  Sessions-v4.mq4 |
 //|                                      Written by Dennis Jorgenson |
 //|                                                                  |
 //|                                                                  |
@@ -8,7 +8,7 @@
 //|                                                                  |
 //+------------------------------------------------------------------+
 #property copyright "(c) 2018, Dennis Jorgenson"
-#property version   "2.0"
+#property version   "4.0"
 #property strict
 #property indicator_chart_window
 
@@ -17,7 +17,7 @@
 
 #include <stdutil.mqh>
 #include <std_utility.mqh>
-#include <Class/SessionArray.mqh>
+#include <Class/Sessions.mqh>
 
 //--- plot Off & Prior Session points
 #property indicator_label1  "indPriorMid"
@@ -58,7 +58,7 @@ const color          EuropeColor        = C'48,0,0';       // Europe session box
 const color          USColor            = C'0,0,56';       // US session box color
 const color          DailyColor         = C'64,64,0';      // US session box color
 
-CSessionArray       *session            = new CSessionArray(inpType,inpHourOpen,inpHourClose);
+CSessions           *session            = new CSessions(inpType,inpHourOpen,inpHourClose);
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
