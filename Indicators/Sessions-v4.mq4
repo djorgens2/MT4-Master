@@ -17,7 +17,7 @@
 
 #include <stdutil.mqh>
 #include <std_utility.mqh>
-#include <Class/Sessions.mqh>
+#include <Class/Session.mqh>
 
 //--- plot Off & Prior Session points
 #property indicator_label1  "indPriorMid"
@@ -58,7 +58,7 @@ const color          EuropeColor        = C'48,0,0';       // Europe session box
 const color          USColor            = C'0,0,56';       // US session box color
 const color          DailyColor         = C'64,64,0';      // US session box color
 
-CSessions           *session            = new CSessions(inpType,inpHourOpen,inpHourClose);
+CSession           *session            = new CSession(inpType,inpHourOpen,inpHourClose);
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
@@ -172,48 +172,48 @@ void RefreshScreen(int Bar=0)
     
       if (session.IsOpen())
       {
-        UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrGray);
-        UpdateLine("lnOffMid",session.Active().OffMid,STYLE_SOLID,clrGoldenrod);
+        UpdateLine("lnPriorMid",session.PriorMid(),STYLE_SOLID,clrGoldenrod);
+        UpdateLine("lnOffsessionMid",session.OffsessionMid(),STYLE_SOLID,clrGray);
       }
       else
       {
-        UpdateLine("lnPriorMid",session.Active().PriorMid,STYLE_SOLID,clrGoldenrod);
-        UpdateLine("lnOffMid",session.Active().OffMid,STYLE_SOLID,clrGray);
+        UpdateLine("lnPriorMid",session.PriorMid(),STYLE_DOT,clrGoldenrod);
+        UpdateLine("lnOffsessionMid",session.OffsessionMid(),STYLE_DOT,clrGray);
       }    
 
-      UpdateLine("lnSupport",session.Active().Support,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnResistance",session.Active().Resistance,STYLE_SOLID,clrForestGreen);
-      UpdateLine("lnPullback",session.Trend().Pullback,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnRally",session.Trend().Rally,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnSupport",session[ActiveRec].Support,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnResistance",session[ActiveRec].Resistance,STYLE_SOLID,clrForestGreen);
+//      UpdateLine("lnPullback",session.Trend().Pullback,STYLE_DOT,clrFireBrick);
+//      UpdateLine("lnRally",session.Trend().Rally,STYLE_DOT,clrForestGreen);
     }
     
     if (inpShowData>dpNone)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TradeBias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
-      UpdateDirection("lbTermDir"+sessionIndex,session.Active().TermDir,DirColor(session.Active().TermDir),20);
-      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
-      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend().OriginDir,DirColor(session.Trend().OriginDir),20);
+      UpdateDirection("lbTermDir"+sessionIndex,session[ActiveRec].Direction,DirColor(session[ActiveRec].Direction),20);
+//      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
+//      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend().OriginDir,DirColor(session.Trend().OriginDir),20);
 
-      if (session.IsOpen())
-        if (TimeHour(Time[0])>inpHourClose-3)
-          UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
-        else
-        if (session.SessionHour()>3)
-          UpdateLabel("lbSessionTime"+sessionIndex,"Mid Session ("+IntegerToString(session.SessionHour())+")",clrYellow);
-        else
-          UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
-      else
-        UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
-
-      if (session.Event(NewBreakout) || session.Event(NewReversal))
-        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrYellow);
-      else
-      if (session.Event(NewRally) || session.Event(NewPullback))
-        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrWhite);
-      else
-        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrDarkGray);
-        
-      UpdateLabel("lbTrendState"+sessionIndex,EnumToString(session.State(Trend)),clrDarkGray);
+//      if (session.IsOpen())
+//        if (TimeHour(Time[0])>inpHourClose-3)
+//          UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
+//        else
+//        if (session.SessionHour()>3)
+//          UpdateLabel("lbSessionTime"+sessionIndex,"Mid Session ("+IntegerToString(session.SessionHour())+")",clrYellow);
+//        else
+//          UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
+//      else
+//        UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
+//
+//      if (session.Event(NewBreakout) || session.Event(NewReversal))
+//        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrYellow);
+//      else
+//      if (session.Event(NewRally) || session.Event(NewPullback))
+//        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrWhite);
+//      else
+//        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrDarkGray);
+//        
+//      UpdateLabel("lbTrendState"+sessionIndex,EnumToString(session.State(Trend)),clrDarkGray);
     }
   }
  
