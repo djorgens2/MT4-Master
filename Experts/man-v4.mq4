@@ -77,7 +77,7 @@ input int      inpUSClose              = 23;    // US market close hour
 //+------------------------------------------------------------------+
 void CallPause(string Message)
   {
-    Pause(Message,"Event Trapper");
+    //Pause(Message,"Event Trapper");
   }
   
 //+------------------------------------------------------------------+

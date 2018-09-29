@@ -183,27 +183,30 @@ void RefreshScreen(int Bar=0)
 
       UpdateLine("lnSupport",session[ActiveRec].Support,STYLE_SOLID,clrFireBrick);
       UpdateLine("lnResistance",session[ActiveRec].Resistance,STYLE_SOLID,clrForestGreen);
-//      UpdateLine("lnPullback",session.Trend().Pullback,STYLE_DOT,clrFireBrick);
-//      UpdateLine("lnRally",session.Trend().Rally,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnHedge",session[ActiveRec].Hedge,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnCorrection",session[ActiveRec].Correction,STYLE_DOT,clrForestGreen);
     }
     
     if (inpShowData>dpNone)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TradeBias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
-      UpdateDirection("lbTermDir"+sessionIndex,session[ActiveRec].Direction,DirColor(session[ActiveRec].Direction),20);
+      UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveRec].Direction,DirColor(session[ActiveRec].Direction),20);
+      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveRec].State),DirColor(session[ActiveRec].BreakoutDir),10);
+
+
 //      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
 //      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend().OriginDir,DirColor(session.Trend().OriginDir),20);
 
-//      if (session.IsOpen())
-//        if (TimeHour(Time[0])>inpHourClose-3)
-//          UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
-//        else
-//        if (session.SessionHour()>3)
-//          UpdateLabel("lbSessionTime"+sessionIndex,"Mid Session ("+IntegerToString(session.SessionHour())+")",clrYellow);
-//        else
-//          UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
-//      else
-//        UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
+      if (session.IsOpen())
+        if (TimeHour(Time[0])>inpHourClose-3)
+          UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
+        else
+        if (session.SessionHour()>3)
+          UpdateLabel("lbSessionTime"+sessionIndex,"Mid Session ("+IntegerToString(session.SessionHour())+")",clrYellow);
+        else
+          UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
+      else
+        UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
 //
 //      if (session.Event(NewBreakout) || session.Event(NewReversal))
 //        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrYellow);
@@ -262,27 +265,31 @@ int OnInit()
       NewLine("lnOffMid");
       NewLine("lnSupport");
       NewLine("lnResistance");
-      NewLine("lnPullback");
-      NewLine("lnRally");
+      NewLine("lnHedge");
+      NewLine("lnCorrection");
     }
     
     if (inpShowData==dpFirst)
     {
       NewLabel("lbhSession","Session",280,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
-      NewLabel("lbhTerm","Term",180,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
-      NewLabel("lbhTrend","Trend",100,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
-      NewLabel("lbhOrigin","Origin",20,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhActive","Active",180,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhTerm","Term",130,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhTrend","Trend",80,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhOrigin","Origin",30,160+sessionOffset,clrGoldenrod,SCREEN_UR,0);
     }
     
     if (inpShowData>dpNone)
     {
       NewLabel("lbSessionType"+sessionIndex,"",260,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTermDir"+sessionIndex,"",150,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTrendDir"+sessionIndex,"",70,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbOriginDir"+sessionIndex,"",10,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveDir"+sessionIndex,"",180,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermDir"+sessionIndex,"",130,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendDir"+sessionIndex,"",80,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginDir"+sessionIndex,"",30,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbSessionTime"+sessionIndex,"",260,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTermState"+sessionIndex,"",150,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTrendState"+sessionIndex,"",70,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveState"+sessionIndex,"",180,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermState"+sessionIndex,"",130,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendState"+sessionIndex,"",80,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginState"+sessionIndex,"",30,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
     }
     
     DeleteRanges();
@@ -310,8 +317,8 @@ void OnDeinit(const int reason)
     ObjectDelete("lnOffMid");
     ObjectDelete("lnSupport");
     ObjectDelete("lnResistance");
-    ObjectDelete("lnPullback");
-    ObjectDelete("lnRally");
+    ObjectDelete("lnHedge");
+    ObjectDelete("lnCorrection");
     
     ObjectDelete("lbhSession");
     ObjectDelete("lbhTerm");
