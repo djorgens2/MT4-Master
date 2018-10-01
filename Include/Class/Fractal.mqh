@@ -844,7 +844,7 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
                        }                         
                        break;
 
-        case Active:   //-- Maximum range based on Major Fractal
+        case Major:    //-- Maximum range based on Major Fractal
                        if (dOrigin.Direction==f[fStateMajor].Direction)
                          range = fabs(this.Price(Origin)-this.Price(fStateMajor,Now));
                        else
@@ -880,7 +880,7 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
                        }                         
                        break;
 
-        case Active:   //-- Actual range now from origin base to retrace (geometric retrace)
+        case Major:    //-- Actual range now from origin base to retrace (geometric retrace)
                        switch (dOrigin.Direction)
                        {
                          case DirectionUp:   range = this.Price(Origin,Top)-this.Price(Origin,Retrace);
@@ -982,7 +982,7 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
                           case Now: fibonacci = fdiv(this.Range(Retrace,Now),this.Range(Origin,Max));
                                     break;
                           
-                          case Max: fibonacci = fdiv(this.Range(Retrace,Active),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Retrace,Major),this.Range(Origin,Max));
                                     break;
                         }
                         break;
@@ -992,7 +992,7 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
                           case Now: fibonacci = fdiv(this.Range(Origin,Now),this.Range(Origin,Max));
                                     break;
                             
-                          case Max: fibonacci = fdiv(this.Range(Origin,Active),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Origin,Major),this.Range(Origin,Max));
                                     break;
                         }
                         break;
@@ -1232,13 +1232,13 @@ void CFractal::RefreshScreen(void)
       rsReport  +="             Retrace: "+DoubleToString(this.Fibonacci(Origin,Retrace,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Retrace,Active,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Retrace,Major,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Retrace,Max,InPips),1)+"\n";
 
       rsReport  +="             Expansion: " +DoubleToString(this.Fibonacci(Origin,Expansion,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Expansion,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Origin,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Origin,Active,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Origin,Major,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Origin,Max,InPips),1)+"\n";
     }
       

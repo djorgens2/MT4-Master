@@ -41,6 +41,13 @@ input int      inpUSClose              = 23;    // US market close hour
   CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
   CEvent             *events                 = new CEvent();
 
+//+------------------------------------------------------------------+
+//| CallPause                                                        |
+//+------------------------------------------------------------------+
+void CallPause(string Message)
+  {
+    Pause(Message,"Event Trapper");
+  }
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
@@ -62,6 +69,12 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+//    if (session[Daily].Event(SessionClose))
+//      CallPause("Session Close");
+//    if (session[Daily].Event(NewDay))
+//      CallPause("NewDay");
+    if (session[Daily].Event(MarketCorrection))
+      CallPause("MarketCorrection");
   }
 
 //+------------------------------------------------------------------+
@@ -104,6 +117,12 @@ int OnInit()
     ManualInit();
     
     session[Daily]        = new CSession(Daily,inpAsiaOpen,inpUSClose);
+    Print("Bad Trend Rec: "+DirText(session[Daily].Trend(NoValue).Direction)
+                           +IntegerToString(session[Daily].Trend(NoValue).Age)
+                           +EnumToString(session[Daily].Trend(NoValue).State)
+                           +DoubleToStr(session[Daily].Trend(NoValue).Base,Digits)
+                           +DoubleToStr(session[Daily].Trend(NoValue).Root,Digits)
+                           +DoubleToStr(session[Daily].Trend(NoValue).Expansion,Digits));
 
     return(INIT_SUCCEEDED);
   }

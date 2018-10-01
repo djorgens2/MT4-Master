@@ -173,25 +173,34 @@ void RefreshScreen(int Bar=0)
       if (session.IsOpen())
       {
         UpdateLine("lnPriorMid",session.PriorMid(),STYLE_SOLID,clrGoldenrod);
-        UpdateLine("lnOffsessionMid",session.OffsessionMid(),STYLE_SOLID,clrGray);
+        UpdateLine("lnOffsessionMid",session.OffMid(),STYLE_SOLID,clrGray);
       }
       else
       {
         UpdateLine("lnPriorMid",session.PriorMid(),STYLE_DOT,clrGoldenrod);
-        UpdateLine("lnOffsessionMid",session.OffsessionMid(),STYLE_DOT,clrGray);
+        UpdateLine("lnOffsessionMid",session.OffMid(),STYLE_DOT,clrGray);
       }    
 
-      UpdateLine("lnSupport",session[ActiveRec].Support,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnResistance",session[ActiveRec].Resistance,STYLE_SOLID,clrForestGreen);
-      UpdateLine("lnHedge",session[ActiveRec].Hedge,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnCorrection",session[ActiveRec].Correction,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnSupport",session[ActiveSession].Support,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnResistance",session[ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
+//      UpdateLine("lnHedge",session[ActiveRec].Hedge,STYLE_DOT,clrFireBrick);
+//      UpdateLine("lnCorrection",session[ActiveRec].Correction,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnHigh",session[ActiveSession].High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnLow",session[ActiveSession].Low,STYLE_DOT,clrFireBrick);
     }
     
     if (inpShowData>dpNone)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TradeBias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
-      UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveRec].Direction,DirColor(session[ActiveRec].Direction),20);
-      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveRec].State),DirColor(session[ActiveRec].BreakoutDir),10);
+      UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,DirColor(session[ActiveSession].Direction),20);
+      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].BreakoutDir),8);
+      
+      UpdateDirection("lbTermDir"+sessionIndex,session.Trend(Term).Direction,DirColor(session.Trend(Term).Direction),20);
+      UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.Trend(Term).State),DirColor(session.Trend(Term).Direction),8);
+
+      if (session.Event(MarketCorrection))
+        NewArrow(BoolToInt(session.TradeBias()==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+                 DirColor(session.TradeBias(InDirection),clrYellow,clrRed));
 
 
 //      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
@@ -267,6 +276,8 @@ int OnInit()
       NewLine("lnResistance");
       NewLine("lnHedge");
       NewLine("lnCorrection");
+      NewLine("lnHigh");
+      NewLine("lnLow");
     }
     
     if (inpShowData==dpFirst)
@@ -319,6 +330,8 @@ void OnDeinit(const int reason)
     ObjectDelete("lnResistance");
     ObjectDelete("lnHedge");
     ObjectDelete("lnCorrection");
+    ObjectDelete("lnHigh");
+    ObjectDelete("lnLow");
     
     ObjectDelete("lbhSession");
     ObjectDelete("lbhTerm");

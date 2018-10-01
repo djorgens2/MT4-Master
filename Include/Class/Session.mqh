@@ -19,6 +19,16 @@ class CSession
 
 public:
 
+             //-- Trend Record Definition
+             struct TrendRec
+             {
+               int            Direction;
+               int            Age;
+               ReservedWords  State;
+               double         Base;
+               double         Root;
+             };
+             
              //-- Session Record Definition
              struct SessionRec
              {
@@ -30,8 +40,6 @@ public:
                double         Low;
                double         Support;
                double         Resistance;
-               double         Correction;
-               double         Hedge;
              };
 
              //-- Session Types
@@ -44,36 +52,35 @@ public:
                SessionTypes
              };
 
-             //-- Record Types
-             enum RecordType
+             //-- Session Record Types
+             enum SessionRecType
              {
-               ActiveRec,
-               OffsessionRec,
-               PriorRec,
-               OriginRec,
-               TrendRec,
-               TermRec,
-               RecordTypes
+               ActiveSession,
+               OffSession,
+               PriorSession,
+               SessionRecTypes
              };
-             
+
              CSession(SessionType Type, int HourOpen, int HourClose);
             ~CSession();
 
-             SessionType   Type(void)                  {return (sType);}
+             SessionType   Type(void)                       {return (sType);}
              int           SessionHour(int Measure=Now);
              bool          IsOpen(void);
              
-             bool          Event(EventType Type)       {return (sEvent[Type]);}
-             bool          ActiveEvent(void)           {return (sEvent.ActiveEvent());}
+             bool          Event(EventType Type)            {return (sEvent[Type]);}
+             bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
 
              void          Update(void);
              void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[]);
 
              double        ActiveMid(void);
              double        PriorMid(void);
-             double        OffsessionMid(void);
+             double        OffMid(void);
+             
+             TrendRec      Trend(int Type);
 
-             int           TradeBias(void);
+             int           TradeBias(int Format=InAction);
              void          PrintSession(int Type);
              
              SessionRec    operator[](const int Type) const {return(srec[Type]);}
@@ -81,10 +88,20 @@ public:
                                  
 private:
 
+             //-- Trend Record Types
+             enum TrendRecType
+             {
+               trTerm,
+               trTrend,
+               trOrigin,
+               TrendRecTypes
+             };
+
              //--- Private Class properties
              SessionType   sType;
              
              bool          sSessionIsOpen;
+             int           sTradeBias;
 
              int           sHourOpen;
              int           sHourClose;
@@ -95,7 +112,8 @@ private:
              
 
              //--- Private class collections
-             SessionRec    srec[6];
+             SessionRec    srec[SessionRecTypes];
+             TrendRec      trec[TrendRecTypes];
                           
              CArrayDouble *sOffMidBuffer;
              CArrayDouble *sPriorMidBuffer;
@@ -109,6 +127,8 @@ private:
              void          UpdateBuffers(void);
 
              void          LoadHistory(void);
+
+             void          SetTradeBias(void);
              void          SetActiveState(void);
              void          SetTermState(void);
              void          SetTrendState(void);
@@ -149,7 +169,10 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
      
     if (State==NoState)
       State                       = ChangeState;
-    else
+
+    if (State==Reversal && ChangeState==Breakout)
+      ChangeState                 = State;
+      
     if (IsChanged(State,ChangeState))
     {
       sEvent.SetEvent(NewState);
@@ -173,6 +196,23 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
   }
     
 //+------------------------------------------------------------------+
+//| SetTradeBias - returns the trade bias based on Time Period       |
+//+------------------------------------------------------------------+
+void CSession::SetTradeBias(void)
+  {
+    int stbTradeBias        = sTradeBias;
+  
+    if (ActiveMid()>PriorMid())
+      stbTradeBias          = OP_BUY;
+
+    if (ActiveMid()<PriorMid())
+      stbTradeBias          = OP_SELL;
+      
+    if (IsChanged(sTradeBias,stbTradeBias))
+      sEvent.SetEvent(MarketCorrection);
+  }
+
+//+------------------------------------------------------------------+
 //| SetOriginState - Sets Origin state on changes to Trend State     |
 //+------------------------------------------------------------------+
 void CSession::SetOriginState(void)
@@ -184,33 +224,6 @@ void CSession::SetOriginState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTrendState(void)
   {
-//    srTrend.State           = State;
-//    
-//    switch (State)
-//    {
-//      case Breakout:   
-//      case Reversal:  srTrend.Age             = srActive.Age;
-//    
-//                      if (srTrend.TrendDir==DirectionUp)
-//                      {
-//                        srTrend.Support       = srTrend.Pullback;
-//                        srTrend.Rally         = ActiveMid();
-//                      }
-//                      
-//                      if (srTrend.TrendDir==DirectionDown)
-//                      {
-//                        srTrend.Resistance    = srTrend.Rally;
-//                        srTrend.Pullback      = ActiveMid();
-//                      }
-//                      break;
-//                      
-//       case Rally:
-//       case Pullback: if (srTrend.TrendDir==DirectionUp)
-//                        srTrend.Rally         = ActiveMid();
-//
-//                      if (srTrend.TrendDir==DirectionDown)
-//                        srTrend.Pullback      = ActiveMid();
-//     }
   }
   
 //+------------------------------------------------------------------+
@@ -218,6 +231,33 @@ void CSession::SetTrendState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTermState(void)
   {
+    if (IsChanged(trec[trTerm].Direction,Direction(ActiveMid()-PriorMid())))
+    {
+      trec[trTerm].Age             = 0;
+      
+      if (trec[trTerm].Direction==DirectionUp)
+        if (IsHigher(ActiveMid(),trec[trTerm].Base))
+          trec[trTerm].State       = Reversal;
+        else
+          trec[trTerm].State       = Rally;
+        
+      if (trec[trTerm].Direction==DirectionDown)
+        if (IsLower(ActiveMid(),trec[trTerm].Base))
+          trec[trTerm].State       = Reversal;
+        else
+          trec[trTerm].State       = Pullback;
+      
+      trec[trTerm].Base            = PriorMid();
+      
+      sEvent.SetEvent(NewTerm);
+    }
+    else
+    {
+      trec[trTerm].State           = Breakout;
+    }
+
+    trec[trTerm].Age++;
+    trec[trTerm].Root              = ActiveMid();
   }
 
 //+------------------------------------------------------------------+
@@ -227,39 +267,37 @@ void CSession::SetActiveState(void)
   {
     ReservedWords stsState             = NoState;
     
-//      sEvent.SetEvent(NewTerm); //<---- here's where the term update happens
-      
-    if (IsHigher(High[sBar],srec[ActiveRec].High))
+    if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
       sEvent.SetEvent(NewHigh);
       sEvent.SetEvent(NewBoundary);
 
-      if (IsHigher(srec[ActiveRec].High,srec[ActiveRec].Resistance,NoUpdate))
-        if (NewDirection(srec[ActiveRec].BreakoutDir,DirectionUp))
-          stsState                   = Reversal;
+      if (NewDirection(srec[ActiveSession].Direction,DirectionUp))
+        stsState                       = Rally;
+
+      if (IsHigher(srec[ActiveSession].High,srec[ActiveSession].Resistance,NoUpdate))
+        if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp))
+          stsState                     = Reversal;
         else
-          stsState                   = Breakout;
-      else
-        if (NewDirection(srec[ActiveRec].Direction,DirectionUp))
-          stsState                   = Rally;
+          stsState                     = Breakout;
     }
             
-    if (IsLower(Low[sBar],srec[ActiveRec].Low))
+    if (IsLower(Low[sBar],srec[ActiveSession].Low))
     {
       sEvent.SetEvent(NewLow);
       sEvent.SetEvent(NewBoundary);
 
-      if (IsLower(srec[ActiveRec].Low,srec[ActiveRec].Support,NoUpdate))
-        if (NewDirection(srec[ActiveRec].BreakoutDir,DirectionDown))
-          stsState                   = Reversal;
+      if (NewDirection(srec[ActiveSession].Direction,DirectionDown))
+        stsState                       = Pullback;
+
+      if (IsLower(srec[ActiveSession].Low,srec[ActiveSession].Support,NoUpdate))
+        if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown))
+          stsState                     = Reversal;
         else
-          stsState                   = Breakout;
-      else
-        if (NewDirection(srec[ActiveRec].Direction,DirectionDown))
-          stsState                   = Pullback;
+          stsState                     = Breakout;
     }
           
-    if (NewState(srec[ActiveRec].State,stsState))
+    if (NewState(srec[ActiveSession].State,stsState))
       sEvent.SetEvent(NewState);
   }
   
@@ -269,23 +307,19 @@ void CSession::SetActiveState(void)
 void CSession::OpenSession(void)
   {    
     //-- Update Offsession Record
-    srec[OffsessionRec]                = srec[ActiveRec];
+    srec[OffSession]                   = srec[ActiveSession];
 
-    //-- Set support/resistance (ActiveRec is Offsession data)
-    srec[ActiveRec].Resistance         = fmax(srec[ActiveRec].High,srec[PriorRec].High);
-    srec[ActiveRec].Support            = fmin(srec[ActiveRec].Low,srec[PriorRec].Low);
-    srec[ActiveRec].Hedge              = PriorMid();
-    srec[ActiveRec].Correction         = ActiveMid();
+    //-- Set support/resistance (ActiveSession is OffSession data)
+    srec[ActiveSession].Resistance     = fmax(srec[ActiveSession].High,srec[PriorSession].High);
+    srec[ActiveSession].Support        = fmin(srec[ActiveSession].Low,srec[PriorSession].Low);
 
     //-- Update indicator buffers
     sOffMidBuffer.SetValue(sBar,ActiveMid());
     sPriorMidBuffer.SetValue(sBar,PriorMid());
 
     //-- Reset Active Record
-    srec[ActiveRec].High               = High[sBar];
-    srec[ActiveRec].Low                = Low[sBar];
-    
-    PrintSession(PriorRec);
+    srec[ActiveSession].High           = High[sBar];
+    srec[ActiveSession].Low            = Low[sBar];
 
     //-- Set OpenSession flag
     sEvent.SetEvent(SessionOpen);
@@ -295,61 +329,23 @@ void CSession::OpenSession(void)
 //| CloseSession - Closes active session start values on close       |
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
-  {
+  {    
+    //-- Set trend states
+    SetTermState();
+    SetTrendState();
+    SetOriginState();
+    
+    //-- Update Prior Record
+    srec[PriorSession]                     = srec[ActiveSession];
 
-//
-//    srActive.Age++;
-//    srTrend.Age++;
-//    
-      //--- Calc session close events
-//
-//        if (IsLower(ActiveMid(),srActive.PriorMid))
-//          if (IsChanged(srTrend.TrendDir,DirectionDown))
-//            sEvent.SetEvent(NewTrend);
-//        
-//        if (IsHigher(ActiveMid(),srActive.PriorMid))
-//          if (IsChanged(srTrend.TrendDir,DirectionUp))
-//            sEvent.SetEvent(NewTrend);
-//            
-//        if (srTrend.TrendDir==DirectionUp)
-//          if (IsHigher(ActiveMid(),srTrend.Resistance))
-//            if (IsChanged(srTrend.OriginDir,srTrend.TrendDir))
-//              sEvent.SetEvent(NewReversal);
-//            else
-//              sEvent.SetEvent(NewBreakout);
-//          else
-//            sEvent.SetEvent(NewRally);
-//
-//        if (srTrend.TrendDir==DirectionDown)
-//          if (IsLower(ActiveMid(),srTrend.Support))
-//            if (IsChanged(srTrend.OriginDir,srTrend.TrendDir))
-//              sEvent.SetEvent(NewReversal);
-//            else
-//              sEvent.SetEvent(NewBreakout);
-//          else
-//            sEvent.SetEvent(NewPullback);
+    //-- Reset Active Record
+    srec[ActiveSession].Resistance     = srec[ActiveSession].High;
+    srec[ActiveSession].Support        = srec[ActiveSession].Low;
 
-    //-- Update Offsession Record
-    srec[PriorRec]                     = srec[ActiveRec];
-
-    srec[ActiveRec].Resistance         = srec[ActiveRec].High;
-    srec[ActiveRec].Support            = srec[ActiveRec].Low;
-
-    srec[ActiveRec].High               = High[sBar];
-    srec[ActiveRec].Low                = Low[sBar];
+    srec[ActiveSession].High           = High[sBar];
+    srec[ActiveSession].Low            = Low[sBar];
 
     sEvent.SetEvent(SessionClose);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateSession - Updates active pricing and sets range events     |
-//+------------------------------------------------------------------+
-void CSession::UpdateSession(void)
-  {      
-    SetActiveState();
-    
-    if (sEvent[NewState])
-      SetTermState();
   }
 
 //+------------------------------------------------------------------+
@@ -379,7 +375,7 @@ void CSession::LoadHistory(void)
     sBarHour                         = NoValue;
 
     //--- Initialize session records
-    for (RecordType type=ActiveRec;type<RecordTypes;type++)
+    for (SessionRecType type=ActiveSession;type<SessionRecTypes;type++)
     {
       srec[type].Direction           = DirectionNone;
       srec[type].Age                 = 0;
@@ -390,6 +386,10 @@ void CSession::LoadHistory(void)
       srec[type].Resistance          = High[sBar];
       srec[type].Support             = Low[sBar];
     }
+
+    //--- Initialize session records
+    for (TrendRecType type=trTerm;type<TrendRecTypes;type++)
+      trec[type]                     = Trend(NoValue);
 
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();
@@ -405,6 +405,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose)
     sHourOpen                       = HourOpen;
     sHourClose                      = HourClose;
     sSessionIsOpen                  = false;
+    sTradeBias                      = NoValue;
     
     sEvent                          = new CEvent();
 
@@ -443,13 +444,13 @@ void CSession::Update(void)
     //--- Clear events
     sEvent.ClearEvents();
 
-    //--- Test for New Day/New Hour
+    //--- Test for New Day; Force close
     if (IsChanged(sBarDay,TimeDay(Time[sBar])))
     {
-      if (sSessionIsOpen)
-        CloseSession();
-
       sEvent.SetEvent(NewDay);
+      
+      if (IsChanged(sSessionIsOpen,false))
+        CloseSession();
     }
     
     if (IsChanged(sBarHour,TimeHour(Time[sBar])))
@@ -462,7 +463,8 @@ void CSession::Update(void)
       else
         CloseSession();
 
-    UpdateSession();
+    SetActiveState();
+    SetTradeBias();
   }
   
 //+------------------------------------------------------------------+
@@ -486,27 +488,44 @@ bool CSession::IsOpen(void)
         
     return (false);
   }
-  
-//+------------------------------------------------------------------+
-//| TradeBias - returns the trade bias based on Time Period          |
-//+------------------------------------------------------------------+
-int CSession::TradeBias(void)
-  {
-    if (ActiveMid()>PriorMid())
-      return(OP_BUY);
 
-    if (ActiveMid()<PriorMid())
-      return(OP_SELL);
-      
+//+------------------------------------------------------------------+
+//| Trend - returns the requested trend record                       |
+//+------------------------------------------------------------------+
+TrendRec CSession::Trend(int Type)
+  {
+    static const TrendRec tRecord = {DirectionNone,NoValue,NoState,NoValue,NoValue};
+    
+    switch (Type)
+    {
+      case Term:          return (trec[trTerm]);
+      case Trend:         return (trec[trTrend]);
+      case Origin:        return (trec[trOrigin]);
+    }
+   
+    return (tRecord);
+  }
+     
+//+------------------------------------------------------------------+
+//| TradeBias - returns the formatted current trade bias             |
+//+------------------------------------------------------------------+
+int CSession::TradeBias(int Format=InAction)
+  {
+    switch (Format)
+    {
+      case InAction:       return(sTradeBias);
+      case InDirection:    return(Direction(sTradeBias,InAction));
+    }
+   
     return (NoValue);
   }
-
+     
 //+------------------------------------------------------------------+
 //| ActiveMid - returns the current active mid price (Fibo50)        |
 //+------------------------------------------------------------------+
 double CSession::ActiveMid(void)
   {
-    return(fdiv(srec[ActiveRec].High+srec[ActiveRec].Low,2,Digits));
+    return(fdiv(srec[ActiveSession].High+srec[ActiveSession].Low,2,Digits));
   }
   
 //+------------------------------------------------------------------+
@@ -514,15 +533,15 @@ double CSession::ActiveMid(void)
 //+------------------------------------------------------------------+
 double CSession::PriorMid(void)
   {
-    return(fdiv(srec[PriorRec].High+srec[PriorRec].Low,2,Digits));
+    return(fdiv(srec[PriorSession].High+srec[PriorSession].Low,2,Digits));
   }
   
 //+------------------------------------------------------------------+
-//| OffsessionMid - returns the offsession mid price (Fibo50)        |
+//| OffMid - returns the off session mid price (Fibo50)              |
 //+------------------------------------------------------------------+
-double CSession::OffsessionMid(void)
+double CSession::OffMid(void)
   {
-    return(fdiv(srec[OffsessionRec].High+srec[OffsessionRec].Low,2,Digits));
+    return(fdiv(srec[OffSession].High+srec[OffSession].Low,2,Digits));
   }
   
 //+------------------------------------------------------------------+
@@ -531,15 +550,16 @@ double CSession::OffsessionMid(void)
 void CSession::PrintSession(int Type)
   {  
     string psSessionInfo      = EnumToString(this.Type())+"|"
+                              + TimeToStr(Time[sBar])+"|"
+                              + BoolToStr(this.IsOpen(),"Open|","Closed|")
+                              + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                               + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")
                               + IntegerToString(srec[Type].Age)+"|"
                               + EnumToString(srec[Type].State)+"|"
                               + DoubleToStr(srec[Type].High,Digits)+"|"
                               + DoubleToStr(srec[Type].Low,Digits)+"|"
                               + DoubleToStr(srec[Type].Resistance,Digits)+"|"
-                              + DoubleToStr(srec[Type].Support,Digits)+"|"
-                              + DoubleToStr(srec[Type].Correction,Digits)+"|"
-                              + DoubleToStr(srec[Type].Hedge,Digits);
+                              + DoubleToStr(srec[Type].Support,Digits);
 
     Print(psSessionInfo);
   }
