@@ -266,6 +266,7 @@ void CSession::SetTermState(void)
 void CSession::SetActiveState(void)
   {
     ReservedWords stsState             = NoState;
+    ReservedWords stsHighState         = NoState;
     
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
@@ -280,6 +281,8 @@ void CSession::SetActiveState(void)
           stsState                     = Reversal;
         else
           stsState                     = Breakout;
+          
+      stsHighState                     = stsState;   //-- Need to preserve in the event of outside reversal
     }
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
@@ -296,7 +299,17 @@ void CSession::SetActiveState(void)
         else
           stsState                     = Breakout;
     }
-          
+    
+    if (sEvent[NewHigh] && sEvent[NewLow])
+      if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
+        if (srec[ActiveSession].Direction==DirectionUp)
+        {
+          stsState                     = stsHighState;
+          sEvent.ClearEvent(NewLow);
+        }
+        else
+          sEvent.ClearEvent(NewHigh);
+    
     if (NewState(srec[ActiveSession].State,stsState))
       sEvent.SetEvent(NewState);
   }
