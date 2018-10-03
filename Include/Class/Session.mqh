@@ -23,7 +23,7 @@ public:
              struct TrendRec
              {
                int            Direction;
-               int            Age;
+               int            Days;
                ReservedWords  State;
                double         Base;
                double         Root;
@@ -33,8 +33,8 @@ public:
              struct SessionRec
              {
                int            Direction;
-               int            Age;
                ReservedWords  State;
+               datetime       StateTime;
                int            BreakoutDir;
                double         High;
                double         Low;
@@ -233,7 +233,7 @@ void CSession::SetTermState(void)
   {
     if (IsChanged(trec[trTerm].Direction,Direction(ActiveMid()-PriorMid())))
     {
-      trec[trTerm].Age             = 0;
+      trec[trTerm].Days            = 0;
       
       if (trec[trTerm].Direction==DirectionUp)
         if (IsHigher(ActiveMid(),trec[trTerm].Base))
@@ -256,7 +256,7 @@ void CSession::SetTermState(void)
       trec[trTerm].State           = Breakout;
     }
 
-    trec[trTerm].Age++;
+    trec[trTerm].Days++;
     trec[trTerm].Root              = ActiveMid();
   }
 
@@ -282,7 +282,7 @@ void CSession::SetActiveState(void)
         else
           stsState                     = Breakout;
           
-      stsHighState                     = stsState;   //-- Need to preserve in the event of outside reversal
+      stsHighState                     = stsState;   //-- Retain high on outside reversal
     }
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
@@ -304,14 +304,14 @@ void CSession::SetActiveState(void)
       if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
         if (srec[ActiveSession].Direction==DirectionUp)
         {
-          stsState                     = stsHighState;
+          stsState                     = stsHighState;  //-- Outside reversal; use retained high
           sEvent.ClearEvent(NewLow);
         }
         else
           sEvent.ClearEvent(NewHigh);
     
     if (NewState(srec[ActiveSession].State,stsState))
-      sEvent.SetEvent(NewState);
+      srec[ActiveSession].StateTime    = Time[sBar];
   }
   
 //+------------------------------------------------------------------+
@@ -391,7 +391,6 @@ void CSession::LoadHistory(void)
     for (SessionRecType type=ActiveSession;type<SessionRecTypes;type++)
     {
       srec[type].Direction           = DirectionNone;
-      srec[type].Age                 = 0;
       srec[type].State               = NoState;
       srec[type].BreakoutDir         = DirectionNone;      
       srec[type].High                = High[sBar];
@@ -567,7 +566,7 @@ void CSession::PrintSession(int Type)
                               + BoolToStr(this.IsOpen(),"Open|","Closed|")
                               + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                               + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")
-                              + IntegerToString(srec[Type].Age)+"|"
+                              + TimeToStr(srec[Type].StateTime)+"|"
                               + EnumToString(srec[Type].State)+"|"
                               + DoubleToStr(srec[Type].High,Digits)+"|"
                               + DoubleToStr(srec[Type].Low,Digits)+"|"
