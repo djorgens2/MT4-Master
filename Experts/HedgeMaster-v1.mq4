@@ -64,6 +64,17 @@ void RefreshScreen(void)
   {
   }
 
+string EventText(void)
+  {
+    string etText    = ActionText(session[Daily].TradeBias());
+
+    for (EventType event=0;event<EventTypes;event++)
+      if (session[Daily].Event(event))
+        etText       += "\n"+EnumToString(event);
+        
+    return (etText);
+  }
+
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
@@ -73,8 +84,8 @@ void Execute(void)
 //      CallPause("Session Close");
 //    if (session[Daily].Event(NewDay))
 //      CallPause("NewDay");
-    if (session[Daily].Event(MarketCorrection))
-      CallPause("MarketCorrection");
+    if (session[Daily].Event(NewTerm))
+      CallPause("NewTerm\n"+EventText());
   }
 
 //+------------------------------------------------------------------+
@@ -117,12 +128,6 @@ int OnInit()
     ManualInit();
     
     session[Daily]        = new CSession(Daily,inpAsiaOpen,inpUSClose);
-    Print("Bad Trend Rec: "+DirText(session[Daily].Trend(NoValue).Direction)
-                           +IntegerToString(session[Daily].Trend(NoValue).Age)
-                           +EnumToString(session[Daily].Trend(NoValue).State)
-                           +DoubleToStr(session[Daily].Trend(NoValue).Base,Digits)
-                           +DoubleToStr(session[Daily].Trend(NoValue).Root,Digits)
-                           +DoubleToStr(session[Daily].Trend(NoValue).Expansion,Digits));
 
     return(INIT_SUCCEEDED);
   }
