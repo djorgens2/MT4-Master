@@ -198,6 +198,12 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbTermDir"+sessionIndex,session.Trend(Term).Direction,DirColor(session.Trend(Term).Direction),20);
       UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.Trend(Term).State),DirColor(session.Trend(Term).StateDir),8);
 
+      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend(Trend).Direction,DirColor(session.Trend(Trend).Direction),20);
+      UpdateLabel("lbTrendState"+sessionIndex,EnumToString(session.Trend(Trend).State),DirColor(session.Trend(Trend).StateDir),8);
+
+      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend(Origin).Direction,DirColor(session.Trend(Origin).Direction),20);
+      UpdateLabel("lbOriginState"+sessionIndex,EnumToString(session.Trend(Origin).State),DirColor(session.Trend(Origin).StateDir),8);
+
       if (session.Event(MarketCorrection))
         NewArrow(BoolToInt(session.TradeBias()==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
                  DirColor(session.TradeBias(InDirection),clrYellow,clrRed));

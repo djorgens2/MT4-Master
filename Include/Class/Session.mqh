@@ -53,6 +53,15 @@ public:
                SessionTypes
              };
 
+             //-- Trend Record Types
+             enum TrendRecType
+             {
+               trTerm,
+               trTrend,
+               trOrigin,
+               TrendRecTypes
+             };
+
              //-- Session Record Types
              enum SessionRecType
              {
@@ -83,21 +92,12 @@ public:
 
              int           TradeBias(int Format=InAction);
              void          PrintSession(int Type);
-             void          PrintTrend(int Type);
+             void          PrintTrend(TrendRecType Type);
              
              SessionRec    operator[](const int Type) const {return(srec[Type]);}
              
                                  
 private:
-
-             //-- Trend Record Types
-             enum TrendRecType
-             {
-               trTerm,
-               trTrend,
-               trOrigin,
-               TrendRecTypes
-             };
 
              //--- Private Class properties
              SessionType   sType;
@@ -132,9 +132,7 @@ private:
 
              void          UpdateTradeBias(void);
              void          UpdateActiveState(void);
-             void          UpdateTermState(void);
-             void          UpdateTrendState(void);
-             void          UpdateOriginState(void);
+             void          UpdateTrendState(TrendRecType Type);
 
              void          SetTermState(void);
              void          SetTrendState(void);
@@ -223,6 +221,13 @@ void CSession::UpdateTradeBias(void)
 //+------------------------------------------------------------------+
 void CSession::SetOriginState(void)
   {
+    if (trec[trOrigin].State==NoState)
+    {
+      trec[trOrigin]                 = trec[trTerm];
+      
+    }
+    else
+    {}
   }
 
 //+------------------------------------------------------------------+
@@ -230,6 +235,68 @@ void CSession::SetOriginState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTrendState(void)
   {
+    ReservedWords stsState          = trec[trTrend].State;
+    
+    if (trec[trTrend].State==NoState)
+    {
+      //-- Initialize first pass
+      trec[trTrend]                 = trec[trTerm];
+      
+      if (trec[trTrend].Direction==DirectionUp)
+        stsState                    = Rally;
+      else
+        stsState                    = Pullback;
+    }
+    else
+    if (IsHigher(PriorMid(),trec[trTrend].Root))
+    {
+      trec[trTrend].StateDir        = DirectionUp; 
+
+      //-- Handle up trends
+      if (IsChanged(trec[trTrend].Direction,DirectionUp))
+        stsState                    = Reversal;
+      else
+        stsState                    = Breakout;
+    }
+    else
+    if (IsLower(PriorMid(),trec[trTrend].Root))
+    {
+      trec[trTrend].StateDir        = DirectionDown; 
+
+      //-- Handle down trends
+      if (IsChanged(trec[trTrend].Direction,DirectionDown))
+        stsState                    = Reversal;
+      else
+        stsState                    = Breakout;
+    }
+    else
+    {
+      //-- Set in bounds trade state
+      if (trec[trTerm].Direction==DirectionUp)
+      {
+        stsState                    = Rally;
+        trec[trTrend].StateDir      = DirectionUp; 
+      }
+      else
+      {
+        stsState                    = Pullback;
+        trec[trTrend].StateDir      = DirectionDown; 
+      }
+    }
+    
+    if (NewState(trec[trTrend].State,stsState))
+      if (stsState==Breakout||stsState==Reversal)
+      {
+        trec[trTrend].Root          = trec[trTerm].Root;
+        
+        if (stsState==Reversal)
+          trec[trTrend].Base        = trec[trTerm].Base; 
+      }
+    
+          //PrintSession(ActiveSession);
+          //PrintSession(PriorSession);
+          //PrintTrend(trTerm);
+          PrintTrend(trTrend);
   }
   
 //+------------------------------------------------------------------+
@@ -237,7 +304,7 @@ void CSession::SetTrendState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTermState(void)
   {
-    if (IsChanged(trec[trTerm].Direction,Direction(ActiveMid()-PriorMid())))
+    if (IsChanged(trec[trTerm].Direction,TradeBias(InDirection)))
     {
       if (trec[trTerm].Direction==DirectionUp)
         if (IsHigher(ActiveMid(),trec[trTerm].Base))
@@ -267,56 +334,45 @@ void CSession::SetTermState(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTermState - Tests for inter-session term state changes     |
+//| UpdateTrendState - Tests for inter-session state changes         |
 //+------------------------------------------------------------------+
-void CSession::UpdateTermState(void)
+void CSession::UpdateTrendState(TrendRecType Type)
   {
+    EventType TrendEvent[TrendRecTypes] = {NewTerm,NewTrend,NewOrigin};
+    
     if (sEvent[MarketCorrection])
-    {
-//      Print(BoolToStr(this.TradeBias(InDirection)==DirectionUp,"UP","DOWN"));
-//      PrintTrend(trTerm);
-      
-      if (this.TradeBias(InDirection)==trec[trTerm].Direction)
+      if (this.TradeBias(InDirection)==trec[Type].Direction)
       {
-        trec[trTerm].State         = Recovery;
-        trec[trTerm].StateDir      = trec[trTerm].Direction;
+        trec[Type].State         = Recovery;
+        trec[Type].StateDir      = trec[Type].Direction;
       }
       else
       {
-        trec[trTerm].State         = Correction;
-        trec[trTerm].StateDir      = Direction(trec[trTerm].Direction,InDirection,InContrarian);
+        trec[Type].State         = Correction;
+        trec[Type].StateDir      = Direction(trec[Type].Direction,InDirection,InContrarian);
       }
-//      PrintTrend(trTerm);
+        
+    if (trec[Type].Direction==DirectionUp)
+    {
+      if (IsLower(this.ActiveMid(),trec[Type].Base,NoUpdate))
+        if (NewState(trec[Type].State,Reversal))
+          sEvent.SetEvent(TrendEvent[Type]);
+
+      if (IsHigher(this.ActiveMid(),trec[Type].Root,NoUpdate))
+        if (NewState(trec[Type].State,Breakout))
+          sEvent.SetEvent(TrendEvent[Type]);
     }
         
-    if (trec[trTerm].Direction==DirectionUp)
+    if (trec[Type].Direction==DirectionDown)
     {
-      if (IsLower(this.ActiveMid(),trec[trTerm].Base,NoUpdate))
-        if (NewState(trec[trTerm].State,Reversal))
-          sEvent.SetEvent(NewTerm);
+      if (IsLower(this.ActiveMid(),trec[Type].Root,NoUpdate))
+        if (NewState(trec[Type].State,Breakout))
+          sEvent.SetEvent(TrendEvent[Type]);
 
-      if (IsHigher(this.ActiveMid(),trec[trTerm].Root,NoUpdate))
-        if (NewState(trec[trTerm].State,Breakout))
-          sEvent.SetEvent(NewTerm);
-    }
-        
-    if (trec[trTerm].Direction==DirectionDown)
-    {
-      if (IsLower(this.ActiveMid(),trec[trTerm].Root,NoUpdate))
-        if (NewState(trec[trTerm].State,Breakout))
-          sEvent.SetEvent(NewTerm);
-
-      if (IsHigher(this.ActiveMid(),trec[trTerm].Base,NoUpdate))
-        if (NewState(trec[trTerm].State,Reversal))
-          sEvent.SetEvent(NewTerm);        
-    }
-    
-//    if (sEvent[MarketCorrection])
-//      PrintTrend(trTerm);
-      
-//    if (IsBetween(ActiveMid(),trec[trTerm].Base,trec[trTerm].Root))
-//      if (trec[trTerm].State==Breakout||trec[trTerm].State==Reversal)
-//        if (trec[trTerm].Di
+      if (IsHigher(this.ActiveMid(),trec[Type].Base,NoUpdate))
+        if (NewState(trec[Type].State,Reversal))
+          sEvent.SetEvent(TrendEvent[Type]);        
+    }    
   }
 
 //+------------------------------------------------------------------+
@@ -536,7 +592,9 @@ void CSession::Update(void)
 
     UpdateActiveState();
     UpdateTradeBias();
-    UpdateTermState();
+
+    for (TrendRecType type=trTerm;type<TrendRecTypes;type++)
+      UpdateTrendState(type);
   }
   
 //+------------------------------------------------------------------+
@@ -566,7 +624,7 @@ bool CSession::IsOpen(void)
 //+------------------------------------------------------------------+
 TrendRec CSession::Trend(int Type)
   {
-    static const TrendRec tRecord = {DirectionNone,NoValue,NoState,NoValue,NoValue};
+    TrendRec tRecord;
     
     switch (Type)
     {
@@ -574,7 +632,14 @@ TrendRec CSession::Trend(int Type)
       case Trend:         return (trec[trTrend]);
       case Origin:        return (trec[trOrigin]);
     }
-   
+
+    tRecord.Direction          = DirectionNone;
+    tRecord.Days               = NoValue;
+    tRecord.State              = NoState;
+    tRecord.StateDir           = DirectionNone;
+    tRecord.Base               = NoValue;
+    tRecord.Root               = NoValue;
+    
     return (tRecord);
   }
      
@@ -639,14 +704,15 @@ void CSession::PrintSession(int Type)
 //+------------------------------------------------------------------+
 //| PrintTrend - Prints Trend Record details                         |
 //+------------------------------------------------------------------+
-void CSession::PrintTrend(int Type)
+void CSession::PrintTrend(TrendRecType Type)
   {  
     string psTrendInfo        = EnumToString(this.Type())+"|"
+                              + EnumToString(Type)+"|"
                               + TimeToStr(Time[sBar])+"|"
                               + BoolToStr(this.IsOpen(),"Open|","Closed|")
                               + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                               + BoolToStr(trec[Type].Direction==DirectionUp,"Long|","Short|")
-                              + TimeToStr(trec[Type].Days)+"|"
+                              + IntegerToString(trec[Type].Days)+"|"
                               + EnumToString(trec[Type].State)+"|"
                               + BoolToStr(trec[Type].StateDir==DirectionUp,"Long|","Short|")
                               + DoubleToStr(trec[Type].Base,Digits)+"|"
