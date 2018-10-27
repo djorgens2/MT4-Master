@@ -36,8 +36,10 @@ public:
                int            Direction;
                ReservedWords  State;
                int            BreakoutDir;
+               double         Open;
                double         High;
                double         Low;
+               double         Close;
                double         Support;
                double         Resistance;
              };
@@ -104,6 +106,7 @@ private:
              bool          sSessionIsOpen;
              int           sTradeBias;             //--- stored as action
              ReservedWords sTradeState;            //--- Normal, Correction, Recovery
+             int           sHourDir;               //--- Hourly direction
 
              int           sHourOpen;
              int           sHourClose;
@@ -257,7 +260,7 @@ void CSession::SetTrendState(void)
       trec[trTrend].StateDir        = DirectionUp; 
 
       //-- Handle up trends
-      if (IsC  hanged(trec[trTrend].Direction,DirectionUp))
+      if (IsChanged(trec[trTrend].Direction,DirectionUp))
         stsState                    = Reversal;
       else
         stsState                    = Breakout;
@@ -274,12 +277,12 @@ void CSession::SetTrendState(void)
         stsState                    = Breakout;
     }
 
-    if (trec[trTrend].State!=stsState)
-        Print("Should be a New State:"+EnumToString(stsState)+"|"+EnumToString(trec[trTrend].State));
+//    if (trec[trTrend].State!=stsState)
+//        Print("Should be a New State:"+EnumToString(stsState)+"|"+EnumToString(trec[trTrend].State));
     
     if (NewState(trec[trTrend].State,stsState))
     {
-        Print(BoolToStr(sEvent[NewState],"New State:","Not NS:")+EnumToString(stsState));
+//        Print(BoolToStr(sEvent[NewState],"New State:","Not NS:")+EnumToString(stsState));
       if (stsState==Breakout||stsState==Reversal)
       {
         trec[trTrend].Root          = ActiveMid();
@@ -288,11 +291,11 @@ void CSession::SetTrendState(void)
     }
           //PrintSession(ActiveSession);
           //PrintSession(PriorSession);
-          PrintTrend(trTerm);
-          PrintTrend(trTerm,Prior);
+//          PrintTrend(trTerm);
+//          PrintTrend(trTerm,Prior);
 
-          PrintTrend(trTrend);
-          PrintTrend(trTrend,Prior);
+//          PrintTrend(trTrend);
+//          PrintTrend(trTrend,Prior);
   }
   
 //+------------------------------------------------------------------+
@@ -351,7 +354,7 @@ void CSession::UpdateTrendState(TrendRecType Type)
     if (trec[Type].Direction==DirectionUp)
     {
       if (IsLower(this.ActiveMid(),ptrec[Type].Base,NoUpdate))
-        if (NewDirection(trec[Type].Direction,
+//        if (NewDirection(trec[Type].Direction,
         if (NewState(trec[Type].State,Reversal))
           sEvent.SetEvent(TrendEvent[Type]);
 
@@ -413,6 +416,7 @@ void CSession::UpdateSession(void)
     }
     
     if (sEvent[NewHigh] && sEvent[NewLow])
+    {
       if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
         if (srec[ActiveSession].Direction==DirectionUp)
         {
@@ -421,7 +425,11 @@ void CSession::UpdateSession(void)
         }
         else
           sEvent.ClearEvent(NewHigh);
+    }
     
+    if (sEvent[NewBoundary])          
+      srec[ActiveSession].Close        = ActiveMid();
+
     if (NewState(srec[ActiveSession].State,stsState))
       sStateTime                       = Time[sBar];
   }
@@ -443,6 +451,7 @@ void CSession::OpenSession(void)
     sPriorMidBuffer.SetValue(sBar,PriorMid());
 
     //-- Reset Active Record
+    srec[ActiveSession].Open           = ActiveMid();
     srec[ActiveSession].High           = High[sBar];
     srec[ActiveSession].Low            = Low[sBar];
 
@@ -461,7 +470,7 @@ void CSession::CloseSession(void)
     SetOriginState();
     
     //-- Update Prior Record
-    srec[PriorSession]                     = srec[ActiveSession];
+    srec[PriorSession]                 = srec[ActiveSession];
 
     //-- Reset Active Record
     srec[ActiveSession].Resistance     = srec[ActiveSession].High;
@@ -512,6 +521,14 @@ void CSession::LoadHistory(void)
     }
 
     //--- Initialize session records
+    //--- *** May need to modify this if the sbar Open==Close
+    if (IsEqual(Open[sBar],Close[sBar]))
+    {
+      Print ("Freak anomaly: aborting due to sbar(Open==Close)");
+      ExpertRemove();
+      return;
+    }
+    else
     for (TrendRecType type=trTerm;type<TrendRecTypes;type++)
     {
       trec[type].State               = NoState;
@@ -616,6 +633,20 @@ void CSession::Update(void)
 
     for (TrendRecType type=trTerm;type<TrendRecTypes;type++)
       UpdateTrendState(type);
+      
+    if (sEvent[NewHour])
+    {
+      int prevHourDir = sHourDir;
+      if (NewDirection(sHourDir,Direction(srec[ActiveSession].Close-srec[ActiveSession].Open)))
+      {
+        Print ("NewHour Directional:"+BoolToStr(prevHourDir==DirectionUp,"Long","Short")+" to "+BoolToStr(sHourDir==DirectionUp,"Long","Short"));
+        ObjectCreate("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sHourDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sHourDir==DirectionUp,clrYellow,clrRed));
+      }
+      
+      PrintSession(ActiveSession);
+    }
   }
   
 //+------------------------------------------------------------------+
@@ -696,10 +727,13 @@ void CSession::PrintSession(int Type)
                               + BoolToStr(this.IsOpen(),"Open|","Closed|")
                               + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                               + TimeToStr(sStateTime)+"|"
+                              + DoubleToStr(ActiveMid(),Digits)+"|"
                               + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")
                               + EnumToString(srec[Type].State)+"|"
+                              + DoubleToStr(srec[Type].Open,Digits)+"|"
                               + DoubleToStr(srec[Type].High,Digits)+"|"
                               + DoubleToStr(srec[Type].Low,Digits)+"|"
+                              + DoubleToStr(srec[Type].Close,Digits)+"|"
                               + DoubleToStr(srec[Type].Resistance,Digits)+"|"
                               + DoubleToStr(srec[Type].Support,Digits);
 
@@ -721,6 +755,7 @@ void CSession::PrintTrend(TrendRecType Type, int Measure=Active)
                               + TimeToStr(Time[sBar])+"|"
                               + BoolToStr(this.IsOpen(),"Open|","Closed|")
                               + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
+                              + DoubleToStr(ActiveMid(),Digits)+"|"
                               + BoolToStr(ptRec.Direction==DirectionUp,"Long|","Short|")
                               + IntegerToString(ptRec.Days)+"|"
                               + EnumToString(ptRec.State)+"|"

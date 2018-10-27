@@ -56,7 +56,7 @@ input DataPosition   inpShowData        = dpNone;          // Indicator data pos
 const color          AsiaColor          = C'0,32,0';       // Asia session box color
 const color          EuropeColor        = C'48,0,0';       // Europe session box color
 const color          USColor            = C'0,0,56';       // US session box color
-const color          DailyColor         = C'64,64,0';      // US session box color
+const color          DailyColor         = C'64,64,0';      // US session box color;
 
 CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose);
 
