@@ -36,10 +36,10 @@ public:
                int            Direction;
                ReservedWords  State;
                int            BreakoutDir;
-               double         Open;
+               double         ActiveOpen;
+               double         ActiveClose;
                double         High;
                double         Low;
-               double         Close;
                double         Support;
                double         Resistance;
              };
@@ -91,7 +91,9 @@ public:
              
              TrendRec      Trend(TrendRecType Type);
 
-             int           TradeBias(int Format=InAction);
+             int           TrendBias(int Format=InAction);
+             int           HourlyBias(int Format=InAction);
+
              void          PrintSession(int Type);
              void          PrintTrend(TrendRecType Type, int Measure=Active);
              
@@ -104,9 +106,8 @@ private:
              SessionType   sType;
              
              bool          sSessionIsOpen;
-             int           sTradeBias;             //--- stored as action
-             ReservedWords sTradeState;            //--- Normal, Correction, Recovery
-             int           sHourDir;               //--- Hourly direction
+             int           sTrendBias;             //--- Trend action
+             int           sHourlyBias;            //--- Hourly action
 
              int           sHourOpen;
              int           sHourClose;
@@ -134,7 +135,7 @@ private:
 
              void          LoadHistory(void);
 
-             void          UpdateTradeBias(void);
+             void          UpdateBiases(void);
              void          UpdateTrendState(TrendRecType Type);
 
              void          SetTermState(void);
@@ -203,20 +204,32 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
   }
     
 //+------------------------------------------------------------------+
-//| UpdateTradeBias - returns the trade bias on the tick             |
+//| UpdateBiases - returns the trade bias on the tick                |
 //+------------------------------------------------------------------+
-void CSession::UpdateTradeBias(void)
+void CSession::UpdateBiases(void)
   {
-    int stbTradeBias        = sTradeBias;
+    int stbTrendBias        = sTrendBias;
   
     if (ActiveMid()>PriorMid())
-      stbTradeBias          = OP_BUY;
+      stbTrendBias          = OP_BUY;
 
     if (ActiveMid()<PriorMid())
-      stbTradeBias          = OP_SELL;
+      stbTrendBias          = OP_SELL;
       
-    if (IsChanged(sTradeBias,stbTradeBias))
+    if (IsChanged(sTrendBias,stbTrendBias))
       sEvent.SetEvent(MarketCorrection);
+      
+    if (sEvent[NewHour])
+    {
+      if (IsChanged(sHourlyBias,Action(srec[ActiveSession].ActiveClose-srec[ActiveSession].ActiveOpen,InDirection)))
+      {
+        ObjectCreate("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sHourlyBias==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sHourlyBias==OP_BUY,clrYellow,clrRed));
+      }
+      
+      PrintSession(ActiveSession);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -303,7 +316,7 @@ void CSession::SetTrendState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTermState(void)
   {
-    if (IsChanged(trec[trTerm].Direction,TradeBias(InDirection)))
+    if (IsChanged(trec[trTerm].Direction,TrendBias(InDirection)))
     {
       if (trec[trTerm].Direction==DirectionUp)
         if (IsHigher(ActiveMid(),trec[trTerm].Base))
@@ -340,7 +353,7 @@ void CSession::UpdateTrendState(TrendRecType Type)
     EventType TrendEvent[TrendRecTypes] = {NewTerm,NewTrend,NewOrigin};
     
     if (sEvent[MarketCorrection])
-      if (this.TradeBias(InDirection)==trec[Type].Direction)
+      if (this.TrendBias(InDirection)==trec[Type].Direction)
       {
         trec[Type].State         = Recovery;
         trec[Type].StateDir      = trec[Type].Direction;
@@ -415,6 +428,7 @@ void CSession::UpdateSession(void)
           stsState                     = Breakout;
     }
     
+    //-- Apply outside reversal correction possible only during historical analysis
     if (sEvent[NewHigh] && sEvent[NewLow])
     {
       if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
@@ -428,7 +442,7 @@ void CSession::UpdateSession(void)
     }
     
     if (sEvent[NewBoundary])          
-      srec[ActiveSession].Close        = ActiveMid();
+      srec[ActiveSession].ActiveClose  = ActiveMid();
 
     if (NewState(srec[ActiveSession].State,stsState))
       sStateTime                       = Time[sBar];
@@ -451,7 +465,7 @@ void CSession::OpenSession(void)
     sPriorMidBuffer.SetValue(sBar,PriorMid());
 
     //-- Reset Active Record
-    srec[ActiveSession].Open           = ActiveMid();
+    srec[ActiveSession].ActiveOpen     = ActiveMid();
     srec[ActiveSession].High           = High[sBar];
     srec[ActiveSession].Low            = Low[sBar];
 
@@ -535,25 +549,25 @@ void CSession::LoadHistory(void)
 
       if (Close[sBar]<Open[sBar])
       {
-        trec[type].Direction        = DirectionDown;
-        trec[type].Days             = 0;
-        trec[type].State            = Pullback;
-        trec[type].StateDir         = DirectionDown;
-        trec[type].Base             = High[sBar];
-        trec[type].Root             = Low[sBar];
+        trec[type].Direction         = DirectionDown;
+        trec[type].Days              = 0;
+        trec[type].State             = Pullback;
+        trec[type].StateDir          = DirectionDown;
+        trec[type].Base              = High[sBar];
+        trec[type].Root              = Low[sBar];
       }
       
       if (Close[sBar]>Open[sBar])
       {
-        trec[type].Direction        = DirectionUp;
-        trec[type].Days             = 0;
-        trec[type].State            = Rally;
-        trec[type].StateDir         = DirectionUp;
-        trec[type].Base             = Low[sBar];
-        trec[type].Root             = High[sBar];
+        trec[type].Direction         = DirectionUp;
+        trec[type].Days              = 0;
+        trec[type].State             = Rally;
+        trec[type].StateDir          = DirectionUp;
+        trec[type].Base              = Low[sBar];
+        trec[type].Root              = High[sBar];
       }
       
-      ptrec[type]                   = trec[type];
+      ptrec[type]                    = trec[type];
     }
 
     for(sBar=Bars-1;sBar>0;sBar--)
@@ -566,23 +580,23 @@ void CSession::LoadHistory(void)
 CSession::CSession(SessionType Type, int HourOpen, int HourClose)
   {
     //--- Init global session values
-    sType                           = Type;
-    sHourOpen                       = HourOpen;
-    sHourClose                      = HourClose;
-    sSessionIsOpen                  = false;
-    sTradeBias                      = NoValue;
+    sType                            = Type;
+    sHourOpen                        = HourOpen;
+    sHourClose                       = HourClose;
+    sSessionIsOpen                   = false;
+    sTrendBias                       = NoValue;
     
-    sEvent                          = new CEvent();
+    sEvent                           = new CEvent();
 
-    sOffMidBuffer                   = new CArrayDouble(Bars);
-    sOffMidBuffer.Truncate          = false;
-    sOffMidBuffer.AutoExpand        = true;    
+    sOffMidBuffer                    = new CArrayDouble(Bars);
+    sOffMidBuffer.Truncate           = false;
+    sOffMidBuffer.AutoExpand         = true;    
     sOffMidBuffer.SetPrecision(Digits);
     sOffMidBuffer.Initialize(0.00);
     
-    sPriorMidBuffer                 = new CArrayDouble(Bars);
-    sPriorMidBuffer.Truncate        = false;
-    sPriorMidBuffer.AutoExpand      = true;
+    sPriorMidBuffer                  = new CArrayDouble(Bars);
+    sPriorMidBuffer.Truncate         = false;
+    sPriorMidBuffer.AutoExpand       = true;
     sPriorMidBuffer.SetPrecision(Digits);
     sPriorMidBuffer.Initialize(0.00);
     
@@ -629,24 +643,10 @@ void CSession::Update(void)
         CloseSession();
 
     UpdateSession();
-    UpdateTradeBias();
+    UpdateBiases();
 
     for (TrendRecType type=trTerm;type<TrendRecTypes;type++)
-      UpdateTrendState(type);
-      
-    if (sEvent[NewHour])
-    {
-      int prevHourDir = sHourDir;
-      if (NewDirection(sHourDir,Direction(srec[ActiveSession].Close-srec[ActiveSession].Open)))
-      {
-        Print ("NewHour Directional:"+BoolToStr(prevHourDir==DirectionUp,"Long","Short")+" to "+BoolToStr(sHourDir==DirectionUp,"Long","Short"));
-        ObjectCreate("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sHourDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sHourDir==DirectionUp,clrYellow,clrRed));
-      }
-      
-      PrintSession(ActiveSession);
-    }
+      UpdateTrendState(type);      
   }
   
 //+------------------------------------------------------------------+
@@ -680,14 +680,28 @@ TrendRec CSession::Trend(TrendRecType Type)
   }
      
 //+------------------------------------------------------------------+
-//| TradeBias - returns the formatted current trade bias             |
+//| TradeBias - returns the formatted current trend bias             |
 //+------------------------------------------------------------------+
-int CSession::TradeBias(int Format=InAction)
+int CSession::TrendBias(int Format=InAction)
   {
     switch (Format)
     {
-      case InAction:       return(sTradeBias);
-      case InDirection:    return(Direction(sTradeBias,InAction));
+      case InAction:       return(sTrendBias);
+      case InDirection:    return(Direction(sTrendBias,InAction));
+    }
+   
+    return (NoValue);
+  }
+     
+//+------------------------------------------------------------------+
+//| HourlyBias - returns the formatted current hourly bias           |
+//+------------------------------------------------------------------+
+int CSession::HourlyBias(int Format=InAction)
+  {
+    switch (Format)
+    {
+      case InAction:       return(sHourlyBias);
+      case InDirection:    return(Direction(sHourlyBias,InAction));
     }
    
     return (NoValue);
@@ -728,14 +742,18 @@ void CSession::PrintSession(int Type)
                               + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                               + TimeToStr(sStateTime)+"|"
                               + DoubleToStr(ActiveMid(),Digits)+"|"
-                              + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")
+                              + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")                              
                               + EnumToString(srec[Type].State)+"|"
-                              + DoubleToStr(srec[Type].Open,Digits)+"|"
+                              + DoubleToStr(srec[Type].ActiveOpen,Digits)+"|"
                               + DoubleToStr(srec[Type].High,Digits)+"|"
                               + DoubleToStr(srec[Type].Low,Digits)+"|"
-                              + DoubleToStr(srec[Type].Close,Digits)+"|"
+                              + DoubleToStr(srec[Type].ActiveClose,Digits)+"|"
                               + DoubleToStr(srec[Type].Resistance,Digits)+"|"
-                              + DoubleToStr(srec[Type].Support,Digits);
+                              + DoubleToStr(srec[Type].Support,Digits)+"|"
+                              + "(Bias/Hr/Brk):"+"|"
+                              + BoolToStr(sTrendBias==OP_BUY,"Long|","Short|")
+                              + BoolToStr(sHourlyBias==OP_BUY,"Long|","Short|")
+                              + BoolToStr(srec[Type].BreakoutDir==DirectionUp,"Long|","Short|");
 
     Print(psSessionInfo);
   }

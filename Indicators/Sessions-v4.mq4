@@ -191,7 +191,7 @@ void RefreshScreen(int Bar=0)
     
     if (inpShowData>dpNone)
     {
-      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TradeBias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.TrendBias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,DirColor(session[ActiveSession].Direction),20);
       UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].BreakoutDir),8);
             
@@ -205,8 +205,8 @@ void RefreshScreen(int Bar=0)
       UpdateLabel("lbOriginState"+sessionIndex,EnumToString(session.Trend(trOrigin).State),DirColor(session.Trend(trOrigin).StateDir),8);
 
       if (session.Event(MarketCorrection))
-        NewArrow(BoolToInt(session.TradeBias()==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-                 DirColor(session.TradeBias(InDirection),clrYellow,clrRed));
+        NewArrow(BoolToInt(session.TrendBias()==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+                 DirColor(session.TrendBias(InDirection),clrYellow,clrRed));
 
 
 //      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
