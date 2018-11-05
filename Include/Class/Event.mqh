@@ -33,7 +33,7 @@ protected:
                   NewDivergence,
                   NewHigh,
                   NewLow,
-                  NewBias,
+                  NewTradeBias,
                   NewBoundary,
                   NewAggregate,
                   NewBreakout,

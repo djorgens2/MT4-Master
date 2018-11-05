@@ -92,7 +92,7 @@ public:
              TrendRec      Trend(TrendRecType Type);
 
              int           TrendBias(int Format=InAction);
-             int           HourlyBias(int Format=InAction);
+             int           ActiveBias(int Format=InAction);
 
              void          PrintSession(int Type);
              void          PrintTrend(TrendRecType Type, int Measure=Active);
@@ -107,7 +107,7 @@ private:
              
              bool          sSessionIsOpen;
              int           sTrendBias;             //--- Trend action
-             int           sHourlyBias;            //--- Hourly action
+             int           sActiveBias;            //--- Active action
 
              int           sHourOpen;
              int           sHourClose;
@@ -219,17 +219,28 @@ void CSession::UpdateBiases(void)
     if (IsChanged(sTrendBias,stbTrendBias))
       sEvent.SetEvent(MarketCorrection);
       
-    if (sEvent[NewHour])
+    if (IsChanged(sActiveBias,Action(srec[ActiveSession].ActiveClose-srec[ActiveSession].ActiveOpen,InDirection)))
+      sEvent.SetEvent(NewTradeBias);
+      
+    if (sBar>0)
     {
-      if (IsChanged(sHourlyBias,Action(srec[ActiveSession].ActiveClose-srec[ActiveSession].ActiveOpen,InDirection)))
+      if (sEvent[MarketCorrection])
+      {
+        ObjectCreate("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
+        ObjectSet("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,SYMBOL_RIGHTPRICE);
+        ObjectSet("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sTrendBias==OP_BUY,clrYellow,clrRed));
+      }
+
+      if (sEvent[NewTradeBias])
       {
         ObjectCreate("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sHourlyBias==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sHourlyBias==OP_BUY,clrYellow,clrRed));
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sActiveBias==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
+        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sActiveBias==OP_BUY,clrYellow,clrRed));
       }
-      
-      PrintSession(ActiveSession);
     }
+ 
+    if (sEvent[NewHour])
+      PrintSession(ActiveSession);
   }
 
 //+------------------------------------------------------------------+
@@ -694,14 +705,14 @@ int CSession::TrendBias(int Format=InAction)
   }
      
 //+------------------------------------------------------------------+
-//| HourlyBias - returns the formatted current hourly bias           |
+//| ActiveBias - returns the formatted current hourly bias           |
 //+------------------------------------------------------------------+
-int CSession::HourlyBias(int Format=InAction)
+int CSession::ActiveBias(int Format=InAction)
   {
     switch (Format)
     {
-      case InAction:       return(sHourlyBias);
-      case InDirection:    return(Direction(sHourlyBias,InAction));
+      case InAction:       return(sActiveBias);
+      case InDirection:    return(Direction(sActiveBias,InAction));
     }
    
     return (NoValue);
@@ -752,7 +763,7 @@ void CSession::PrintSession(int Type)
                               + DoubleToStr(srec[Type].Support,Digits)+"|"
                               + "(Bias/Hr/Brk):"+"|"
                               + BoolToStr(sTrendBias==OP_BUY,"Long|","Short|")
-                              + BoolToStr(sHourlyBias==OP_BUY,"Long|","Short|")
+                              + BoolToStr(sActiveBias==OP_BUY,"Long|","Short|")
                               + BoolToStr(srec[Type].BreakoutDir==DirectionUp,"Long|","Short|");
 
     Print(psSessionInfo);
