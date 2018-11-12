@@ -67,13 +67,20 @@ void CFibonacci::LoadHistory(void)
     int lhHighBar                    = iHighest(Symbol(),0,MODE_HIGH,fSeed,fBars-fSeed);
     int lhLowBar                     = iLowest(Symbol(),0,MODE_LOW,fSeed,fBars-fSeed);
 
-    fiboTermDir                      = Direction(lhLowBar-lhHighBar);    
+    if (lhLowBar==lhHighBar)
+    {
+      fiboTermDir                    = Direction(Close[lhLowBar]-Open[lhHighBar]);
+      fEvent.SetEvent(NewReversal);
+    }
+    else
+      fiboTermDir                    = Direction(lhLowBar-lhHighBar);
+    
     
     if (fiboTermDir==DirectionUp)
     {
       //-- Initialize uptrend
       fiboTermRoot                   = Low[lhLowBar];
-      fiboTermBase                   = High[iHighest(Symbol(),0,MODE_HIGH,(fBars-lhLowBar)+1,lhLowBar)];
+      fiboTermBase                   = High[iHighest(Symbol(),0,MODE_HIGH,(fBars-lhLowBar)+1,lhLowBar+1)];
       fiboTermHigh                   = High[lhHighBar];
       
       //-- Test for breakout-in-progress; set accurate retrace
@@ -87,7 +94,7 @@ void CFibonacci::LoadHistory(void)
     {
       //-- Initialize downtrend
       fiboTermRoot                   = High[lhHighBar];
-      fiboTermBase                   = Low[iLowest(Symbol(),0,MODE_LOW,(fBars-lhHighBar)+1,lhHighBar)];
+      fiboTermBase                   = Low[iLowest(Symbol(),0,MODE_LOW,(fBars-lhHighBar)+1,lhHighBar+1)];
       fiboTermLow                    = Low[lhLowBar];
 
       //-- Test for breakout-in-progress; set accurate retrace
@@ -99,13 +106,14 @@ void CFibonacci::LoadHistory(void)
     else
     {
       //-- Initialize outside reversal
+    
     }
     
     Print("lb:"+IntegerToString(lhLowBar)+" hb:"+IntegerToString(lhHighBar)+" fseed agg:"+IntegerToString(fBars-fSeed)+" fBars:"+IntegerToString(fBars)+" fSeed:"+IntegerToString(fSeed));
     
     if (fiboTermDir==DirectionUp)
     {
-      NewArrow(SYMBOL_ARROWDOWN,clrYellow,"lBase",fiboTermBase,iHighest(Symbol(),0,MODE_HIGH,(fBars-lhLowBar)+1,lhLowBar));
+      NewArrow(SYMBOL_ARROWDOWN,clrYellow,"lBase",fiboTermBase,iHighest(Symbol(),0,MODE_HIGH,(fBars-lhLowBar)+1,lhLowBar+1));
       NewArrow(SYMBOL_ARROWUP,clrYellow,"lRoot",fiboTermRoot,lhLowBar);
       NewArrow(SYMBOL_ARROWDOWN,clrYellow,"lExpansion",fiboTermHigh,lhHighBar);
       NewArrow(SYMBOL_ARROWUP,clrYellow,"lRetrace",fiboTermLow,BoolToInt(lhHighBar-(fBars-fSeed)==0,lhHighBar,iLowest(Symbol(),0,MODE_LOW,lhHighBar-(fBars-fSeed),fBars-fSeed)));
@@ -113,7 +121,7 @@ void CFibonacci::LoadHistory(void)
     else
     if (fiboTermDir==DirectionDown)
     {
-      NewArrow(SYMBOL_ARROWUP,clrRed,"lBase",fiboTermBase,iLowest(Symbol(),0,MODE_LOW,(fBars-lhHighBar)+1,lhHighBar));
+      NewArrow(SYMBOL_ARROWUP,clrRed,"lBase",fiboTermBase,iLowest(Symbol(),0,MODE_LOW,(fBars-lhHighBar)+1,lhHighBar+1));
       NewArrow(SYMBOL_ARROWDOWN,clrRed,"lRoot",fiboTermRoot,lhHighBar);
       NewArrow(SYMBOL_ARROWUP,clrRed,"lExpansion",fiboTermLow,lhLowBar);
       NewArrow(SYMBOL_ARROWDOWN,clrRed,"lRetrace",fiboTermHigh,BoolToInt(lhLowBar-(fBars-fSeed)==0,lhLowBar,iHighest(Symbol(),0,MODE_HIGH,lhLowBar-(fBars-fSeed),fBars-fSeed)));
