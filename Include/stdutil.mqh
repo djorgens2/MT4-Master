@@ -45,7 +45,6 @@
 #define InAction              9      //--- Stated as an Action
 #define InState              10      //--- State definition
 
-
 //--- Boolean format defines
 #define InTrueFalse          11      //--- Stated as True or False
 #define InYesNo              12      //--- Stated as Yes or No
@@ -188,7 +187,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Pivot,
                   Major,
                   Minor,
-                  Fibonacci,
                   Peg,
                   Origin,
                   Active,
