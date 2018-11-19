@@ -28,10 +28,10 @@ void RefreshScreen(void)
   {
     string rsComment;
     
-    rsComment   = "Fibo Term: (b) "+DoubleToStr(fibo[Term].Base,Digits)
-                  +" (r) "+DoubleToStr(fibo[Term].Root,Digits)
-                  +" (h) "+DoubleToStr(fibo[Term].High,Digits)
-                  +" (l) "+DoubleToStr(fibo[Term].Low,Digits)+"\n";
+    rsComment   = "Fibo Term: (b) "+DoubleToStr(fibo[Term].Price[feBase],Digits)
+                  +" (r) "+DoubleToStr(fibo[Term].Price[feRoot],Digits)
+                  +" (h) "+DoubleToStr(fibo[Term].Price[feHigh],Digits)
+                  +" (l) "+DoubleToStr(fibo[Term].Price[feLow],Digits)+"\n";
                   
     rsComment   = "(TmLE) Now: "+DoubleToStr(fibo.Fibonacci(Term,Linear,Now,InPercent),2)
                   +"%  Expansion: "+DoubleToStr(fibo.Fibonacci(Term,Linear,Max,InPercent),2)
