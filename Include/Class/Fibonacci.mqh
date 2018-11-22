@@ -84,29 +84,42 @@ private:
 void CFibonacci::LoadHistory(void)
   {
     int    lhStart                   = fBars-fSeed;
-    int    lhFiboDir                 = DirectionNone;
-    double lhHigh                    = High[fBars];
-    double lhLow                     = Low[fBars];
-    
-    //-- Initialize starting Term Price:Age arrays
-    ArrayInitialize(fRec[Term].Price,NoValue);
-    ArrayInitialize(fRec[Term].Age,NoValue);
-    
-    //-- Calculate starting Term Expansion
-    fRec[Term].Age[feHigh]           = iHighest(Symbol(),0,MODE_HIGH,fSeed,fBars-fSeed);
-    fRec[Term].Age[feLow]            = iLowest(Symbol(),0,MODE_LOW,fSeed,fBars-fSeed);
-
-    //-- Initialize starting Term direction
-    if (fRec[Term].Age[feLow]==fRec[Term].Age[feHigh])         //-- Opening outside reversal test
-      fRec[Term].Direction           = Direction(Close[fRec[Term].Age[feLow]]-Open[fRec[Term].Age[feHigh]]);  
+    int    lhHighBar                 = iHighest(Symbol(),0,MODE_HIGH,fSeed,lhStart);
+    int    lhLowBar                  = iLowest(Symbol(),0,MODE_LOW,fSeed,lhStart);
+    int    lhDir                     = Direction(Close[lhLowBar]-Open[lhHighBar]);
+   
+    //-- Compute major fractal points
+    if (lhDir==DirectionUp)
+    {
+      fRec[Term].Age[feRoot]         = lhLowBar;
+      fRec[Term].Age[feHigh]         = lhHighBar;
+      fRec[Term].Age[feBase]         = iHighest(Symbol(),0,MODE_HIGH,fBars-lhLowBar+1,lhLowBar);
+      
+      fRec[Term].Price[feRoot]       = Low[lhLowBar];
+      fRec[Term].Price[feHigh]       = High[lhHighBar];
+      fRec[Term].Price[feBase]       = High[fRec[Term].Age[feBase]];      
+    }
     else
-      fRec[Term].Direction           = Direction(fRec[Term].Age[feLow]-fRec[Term].Age[feHigh]);
+    {
+      fRec[Term].Age[feRoot]         = lhHighBar;
+      fRec[Term].Age[feLow]          = lhLowBar;
+      fRec[Term].Age[feBase]         = iLowest(Symbol(),0,MODE_LOW,fBars-lhHighBar+1,lhHighBar);
+      
+      fRec[Term].Price[feRoot]       = High[lhHighBar];
+      fRec[Term].Price[feHigh]       = Low[lhLowBar];
+      fRec[Term].Price[feBase]       = Low[fRec[Term].Age[feBase]];      
+    }
     
+    if (fdiv(fabs(fRec[Term].Price[feBase]-fRec[Term].Price[feRoot]),High[lhHighBar]-Low[lhLowBar])<FiboPercent(Fibo50))
+    {
+      fRec[Term].Age[feBase]       = fBars;
+      fRec[Term].Price[feBase]     = fdiv(High[lhHighBar]-Low[lhLowBar],2,Digits);
+    }
 
 //    //-- Initialize opening fibo points
 //    if (fRec[Term].Direction==DirectionUp)        //-- Initialize uptrend
 //    {
-//      fRec[Term].Age[feBase]         = iHighest(Symbol(),0,MODE_HIGH,(fBars-fRec[Term].Age[feLow])+1,fRec[Term].Age[feLow]+1);
+
 //      fRec[Term].Age[feRoot]         = fRec[Term].Age[feLow];
 //      fRec[Term].Age[feLow]          = iLowest(Symbol(),0,MODE_LOW,fRec[Term].Age[feHigh]-(fBars-fSeed),fBars-fSeed);
 //      fRec[Term].Age[feRally]        = iHighest(Symbol(),0,MODE_HIGH,fRec[Term].Age[feLow]-(fBars-fSeed),fBars-fSeed);
