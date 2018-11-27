@@ -82,126 +82,20 @@ private:
 //| LoadHistory - Prepopulate historical data and events             |
 //+------------------------------------------------------------------+
 void CFibonacci::LoadHistory(void)
-  {
-    int    lhStart                   = fBars-fSeed;
-    int    lhHighBar                 = iHighest(Symbol(),0,MODE_HIGH,fSeed,lhStart);
-    int    lhLowBar                  = iLowest(Symbol(),0,MODE_LOW,fSeed,lhStart);
-    int    lhDir                     = Direction(Close[lhLowBar]-Open[lhHighBar]);
-   
-    //-- Compute major fractal points
-    if (lhDir==DirectionUp)
-    {
-      fRec[Term].Age[feRoot]         = lhLowBar;
-      fRec[Term].Age[feHigh]         = lhHighBar;
-      fRec[Term].Age[feBase]         = iHighest(Symbol(),0,MODE_HIGH,fBars-lhLowBar+1,lhLowBar);
-      
-      fRec[Term].Price[feRoot]       = Low[lhLowBar];
-      fRec[Term].Price[feHigh]       = High[lhHighBar];
-      fRec[Term].Price[feBase]       = High[fRec[Term].Age[feBase]];      
-    }
-    else
-    {
-      fRec[Term].Age[feRoot]         = lhHighBar;
-      fRec[Term].Age[feLow]          = lhLowBar;
-      fRec[Term].Age[feBase]         = iLowest(Symbol(),0,MODE_LOW,fBars-lhHighBar+1,lhHighBar);
-      
-      fRec[Term].Price[feRoot]       = High[lhHighBar];
-      fRec[Term].Price[feHigh]       = Low[lhLowBar];
-      fRec[Term].Price[feBase]       = Low[fRec[Term].Age[feBase]];      
-    }
+  {   
+    fRec[Term].Direction             = NoDirection;
     
-    if (fdiv(fabs(fRec[Term].Price[feBase]-fRec[Term].Price[feRoot]),High[lhHighBar]-Low[lhLowBar])<FiboPercent(Fibo50))
-    {
-      fRec[Term].Age[feBase]       = fBars;
-      fRec[Term].Price[feBase]     = fdiv(High[lhHighBar]-Low[lhLowBar],2,Digits);
-    }
-
-//    //-- Initialize opening fibo points
-//    if (fRec[Term].Direction==DirectionUp)        //-- Initialize uptrend
-//    {
-
-//      fRec[Term].Age[feRoot]         = fRec[Term].Age[feLow];
-//      fRec[Term].Age[feLow]          = iLowest(Symbol(),0,MODE_LOW,fRec[Term].Age[feHigh]-(fBars-fSeed),fBars-fSeed);
-//      fRec[Term].Age[feRally]        = iHighest(Symbol(),0,MODE_HIGH,fRec[Term].Age[feLow]-(fBars-fSeed),fBars-fSeed);
-//      fRec[Term].Age[fePullback]     = iLowest(Symbol(),0,MODE_LOW,fRec[Term].Age[feRally]-(fBars-fSeed),fBars-fSeed);
-//    }
-//    else
-//    if (fRec[Term].Direction==DirectionDown)      //-- Initialize downtrend
-//    {
-//      fRec[Term].Age[feBase]         = iLowest(Symbol(),0,MODE_LOW,(fBars-fRec[Term].Age[feHigh])+1,fRec[Term].Age[feHigh]+1);
-//      fRec[Term].Age[feRoot]         = fRec[Term].Age[feHigh];
-//      fRec[Term].Age[feHigh]         = iHighest(Symbol(),0,MODE_HIGH,fRec[Term].Age[feLow]-(fBars-fSeed),fBars-fSeed);
-//      fRec[Term].Age[fePullback]     = iLowest(Symbol(),0,MODE_LOW,fRec[Term].Age[feHigh]-(fBars-fSeed)-1,fBars-fSeed);
-//      Print ("Time PB:"+TimeToStr(Time[fRec[Term].Age[fePullback]])+" Age:"+IntegerToString(fRec[Term].Age[fePullback]));
-//      fRec[Term].Age[feRally]        = iHighest(Symbol(),0,MODE_HIGH,fRec[Term].Age[fePullback]-(fBars-fSeed)-1,fBars-fSeed);
-//    }
-//    
-//    lhFiboDir                        = fRec[Term].Direction;
-//    
-//    for (FiboElement elem=feBase;elem<FiboElements;elem++)
-//    {
-//      if (fRec[Term].Age[elem]-(fBars-fSeed)==0)             //-- Set retrace based on opening breakout pattern
-//        fRec[Term].Price[feLow]      = Close[fRec[Term].Age[elem]];
-//      else
-//      if (lhFiboDir==DirectionUp)
-//      {
-//        fRec[Term].Price[elem]       = High[fRec[Term].Age[elem]];
-//        NewArrow(SYMBOL_ARROWDOWN,DirColor(fRec[Term].Direction,clrYellow,clrRed),EnumToString(elem),fRec[Term].Price[elem],fRec[Term].Age[elem]);
-//      }
-//      else
-//      {
-//        fRec[Term].Price[elem]       = Low[fRec[Term].Age[elem]];
-//        NewArrow(SYMBOL_ARROWUP,DirColor(fRec[Term].Direction,clrYellow,clrRed),EnumToString(elem),fRec[Term].Price[elem],fRec[Term].Age[elem]);
-//      }
-//      
-//      lhFiboDir                     *= DirectionInverse;
-//    }
-
-    fRec[Trend]                      = fRec[Term];
+    ArrayInitialize(fRec[Term].Age,NoValue);
+    ArrayInitialize(fRec[Term].Price,NoValue);
     
-    for (fBar=fBars-fSeed;fBar<fBars;fBar--)
-      break;
+    fRec[Trend].Direction            = NoDirection;
 
-    string rsComment;
+    ArrayInitialize(fRec[Trend].Age,NoValue);
+    ArrayInitialize(fRec[Trend].Price,NoValue);
     
-    rsComment   = "Fibo Term: (b) "+DoubleToStr(fRec[Term].Price[feBase],Digits)
-                  +" (r) "+DoubleToStr(fRec[Term].Price[feRoot],Digits)
-                  +" (h) "+DoubleToStr(fRec[Term].Price[feHigh],Digits)
-                  +" (l) "+DoubleToStr(fRec[Term].Price[feLow],Digits)
-                  +" (c) "+DoubleToStr(Close[fBar],Digits)+"\n";
-
-                  
-    rsComment  += "(TmLE) Now: "+DoubleToStr(this.Fibonacci(Term,Linear,Now,InPercent),2)
-                  +"%  Expansion: "+DoubleToStr(this.Fibonacci(Term,Linear,Max,InPercent),2)
-                  +"%  Retrace: "+DoubleToStr(this.Fibonacci(Term,Linear,Min,InPercent),2)+"%\n";
-                  
-    rsComment  += "(TmGE) Now: "+DoubleToStr(this.Fibonacci(Term,Geometric,Now,InPercent),2)
-                  +"%  Expansion: "+DoubleToStr(this.Fibonacci(Term,Geometric,Max,InPercent),2)
-                  +"%  Retrace: "+DoubleToStr(this.Fibonacci(Term,Geometric,Min,InPercent),2)+"%";
-
-    Comment(rsComment);
-
-//    {
-//      fEvent.ClearEvents();
-//      
-//      if (IsHigher(High[fBar],fRec[Term].High))
-//        fEvent.SetEvent(NewHigh);
-//        
-//      if (IsLower(Low[fBar],fRec[Term].Low))
-//        fEvent.SetEvent(NewLow);
-//        
-//      if (fEvent[NewHigh]&&fEvent[NewLow])  //-- Handle outside reversal
-//      {
-//        if (NewDirection(fRec[Term].Dir,Direction(Close[fBar]-Open[fBar])))
-//          fEvent.SetEvent(NewReversal);
-//        else
-//          fEvent.SetEvent(NewBreakout);
-//      }
-//      else
-//      if (fEvent[NewHigh])
-//        if (
-//      
-//    }
+    //-- Iterate thru seed to identify opening fractal
+    for (fBar==fBars;fBar>fBars-fSeed;fBar--)
+      Update();
   }
 
 //+------------------------------------------------------------------+
@@ -235,6 +129,34 @@ CFibonacci::~CFibonacci()
     delete fEvent;
     delete fBuffer;
   }
+  
+
+//+------------------------------------------------------------------+
+//| Fibonacci Class Destructor                                       |
+//+------------------------------------------------------------------+
+CFibonacci::Update(void)
+  {
+    fEvent.ClearEvents();
+   
+    if (IsHigher(High[fBar],fRec[Term].High))
+      fEvent.SetEvent(NewHigh);
+     
+    if (IsLower(Low[fBar],fRec[Term].Low))
+      fEvent.SetEvent(NewLow);
+     
+    if (fEvent[NewHigh]&&fEvent[NewLow])  //-- Handle outside reversal
+    {
+      if (NewDirection(fRec[Term].Dir,Direction(Close[fBar]-Open[fBar])))
+        fEvent.SetEvent(NewReversal);
+      else
+        fEvent.SetEvent(NewBreakout);
+    }
+    else
+   if (fEvent[NewHigh])
+     if (
+   
+ }
+
   
 //+------------------------------------------------------------------+
 //| Fibonacci - Returns the Fibonacci calc based on measure type     |
