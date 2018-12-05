@@ -26,8 +26,7 @@ protected:
                     {
                       feBase,
                       feRoot,
-                      feHigh,
-                      feLow,
+                      feExpansion,
                       feRally,
                       fePullback,
                       FiboElements
@@ -37,6 +36,7 @@ protected:
                     struct FiboRec 
                     {
                       int         Direction;
+                      int         State;
                       double      Price[FiboElements];
                       int         Age[FiboElements];
                     };
@@ -72,6 +72,13 @@ private:
                     int           fBar;          //-- Current bar
                     int           fBars;         //-- Total bars
                     int           fSeed;         //-- History seed (default: 24 periods)
+
+                    double        fBase;         //--
+                    double        fMaxHigh;      //-- Root/Expansion value
+                    double        fMaxLow;       //-- Root/Expansion value
+                    double        fMinHigh;      //-- Rally/Retrace value
+                    double        fMinLow;       //-- Rally/Retrace value
+                    double        fDivergence;   //-- Last timed divergence
                      
                     CArrayDouble *fBuffer;
                     CEvent       *fEvent;
