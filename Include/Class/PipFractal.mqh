@@ -36,6 +36,8 @@ class CPipFractal : public CPipRegression
                        double     Root;                 //--- Current root
                        double     Expansion;            //--- Current expansion
                        double     Retrace;              //--- Current retrace
+                       
+                       int        Count;                //--- Total consecutive states
                      };
     
           //--- Operational variables
@@ -46,13 +48,13 @@ class CPipFractal : public CPipRegression
           double     pfPegMax;                          //--- Max price after peg
           double     pfPegMin;                          //--- Min price after peg
           double     pfPegExpansion;                    //--- Expansion price at peg      
-          int        pfTrendCount;                      //--- Counts trend continuations
-          int        pfTermCount;                       //--- Counts term changes
+          int        pfState;                           //--- Current state of the fractal
                      
           double     NewFractalRoot(RetraceType Type);  //--- Updates fractal price points
           void       UpdateFractal(RetraceType Type, int Direction);
           void       CalcPipFractal(void);
           void       CalcFiboChange(void);
+          void       CalcState(void);
           
 
     public:
@@ -129,14 +131,26 @@ double CPipFractal::NewFractalRoot(RetraceType Type)
 
     switch (Type)
     {
-      case Trend: pfTrendCount  = 1;
-                  pfTermCount   = 0;
+      case Trend: pf[Trend].Count  = 1;
+                  pf[Term].Count   = 0;
                   break;
 
-      case Term:  pfTermCount++;
+      case Term:  pf[Term].Count++;
     }
     
     return (pf[Type].Root);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateState - updates state data for the supplied type           |
+//+------------------------------------------------------------------+
+void CPipFractal::CalcState(void)
+  {
+    int usState          = pfState;
+    
+//    if (Fibonacci(Type,Max,Expansion)>FiboPercent(Fibo161))
+      //if (pf[Type].d
+
   }
 
 //+------------------------------------------------------------------+
@@ -199,8 +213,8 @@ void CPipFractal::UpdateFractal(RetraceType Type, int Direction)
             
           pf[Trend].Base             = pfPegExpansion;
           
-          pfTrendCount++;
-          pfTermCount                = 0;
+          pf[Trend].Count++;
+          pf[Term].Count             = 0;
         }
 
         pfPeg                        = false;
@@ -244,10 +258,11 @@ void CPipFractal::CalcPipFractal(void)
   {
     int      uTermDir               = DirectionNone;
     int      uTrendDir              = DirectionNone;
+    int      uState                 = NoState;
 
     //--- Clear fractal events
     ClearEvent(NewTerm);
-    ClearEvent(NewTrend);    
+    ClearEvent(NewTrend);
 
     //--- Detect term change
     if (Event(NewBoundary))
@@ -333,8 +348,8 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, CFractal &Fr
     pfPegMax                 = fmax(pf[Trend].Root,pf[Trend].Base);
     pfPegMin                 = fmin(pf[Trend].Root,pf[Trend].Base);
 
-    pfTrendCount             = 0;
-    pfTermCount              = 0;
+    pf[Trend].Count          = 0;
+    pf[Term].Count           = 0;
   }
 
 //+------------------------------------------------------------------+
@@ -384,8 +399,8 @@ int CPipFractal::Count(int Counter)
   {
     switch (Counter)
     {
-      case Term:           return (pfTermCount);
-      case Trend:          return (pfTrendCount);
+      case Term:           return (pf[Term].Count);
+      case Trend:          return (pf[Trend].Count);
       case History:        return (pipHistory.Count);
     }
     
@@ -440,20 +455,20 @@ double CPipFractal::Price(int TimeRange, int Measure=Expansion)
 //+------------------------------------------------------------------+
 //| Fibonacci - Returns the fibonacci percentage for supplied params |
 //+------------------------------------------------------------------+
-double CPipFractal::Fibonacci(int TimeRange, int Method, int Measure, int Format=InDecimal)
+double CPipFractal::Fibonacci(int Type, int Method, int Measure, int Format=InDecimal)
   {
     int fFormat   = 1;
     
     if (Format == InPercent)
       fFormat     = 100;
       
-    if (TimeRange==Origin)
+    if (Type==Origin)
       switch (Method)
       {
         case Retrace:   switch (Measure)
                         {
-                          case Now: return (fdiv(this.Price(Origin,Base)-Close[0],this.Price(Origin,Base)-this.Price(Origin,Root),3)*fFormat);
-                          case Max: return (fdiv(this.Price(Origin,Base)-this.Price(Origin,Retrace),this.Price(Origin,Base)-this.Price(Origin,Root),3)*fFormat);
+                          case Now: return (fdiv(this.Price(Origin,Expansion)-Close[0],this.Price(Origin,Expansion)-this.Price(Origin,Root),3)*fFormat);
+                          case Max: return (fdiv(this.Price(Origin,Expansion)-this.Price(Origin,Retrace),this.Price(Origin,Expansion)-this.Price(Origin,Root),3)*fFormat);
                         }
                         return (0.00);
         case Expansion: switch (Measure)
@@ -464,20 +479,20 @@ double CPipFractal::Fibonacci(int TimeRange, int Method, int Measure, int Format
                         return (0.00);
       }
     
-    if (TimeRange==Term || TimeRange==Trend)
+    if (Type==Term || Type==Trend)
       switch (Method)
       {
         case Retrace:   switch (Measure)
                         {
-                          case Now: return (fabs(fdiv(Close[0]-pf[TimeRange].Expansion,pf[TimeRange].Root-pf[TimeRange].Expansion,3))*fFormat);
-                          case Max: return (fabs(fdiv(pf[TimeRange].Retrace-pf[TimeRange].Expansion,pf[TimeRange].Root-pf[TimeRange].Expansion,3))*fFormat);
+                          case Now: return (fabs(fdiv(Close[0]-pf[Type].Expansion,pf[Type].Root-pf[Type].Expansion,3))*fFormat);
+                          case Max: return (fabs(fdiv(pf[Type].Retrace-pf[Type].Expansion,pf[Type].Root-pf[Type].Expansion,3))*fFormat);
                         }
                         break;
                           
         case Expansion: switch (Measure)
                         {
-                          case Now: return (fabs(fdiv(pf[TimeRange].Root-Close[0],pf[TimeRange].Root-pf[TimeRange].Base,3))*fFormat);
-                          case Max: return (fabs(fdiv(pf[TimeRange].Root-pf[TimeRange].Expansion,pf[TimeRange].Root-pf[TimeRange].Base,3))*fFormat);
+                          case Now: return (fdiv(pf[Type].Root-Close[0],pf[Type].Root-pf[Type].Base,3)*fFormat);
+                          case Max: return (fabs(fdiv(pf[Type].Root-pf[Type].Expansion,pf[Type].Base-pf[Type].Root,3))*fFormat);
                         }
       }
 

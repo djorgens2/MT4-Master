@@ -33,6 +33,7 @@ input int    inpRangeMin        = 60;    // Minimum fractal pip range
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    fractal.Update();
     pfractal.Update();
 
   }
@@ -42,17 +43,17 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdateLine("pfBaseT",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
-    UpdateLine("pfRootT",pfractal[Term].Root,STYLE_DASH,clrSteelBlue);
-    UpdateLine("pfExpansionT",pfractal[Term].Expansion,STYLE_DASH,clrFireBrick);
+//    UpdateLine("pfBaseT",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
+//    UpdateLine("pfRootT",pfractal[Term].Root,STYLE_DASH,clrSteelBlue);
+//    UpdateLine("pfExpansionT",pfractal[Term].Expansion,STYLE_DASH,clrFireBrick);
 
     UpdateLine("pfBase",pfractal[Trend].Base,STYLE_SOLID,clrGoldenrod);
     UpdateLine("pfRoot",pfractal[Trend].Root,STYLE_SOLID,clrSteelBlue);
     UpdateLine("pfExpansion",pfractal[Trend].Expansion,STYLE_SOLID,clrFireBrick);
-
-    UpdateLine("pfBaseO",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
-    UpdateLine("pfRootO",pfractal.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
-    UpdateLine("pfExpansionO",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
+//
+//    UpdateLine("pfBaseO",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
+//    UpdateLine("pfRootO",pfractal.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
+//    UpdateLine("pfExpansionO",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
   }
 
 //+------------------------------------------------------------------+
