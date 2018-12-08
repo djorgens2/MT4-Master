@@ -20,7 +20,7 @@ input bool   inpShowFibo        = true;  // Display lines and fibonacci points
 input bool   inpShowComment     = false; // Display fibonacci data in Comment
 
 input string fractalHeader      = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax        = 120;    // Maximum fractal pip range
+input int    inpRangeMax        = 120;   // Maximum fractal pip range
 input int    inpRangeMin        = 60;    // Minimum fractal pip range
 
 //--- Class defs
@@ -52,7 +52,7 @@ void RefreshScreen(void)
     UpdateLine("pfExpansion",pfractal[Trend].Expansion,STYLE_SOLID,clrFireBrick);
 //
 //    UpdateLine("pfBaseO",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
-//    UpdateLine("pfRootO",pfractal.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
+//    UpdateLine("pfRootO",pfractal.Pr.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
 //    UpdateLine("pfExpansionO",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
   }
 

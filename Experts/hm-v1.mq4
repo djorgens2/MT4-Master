@@ -9,9 +9,23 @@
 #property strict
 
 #include <manual.mqh>
-#include <Class/Fibonacci.mqh>
+#include <Class\PipFractal.mqh>
 
-  CFibonacci       *fibo                = new CFibonacci(24);
+//--- Input params
+input string PipMAHeader        = "";    //+------ PipMA inputs ------+
+input int    inpDegree          = 6;     // Degree of poly regression
+input int    inpPeriods         = 200;   // Number of poly regression periods
+input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
+input bool   inpShowFibo        = true;  // Display lines and fibonacci points
+input bool   inpShowComment     = false; // Display fibonacci data in Comment
+
+input string fractalHeader      = "";    //+------ Fractal inputs ------+
+input int    inpRangeMax        = 120;   // Maximum fractal pip range
+input int    inpRangeMin        = 60;    // Minimum fractal pip range
+
+//--- Class defs
+  CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
+  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
 
 
 //+------------------------------------------------------------------+
@@ -19,6 +33,8 @@
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    fractal.Update();
+    pfractal.Update();
   }
 
 //+------------------------------------------------------------------+
@@ -26,22 +42,7 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string rsComment;
-    
-    rsComment   = "Fibo Term: (b) "+DoubleToStr(fibo[Term].Price[feBase],Digits)
-                  +" (r) "+DoubleToStr(fibo[Term].Price[feRoot],Digits)
-                  +" (h) "+DoubleToStr(fibo[Term].Price[feHigh],Digits)
-                  +" (l) "+DoubleToStr(fibo[Term].Price[feLow],Digits)+"\n";
-                  
-    rsComment   = "(TmLE) Now: "+DoubleToStr(fibo.Fibonacci(Term,Linear,Now,InPercent),2)
-                  +"%  Expansion: "+DoubleToStr(fibo.Fibonacci(Term,Linear,Max,InPercent),2)
-                  +"%  Retrace: "+DoubleToStr(fibo.Fibonacci(Term,Linear,Min,InPercent),2)+"%\n";
-                  
-    rsComment  += "(TmGE) Now: "+DoubleToStr(fibo.Fibonacci(Term,Geometric,Now,InPercent),2)
-                  +"%  Expansion: "+DoubleToStr(fibo.Fibonacci(Term,Geometric,Max,InPercent),2)
-                  +"%  Retrace: "+DoubleToStr(fibo.Fibonacci(Term,Geometric,Min,InPercent),2)+"%";
-
-    Comment(rsComment);
+    pfractal.RefreshScreen();
   }
 
 //+------------------------------------------------------------------+
@@ -49,6 +50,16 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    static int eMajorDir   = DirectionNone;
+    static int eMinorDir   = DirectionNone;
+    
+    if (pfractal.Event(NewMinor))
+      if (IsChanged(eMinorDir,pfractal.Direction(Term)))
+        SendMail("New Minor ("+DirText(eMinorDir)+")","HM-V2 has detected a new minor trend");
+
+    if (pfractal.Event(NewMajor))
+      if (IsChanged(eMajorDir,pfractal.Direction(Term)))
+        SendMail("New Major ("+DirText(eMajorDir)+")","HM-V2 has detected a new major trend");
   }
 
 //+------------------------------------------------------------------+
@@ -75,7 +86,7 @@ void OnTick()
     OrderMonitor();
     GetData(); 
 
-//    RefreshScreen();
+    RefreshScreen();
     
     if (AutoTrade())
       Execute();
@@ -99,5 +110,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete fibo;
+    delete fractal;
+    delete pfractal;
   }
