@@ -12,6 +12,10 @@
 #include <Class\PipFractal.mqh>
 
 //--- Input params
+input string appHeader          = "";    //+------ Application inputs ------+
+//input int    inpShowLines       = 120;   // Maximum fractal pip range
+//input int    inpRangeMin        = 60;    // Minimum fractal pip range
+
 input string PipMAHeader        = "";    //+------ PipMA inputs ------+
 input int    inpDegree          = 6;     // Degree of poly regression
 input int    inpPeriods         = 200;   // Number of poly regression periods
@@ -23,10 +27,12 @@ input string fractalHeader      = "";    //+------ Fractal inputs ------+
 input int    inpRangeMax        = 120;   // Maximum fractal pip range
 input int    inpRangeMin        = 60;    // Minimum fractal pip range
 
+
 //--- Class defs
   CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
 
+int hmShowLineType              = NoValue;
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
@@ -35,7 +41,6 @@ void GetData(void)
   {
     fractal.Update();
     pfractal.Update();
-
   }
 
 //+------------------------------------------------------------------+
@@ -43,17 +48,30 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-//    UpdateLine("pfBaseT",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
-//    UpdateLine("pfRootT",pfractal[Term].Root,STYLE_DASH,clrSteelBlue);
-//    UpdateLine("pfExpansionT",pfractal[Term].Expansion,STYLE_DASH,clrFireBrick);
+  
+    switch (hmShowLineType)
+    {
+      case Term:       UpdateLine("pfBase",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
+                       UpdateLine("pfRoot",pfractal[Term].Root,STYLE_DASH,clrSteelBlue);
+                       UpdateLine("pfExpansion",pfractal[Term].Expansion,STYLE_DASH,clrFireBrick);
+                       break;
+      
+      case Trend:      UpdateLine("pfBase",pfractal[Trend].Base,STYLE_SOLID,clrGoldenrod);
+                       UpdateLine("pfRoot",pfractal[Trend].Root,STYLE_SOLID,clrSteelBlue);
+                       UpdateLine("pfExpansion",pfractal[Trend].Expansion,STYLE_SOLID,clrFireBrick);
+                       break;
+                       
+      case Origin:     UpdateLine("pfBase",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
+                       UpdateLine("pfRoot",pfractal.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
+                       UpdateLine("pfExpansion",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
+                       break;
 
-    UpdateLine("pfBase",pfractal[Trend].Base,STYLE_SOLID,clrGoldenrod);
-    UpdateLine("pfRoot",pfractal[Trend].Root,STYLE_SOLID,clrSteelBlue);
-    UpdateLine("pfExpansion",pfractal[Trend].Expansion,STYLE_SOLID,clrFireBrick);
-//
-//    UpdateLine("pfBaseO",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
-//    UpdateLine("pfRootO",pfractal.Pr.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
-//    UpdateLine("pfExpansionO",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
+      default:         UpdateLine("pfBase",0.00,STYLE_DOT,clrNONE);
+                       UpdateLine("pfRoot",0.00,STYLE_DOT,clrNONE);
+                       UpdateLine("pfExpansionSQL",0.00,STYLE_DOT,clrNONE);
+                       break;
+    }
+
   }
 
 //+------------------------------------------------------------------+
@@ -61,6 +79,17 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    static int eMajorDir   = DirectionNone;
+    static int eMinorDir   = DirectionNone;
+    
+    if (pfractal.Event(NewMinor))
+      if (IsChanged(eMinorDir,pfractal.Direction(Term)))
+        SendMail("New Minor ("+DirText(eMinorDir)+")","HM-V2 has detected a new minor trend");
+
+    if (pfractal.Event(NewMajor))
+      if (IsChanged(eMajorDir,pfractal.Direction(Term)))
+        SendMail("New Major ("+DirText(eMajorDir)+")","HM-V2 has detected a new major trend");
+
   }
 
 //+------------------------------------------------------------------+
@@ -68,6 +97,20 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    if (Command[0] == "SHOW")
+      if (Command[1] == "LINE")
+      {
+         hmShowLineType    = NoValue;
+
+         if (Command[2] == "ORIGIN")
+           hmShowLineType    = Origin;
+
+         if (Command[2] == "TREND")
+           hmShowLineType    = Trend;
+
+         if (Command[2] == "TERM")
+           hmShowLineType    = Term;
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -106,14 +149,6 @@ int OnInit()
     NewLine("pfRoot");
     NewLine("pfExpansion");
 
-    NewLine("pfBaseT");
-    NewLine("pfRootT");
-    NewLine("pfExpansionT");
-
-    NewLine("pfBaseO");
-    NewLine("pfRootO");
-    NewLine("pfExpansionO");
-
     return(INIT_SUCCEEDED);
   }
 
@@ -122,5 +157,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   
+    delete pfractal;
+    delete fractal;   
   }
