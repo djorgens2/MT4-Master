@@ -32,7 +32,26 @@ input int    inpRangeMin        = 60;    // Minimum fractal pip range
   CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
 
-int hmShowLineType              = NoValue;
+  enum PivotState {
+                    NewOrder,
+                    NewHedge,
+                    TakeProfit,
+                    TakeLoss
+                  };
+                  
+  struct PivotRec {
+                    int         Action;
+                    int         Direction;
+                    PivotState  State;
+                    double      Price;
+                    datetime    Time;
+                 };
+
+  PivotRec          pr;                
+
+  int               hmShowLineType = NoValue;
+  int               hmTradeBias    = OP_NO_ACTION;
+  int               hmTradeDir     = DirectionNone;
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
@@ -48,7 +67,8 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-  
+    UpdateLine("lnPivot",pr.Price,STYLE_SOLID,clrWhite);
+    
     switch (hmShowLineType)
     {
       case Term:       UpdateLine("pfBase",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
@@ -71,7 +91,87 @@ void RefreshScreen(void)
                        UpdateLine("pfExpansionSQL",0.00,STYLE_DOT,clrNONE);
                        break;
     }
+  }
 
+//+------------------------------------------------------------------+
+//| PivotDeviation - Current pivot deviation                         |
+//+------------------------------------------------------------------+
+double PivotDeviation(void)
+  {
+    if (hmTradeDir==DirectionUp)
+      return (Close[0]-pr.Price);
+      
+    if (hmTradeDir==DirectionDown)
+      return (pr.Price-Close[0]);
+      
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| SetPivot - Moves the pivot based on the most recent action       |
+//+------------------------------------------------------------------+
+void SetPivot(int Action, PivotState State, double Price)
+  {
+    pr.Action      = Action;
+    pr.Direction   = Direction(Action,InAction);
+    pr.State       = State;
+    pr.Price       = Price;
+    pr.Time        = TimeCurrent();
+  }
+
+//+------------------------------------------------------------------+
+//| OrderCheck - verifies order margin requirements and position     |
+//+------------------------------------------------------------------+
+void OrderCheck(int Action, PivotState State, string Reason)
+  {
+    if (OpenOrder(Action,Reason))
+      SetPivot(Action,State,ordOpen.Price);
+  }
+
+//+------------------------------------------------------------------+
+//| EquityCheck - lot diversity micro manager                        |
+//+------------------------------------------------------------------+
+void EquityCheck(void)
+  {
+    string ecComment         = "";
+    
+    if (LotCount(OP_BUY,Loss)>0.00)
+      if (LotValue(OP_BUY,Lowest,InEquity)<-ordEQMinTarget)
+        ecComment            = "Long";
+        //Pause("Check your Long positions","Equity Check");
+
+    if (LotCount(OP_SELL,Loss)>0.00)
+      if (LotValue(OP_SELL,Lowest,InEquity)<-ordEQMinTarget)
+        Append(ecComment,"Short","\\");
+        //Pause("Check your Short positions","Equity Check");
+
+    if (StringLen(ecComment)>0)
+      ecComment              ="Check your "+ecComment+" Positions";
+    else
+      ecComment              = "OK";
+      
+    UpdateLabel("lbEQCheck",ecComment,BoolToInt(ecComment=="OK",clrLawnGreen,clrRed),16);
+  }
+
+//+------------------------------------------------------------------+
+//| EventCheck - Scan for entry/exit positions                       |
+//+------------------------------------------------------------------+
+void EventCheck(int Event)
+  {
+    switch (Event)
+    {
+      case Term:         hmTradeDir      = pfractal[Term].Direction;
+                         hmTradeBias     = BoolToInt(pfractal[Term].Direction==DirectionUp,OP_BUY,OP_SELL);
+
+                         NewArrow(BoolToInt(hmTradeDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),DirColor(pfractal[Term].Direction,clrYellow,clrRed),"TermTrigger");
+                         OrderCheck(hmTradeBias,NewOrder,"Term Trigger");
+                         //Pause("New minor detected","Minor Trigger");
+                         break;
+      case Minor:
+      case Major:
+      case Trend:
+      case Divergent:    break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -79,16 +179,26 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    static int eMajorDir   = DirectionNone;
-    static int eMinorDir   = DirectionNone;
-    
     if (pfractal.Event(NewMinor))
-      if (IsChanged(eMinorDir,pfractal.Direction(Term)))
-        SendMail("New Minor ("+DirText(eMinorDir)+")","HM-V2 has detected a new minor trend");
-
+      if (pfractal.Event(NewTerm))
+        EventCheck(Term);
+      else
+        EventCheck(Minor); // "New minor checkpoint detected","Minor Checkpoint");
+        //ResetTrigger(Term);
+    else
     if (pfractal.Event(NewMajor))
-      if (IsChanged(eMajorDir,pfractal.Direction(Term)))
-        SendMail("New Major ("+DirText(eMajorDir)+")","HM-V2 has detected a new major trend");
+      if (pfractal.Event(NewTrend))
+        EventCheck(Trend); // "New major detected","Major Trigger");
+      else
+        EventCheck(Major); // "New fractal detected","Fractal Trigger");
+        //ResetTrigger(Trend);
+    else
+    if (pfractal.Event(NewTerm))
+      EventCheck(Divergent); // "New divergence detected","Divergence Trigger");
+    else
+    if (pfractal.Event(NewBoundary))
+      EquityCheck();
+        
 
   }
 
@@ -98,7 +208,7 @@ void Execute(void)
 void ExecAppCommands(string &Command[])
   {
     if (Command[0] == "SHOW")
-      if (Command[1] == "LINE")
+      if (StringSubstr(Command[1],0,4) == "LINE")
       {
          hmShowLineType    = NoValue;
 
@@ -149,6 +259,9 @@ int OnInit()
     NewLine("pfRoot");
     NewLine("pfExpansion");
 
+    NewLabel("lbEQCheck","",5,20);
+    NewLine("lnPivot");
+    
     return(INIT_SUCCEEDED);
   }
 

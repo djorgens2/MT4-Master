@@ -131,25 +131,25 @@ void RefreshScreen()
     //---Fibonacci data
     UpdateLabel("lrFibo tm(e)",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Term)),16);
     UpdateLabel("lrFibo tm(e)x",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tm(e)d",DoubleToStr(fabs(pfractal.Fibonacci(Term,Expansion,Max,InPercent)-pfractal.Fibonacci(Term,Expansion,Now,InPercent)),1),DirColor(pfractal.Direction(Term)),8);
+    UpdateLabel("lrFibo tm(e)n",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Term)),8);
     UpdateLabel("lrFibo tr(e)",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Trend)),16);
     UpdateLabel("lrFibo tr(e)x",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo tr(e)d",DoubleToStr(fabs(pfractal.Fibonacci(Trend,Expansion,Max,InPercent)-pfractal.Fibonacci(Trend,Expansion,Now,InPercent)),1),DirColor(pfractal.Direction(Trend)),8);
+    UpdateLabel("lrFibo tr(e)n",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
     UpdateLabel("lrFibo o(e)",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Origin)),16);
     UpdateLabel("lrFibo o(e)x",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
-    UpdateLabel("lrFibo o(e)d",DoubleToStr(fabs(pfractal.Fibonacci(Origin,Expansion,Max,InPercent)-pfractal.Fibonacci(Origin,Expansion,Now,InPercent)),1),DirColor(pfractal.Direction(Origin)),8);
+    UpdateLabel("lrFibo o(e)n",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
                
     UpdateLabel("lrFibo tm(rt)",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Term)),16);
     UpdateLabel("lrFibo tm(rt)x",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tm(rt)d",DoubleToStr(fabs(pfractal.Fibonacci(Term,Retrace,Max,InPercent)-pfractal.Fibonacci(Term,Retrace,Now,InPercent)),1),DirColor(pfractal.Direction(Term)),8);
+    UpdateLabel("lrFibo tm(rt)n",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Term)),8);
     UpdateLabel("lrFibo tr(rt)",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Trend)),16);
     UpdateLabel("lrFibo tr(rt)x",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo tr(rt)d",DoubleToStr(fabs(pfractal.Fibonacci(Trend,Retrace,Max,InPercent)-pfractal.Fibonacci(Trend,Retrace,Now,InPercent)),1),DirColor(pfractal.Direction(Trend)),8);
+    UpdateLabel("lrFibo tr(rt)n",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
     UpdateLabel("lrFibo o(rt)",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Origin)),16);
     UpdateLabel("lrFibo o(rt)x",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
-    UpdateLabel("lrFibo o(rt)d",DoubleToStr(fabs(pfractal.Fibonacci(Origin,Retrace,Max,InPercent)-pfractal.Fibonacci(Origin,Retrace,Now,InPercent)),1),DirColor(pfractal.Direction(Origin)),8);
+    UpdateLabel("lrFibo o(rt)n",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
 
-    for (int ftype=0;ftype<4;ftype++)
+    for (int ftype=0;ftype<5;ftype++)
       for (int fperiod=0;fperiod<3;fperiod++)
         UpdateLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(pmFiboPeriodId[fperiod],pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
 
@@ -281,17 +281,17 @@ void InitScreenObjects()
     NewLabel("lrFibo03","Trend",180,109,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrFibo04","Origin",260,109,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrFibo05","Max",82,155,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo06","Dev",122,155,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo06","Min",122,155,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo07","Max",162,155,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo08","Dev",202,155,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo08","Min",202,155,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo09","Max",242,155,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo10","Dev",282,155,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo10","Min",282,155,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo12","Max",82,205,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo13","Dev",122,205,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo13","Min",122,205,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo14","Max",162,205,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo15","Dev",202,205,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo15","Min",202,205,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo16","Max",242,205,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo17","Dev",282,205,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo17","Min",282,205,clrWhite,SCREEN_UL,IndWinId);
     
     NewLabel("lrFibo11","Expansion",60,165,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrFibo18","Retrace",60,215,clrGoldenrod,SCREEN_UL,IndWinId);
@@ -307,23 +307,23 @@ void InitScreenObjects()
 
     NewLabel("lrFibo tm(e)","",92,120,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tm(e)x","",82,142,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo tm(e)d","",122,142,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo tm(e)n","",122,142,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tr(e)","",172,120,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tr(e)x","",162,142,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo tr(e)d","",202,142,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo tr(e)n","",202,142,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo o(e)","",252,120,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo o(e)x","",242,142,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo o(e)d","",282,142,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo o(e)n","",282,142,clrNONE,SCREEN_UL,IndWinId);
 
     NewLabel("lrFibo tm(rt)","",92,170,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tm(rt)x","",82,192,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo tm(rt)d","",122,192,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo tm(rt)n","",122,192,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tr(rt)","",172,170,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo tr(rt)x","",162,192,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo tr(rt)d","",202,192,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo tr(rt)n","",202,192,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo o(rt)","",252,170,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFibo o(rt)x","",242,192,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrFibo o(rt)d","",282,192,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrFibo o(rt)n","",282,192,clrNONE,SCREEN_UL,IndWinId);
     
     for (int fperiod=0;fperiod<3;fperiod++)
       for (int ftype=0;ftype<5;ftype++)
