@@ -10,6 +10,7 @@
 
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
+#include <Class\ArrayInteger.mqh>
 
 //--- Input params
 input string appHeader          = "";    //+------ Application inputs ------+
@@ -31,6 +32,7 @@ input int    inpRangeMin        = 60;    // Minimum fractal pip range
 //--- Class defs
   CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CArrayInteger    *kill        = new CArrayInteger(0);
 
   enum PivotState {
                     NewOrder,
@@ -60,6 +62,9 @@ void GetData(void)
   {
     fractal.Update();
     pfractal.Update();
+    
+    if (pfractal.Event(NewTrend))
+      Print ("New Trend @"+DoubleToStr(Close[0],Digits));
   }
 
 //+------------------------------------------------------------------+
@@ -154,6 +159,46 @@ void EquityCheck(void)
   }
 
 //+------------------------------------------------------------------+
+//| ProfitCheck - Add ticket to Major entry array                    |
+//+------------------------------------------------------------------+
+void ProfitCheck(int Action)
+  {
+    if (LotValue(Action,Net,InEquity)>(ordEQMinTarget*2));
+  }
+
+//+------------------------------------------------------------------+
+//| AddTicket - Add ticket to Major entry array                      |
+//+------------------------------------------------------------------+
+void AddTicket(int Action)
+  {
+    if (OrderFulfilled(Action))
+      kill.Add(ordOpen.Ticket);
+  }
+
+//+------------------------------------------------------------------+
+//| CloseTicket - Closes profitable tickets on Major entry array     |
+//+------------------------------------------------------------------+
+void CloseTicket(int Action)
+  {
+    int ctCount     = kill.Count;
+    int ctTicket[];
+    
+    kill.Copy(ctTicket);
+    
+    for (int ct=0; ct<ctCount; ct++)
+      if (OrderSelect(ctTicket[ct],SELECT_BY_TICKET,MODE_TRADES))
+      {
+        if (OrderClosePrice()>0.00)
+          kill.Delete(kill.Find(ctTicket[ct]));
+        else
+        if (OrderType()==Action && OrderProfit()+OrderSwap()+OrderCommission()>0.00)
+          if (CloseOrder(ctTicket[ct],true))
+            kill.Delete(kill.Find(ctTicket[ct]));
+      }
+      else kill.Delete(kill.Find(ctTicket[ct]));
+  }
+
+//+------------------------------------------------------------------+
 //| EventCheck - Scan for entry/exit positions                       |
 //+------------------------------------------------------------------+
 void EventCheck(int Event)
@@ -165,11 +210,24 @@ void EventCheck(int Event)
 
                          NewArrow(BoolToInt(hmTradeDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),DirColor(pfractal[Term].Direction,clrYellow,clrRed),"TermTrigger");
                          OrderCheck(hmTradeBias,NewOrder,"Term Trigger");
-                         //Pause("New minor detected","Minor Trigger");
                          break;
-      case Minor:
-      case Major:
-      case Trend:
+
+      case Trend:        OrderCheck(Action(pfractal[Term].Direction,InDirection,InContrarian),NewOrder,"Trend Trigger");
+                         ProfitCheck(Action(pfractal[Term].Direction));
+                         Pause("New trend detected","Trend Trigger");
+                         break;
+
+      case Minor:        CloseTicket(Action(pfractal[Term].Direction,InDirection));
+                         Pause("New minor detected","Minor Trigger");
+                         break;
+
+      case Major:        //NewArrow(BoolToInt(hmTradeDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),DirColor(pfractal[Term].Direction,clrYellow,clrRed),"TrendTrigger");
+                         CloseTicket(Action(pfractal[Term].Direction,InDirection));
+                         OrderCheck(Action(pfractal[Term].Direction,InDirection,InContrarian),NewOrder,"Major Trigger");
+                         AddTicket(Action(pfractal[Term].Direction,InDirection,InContrarian));
+                         Pause("New major term ("+ActionText(Action(pfractal[Term].Direction,InDirection,InContrarian))+") detected","Major Trigger");
+                         break;
+
       case Divergent:    break;
     }
   }
@@ -183,23 +241,19 @@ void Execute(void)
       if (pfractal.Event(NewTerm))
         EventCheck(Term);
       else
-        EventCheck(Minor); // "New minor checkpoint detected","Minor Checkpoint");
-        //ResetTrigger(Term);
+        EventCheck(Minor);
     else
     if (pfractal.Event(NewMajor))
       if (pfractal.Event(NewTrend))
-        EventCheck(Trend); // "New major detected","Major Trigger");
+        EventCheck(Trend);
       else
-        EventCheck(Major); // "New fractal detected","Fractal Trigger");
-        //ResetTrigger(Trend);
+        EventCheck(Major);
     else
     if (pfractal.Event(NewTerm))
-      EventCheck(Divergent); // "New divergence detected","Divergence Trigger");
+      EventCheck(Divergent);
     else
     if (pfractal.Event(NewBoundary))
       EquityCheck();
-        
-
   }
 
 //+------------------------------------------------------------------+
@@ -262,6 +316,9 @@ int OnInit()
     NewLabel("lbEQCheck","",5,20);
     NewLine("lnPivot");
     
+    kill.AutoExpand    = true;
+    kill.Truncate      = false;
+    
     return(INIT_SUCCEEDED);
   }
 
@@ -271,5 +328,6 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete pfractal;
-    delete fractal;   
+    delete fractal;
+    delete kill;
   }

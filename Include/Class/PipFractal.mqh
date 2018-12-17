@@ -296,14 +296,14 @@ void CPipFractal::CalcPipFractal(void)
     UpdateFractal(Term,uTermDir);
 
     //--- Detect trend change
-    if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo161))
+    if (Fibonacci(Term,Expansion,Max)>=FiboPercent(Fibo161))
       uTrendDir                    = uTermDir;
 
     UpdateFractal(Trend,uTrendDir);
 
     //--- Detect origin change
-    if (Fibonacci(Origin,Expansion,Max)>FiboPercent(Fibo100) ||
-        Fibonacci(Origin,Expansion,Max)<FiboPercent(FiboRoot)
+    if (Fibonacci(Origin,Expansion,Max)>=FiboPercent(Fibo100) ||
+        Fibonacci(Origin,Expansion,Max)<=FiboPercent(FiboRoot)
        )
       pfOriginDir                  = pf[Trend].Direction;  //<---- this may be broken (?)
   }
