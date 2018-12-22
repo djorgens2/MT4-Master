@@ -608,5 +608,6 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
       ObjectCreate(PriceLabelName,OBJ_ARROW_LEFT_PRICE,Window,0,Price);
     else
       ObjectCreate(PriceLabelName,OBJ_ARROW_RIGHT_PRICE,Window,0,Price);
-  }
 
+    ObjectSet(PriceLabelName,OBJPROP_TIME1,Time[0]);
+  }

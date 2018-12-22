@@ -330,10 +330,11 @@ int CPipRegression::Direction(int Type, bool Contrarian=false)
       case Range:         return (ptrRangeDir*dContrary);
       case RangeHigh:     return (ptrRangeDirHigh*dContrary);
       case RangeLow:      return (ptrRangeDirLow*dContrary);
+      case Boundary:      return (Direction(ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary);
       case Aggregate:     return (BoolToInt(ptrRangeDirHigh==ptrRangeDirLow,ptrRangeDirHigh*dContrary,DirectionNone));
       case Tick:          return (ptrTickDir*dContrary);
     }
-    
+
     return (ptrRangeDir);
   }
 
@@ -346,6 +347,7 @@ int CPipRegression::Age(int Measure)
     {
       case History:        return (pipHistory.Count);
       case Tick:           return (ptrTick);
+      case Boundary:       return (fmin(ptrRangeAgeHigh,ptrRangeAgeLow));
       case Range:          return (ptrRangeAge);
       case RangeHigh:      return (ptrRangeAgeHigh);
       case RangeLow:       return (ptrRangeAgeLow);

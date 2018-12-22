@@ -74,7 +74,7 @@ input int      inpUSClose              = 23;    // US market close hour
 //+------------------------------------------------------------------+
 void CallPause(string Message)
   {
-    Pause(Message,"Event Trapper");
+//    Pause(Message,"Event Trapper");
   }
   
 //+------------------------------------------------------------------+
@@ -128,20 +128,20 @@ void RefreshScreen(void)
     UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
     UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
     
-    for (int bound=0;bound<6;bound++)
-      if (dbPriceZone==0 || dbPriceZone==dbBoundsCount)
-        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_SOLID,clrGoldenrod);
-      else
-      if (bound==dbUpperBound)
-        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrForestGreen);
-      else
-      if (bound==dbLowerBound)
-        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrFireBrick);
-      else
-      if (bound==dbPriceZone)
-        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrGoldenrod);
-      else
-        UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrDarkGray);
+    //for (int bound=0;bound<6;bound++)
+    //  if (dbPriceZone==0 || dbPriceZone==dbBoundsCount)
+    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_SOLID,clrGoldenrod);
+    //  else
+    //  if (bound==dbUpperBound)
+    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrForestGreen);
+    //  else
+    //  if (bound==dbLowerBound)
+    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrFireBrick);
+    //  else
+    //  if (bound==dbPriceZone)
+    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrGoldenrod);
+    //  else
+    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrDarkGray);
   }
 
 //+------------------------------------------------------------------+
@@ -196,16 +196,56 @@ void SetDailyAction(void)
     //--- Set Hedging Indicator and Limits
   }
 
+
 //+------------------------------------------------------------------+
 //| CheckPerformance - verifies that the trade plan is working       |
 //+------------------------------------------------------------------+
 void CheckPerformance(void)
   {
-    if (IsHigher(High[0],pfPolyBounds[OP_BUY]))
-      events.SetEvent(NewHigh);
-         
-    if (IsLower(Low[0],pfPolyBounds[OP_SELL]))
-      events.SetEvent(NewLow);    
+    static int  cpDir   = DirectionNone;
+    static int  cpIdx   = 0;
+    static bool cpFire  = false;
+    static bool cpScan  = false;
+    static int  cpFibo  = NoValue;
+
+    if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
+    {
+      if (IsChanged(cpFibo,FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))))
+        cpScan          = true;
+
+      if (IsChanged(cpDir,pfractal.Direction(Trend)))
+        cpScan          = true;
+    }
+
+//    if (cpScan)
+    if (pfractal.Age(Boundary)==50)
+    {
+      if (!cpFire)
+        {
+          cpFire            = true;
+          NewPriceLabel("Boundary"+IntegerToString(cpIdx++),Close[0],true);
+        }
+    }
+    else
+      if (cpFire)
+      {
+        {
+          if (pfractal.Event(NewHigh))
+            NewArrow(SYMBOL_ARROWUP,clrYellow,"Breakout"+IntegerToString(cpIdx++));
+
+          if (pfractal.Event(NewLow))
+            NewArrow(SYMBOL_ARROWDOWN,clrRed,"Breakout"+IntegerToString(cpIdx++));
+          
+          if (pfractal.Event(NewBoundary))
+          {
+            Pause("Time to act","trigger");
+            cpFire            = false;
+            cpScan            = false;
+          }
+        }
+      }
+      
+    Comment("Age: "+IntegerToString(pfractal.Age(Boundary)));
   }
 
 //+------------------------------------------------------------------+
