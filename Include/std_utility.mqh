@@ -596,7 +596,7 @@ void UpdatePriceLabel(string PriceLabelName, double Price, int Color=White, int 
   {
     ObjectSet(PriceLabelName,OBJPROP_COLOR,Color);
     ObjectSet(PriceLabelName,OBJPROP_PRICE1,Price);
-    ObjectSet(PriceLabelName,OBJPROP_TIME1,Time[Bar]);      
+    ObjectSet(PriceLabelName,OBJPROP_TIME1,Time[Bar]);
   }
   
 //+------------------------------------------------------------------+

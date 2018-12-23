@@ -330,7 +330,9 @@ int CPipRegression::Direction(int Type, bool Contrarian=false)
       case Range:         return (ptrRangeDir*dContrary);
       case RangeHigh:     return (ptrRangeDirHigh*dContrary);
       case RangeLow:      return (ptrRangeDirLow*dContrary);
-      case Boundary:      return (Direction(ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary);
+      case Boundary:      if ((ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary>0) return (DirectionUp);
+                          if ((ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary<0) return (DirectionDown);
+                          return (this.Direction(Range));
       case Aggregate:     return (BoolToInt(ptrRangeDirHigh==ptrRangeDirLow,ptrRangeDirHigh*dContrary,DirectionNone));
       case Tick:          return (ptrTickDir*dContrary);
     }

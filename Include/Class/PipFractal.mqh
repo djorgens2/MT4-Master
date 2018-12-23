@@ -150,9 +150,15 @@ void CPipFractal::CalcState(void)
   {
     int usState          = pfState;
     
-//    if (Fibonacci(Type,Max,Expansion)>FiboPercent(Fibo161))
-      //if (pf[Type].d
-
+    if (this.Direction(Term)!=this.Direction(Boundary))
+      if (this.Direction(Range)!=this.Direction(Boundary))
+        //pfState          = RetraceReversal;
+        return;
+      else
+        pfState          = Retrace;
+    else  
+    if (this.Direction(Range)!=this.Direction(Boundary))   
+      pfState            = Reversal;
   }
 
 //+------------------------------------------------------------------+
@@ -538,6 +544,9 @@ int CPipFractal::Direction(int Type=Term, bool Contrarian=false)
       case Range:         return (ptrRangeDir*dContrary);
       case RangeHigh:     return (ptrRangeDirHigh*dContrary);
       case RangeLow:      return (ptrRangeDirLow*dContrary);
+      case Boundary:      if ((ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary>0) return (DirectionUp);
+                          if ((ptrRangeAgeLow-ptrRangeAgeHigh)*dContrary<0) return (DirectionDown);
+                          return (this.Direction(Range));
       case Aggregate:     return (BoolToInt(ptrRangeDirHigh==ptrRangeDirLow,ptrRangeDirHigh*dContrary,DirectionNone));
       case Tick:          return (ptrTickDir*dContrary);
     }

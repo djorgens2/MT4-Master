@@ -57,6 +57,8 @@ input int      inpUSClose              = 23;    // US market close hour
                         LossExit,
                         ActionProtocols
                       };
+  
+  bool                PauseOn                = true;
     
   ActionProtocol      opProtocol;
   int                 pfPolyDir;
@@ -74,7 +76,8 @@ input int      inpUSClose              = 23;    // US market close hour
 //+------------------------------------------------------------------+
 void CallPause(string Message)
   {
-//    Pause(Message,"Event Trapper");
+    if (PauseOn)
+      Pause(Message,"Event Trapper");
   }
   
 //+------------------------------------------------------------------+
@@ -124,8 +127,8 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
-    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
+//    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
+//    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
     UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
     
     //for (int bound=0;bound<6;bound++)
@@ -196,39 +199,92 @@ void SetDailyAction(void)
     //--- Set Hedging Indicator and Limits
   }
 
+//+------------------------------------------------------------------+
+//| SendOrder - verifies margin requirements and opens new positions |
+//+------------------------------------------------------------------+
+void SendOrder(int Direction, bool Contrarian)
+  {
+    int    soAction     = Action(Direction,InDirection,Contrarian);
+    bool   soOpenOrder  = false;
+    string soFibo       = " "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%";
+    
+    if (LotCount(soAction)==0.00)
+      soOpenOrder       = true;
+    else
+      if (fabs(LotValue(soAction,Smallest,InEquity))>ordEQMinProfit)
+        soOpenOrder     = true;
+        
+    if (soOpenOrder)
+    {
+      OpenOrder(soAction,BoolToStr(Contrarian,"Contrarian"+soFibo,"Trend"+soFibo));
+      CallPause("New Order entry");
+    }
+  }
 
 //+------------------------------------------------------------------+
 //| CheckPerformance - verifies that the trade plan is working       |
 //+------------------------------------------------------------------+
 void CheckPerformance(void)
   {
-    static int  cpDir   = DirectionNone;
-    static int  cpIdx   = 0;
-    static bool cpFire  = false;
-    static bool cpScan  = false;
-    static int  cpFibo  = NoValue;
+    static int     cpDir         = DirectionNone;
+    static int     cpIdx         = 0;
+    static bool    cpScan        = false;
+    static double  cpFibo        = NoValue;
 
+    static bool    cpFire        = false;
+    static int     cpFireDir     = DirectionNone;
+    static string  cpFireName    = "";
+    
+    string         cpComment     = "Age: "+IntegerToString(pfractal.Age(Boundary))+"\n"
+                                 + "Fibo: "+DoubleToStr(cpFibo,0);
+
+    if (pfractal.Direction(Term)!=pfractal.Direction(Boundary))
+      Append(cpComment,"Divergence","\n");
+      
+    if (pfractal.Direction(Range)!=pfractal.Direction(Boundary))   
+      Append(cpComment,"Reversal","\n");
+//      Pause("We have a rare event.... boundary/term mismatch\n"
+//            +"Term: "+DirText(pfractal.Direction(Range))+"\n"
+//            +"Boundary: "+DirText(pfractal.Direction(Boundary))+" Agg: "+IntegerToString(pfractal.Age(RangeLow)-pfractal.Age(RangeHigh)),
+//             "Directional Anomaly");
+      
     if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
     {
-      if (IsChanged(cpFibo,FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))))
+      if (IsHigher(FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)),cpFibo))
         cpScan          = true;
 
       if (IsChanged(cpDir,pfractal.Direction(Trend)))
+      {
         cpScan          = true;
+        cpFibo          = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));
+      }
     }
 
-//    if (cpScan)
+    if (cpScan)
+    {
+      Pause("Fibo "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%","Fibo Expansion");
+      cpScan            = false;
+    }
+      
     if (pfractal.Age(Boundary)==50)
     {
       if (!cpFire)
         {
           cpFire            = true;
-          NewPriceLabel("Boundary"+IntegerToString(cpIdx++),Close[0],true);
+          cpFireName        = "Boundary"+IntegerToString(cpIdx++);
+          
+          if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
+            SendOrder(cpFireDir,InContrarian);
+          else
+            CallPause("Trend action");
+            
+          NewPriceLabel(cpFireName,Close[0],true);
+          UpdatePriceLabel(cpFireName,Close[0],DirColor(cpFireDir,clrForestGreen,clrFireBrick));
         }
     }
     else
       if (cpFire)
-      {
+        if (pfractal.Event(NewBoundary))
         {
           if (pfractal.Event(NewHigh))
             NewArrow(SYMBOL_ARROWUP,clrYellow,"Breakout"+IntegerToString(cpIdx++));
@@ -236,16 +292,17 @@ void CheckPerformance(void)
           if (pfractal.Event(NewLow))
             NewArrow(SYMBOL_ARROWDOWN,clrRed,"Breakout"+IntegerToString(cpIdx++));
           
-          if (pfractal.Event(NewBoundary))
-          {
-            Pause("Time to act","trigger");
+            CallPause("Time to act");
             cpFire            = false;
-            cpScan            = false;
           }
-        }
-      }
+
+    if (pfractal.Event(NewHigh))
+      cpFireDir         = DirectionUp;
+
+    if (pfractal.Event(NewLow))
+      cpFireDir         = DirectionDown;
       
-    Comment("Age: "+IntegerToString(pfractal.Age(Boundary)));
+    Comment(cpComment);
   }
 
 //+------------------------------------------------------------------+
@@ -259,7 +316,8 @@ void Execute(void)
     if (leadSession.Event(SessionOpen))
       CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
-    CheckPerformance();
+    if (pfractal.HistoryLoaded())
+      CheckPerformance();
     
     switch (opProtocol)
     {
@@ -272,6 +330,11 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+    if (Command[0]=="PAUSE")
+      if (PauseOn)
+        PauseOn    = false;
+      else
+        PauseOn    = true;
   }
 
 //+------------------------------------------------------------------+
