@@ -71,6 +71,13 @@ input int      inpUSClose              = 23;    // US market close hour
   int                 dbUpperBound;
   int                 dbLowerBound;
 
+  //--- Check Performance Operationals
+  int     cpDir         = DirectionNone;
+  bool    cpScan        = false;
+  int     cpFibo        = NoValue;
+  bool    cpFire        = false;
+  int     cpFireDir     = DirectionNone;
+
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
 //+------------------------------------------------------------------+
@@ -127,6 +134,23 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    string         rsComment     = "Dir: "+DirText(cpDir)+"\n"
+                                 + "Age: "+IntegerToString(pfractal.Age(Boundary))+"\n"
+                                 + "Fibo: "+DoubleToStr(FiboPercent(cpFibo,InPercent),1)+"%\n"
+                                 + "State: "+EnumToString((ReservedWords) pfractal.State());
+
+    if (pfractal.Direction(Term)!=pfractal.Direction(Boundary))
+      Append(rsComment,"Divergence","\n");
+      
+    if (pfractal.Direction(Range)!=pfractal.Direction(Boundary))
+      Append(rsComment,"Reversal","\n");
+      
+    if (cpFire)
+      Append(rsComment,"Fire: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%","\n");
+
+    if (cpScan)
+      Append(rsComment,"Scan: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Max,InPercent),1)+"%","\n");
+
 //    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
 //    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
     UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
@@ -145,6 +169,8 @@ void RefreshScreen(void)
     //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrGoldenrod);
     //  else
     //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrDarkGray);
+
+    Comment(rsComment);
   }
 
 //+------------------------------------------------------------------+
@@ -226,38 +252,18 @@ void SendOrder(int Direction, bool Contrarian)
 //+------------------------------------------------------------------+
 void CheckPerformance(void)
   {
-    static int     cpDir         = DirectionNone;
     static int     cpIdx         = 0;
-    static bool    cpScan        = false;
-    static double  cpFibo        = NoValue;
-
-    static bool    cpFire        = false;
-    static int     cpFireDir     = DirectionNone;
     static string  cpFireName    = "";
-    
-    string         cpComment     = "Age: "+IntegerToString(pfractal.Age(Boundary))+"\n"
-                                 + "Fibo: "+DoubleToStr(cpFibo,0);
 
-    if (pfractal.Direction(Term)!=pfractal.Direction(Boundary))
-      Append(cpComment,"Divergence","\n");
-      
-    if (pfractal.Direction(Range)!=pfractal.Direction(Boundary))   
-      Append(cpComment,"Reversal","\n");
-//      Pause("We have a rare event.... boundary/term mismatch\n"
-//            +"Term: "+DirText(pfractal.Direction(Range))+"\n"
-//            +"Boundary: "+DirText(pfractal.Direction(Boundary))+" Agg: "+IntegerToString(pfractal.Age(RangeLow)-pfractal.Age(RangeHigh)),
-//             "Directional Anomaly");
-      
     if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
     {
-      if (IsHigher(FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)),cpFibo))
+      if (FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)>cpFibo))
         cpScan          = true;
 
       if (IsChanged(cpDir,pfractal.Direction(Trend)))
-      {
         cpScan          = true;
-        cpFibo          = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));
-      }
+
+      cpFibo          = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));
     }
 
     if (cpScan)
@@ -301,8 +307,6 @@ void CheckPerformance(void)
 
     if (pfractal.Event(NewLow))
       cpFireDir         = DirectionDown;
-      
-    Comment(cpComment);
   }
 
 //+------------------------------------------------------------------+

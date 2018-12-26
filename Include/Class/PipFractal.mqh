@@ -74,6 +74,7 @@ class CPipFractal : public CPipRegression
 
        virtual   
           int        Count(int Counter);
+          int        State(void) { return (pfState); };
           double     Price(int TimeRange, int Measure=Expansion);
           double     Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
           bool       IsPegged(void)  {return (pfPeg); }
@@ -152,8 +153,7 @@ void CPipFractal::CalcState(void)
     
     if (this.Direction(Term)!=this.Direction(Boundary))
       if (this.Direction(Range)!=this.Direction(Boundary))
-        //pfState          = RetraceReversal;
-        return;
+        pfState          = Correction;
       else
         pfState          = Retrace;
     else  
