@@ -41,6 +41,8 @@ protected:
                   NewRally,
                   NewPullback,
                   MarketCorrection,
+                  MarketIdle,
+                  MarketResume,
                   SessionOpen,
                   SessionClose,
                   NewDay,
