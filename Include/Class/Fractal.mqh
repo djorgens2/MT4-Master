@@ -29,6 +29,7 @@ private:
          bool          Peg;
          bool          Reversal;
          bool          Breakout;
+         bool          Correction;
          datetime      Updated;
        };
        
@@ -316,6 +317,7 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
         f[type].Peg          = false;
         f[type].Breakout     = false;
         f[type].Reversal     = false;
+        f[type].Correction   = false;        
       }
     }
     
@@ -369,6 +371,10 @@ void CFractal::CalcRetrace(void)
       {
         crStateMajor            = type;
         crStateMinor            = type;
+        
+        if (this.Fibonacci(type,Retrace,Max)>=1-FiboPercent(Fibo23))
+          if (IsChanged(f[type].Correction,true))
+            fEvents.SetEvent(MarketCorrection);
       }
       
       if (this.IsMinor(type))
@@ -409,6 +415,7 @@ void CFractal::InsertFractal(FractalRec &Fractal)
     Fractal.Peg            = false;
     Fractal.Breakout       = false;
     Fractal.Reversal       = false;
+    Fractal.Correction     = false;
         
     fOrigin                = f[Trend];
     f[Trend]               = f[Term];
@@ -594,28 +601,29 @@ void CFractal::CalcFractal(void)
 //+------------------------------------------------------------------+
 CFractal::CFractal(int Range, int MinRange)
   {
-    fDirection            = DirectionNone;
-    fStateMajor           = Expansion;
-    fStateMinor           = Expansion;
+    fDirection              = DirectionNone;
+    fStateMajor             = Expansion;
+    fStateMinor             = Expansion;
 
-    fRange                = Pip(Range,InPoints);
-    fRangeMin             = Pip(MinRange,InPoints);
+    fRange                  = Pip(Range,InPoints);
+    fRangeMin               = Pip(MinRange,InPoints);
     
-    fBarHigh              = Bars-1;
-    fBarLow               = Bars-1;
+    fBarHigh                = Bars-1;
+    fBarLow                 = Bars-1;
 
-    fEvents               = new CEvent();
-    fBuffer               = new CArrayDouble(Bars);
+    fEvents                 = new CEvent();
+    fBuffer                 = new CArrayDouble(Bars);
     fBuffer.Initialize(0.00);
-    fBuffer.AutoExpand    = true;
+    fBuffer.AutoExpand      = true;
     
-    f[Expansion].Peg      = false;
-    f[Expansion].Breakout = false;
-    f[Expansion].Reversal = false;
+    f[Expansion].Peg        = false;
+    f[Expansion].Breakout   = false;
+    f[Expansion].Reversal   = false;
+    f[Expansion].Correction = false;
 
-    dOrigin.Bar           = NoValue;
-    dOrigin.Direction     = DirectionNone;
-        
+    dOrigin.Bar             = NoValue;
+    dOrigin.Direction       = DirectionNone;
+
     for (RetraceType Type=Trend;Type<RetraceTypes;Type++)
       UpdateRetrace(Type,NoValue);
 
