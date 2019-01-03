@@ -87,12 +87,18 @@ void EventCheck(int Event)
                          //Pause("Divergences do occur!","Divergent Trigger");
                          OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
                          break;
-      case Term:
+
+      case Term:         break;
+
       case Trend:        //Pause("New "+EnumToString((RetraceType)Event)+" detected","Trend Trigger");
+                         
                          break;
 
-      case Minor:
-      case Major:
+      case Minor:        break;
+      
+      case Major:        CloseOrders(CloseMax,Action(pfractal[Term].Direction,InDirection),"Major PT");
+                         break;
+
       case Boundary:     //Pause("New "+EnumToString((ReservedWords)Event)+" detected","Boundary Trigger");
                          break;
     }

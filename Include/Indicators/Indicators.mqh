@@ -78,7 +78,7 @@ CIndicator *CIndicators::Create(const string symbol,const ENUM_TIMEFRAMES period
          break;
       case IND_ADXW:
          //--- Identifier of "Average Directional Index by Welles Wilder"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_ATR:
          //--- Identifier of "Average True Range"
@@ -112,7 +112,7 @@ CIndicator *CIndicators::Create(const string symbol,const ENUM_TIMEFRAMES period
          break;
       case IND_CHAIKIN:
          //--- Identifier of "Chaikin Oscillator"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_DEMARKER:
          //--- Identifier of "DeMarker"
@@ -211,31 +211,31 @@ CIndicator *CIndicators::Create(const string symbol,const ENUM_TIMEFRAMES period
          break;
       case IND_DEMA:
          //--- Identifier of "Double Exponential Moving Average"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_TEMA:
          //--- Identifier of "Triple Exponential Moving Average"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_TRIX:
          //--- Identifier of "Triple Exponential Moving Averages Oscillator"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_FRAMA:
          //--- Identifier of "Fractal Adaptive Moving Average"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_AMA:
          //--- Identifier of "Adaptive Moving Average"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_VIDYA:
          //--- Identifier of "Variable Index DYnamic Average"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
       case IND_VOLUMES:
          //--- Identifier of "Volumes"
-         //--- в MT4 не реализован
+         //--- not implemented in MT4
          break;
          //--- Identifier of "Custom"
       case IND_CUSTOM:

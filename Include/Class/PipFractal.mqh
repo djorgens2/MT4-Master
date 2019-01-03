@@ -386,6 +386,7 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
       
     CalcPipFractal();          
     CalcFiboChange();
+    CalcState();
     
     ArrayCopy(MA,maData,0,0,fmin(prPeriods,pipHistory.Count));
   }
@@ -405,6 +406,7 @@ void CPipFractal::Update(void)
       
     CalcPipFractal();          
     CalcFiboChange();
+    CalcState();
   }
   
 //+------------------------------------------------------------------+

@@ -222,25 +222,25 @@ void CSession::UpdateBiases(void)
     if (IsChanged(sActiveBias,Action(srec[ActiveSession].ActiveClose-srec[ActiveSession].ActiveOpen,InDirection)))
       sEvent.SetEvent(NewTradeBias);
       
-    if (sBar>0)
-    {
-      if (sEvent[MarketCorrection])
-      {
-        ObjectCreate("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
-        ObjectSet("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,SYMBOL_RIGHTPRICE);
-        ObjectSet("Corr:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sTrendBias==OP_BUY,clrYellow,clrRed));
-      }
-
-      if (sEvent[NewTradeBias])
-      {
-        ObjectCreate("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sActiveBias==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
-        ObjectSet("Hour:"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sActiveBias==OP_BUY,clrYellow,clrRed));
-      }
-    }
+//    if (sBar>0)
+//    {
+//      if (sEvent[MarketCorrection])
+//      {
+//        ObjectCreate("Corr("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
+//        ObjectSet("Corr("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,SYMBOL_RIGHTPRICE);
+//        ObjectSet("Corr("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sTrendBias==OP_BUY,clrYellow,clrRed));
+//      }
+//
+//      if (sEvent[NewTradeBias])
+//      {
+//        ObjectCreate("Hour("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJ_ARROW,0,Time[sBar],ActiveMid());
+//        ObjectSet("Hour("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_ARROWCODE,BoolToInt(sActiveBias==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
+//        ObjectSet("Hour("+EnumToString(sType)+"):"+TimeToString(Time[sBar],TIME_DATE)+IntegerToString(sBarHour),OBJPROP_COLOR,BoolToInt(sActiveBias==OP_BUY,clrYellow,clrRed));
+//      }
+//    }
  
-    if (sEvent[NewHour])
-      PrintSession(ActiveSession);
+//    if (sEvent[NewHour])
+//      PrintSession(ActiveSession);
   }
 
 //+------------------------------------------------------------------+

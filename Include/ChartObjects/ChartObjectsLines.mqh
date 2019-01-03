@@ -152,7 +152,7 @@ bool CChartObjectTrend::RayLeft(void) const
    if(m_chart_id==-1)
       return(false);
 //--- result
-   return(ObjectGetInteger(m_chart_id,m_name,OBJPROP_RAY_LEFT));
+   return((bool)ObjectGetInteger(m_chart_id,m_name,OBJPROP_RAY_LEFT));
   }
 //+------------------------------------------------------------------+
 //| Set the "Ray left" flag                                          |
@@ -174,7 +174,7 @@ bool CChartObjectTrend::RayRight(void) const
    if(m_chart_id==-1)
       return(false);
 //--- result
-   return(ObjectGetInteger(m_chart_id,m_name,OBJPROP_RAY_RIGHT));
+   return((bool)ObjectGetInteger(m_chart_id,m_name,OBJPROP_RAY_RIGHT));
   }
 //+------------------------------------------------------------------+
 //| Set the "Ray right" flag                                         |

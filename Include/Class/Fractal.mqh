@@ -175,6 +175,7 @@ int CFractal::Origin(const ReservedWords Measure)
 void CFractal::CalcOrigin(void)
   {
     //--- Boundary calc vars
+    int         coState        = dOrigin.State;
     RetraceType coTopLeg       = Trend;
     RetraceType coBottomLeg    = Trend;
     
@@ -294,6 +295,9 @@ void CFractal::CalcOrigin(void)
       if (this.Fibonacci(Base,Expansion,Max)>FiboPercent(Fibo23)+1)
         dOrigin.State            = Reversal;
     }
+    
+    if (IsChanged(coState,dOrigin.State))
+      fEvents.SetEvent(NewState);
   }
         
 //+------------------------------------------------------------------+
@@ -372,9 +376,13 @@ void CFractal::CalcRetrace(void)
         crStateMajor            = type;
         crStateMinor            = type;
         
-        if (this.Fibonacci(type,Retrace,Max)>=1-FiboPercent(Fibo23))
+        if (this.Fibonacci(type,Retrace,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,true))
             fEvents.SetEvent(MarketCorrection);
+
+        if (this.Fibonacci(type,Expansion,Now)>=1-FiboPercent(Fibo23))
+          if (IsChanged(f[type].Correction,false))
+            fEvents.SetEvent(MarketResume);
       }
       
       if (this.IsMinor(type))
