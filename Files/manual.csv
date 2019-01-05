@@ -1,1 +1,9 @@
+tp short cancel
 
+/*
+tp short 1.2486
+stop short 1.2744
+eq 10 5
+risk 80 10
+eqh
+eqp

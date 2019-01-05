@@ -71,6 +71,8 @@ void RefreshScreen(void)
                        UpdateLine("pfExpansion",0.00,STYLE_DOT,clrNONE);
                        break;
     }
+    
+    pfractal.ShowFiboArrow();
   }
 
 //+------------------------------------------------------------------+
@@ -88,7 +90,8 @@ void EventCheck(int Event)
                          OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
                          break;
 
-      case Term:         break;
+      case Term:         OpenDCAPlan(Action(pfractal[Term].Direction,InDirection,InContrarian),ordEQMinTarget,CloseAll);
+                         break;
 
       case Trend:        //Pause("New "+EnumToString((RetraceType)Event)+" detected","Trend Trigger");
                          
