@@ -10,30 +10,43 @@
 
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
+#include <Class\Session.mqh>
 
 //--- Input params
-input string appHeader          = "";    //+------ Application inputs ------+
-input int    inpMarketIdle      = 50;    // Market Idle Alert (pipMA periods)
+input string    appHeader          = "";    //+------ Application inputs ------+
+input int       inpMarketIdle      = 50;    // Market Idle Alert (pipMA periods)
 
-input string PipMAHeader        = "";    //+------ PipMA inputs ------+
-input int    inpDegree          = 6;     // Degree of poly regression
-input int    inpPeriods         = 200;   // Number of poly regression periods
-input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
-input bool   inpShowFibo        = true;  // Display lines and fibonacci points
-input bool   inpShowComment     = false; // Display fibonacci data in Comment
+input string    PipMAHeader        = "";    //+------ PipMA inputs ------+
+input int       inpDegree          = 6;     // Degree of poly regression
+input int       inpPeriods         = 200;   // Number of poly regression periods
+input double    inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
 
-input string fractalHeader      = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax        = 120;   // Maximum fractal pip range
-input int    inpRangeMin        = 60;    // Minimum fractal pip range
+input string    fractalHeader      = "";    //+------ Fractal inputs ------+
+input int       inpRangeMax        = 120;   // Maximum fractal pip range
+input int       inpRangeMin        = 60;    // Minimum fractal pip range
+input int       inpRangeLT         = 600;   // Long term fractal pip range
+input int       inpRangeST         = 300;   // Short term fractal pip range
+
+input string    SessionHeader      = "";    //+---- Session Hours -------+
+input int       inpAsiaOpen        = 1;     // Asian market open hour
+input int       inpAsiaClose       = 10;    // Asian market close hour
+input int       inpEuropeOpen      = 8;     // Europe market open hour
+input int       inpEuropeClose     = 18;    // Europe market close hour
+input int       inpUSOpen          = 14;    // US market open hour
+input int       inpUSClose         = 23;    // US market close hour
 
 
 //--- Class defs
-  CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
+  CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
+  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
 
-  int               hmShowLineType = NoValue;
-  int               hmTradeBias    = OP_NO_ACTION;
-  int               hmTradeDir     = DirectionNone;
+  CSession     *session[SessionTypes];
+  CSession     *leadSession;
+
+  int           hmShowLineType     = NoValue;
+  int           hmTradeBias        = OP_NO_ACTION;
+  int           hmTradeDir         = DirectionNone;
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
@@ -41,7 +54,17 @@ input int    inpRangeMin        = 60;    // Minimum fractal pip range
 void GetData(void)
   {
     fractal.Update();
+    lfractal.Update();
     pfractal.Update();
+
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      session[type].Update();
+            
+      if (type<Daily)
+        if (session[type].IsOpen())
+          leadSession    = session[type];
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -86,8 +109,9 @@ void EventCheck(int Event)
     {
       case Divergent:    //NewArrow(BoolToInt(pfractal[Term].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
                          //        +DirColor(pfractal[Term].Direction,clrYellow,clrRed),"Term Divergence("+IntegerToString(ecDivergent++)+")");
-                         //Pause("Divergences do occur!","Divergent Trigger");
-                         OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
+                         Pause("Divergences do occur!","Divergent Trigger");
+                         
+                         //OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
                          break;
 
       case Term:         OpenDCAPlan(Action(pfractal[Term].Direction,InDirection,InContrarian),ordEQMinTarget,CloseAll);
@@ -108,13 +132,12 @@ void EventCheck(int Event)
   }
 
 //+------------------------------------------------------------------+
-//| Execute                                                          |
+//| ExecPipFractal - Micro management at the pfractal level          |
 //+------------------------------------------------------------------+
-void Execute(void)
+void ExecPipFractal(void)
   {
     if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
       SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);
-    
       
     if (pfractal.Event(NewMinor))
       if (pfractal.Event(NewTerm))
@@ -133,6 +156,22 @@ void Execute(void)
     else
     if (pfractal.Event(NewBoundary))
       EventCheck(Boundary);
+  }
+  
+//+------------------------------------------------------------------+
+//| ExecDFractal - Micro management at the pfractal level          |
+//+------------------------------------------------------------------+
+void ExecDailyFractal(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| Execute                                                          |
+//+------------------------------------------------------------------+
+void Execute(void)
+  {
+    ExecPipFractal();
+    ExecDailyFractal();
   }
 
 //+------------------------------------------------------------------+
@@ -188,6 +227,13 @@ int OnInit()
   {
     ManualInit();
     
+    session[Daily]        = new CSession(Daily,inpAsiaOpen,inpUSClose);
+    session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]           = new CSession(US,inpUSOpen,inpUSClose);
+    
+    leadSession           = session[Daily];
+
     NewLine("pfBase");
     NewLine("pfRoot");
     NewLine("pfExpansion");
@@ -202,4 +248,8 @@ void OnDeinit(const int reason)
   {
     delete pfractal;
     delete fractal;
+    delete lfractal;
+        
+    for (SessionType type=Asia;type<SessionTypes;type++)
+      delete session[type];
   }
