@@ -40,19 +40,30 @@ input int       inpUSClose         = 23;    // US market close hour
   CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
   CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
   CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CEvent       *events             = new CEvent();
 
   CSession     *session[SessionTypes];
   CSession     *leadSession;
 
   int           hmShowLineType     = NoValue;
+
   int           hmTradeBias        = OP_NO_ACTION;
   int           hmTradeDir         = DirectionNone;
+  int           hmTradeState       = NoState;
+  
+  double        hmIdlePrice[2];
+  int           hmIdleCount        = NoValue;
+  datetime      hmIdleTime;
+  
+  
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    events.ClearEvents();
+    
     fractal.Update();
     lfractal.Update();
     pfractal.Update();
@@ -118,7 +129,6 @@ void EventCheck(int Event)
                          break;
 
       case Trend:        //Pause("New "+EnumToString((RetraceType)Event)+" detected","Trend Trigger");
-                         
                          break;
 
       case Minor:        break;
@@ -128,6 +138,12 @@ void EventCheck(int Event)
 
       case Boundary:     //Pause("New "+EnumToString((ReservedWords)Event)+" detected","Boundary Trigger");
                          break;
+
+      case MarketResume: Pause("New "+EnumToString((EventType)Event)+" detected","Boundary Trigger");
+                         break;
+
+      case MarketIdle:   Pause("New "+EnumToString((EventType)Event)+" detected","Boundary Trigger");
+                         break;
     }
   }
 
@@ -136,6 +152,14 @@ void EventCheck(int Event)
 //+------------------------------------------------------------------+
 void ExecPipFractal(void)
   {
+    if (fmin(pfractal.Age(RangeHigh),pfractal.Age(RangeLow))==1)
+      if (IsChanged(hmTradeState,Active))
+        EventCheck(MarketResume);
+          
+    if (fmin(pfractal.Age(RangeHigh),pfractal.Age(RangeLow))==inpMarketIdle)
+      if (IsChanged(hmTradeState,MarketIdle))
+        EventCheck(MarketIdle);
+        
     if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
       SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);
       
@@ -159,7 +183,7 @@ void ExecPipFractal(void)
   }
   
 //+------------------------------------------------------------------+
-//| ExecDFractal - Micro management at the pfractal level          |
+//| ExecDFractal - Micro management at the pfractal level            |
 //+------------------------------------------------------------------+
 void ExecDailyFractal(void)
   {
