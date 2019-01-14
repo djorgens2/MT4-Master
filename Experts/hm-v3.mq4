@@ -45,23 +45,9 @@ input int       inpUSClose         = 23;    // US market close hour
   CSession     *session[SessionTypes];
   CSession     *leadSession;
 
-const color     ColorConfirm       = C'0,32,0';       // Confirmed trading period
-const color     ColorReject        = C'48,0,0';       // Reject trading period
-
-  int           hmShowLineType     = NoValue;
-
-  int           hmTradeBias        = OP_NO_ACTION;
-  int           hmTradeDir         = DirectionNone;
-  int           hmTradeState       = NoState;
-  double        hmTradePrice       = Close[0];
-  double        hmTradeRoot        = Close[0];
-    
-  int           hmIdleDir          = DirectionNone;
-  int           hmIdleState        = NoState;
-  double        hmIdlePrice        = Close[0];
-  
   int           pfPolyDir          = DirectionNone;
 
+  int           hmShowLineType     = NoValue;    
   int           hmOrderAction      = OP_NO_ACTION;
   string        hmOrderReason      = "";
   
@@ -154,20 +140,6 @@ void EventCheck(int Event)
       case Boundary:     //Pause("New "+EnumToString((ReservedWords)Event)+" detected","Boundary Trigger");
                          break;
 
-      case MarketResume: Comment(EnumToString((SignalType)hmTradeState)+" ("+DirText(hmIdleDir)+")");
-                         break;
-
-      case MarketIdle:   //Pause("New "+EnumToString((EventType)Event)+" detected","Boundary Trigger");
-      
-                         if (IsChanged(hmIdleDir,BoolToInt(pfractal.Age(RangeHigh)==inpMarketIdle,DirectionUp,DirectionDown)));
-                           //Pause("We have an idle direction change","Idle Check");
-                           Comment(EnumToString((ReservedWords)hmIdleState)+" ("+DirText(hmIdleDir)+")");
-                           
-                         NewPriceLabel("MktIdle-"+IntegerToString(++ecResume),Close[0],true);
-                         UpdatePriceLabel("MktIdle-"+IntegerToString(ecResume),Close[0],
-                                  BoolToInt(hmIdleDir==DirectionUp,clrYellow,clrRed));
-
-                         break;
     }
   }
 
@@ -176,14 +148,6 @@ void EventCheck(int Event)
 //+------------------------------------------------------------------+
 void ExecPipFractal(void)
   {
-    if (fmin(pfractal.Age(RangeHigh),pfractal.Age(RangeLow))==1)
-      if (IsChanged(hmIdleState,Active))
-        EventCheck(MarketResume);
-
-    if (fmin(pfractal.Age(RangeHigh),pfractal.Age(RangeLow))==inpMarketIdle)
-      if (IsChanged(hmIdleState,Idle))
-        EventCheck(MarketIdle);
-      
     if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
       SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);
       
