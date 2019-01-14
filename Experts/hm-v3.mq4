@@ -198,13 +198,32 @@ void ExecDailyFractal(void)
 //+------------------------------------------------------------------+
 void ExecOrders(void)
   {
+    int  eoMBResponse   = NoValue;
+    bool eoContrarian   = false;
+    
     if (hmOrderAction!=OP_NO_ACTION)
       if (pfractal.HistoryLoaded())
-        if (OpenOrder(hmOrderAction,hmOrderReason))
+      {
+        eoMBResponse        = Pause("Shall I "+ActionText(hmOrderAction)+"?","Time to Trade!",MB_YESNOCANCEL|MB_ICONQUESTION);
+        
+        switch (eoMBResponse)
+        {
+          case IDYES:     eoContrarian   = false;
+                          break;
+                        
+          case IDNO:      eoContrarian   = true;
+                          break;
+                        
+          case IDCANCEL:  hmOrderAction  = OP_NO_ACTION;
+                          return;
+        }
+                                
+        if (OpenOrder(Action(hmOrderAction,InAction,eoContrarian),hmOrderReason))
         {
           hmOrderAction     = OP_NO_ACTION;
           hmOrderReason     = "";
         }
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -214,6 +233,7 @@ void ExecRiskManagement(void)
   {
 //    if (LotValue(OP_SELL,Loss,InEquity)<-ordEQMinProfit)
 //      if (LotValue(OP_SELL,Net,InEquity)>=0.00)
+ 
 //        Pause("DCA Check (Short)","DCA Check");
 //
 //    if (LotValue(OP_BUY,Loss,InEquity)<-ordEQMinProfit)
