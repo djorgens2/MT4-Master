@@ -63,7 +63,7 @@ void GetData(void)
     lfractal.Update();
     pfractal.Update();
     
-//    pfractal.ShowFiboArrow();
+    pfractal.ShowFiboArrow();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
@@ -248,13 +248,32 @@ void ExecOrders(void)
 void ExecRiskManagement(void)
   {
 //    if (LotValue(OP_SELL,Loss,InEquity)<-ordEQMinProfit)
-//      if (LotValue(OP_SELL,Net,InEquity)>=0.00)
+//     if (LotValue(OP_SELL,Net,InEquity)>=0.00)
  
 //        Pause("DCA Check (Short)","DCA Check");
 //
 //    if (LotValue(OP_BUY,Loss,InEquity)<-ordEQMinProfit)
 //      if (LotValue(OP_BUY,Net,InEquity)>=0.00)
 //        Pause("DCA Check (Long)","DCA Check");
+  }
+
+//+------------------------------------------------------------------+
+//| ExecProfitManagement - Protects trade profits                    |
+//+------------------------------------------------------------------+
+void ExecProfitManagement(void)
+  {
+    int epmTickets[1]   = {0};
+    
+    for (int ord=0;ord<OrdersTotal();ord++)
+      if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
+        if (TicketValue(OrderTicket(),InEquity)>ordEQMinTarget)
+        {
+          ArrayResize(epmTickets,ArraySize(epmTickets)+1);
+          epmTickets[ArraySize(epmTickets)-1] = OrderTicket();
+        }
+
+    for (int ord=0;ord<ArraySize(epmTickets);ord++)
+      CloseOrder(epmTickets[ord],true);
   }
 
 //+------------------------------------------------------------------+
@@ -272,6 +291,7 @@ void Execute(void)
     ExecDailyFractal();
     ExecSession();
     ExecRiskManagement();
+    ExecProfitManagement();
     ExecOrders();
   }
 
