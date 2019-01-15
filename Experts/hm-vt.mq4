@@ -1,7 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                        hm-vt.mq4 |
-//| HedgeMaster (vt) - used to test branch changes                   |
-//|                                                                  |
+//|                                                        hm-v3.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -12,80 +10,76 @@
 
 #include <manual.mqh>
 #include <Class\PipFractal.mqh>
-#include <Class\ArrayInteger.mqh>
+#include <Class\Session.mqh>
 
 //--- Input params
-input string appHeader          = "";    //+------ Application inputs ------+
-//input int    inpShowLines       = 120;   // Maximum fractal pip range
-//input int    inpRangeMin        = 60;    // Minimum fractal pip range
+input string    appHeader          = "";    //+------ Application inputs ------+
+input int       inpMarketIdle      = 50;    // Market Idle Alert (pipMA periods)
 
-input string PipMAHeader        = "";    //+------ PipMA inputs ------+
-input int    inpDegree          = 6;     // Degree of poly regression
-input int    inpPeriods         = 200;   // Number of poly regression periods
-input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
-input bool   inpShowFibo        = true;  // Display lines and fibonacci points
-input bool   inpShowComment     = false; // Display fibonacci data in Comment
+input string    PipMAHeader        = "";    //+------ PipMA inputs ------+
+input int       inpDegree          = 6;     // Degree of poly regression
+input int       inpPeriods         = 200;   // Number of poly regression periods
+input double    inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
 
-input string fractalHeader      = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax        = 120;   // Maximum fractal pip range
-input int    inpRangeMin        = 60;    // Minimum fractal pip range
+input string    fractalHeader      = "";    //+------ Fractal inputs ------+
+input int       inpRangeMax        = 120;   // Maximum fractal pip range
+input int       inpRangeMin        = 60;    // Minimum fractal pip range
+input int       inpRangeLT         = 600;   // Long term fractal pip range
+input int       inpRangeST         = 300;   // Short term fractal pip range
+
+input string    SessionHeader      = "";    //+---- Session Hours -------+
+input int       inpAsiaOpen        = 1;     // Asian market open hour
+input int       inpAsiaClose       = 10;    // Asian market close hour
+input int       inpEuropeOpen      = 8;     // Europe market open hour
+input int       inpEuropeClose     = 18;    // Europe market close hour
+input int       inpUSOpen          = 14;    // US market open hour
+input int       inpUSClose         = 23;    // US market close hour
 
 
 //--- Class defs
-  CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
-  CArrayInteger    *kill        = new CArrayInteger(0);
+  CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
+  CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
+  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CEvent       *events             = new CEvent();
 
-  enum PivotState {
-                    NewOrder,
-                    NewHedge,
-                    TakeProfit,
-                    TakeLoss
-                  };
-                  
-  struct PivotRec {
-                    int         Action;
-                    int         Direction;
-                    PivotState  State;
-                    double      Price;
-                    datetime    Time;
-                 };
+  CSession     *session[SessionTypes];
+  CSession     *leadSession;
 
-  PivotRec          pr;             
+  int           pfPolyDir          = DirectionNone;
 
-  bool              hmPauseOn      = true;
-  int               hmShowLineType = NoValue;
-  int               hmTradeBias    = OP_NO_ACTION;
-  int               hmTradeDir     = DirectionNone;
-
-//+------------------------------------------------------------------+
-//| CallPause - centralized pause control                            |
-//+------------------------------------------------------------------+
-void CallPause(string Body, string Header)
-  {
-    if (hmPauseOn)
-      Pause(Body,Header);
-  }
+  int           hmShowLineType     = NoValue;    
+  int           hmOrderAction      = OP_NO_ACTION;
+  string        hmOrderReason      = "";
+  
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    events.ClearEvents();
+    
     fractal.Update();
+    lfractal.Update();
     pfractal.Update();
     
-    if (pfractal.Event(NewTrend))
-      Print ("New Trend @"+DoubleToStr(Close[0],Digits));
+//    pfractal.ShowFiboArrow();
+
+    for (SessionType type=Asia;type<SessionTypes;type++)
+    {
+      session[type].Update();
+            
+      if (type<Daily)
+        if (session[type].IsOpen())
+          leadSession    = session[type];
+    }
   }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
-  {
-    UpdateLine("lnPivot",pr.Price,STYLE_SOLID,clrWhite);
-    
+  {    
     switch (hmShowLineType)
     {
       case Term:       UpdateLine("pfBase",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
@@ -105,109 +99,13 @@ void RefreshScreen(void)
 
       default:         UpdateLine("pfBase",0.00,STYLE_DOT,clrNONE);
                        UpdateLine("pfRoot",0.00,STYLE_DOT,clrNONE);
-                       UpdateLine("pfExpansionSQL",0.00,STYLE_DOT,clrNONE);
+                       UpdateLine("pfExpansion",0.00,STYLE_DOT,clrNONE);
                        break;
     }
-  }
-
-//+------------------------------------------------------------------+
-//| PivotDeviation - Current pivot deviation                         |
-//+------------------------------------------------------------------+
-double PivotDeviation(void)
-  {
-    if (hmTradeDir==DirectionUp)
-      return (Close[0]-pr.Price);
-      
-    if (hmTradeDir==DirectionDown)
-      return (pr.Price-Close[0]);
-      
-    return (0.00);
-  }
-
-//+------------------------------------------------------------------+
-//| SetPivot - Moves the pivot based on the most recent action       |
-//+------------------------------------------------------------------+
-void SetPivot(int Action, PivotState State, double Price)
-  {
-    pr.Action      = Action;
-    pr.Direction   = Direction(Action,InAction);
-    pr.State       = State;
-    pr.Price       = Price;
-    pr.Time        = TimeCurrent();
-  }
-
-//+------------------------------------------------------------------+
-//| OrderCheck - verifies order margin requirements and position     |
-//+------------------------------------------------------------------+
-void OrderCheck(int Action, PivotState State, string Reason)
-  {
-    if (OpenOrder(Action,Reason))
-      SetPivot(Action,State,ordOpen.Price);
-  }
-
-//+------------------------------------------------------------------+
-//| EquityCheck - lot diversity micro manager                        |
-//+------------------------------------------------------------------+
-void EquityCheck(void)
-  {
-    string ecComment         = "";
     
-    if (LotCount(OP_BUY,Loss)>0.00)
-      if (LotValue(OP_BUY,Lowest,InEquity)<-ordEQMinTarget)
-        ecComment            = "Long";
-        //Pause("Check your Long positions","Equity Check");
-
-    if (LotCount(OP_SELL,Loss)>0.00)
-      if (LotValue(OP_SELL,Lowest,InEquity)<-ordEQMinTarget)
-        Append(ecComment,"Short","\\");
-        //Pause("Check your Short positions","Equity Check");
-
-    if (StringLen(ecComment)>0)
-      ecComment              ="Check your "+ecComment+" Positions";
-    else
-      ecComment              = "OK";
-      
-    UpdateLabel("lbEQCheck",ecComment,BoolToInt(ecComment=="OK",clrLawnGreen,clrRed),16);
-  }
-
-//+------------------------------------------------------------------+
-//| ProfitCheck - Add ticket to Major entry array                    |
-//+------------------------------------------------------------------+
-void ProfitCheck(int Action)
-  {
-    if (LotValue(Action,Net,InEquity)>(ordEQMinTarget*2));
-  }
-
-//+------------------------------------------------------------------+
-//| AddTicket - Add ticket to Major entry array                      |
-//+------------------------------------------------------------------+
-void AddTicket(int Action)
-  {
-    if (OrderFulfilled(Action))
-      kill.Add(ordOpen.Ticket);
-  }
-
-//+------------------------------------------------------------------+
-//| CloseTicket - Closes profitable tickets on Major entry array     |
-//+------------------------------------------------------------------+
-void CloseTicket(int Action)
-  {
-    int ctCount     = kill.Count;
-    int ctTicket[];
-    
-    kill.Copy(ctTicket);
-    
-    for (int ct=0; ct<ctCount; ct++)
-      if (OrderSelect(ctTicket[ct],SELECT_BY_TICKET,MODE_TRADES))
-      {
-        if (OrderClosePrice()>0.00)
-          kill.Delete(kill.Find(ctTicket[ct]));
-        else
-        if (OrderType()==Action && OrderProfit()+OrderSwap()+OrderCommission()>0.00)
-          if (CloseOrder(ctTicket[ct],true))
-            kill.Delete(kill.Find(ctTicket[ct]));
-      }
-      else kill.Delete(kill.Find(ctTicket[ct]));
+//    UpdatePriceLabel("hmIdle",hmIdlePrice,DirColor(hmIdleDir,clrYellow,clrRed));
+//    UpdatePriceLabel("hmTrade(e)",hmTradePrice,DirColor(hmTradeDir,clrYellow,clrRed));    
+//    UpdatePriceLabel("hmTrade(r)",hmTradePrice,DirColor(hmTradeDir,clrYellow,clrRed));    
   }
 
 //+------------------------------------------------------------------+
@@ -215,40 +113,44 @@ void CloseTicket(int Action)
 //+------------------------------------------------------------------+
 void EventCheck(int Event)
   {
+    static int ecDivergent    = 0;
+    static int ecResume       = 0;
+    static int ecTradeState   = NoState;
+    
     switch (Event)
     {
-      case Term:         hmTradeDir      = pfractal[Term].Direction;
-                         hmTradeBias     = BoolToInt(pfractal[Term].Direction==DirectionUp,OP_BUY,OP_SELL);
-
-                         NewArrow(BoolToInt(hmTradeDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),DirColor(pfractal[Term].Direction,clrYellow,clrRed),"TermTrigger");
-                         OrderCheck(hmTradeBias,NewOrder,"Term Trigger");
+      case Divergent:    //NewArrow(BoolToInt(pfractal[Term].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+                         //        +DirColor(pfractal[Term].Direction,clrYellow,clrRed),"Term Divergence("+IntegerToString(ecDivergent++)+")");
+                         //Pause("Divergences do occur!","Divergent Trigger");
+                         
+                         //OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
                          break;
 
-      case Trend:        OrderCheck(Action(pfractal[Term].Direction,InDirection,InContrarian),NewOrder,"Trend Trigger");
-                         ProfitCheck(Action(pfractal[Term].Direction));
-                         CallPause("New trend detected","Trend Trigger");
+      case Term:         //OpenDCAPlan(Action(pfractal[Term].Direction,InDirection,InContrarian),ordEQMinTarget,CloseAll);
                          break;
 
-      case Minor:        CloseTicket(Action(pfractal[Term].Direction,InDirection));
-                         CallPause("New minor detected","Minor Trigger");
+      case Trend:        //Pause("New "+EnumToString((RetraceType)Event)+" detected","Trend Trigger");
                          break;
 
-      case Major:        //NewArrow(BoolToInt(hmTradeDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),DirColor(pfractal[Term].Direction,clrYellow,clrRed),"TrendTrigger");
-                         CloseTicket(Action(pfractal[Term].Direction,InDirection));
-                         OrderCheck(Action(pfractal[Term].Direction,InDirection,InContrarian),NewOrder,"Major Trigger");
-                         AddTicket(Action(pfractal[Term].Direction,InDirection,InContrarian));
-                         CallPause("New major term ("+ActionText(Action(pfractal[Term].Direction,InDirection,InContrarian))+") detected","Major Trigger");
+      case Minor:        break;
+      
+      case Major:        //CloseOrders(CloseMax,Action(pfractal[Term].Direction,InDirection),"Major PT");
                          break;
 
-      case Divergent:    break;
+      case Boundary:     //Pause("New "+EnumToString((ReservedWords)Event)+" detected","Boundary Trigger");
+                         break;
+
     }
   }
 
 //+------------------------------------------------------------------+
-//| Execute                                                          |
+//| ExecPipFractal - Micro management at the pfractal level          |
 //+------------------------------------------------------------------+
-void Execute(void)
+void ExecPipFractal(void)
   {
+    if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
+      SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);
+      
     if (pfractal.Event(NewMinor))
       if (pfractal.Event(NewTerm))
         EventCheck(Term);
@@ -265,7 +167,112 @@ void Execute(void)
       EventCheck(Divergent);
     else
     if (pfractal.Event(NewBoundary))
-      EquityCheck();
+      EventCheck(Boundary);
+      
+   if (pfractal.Event(NewHigh))
+     if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
+       if (IsChanged(pfPolyDir,DirectionUp))
+       {
+         hmOrderAction    = OP_BUY;
+         hmOrderReason    = "Poly";
+       }
+         
+   if (pfractal.Event(NewLow))
+     if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+       if (IsChanged(pfPolyDir,DirectionDown))
+       {
+         hmOrderAction    = OP_SELL;
+         hmOrderReason    = "Poly";
+       }
+  }
+  
+//+------------------------------------------------------------------+
+//| ExecDailyFractal - Micro management at the pfractal level        |
+//+------------------------------------------------------------------+
+void ExecDailyFractal(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| ExecSession - Test for session events                            |
+//+------------------------------------------------------------------+
+void ExecSession(void)
+  {
+    static int esIdx      = 0;
+    
+    if (leadSession.Event(NewDirection))
+      if (leadSession.SessionHour()>2)
+        if (OpenOrder(Action(leadSession[ActiveSession].Direction,InDirection),"Session"))
+        NewArrow(BoolToInt(leadSession[ActiveSession].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+                 DirColor(leadSession[ActiveSession].Direction),
+                 EnumToString(leadSession.Type())+":"+IntegerToString(esIdx++));
+    
+  }
+
+//+------------------------------------------------------------------+
+//| ExecOrders - Processes Open Order triggers                       |
+//+------------------------------------------------------------------+
+void ExecOrders(void)
+  {
+    int  eoMBResponse   = NoValue;
+    bool eoContrarian   = false;
+    
+    if (hmOrderAction!=OP_NO_ACTION)
+      if (pfractal.HistoryLoaded())
+      {
+        eoMBResponse        = Pause("Shall I "+ActionText(hmOrderAction)+"?","Time to Trade!",MB_YESNOCANCEL|MB_ICONQUESTION);
+        
+        switch (eoMBResponse)
+        {
+          case IDYES:     eoContrarian   = false;
+                          break;
+                        
+          case IDNO:      eoContrarian   = true;
+                          break;
+                        
+          case IDCANCEL:  hmOrderAction  = OP_NO_ACTION;
+                          return;
+        }
+                                
+        if (OpenOrder(Action(hmOrderAction,InAction,eoContrarian),hmOrderReason))
+        {
+          hmOrderAction     = OP_NO_ACTION;
+          hmOrderReason     = "";
+        }
+      }
+  }
+
+//+------------------------------------------------------------------+
+//| ExecRiskManagement - Corrects trade imbalances                   |
+//+------------------------------------------------------------------+
+void ExecRiskManagement(void)
+  {
+//    if (LotValue(OP_SELL,Loss,InEquity)<-ordEQMinProfit)
+//      if (LotValue(OP_SELL,Net,InEquity)>=0.00)
+ 
+//        Pause("DCA Check (Short)","DCA Check");
+//
+//    if (LotValue(OP_BUY,Loss,InEquity)<-ordEQMinProfit)
+//      if (LotValue(OP_BUY,Net,InEquity)>=0.00)
+//        Pause("DCA Check (Long)","DCA Check");
+  }
+
+//+------------------------------------------------------------------+
+//| Execute                                                          |
+//+------------------------------------------------------------------+
+void Execute(void)
+  {
+//    if (session[Daily].Event(NewDay))
+//      Pause ("Wake up, it''s a New Day","Alarm Clock");
+//      
+//    if (leadSession.Event(SessionOpen))
+//      Pause ("Ahoy, Matey, the Market is Now OPEN","Alarm Clock");
+      
+//    ExecPipFractal();
+    ExecDailyFractal();
+    ExecSession();
+    ExecRiskManagement();
+    ExecOrders();
   }
 
 //+------------------------------------------------------------------+
@@ -287,12 +294,6 @@ void ExecAppCommands(string &Command[])
          if (Command[2] == "TERM")
            hmShowLineType    = Term;
       }
-
-    if (Command[0] == "PAUSE")
-      if (hmPauseOn)
-        hmPauseOn            = false;
-      else
-        hmPauseOn            = true;
   }
 
 //+------------------------------------------------------------------+
@@ -327,15 +328,20 @@ int OnInit()
   {
     ManualInit();
     
+    session[Daily]        = new CSession(Daily,inpAsiaOpen,inpUSClose);
+    session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose);
+    session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose);
+    session[US]           = new CSession(US,inpUSOpen,inpUSClose);
+    
+    leadSession           = session[Daily];
+
     NewLine("pfBase");
     NewLine("pfRoot");
     NewLine("pfExpansion");
-
-    NewLabel("lbEQCheck","",5,20);
-    NewLine("lnPivot");
     
-    kill.AutoExpand    = true;
-    kill.Truncate      = false;
+    NewPriceLabel("hmTrade(r)");
+    NewPriceLabel("hmTrade(e)");
+    NewPriceLabel("hmIdle",0,True);
     
     return(INIT_SUCCEEDED);
   }
@@ -347,5 +353,8 @@ void OnDeinit(const int reason)
   {
     delete pfractal;
     delete fractal;
-    delete kill;
+    delete lfractal;
+        
+    for (SessionType type=Asia;type<SessionTypes;type++)
+      delete session[type];
   }
