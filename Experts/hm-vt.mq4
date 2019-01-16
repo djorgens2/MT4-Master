@@ -40,7 +40,6 @@ input int       inpUSClose         = 23;    // US market close hour
   CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
   CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
   CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
-  CEvent       *events             = new CEvent();
 
   CSession     *session[SessionTypes];
   CSession     *leadSession;
@@ -51,14 +50,47 @@ input int       inpUSClose         = 23;    // US market close hour
   int           hmOrderAction      = OP_NO_ACTION;
   string        hmOrderReason      = "";
   
+  ReservedWords EventClass[WordCount];
+  
+//+------------------------------------------------------------------+
+//| CallPause - pauses based on class level events                   |
+//+------------------------------------------------------------------+
+void CallPause(ReservedWords Class, EventType Event, string Indicator, int Action=OP_NO_ACTION)
+  {
+    int     cpResponse;
+    bool    cpContrarian   = false;
+    string  cpMessage      = EnumToString(Event)+" alert detected on "+Indicator+"\n";
+    int     cpStyle        = BoolToInt(Action==OP_NO_ACTION,MB_OKCANCEL|MB_ICONEXCLAMATION,MB_YESNOCANCEL|MB_ICONQUESTION);
+    
+    if (Action!=OP_NO_ACTION)
+      Append(cpMessage,ActionText(Action)+" triggered, click Yes to trade, No for contrarian","\n");
+      
+    if (EventClass[Class])
+    {
+      cpResponse = Pause(cpMessage,EnumToString(Class)+" Alert",cpStyle);
+      
+      switch (cpStyle)
+      {
+        case MB_OKCANCEL|MB_ICONEXCLAMATION:  if (cpResponse==IDCANCEL)
+                                                EventClass[Class] = false;
+                                              break;
+
+        default:  if (cpResponse==IDCANCEL)
+                    return;
+
+                  if (cpResponse==IDNO)
+                    cpContrarian      = true;
+                  
+                  OpenOrder(Action(Action,InAction,cpContrarian),Indicator+" "+EnumToString(Event));
+      }
+    }
+  }
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    events.ClearEvents();
-    
     fractal.Update();
     lfractal.Update();
     pfractal.Update();
@@ -172,25 +204,21 @@ void ExecPipFractal(void)
    if (pfractal.Event(NewHigh))
      if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
        if (IsChanged(pfPolyDir,DirectionUp))
-       {
-         hmOrderAction    = OP_BUY;
-         hmOrderReason    = "Poly";
-       }
+         CallPause(Minor,NewBoundary,"PipFractal (Poly)",OP_BUY);
          
    if (pfractal.Event(NewLow))
      if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
        if (IsChanged(pfPolyDir,DirectionDown))
-       {
-         hmOrderAction    = OP_SELL;
-         hmOrderReason    = "Poly";
-       }
+         CallPause(Minor,NewBoundary,"PipFractal (Poly)",OP_SELL);
   }
   
 //+------------------------------------------------------------------+
-//| ExecDailyFractal - Micro management at the pfractal level        |
+//| ExecFractal - Macro management at fractal level                  |
 //+------------------------------------------------------------------+
-void ExecDailyFractal(void)
+void ExecFractal(void)
   {
+    if (fractal.Event(NewMajor))
+      CallPause(Major,NewMajor,"Fractal");
   }
 
 //+------------------------------------------------------------------+
@@ -202,10 +230,11 @@ void ExecSession(void)
     
     if (leadSession.Event(NewDirection))
       if (leadSession.SessionHour()>2)
-        if (OpenOrder(Action(leadSession[ActiveSession].Direction,InDirection),"Session"))
-        NewArrow(BoolToInt(leadSession[ActiveSession].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-                 DirColor(leadSession[ActiveSession].Direction),
-                 EnumToString(leadSession.Type())+":"+IntegerToString(esIdx++));
+        CallPause(Major,NewBreakout,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+        //if (OpenOrder(Action(leadSession[ActiveSession].Direction,InDirection),"Session"))
+       // NewArrow(BoolToInt(leadSession[ActiveSession].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+       //          DirColor(leadSession[ActiveSession].Direction,clrYellow,clrRed),
+       //          EnumToString(leadSession.Type())+":"+IntegerToString(esIdx++));
     
   }
 
@@ -287,8 +316,8 @@ void Execute(void)
 //    if (leadSession.Event(SessionOpen))
 //      Pause ("Ahoy, Matey, the Market is Now OPEN","Alarm Clock");
       
-//    ExecPipFractal();
-    ExecDailyFractal();
+    ExecPipFractal();
+    ExecFractal();
     ExecSession();
     ExecRiskManagement();
     ExecProfitManagement();
@@ -355,6 +384,8 @@ int OnInit()
     
     leadSession           = session[Daily];
 
+    ArrayInitialize(EventClass,true);
+    
     NewLine("pfBase");
     NewLine("pfRoot");
     NewLine("pfExpansion");
