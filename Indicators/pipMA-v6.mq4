@@ -39,16 +39,17 @@ input string PipMAHeader        = "";    //+------ PipMA inputs ------+
 input int    inpDegree          = 6;     // Degree of poly regression
 input int    inpPeriods         = 200;   // Number of poly regression periods
 input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
+input int    inpIdleTime        = 50;    // Market idle time in Pips
 input bool   inpShowFibo        = true;  // Display lines and fibonacci points
 input bool   inpShowComment     = false; // Display fibonacci data in Comment
 
 input string fractalHeader      = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax        = 120;    // Maximum fractal pip range
+input int    inpRangeMax        = 120;   // Maximum fractal pip range
 input int    inpRangeMin        = 60;    // Minimum fractal pip range
 
 //--- Class defs
   CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
 
 string    ShortName             = "pipMA-v6: Degree:"+IntegerToString(inpDegree)+" Period:"+IntegerToString(inpPeriods);
 int       IndWinId  = -1;
@@ -153,8 +154,8 @@ void RefreshScreen()
       for (int fperiod=0;fperiod<3;fperiod++)
         UpdateLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(pmFiboPeriodId[fperiod],pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
 
-    if (pfractal.Event(NewAggregate))
-      UpdateLabel("lrEvent","New Aggregate",DirColor(pfractal.Direction(Aggregate)),16);
+    if (pfractal.Event(MarketIdle))
+      UpdateLabel("lrEvent","Market is Idle",DirColor(pfractal.Direction(Aggregate)),16);
     else
     if (pfractal.Event(NewDirection))
       UpdateLabel("lrEvent","New Direction",DirColor(pfractal.Direction(Term)),16);

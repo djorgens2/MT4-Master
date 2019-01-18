@@ -20,6 +20,7 @@ input string    PipMAHeader        = "";    //+------ PipMA inputs ------+
 input int       inpDegree          = 6;     // Degree of poly regression
 input int       inpPeriods         = 200;   // Number of poly regression periods
 input double    inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
+input int       inpIdleTime        = 50;    // Market idle time in Pips
 
 input string    fractalHeader      = "";    //+------ Fractal inputs ------+
 input int       inpRangeMax        = 120;   // Maximum fractal pip range
@@ -39,19 +40,34 @@ input int       inpUSClose         = 23;    // US market close hour
 //--- Class defs
   CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
   CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
-  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
 
   CSession     *session[SessionTypes];
   CSession     *leadSession;
+  
+  ReservedWords EventClass[WordCount];
+  EventType     LockEvent          = NoEvent;
+  string        IndicatorName[3]   = {"PIPFRACTAL","FRACTAL","SESSION"};
+  bool          Monitor[3]         = {true,true,true};
 
+  //-- Operationals                   
   int           pfPolyDir          = DirectionNone;
 
-  int           hmShowLineType     = NoValue;    
   int           hmOrderAction      = OP_NO_ACTION;
   string        hmOrderReason      = "";
   
-  ReservedWords EventClass[WordCount];
-  
+//+------------------------------------------------------------------+
+//| Monitoring - Returns true if this indicator is being monitored   |
+//+------------------------------------------------------------------+
+bool Monitoring(string Indicator)
+  {
+    for (int ind=0;ind<ArraySize(Monitor);ind++)
+      if (upper(Indicator)==IndicatorName[ind])
+        return (Monitor[ind]);
+        
+    return (false);
+  }
+
 //+------------------------------------------------------------------+
 //| CallPause - pauses based on class level events                   |
 //+------------------------------------------------------------------+
@@ -62,28 +78,30 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
     string  cpMessage      = EnumToString(Event)+" alert detected on "+Indicator+"\n";
     int     cpStyle        = BoolToInt(Action==OP_NO_ACTION,MB_OKCANCEL|MB_ICONEXCLAMATION,MB_YESNOCANCEL|MB_ICONQUESTION);
     
-    if (Action!=OP_NO_ACTION)
-      Append(cpMessage,ActionText(Action)+" triggered, click Yes to trade, No for contrarian","\n");
-      
-    if (EventClass[Class])
-    {
-      cpResponse = Pause(cpMessage,EnumToString(Class)+" Alert",cpStyle);
-      
-      switch (cpStyle)
-      {
-        case MB_OKCANCEL|MB_ICONEXCLAMATION:  if (cpResponse==IDCANCEL)
-                                                EventClass[Class] = false;
-                                              break;
+    if (LockEvent==NoEvent || Event==LockEvent)
+      if (Monitoring(Indicator))
+        if (EventClass[Class])
+        {
+          if (Action!=OP_NO_ACTION)
+            Append(cpMessage,ActionText(Action)+" triggered, click Yes to "+ActionText(Action)+", No to trade contrarian ("+ActionText(Action)+")","\n");
 
-        default:  if (cpResponse==IDCANCEL)
-                    return;
+          cpResponse = Pause(cpMessage,EnumToString(Class)+" Alert",cpStyle);
+      
+          switch (cpStyle)
+          {
+            case MB_OKCANCEL|MB_ICONEXCLAMATION:  if (cpResponse==IDCANCEL)
+                                                    EventClass[Class] = false;
+                                                  break;
 
-                  if (cpResponse==IDNO)
-                    cpContrarian      = true;
+            default:  if (cpResponse==IDCANCEL)
+                        return;
+
+                      if (cpResponse==IDNO)
+                        cpContrarian      = true;
                   
-                  OpenOrder(Action(Action,InAction,cpContrarian),Indicator+" "+EnumToString(Event));
-      }
-    }
+                      OpenOrder(Action(Action,InAction,cpContrarian),Indicator+"("+EnumToString(Event)+")");
+          }
+        }
   }
 
 //+------------------------------------------------------------------+
@@ -111,68 +129,7 @@ void GetData(void)
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
-  {    
-    switch (hmShowLineType)
-    {
-      case Term:       UpdateLine("pfBase",pfractal[Term].Base,STYLE_DASH,clrGoldenrod);
-                       UpdateLine("pfRoot",pfractal[Term].Root,STYLE_DASH,clrSteelBlue);
-                       UpdateLine("pfExpansion",pfractal[Term].Expansion,STYLE_DASH,clrFireBrick);
-                       break;
-      
-      case Trend:      UpdateLine("pfBase",pfractal[Trend].Base,STYLE_SOLID,clrGoldenrod);
-                       UpdateLine("pfRoot",pfractal[Trend].Root,STYLE_SOLID,clrSteelBlue);
-                       UpdateLine("pfExpansion",pfractal[Trend].Expansion,STYLE_SOLID,clrFireBrick);
-                       break;
-                       
-      case Origin:     UpdateLine("pfBase",pfractal.Price(Origin,Base),STYLE_DOT,clrGoldenrod);
-                       UpdateLine("pfRoot",pfractal.Price(Origin,Root),STYLE_DOT,clrSteelBlue);
-                       UpdateLine("pfExpansion",pfractal.Price(Origin,Expansion),STYLE_DOT,clrFireBrick);
-                       break;
-
-      default:         UpdateLine("pfBase",0.00,STYLE_DOT,clrNONE);
-                       UpdateLine("pfRoot",0.00,STYLE_DOT,clrNONE);
-                       UpdateLine("pfExpansion",0.00,STYLE_DOT,clrNONE);
-                       break;
-    }
-    
-//    UpdatePriceLabel("hmIdle",hmIdlePrice,DirColor(hmIdleDir,clrYellow,clrRed));
-//    UpdatePriceLabel("hmTrade(e)",hmTradePrice,DirColor(hmTradeDir,clrYellow,clrRed));    
-//    UpdatePriceLabel("hmTrade(r)",hmTradePrice,DirColor(hmTradeDir,clrYellow,clrRed));    
-  }
-
-//+------------------------------------------------------------------+
-//| EventCheck - Scan for entry/exit positions                       |
-//+------------------------------------------------------------------+
-void EventCheck(int Event)
-  {
-    static int ecDivergent    = 0;
-    static int ecResume       = 0;
-    static int ecTradeState   = NoState;
-    
-    switch (Event)
-    {
-      case Divergent:    //NewArrow(BoolToInt(pfractal[Term].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-                         //        +DirColor(pfractal[Term].Direction,clrYellow,clrRed),"Term Divergence("+IntegerToString(ecDivergent++)+")");
-                         //Pause("Divergences do occur!","Divergent Trigger");
-                         
-                         //OpenOrder(Action(pfractal[Term].Direction,InDirection),"Scalp");
-                         break;
-
-      case Term:         //OpenDCAPlan(Action(pfractal[Term].Direction,InDirection,InContrarian),ordEQMinTarget,CloseAll);
-                         break;
-
-      case Trend:        //Pause("New "+EnumToString((RetraceType)Event)+" detected","Trend Trigger");
-                         break;
-
-      case Minor:        break;
-      
-      case Major:        //CloseOrders(CloseMax,Action(pfractal[Term].Direction,InDirection),"Major PT");
-                         break;
-
-      case Boundary:     //Pause("New "+EnumToString((ReservedWords)Event)+" detected","Boundary Trigger");
-                         break;
-
-    }
+  {        
   }
 
 //+------------------------------------------------------------------+
@@ -180,36 +137,70 @@ void EventCheck(int Event)
 //+------------------------------------------------------------------+
 void ExecPipFractal(void)
   {
-    if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
-      SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);
-      
-    if (pfractal.Event(NewMinor))
-      if (pfractal.Event(NewTerm))
-        EventCheck(Term);
-      else
-        EventCheck(Minor);
-    else
-    if (pfractal.Event(NewMajor))
-      if (pfractal.Event(NewTrend))
-        EventCheck(Trend);
-      else
-        EventCheck(Major);
-    else
-    if (pfractal.Event(NewTerm))
-      EventCheck(Divergent);
-    else
+    int           epfAction  = Action(pfractal.Direction(Tick),InDirection);
+
+    ReservedWords epfClass   = Default;
+    EventType     epfEvent   = NoEvent;
+
     if (pfractal.Event(NewBoundary))
-      EventCheck(Boundary);
+    {
+      epfClass               = Boundary;
+      epfEvent               = NewBoundary;
       
-   if (pfractal.Event(NewHigh))
-     if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
-       if (IsChanged(pfPolyDir,DirectionUp))
-         CallPause(Minor,NewBoundary,"PipFractal (Poly)",OP_BUY);
-         
-   if (pfractal.Event(NewLow))
-     if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
-       if (IsChanged(pfPolyDir,DirectionDown))
-         CallPause(Minor,NewBoundary,"PipFractal (Poly)",OP_SELL);
+      if (pfractal.HistoryLoaded())
+      {
+        if (pfractal.Event(NewHigh))
+          if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
+            if (IsChanged(pfPolyDir,DirectionUp))
+            {
+              epfClass       = Minor;
+              epfEvent       = NewPoly;
+            }
+
+        if (pfractal.Event(NewLow))
+          if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+            if (IsChanged(pfPolyDir,DirectionDown))
+            {
+              epfClass       = Minor;
+              epfEvent       = NewPoly;
+            }
+      }
+    }
+        
+    if (pfractal.Event(NewTerm))
+    {
+      epfClass              = Minor;
+      epfEvent              = NewDivergence;
+    }
+
+    if (pfractal.Event(NewMinor))
+    {
+      epfClass              = Minor;
+
+      if (pfractal.Event(NewTerm))
+        epfEvent            = NewReversal;
+      else
+        epfEvent            = NewBreakout;
+    }
+
+    if (pfractal.Event(NewMajor))
+    {
+      epfClass              = Major;
+
+      if (pfractal.Event(NewTrend))
+        epfEvent            = NewReversal;
+      else
+        epfEvent            = NewBreakout;
+    }
+
+    if (pfractal.Event(MarketIdle))
+      CallPause(Tick,MarketIdle,"PipFractal");
+
+    if (pfractal.Event(MarketResume))
+//      CallPause(Tick,MarketResume,"PipFractal",epfAction);
+      ExecOrders(Tick,MarketResume,"PipFractal",Action(fractal[fractal.State(Major)].Direction,InDirection));
+
+    CallPause(epfClass,epfEvent,"PipFractal",epfAction);
   }
   
 //+------------------------------------------------------------------+
@@ -217,58 +208,56 @@ void ExecPipFractal(void)
 //+------------------------------------------------------------------+
 void ExecFractal(void)
   {
+    int           efAction   = Action(fractal[fractal.State(Now)].Direction,InDirection);
+
+    ReservedWords efClass    = Default;
+    EventType     efEvent    = NoEvent;
+  
     if (fractal.Event(NewMajor))
-      CallPause(Major,NewMajor,"Fractal");
+      if (fractal.IsDivergent())
+      {
+      }
+
+    CallPause(Major,NewDivergence,"Fractal",efAction);
   }
 
 //+------------------------------------------------------------------+
 //| ExecSession - Test for session events                            |
 //+------------------------------------------------------------------+
 void ExecSession(void)
-  {
-    static int esIdx      = 0;
-    
+  {    
     if (leadSession.Event(NewDirection))
-      if (leadSession.SessionHour()>2)
-        CallPause(Major,NewBreakout,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
-        //if (OpenOrder(Action(leadSession[ActiveSession].Direction,InDirection),"Session"))
-       // NewArrow(BoolToInt(leadSession[ActiveSession].Direction==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-       //          DirColor(leadSession[ActiveSession].Direction,clrYellow,clrRed),
-       //          EnumToString(leadSession.Type())+":"+IntegerToString(esIdx++));
-    
+      switch (leadSession.SessionHour())
+      {
+        case 1:   CallPause(Tick,NewDirection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+                  break;
+
+        case 2:   CallPause(Minor,NewDirection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+                  break;
+
+        default:  CallPause(Major,NewBreakout,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+                  break;
+      }
+
+    if (leadSession.Event(MarketCorrection))
+      CallPause(Major,MarketCorrection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+
+    if (session[Daily].Event(MarketCorrection))
+      CallPause(Major,MarketCorrection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));      
   }
 
 //+------------------------------------------------------------------+
 //| ExecOrders - Processes Open Order triggers                       |
 //+------------------------------------------------------------------+
-void ExecOrders(void)
+void ExecOrders(ReservedWords Class, EventType Event, string Indicator, int Action=OP_NO_ACTION)
   {
-    int  eoMBResponse   = NoValue;
-    bool eoContrarian   = false;
-    
-    if (hmOrderAction!=OP_NO_ACTION)
-      if (pfractal.HistoryLoaded())
-      {
-        eoMBResponse        = Pause("Shall I "+ActionText(hmOrderAction)+"?","Time to Trade!",MB_YESNOCANCEL|MB_ICONQUESTION);
-        
-        switch (eoMBResponse)
-        {
-          case IDYES:     eoContrarian   = false;
-                          break;
-                        
-          case IDNO:      eoContrarian   = true;
-                          break;
-                        
-          case IDCANCEL:  hmOrderAction  = OP_NO_ACTION;
-                          return;
-        }
-                                
-        if (OpenOrder(Action(hmOrderAction,InAction,eoContrarian),hmOrderReason))
-        {
-          hmOrderAction     = OP_NO_ACTION;
-          hmOrderReason     = "";
-        }
-      }
+    if (OpenOrder(Action,Indicator+"("+EnumToString(Event)+")"))
+      SetStopPrice(Action,fractal.Price(fractal.Previous(fractal.State(Major))));
+      
+    //{
+    //   hmOrderAction     = OP_NO_ACTION;
+    //   hmOrderReason     = "";
+    //}
   }
 
 //+------------------------------------------------------------------+
@@ -276,6 +265,8 @@ void ExecOrders(void)
 //+------------------------------------------------------------------+
 void ExecRiskManagement(void)
   {
+      if (EquityPercent()==-ordEQMaxRisk)
+        CloseOrders(CloseLoss);
 //    if (LotValue(OP_SELL,Loss,InEquity)<-ordEQMinProfit)
 //     if (LotValue(OP_SELL,Net,InEquity)>=0.00)
  
@@ -292,6 +283,9 @@ void ExecRiskManagement(void)
 void ExecProfitManagement(void)
   {
     int epmTickets[1]   = {0};
+
+    if (fmin(pfractal.Age(RangeLow),pfractal.Age(RangeHigh))==1)
+      SetEquityHold(Action(pfractal[Term].Direction,InDirection),3,true);    
     
     for (int ord=0;ord<OrdersTotal();ord++)
       if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
@@ -320,8 +314,54 @@ void Execute(void)
     ExecFractal();
     ExecSession();
     ExecRiskManagement();
-    ExecProfitManagement();
-    ExecOrders();
+    //ExecProfitManagement();
+    //ExecOrders();
+  }
+
+//+------------------------------------------------------------------+
+//| AlertFound - validates reserved words and returns the enum id    |
+//+------------------------------------------------------------------+
+bool AlertFound(string EventName, ReservedWords &AlertCode)
+  {
+    for (ReservedWords alert=0;alert<WordCount;alert++)
+      if (upper(EnumToString(alert))==EventName)
+      {
+        AlertCode          = alert;
+        return (true);
+      }
+
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| SetEventLock - Disables alerts for all events except provided    |
+//+------------------------------------------------------------------+
+void SetEventLock(string EventName)
+  {
+    LockEvent              = NoEvent;
+  
+    for (EventType event=0;event<EventTypes;event++)
+      if (upper(EnumToString(event))==EventName)
+      {
+        LockEvent          = event;
+        break;
+      }
+  }
+
+//+------------------------------------------------------------------+
+//| SetMonitorLock - Disables alerts for indicators except provided  |
+//+------------------------------------------------------------------+
+void SetMonitorLock(string Indicator)
+  {
+    ArrayInitialize(Monitor,true);
+  
+    for (int ind=0;ind<ArraySize(Monitor);ind++)
+      if (IndicatorName[ind]==Indicator)
+      {
+        ArrayInitialize(Monitor,false);
+        Monitor[ind]       = true;
+        break;
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -329,20 +369,25 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
-    if (Command[0] == "SHOW")
-      if (StringSubstr(Command[1],0,4) == "LINE")
+    ReservedWords eacAlertCode;
+    
+    if (Command[0] == "SET")
+    {
+      if (AlertFound(Command[1],eacAlertCode))
       {
-         hmShowLineType    = NoValue;
-
-         if (Command[2] == "ORIGIN")
-           hmShowLineType    = Origin;
-
-         if (Command[2] == "TREND")
-           hmShowLineType    = Trend;
-
-         if (Command[2] == "TERM")
-           hmShowLineType    = Term;
+        if (Command[2] == "ON")
+          EventClass[eacAlertCode]  = true;
+          
+        if (Command[2] == "OFF")
+          EventClass[eacAlertCode]  = false;
       }
+    }
+
+    if (Command[0] == "LOCK")
+      SetEventLock(Command[1]);
+
+    if (Command[0] == "MONITOR")
+      SetMonitorLock(Command[1]);
   }
 
 //+------------------------------------------------------------------+

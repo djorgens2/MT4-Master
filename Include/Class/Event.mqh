@@ -18,6 +18,7 @@ class CEvent
 protected:
        enum     EventType
                 {
+                  NoEvent,
                   NewDirection,
                   NewFractal,
                   NewFibonacci,
@@ -31,11 +32,11 @@ protected:
                   NewTerm,
                   NewTrend,
                   NewDivergence,
+                  NewPoly,
                   NewHigh,
                   NewLow,
                   NewTradeBias,
                   NewBoundary,
-                  NewAggregate,
                   NewBreakout,
                   NewReversal,
                   NewRally,

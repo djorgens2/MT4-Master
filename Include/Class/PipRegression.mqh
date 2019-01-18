@@ -37,7 +37,7 @@ private:
 
 public:
 
-                CPipRegression(int Degree, int Periods, double Tolerance);
+                CPipRegression(int Degree, int Periods, double Tolerance, int IdleTime);
                ~CPipRegression();                     
 
     virtual
@@ -45,6 +45,8 @@ public:
        
     virtual
        void     Update(void);
+       
+    void        SetMarketIdleTime(int IdleTime) {ptrMarketIdleTime = IdleTime;};
 
     virtual
        int      Direction(int Direction, bool Contrarian=false);
@@ -67,6 +69,7 @@ protected:
        int      ptrRangeAge;
        int      ptrRangeAgeHigh;
        int      ptrRangeAgeLow;
+       int      ptrMarketIdleTime;
        
        double   ptrRangeSize;
        double   ptrRangeMean;
@@ -192,10 +195,7 @@ int CPipRegression::CalcState(double Last, double Current)
 //+------------------------------------------------------------------+
 void CPipRegression::CalcMA(void)
   {
-    static int cmaRangeDir  = DirectionNone;
-    static int cmaAggregate = DirectionNone;
-    
-    ClearEvent(NewAggregate);
+    static int  cmaRangeDir     = DirectionNone;
     
     if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=1.0)
     {
@@ -259,9 +259,6 @@ void CPipRegression::CalcMA(void)
       ptrRangeAge++;
     }
 
-    if (IsChanged(cmaAggregate,ptrRangeDirHigh+ptrRangeDirLow))
-      SetEvent(NewAggregate);
-
     ptrTick++;
   }
 
@@ -270,9 +267,10 @@ void CPipRegression::CalcMA(void)
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-CPipRegression::CPipRegression(int Degree, int Periods, double Tolerance) : CTrendRegression(Degree,Periods,0)
+CPipRegression::CPipRegression(int Degree, int Periods, double Tolerance, int IdleTime) : CTrendRegression(Degree,Periods,0)
   {
     SetTrendlineTolerance(Tolerance);
+    SetMarketIdleTime(IdleTime);
     
     pipHistory = new CArrayDouble(Degree+Periods);    
     pipHistory.Truncate  = true;

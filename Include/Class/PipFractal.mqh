@@ -59,7 +59,7 @@ class CPipFractal : public CPipRegression
           
 
     public:
-                     CPipFractal(int Degree, int Periods, double Tolerance, CFractal &Fractal);
+                     CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime, CFractal &Fractal);
                     ~CPipFractal();
                              
        virtual
@@ -94,16 +94,29 @@ class CPipFractal : public CPipRegression
 //+------------------------------------------------------------------+
 void CPipFractal::CalcFiboChange(void)
   {
-    static int cfcFiboLevel     = FiboRoot;
-    static int cfcFiboDir       = DirectionNone;
-           int cfcFiboLevelNow  = fabs(FiboLevel(Fibonacci(Term,Expansion,Max),Signed));
+    static int  cfcFiboLevel     = FiboRoot;
+    static int  cfcFiboDir       = DirectionNone;
+           int  cfcFiboLevelNow  = fabs(FiboLevel(Fibonacci(Term,Expansion,Max),Signed));
+
+    static int  cfcBoundaryAge   = 0;
+    static int  cfcMarketIdle    = false;
+    static bool cfcNewMajor      = false;
     
+    ClearEvent(MarketIdle);
+    ClearEvent(MarketResume);
     ClearEvent(NewMajor);
     ClearEvent(NewMinor);
 
     if (IsChanged(cfcFiboDir,this.Direction(Term)))
       cfcFiboLevel              = FiboRoot;
     
+    if (fmin(ptrRangeAgeLow,ptrRangeAgeHigh)==1)
+      if (cfcMarketIdle)
+      {
+        SetEvent(MarketResume);
+        cfcMarketIdle    = false;
+      } 
+
     if (cfcFiboLevelNow>cfcFiboLevel)
     {
       cfcFiboLevel              = cfcFiboLevelNow;
@@ -114,6 +127,14 @@ void CPipFractal::CalcFiboChange(void)
       if (cfcFiboLevel==Fibo100)
         SetEvent(NewMinor);
     }
+
+    if (cfcFiboLevelNow>Fibo100)
+      if (IsChanged(cfcBoundaryAge,fmin(ptrRangeAgeLow,ptrRangeAgeHigh)))
+        if (cfcBoundaryAge>=ptrMarketIdleTime)
+        {
+          SetEvent(MarketIdle);
+          cfcMarketIdle    = true;
+        }    
   }
   
 //+------------------------------------------------------------------+
@@ -317,7 +338,7 @@ void CPipFractal::CalcPipFractal(void)
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, CFractal &Fractal) : CPipRegression(Degree,Periods,Tolerance)
+CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime, CFractal &Fractal) : CPipRegression(Degree,Periods,Tolerance,IdleTime)
   {
     RetraceType   state        = Actual;
     
