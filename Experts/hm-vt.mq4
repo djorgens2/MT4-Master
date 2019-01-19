@@ -197,8 +197,8 @@ void ExecPipFractal(void)
       CallPause(Tick,MarketIdle,"PipFractal");
 
     if (pfractal.Event(MarketResume))
-//      CallPause(Tick,MarketResume,"PipFractal",epfAction);
-      ExecOrders(Tick,MarketResume,"PipFractal",Action(fractal[fractal.State(Major)].Direction,InDirection));
+      CallPause(Tick,MarketResume,"PipFractal",epfAction);
+//      ExecOrders(Tick,MarketResume,"PipFractal",Action(fractal[fractal.State(Major)].Direction,InDirection));
 
     CallPause(epfClass,epfEvent,"PipFractal",epfAction);
   }
@@ -214,11 +214,26 @@ void ExecFractal(void)
     EventType     efEvent    = NoEvent;
   
     if (fractal.Event(NewMajor))
+    {
+      efClass                = Major;
+      
       if (fractal.IsDivergent())
-      {
-      }
+        efEvent              = NewDivergence;
+      else
+      if (fractal.IsBreakout(Term))
+        efEvent              = NewBreakout;
+      else
+      if (fractal.IsReversal(Term))
+        efEvent              = NewReversal;
+    }
+    
+    if (fractal.Event(MarketCorrection))
+    {
+      efClass                = Major;      
+      efEvent                = MarketCorrection;
+    }
 
-    CallPause(Major,NewDivergence,"Fractal",efAction);
+    CallPause(efClass,efEvent,"Fractal",efAction);
   }
 
 //+------------------------------------------------------------------+
@@ -252,8 +267,7 @@ void ExecSession(void)
 void ExecOrders(ReservedWords Class, EventType Event, string Indicator, int Action=OP_NO_ACTION)
   {
     if (OpenOrder(Action,Indicator+"("+EnumToString(Event)+")"))
-      SetStopPrice(Action,fractal.Price(fractal.Previous(fractal.State(Major))));
-      
+      SetStopPrice(Action,fractal.Price(fractal.Previous(fractal.State(Major))));      
     //{
     //   hmOrderAction     = OP_NO_ACTION;
     //   hmOrderReason     = "";
@@ -265,8 +279,16 @@ void ExecOrders(ReservedWords Class, EventType Event, string Indicator, int Acti
 //+------------------------------------------------------------------+
 void ExecRiskManagement(void)
   {
-      if (EquityPercent()==-ordEQMaxRisk)
-        CloseOrders(CloseLoss);
+    if (EquityPercent()<=-ordEQMaxRisk)
+      CloseOrders(CloseLoss);
+
+    if (pfractal.Event(NewMajor))
+    {
+      OpenDCAPlan(Action(pfractal.Direction(Term),InDirection,InContrarian),1,CloseAll);
+     // Pause("I got here","DCA Plan Open for "+ActionText(Action(pfractal.Direction(Term),InDirection,InContrarian)));
+    }
+        
+        
 //    if (LotValue(OP_SELL,Loss,InEquity)<-ordEQMinProfit)
 //     if (LotValue(OP_SELL,Net,InEquity)>=0.00)
  
