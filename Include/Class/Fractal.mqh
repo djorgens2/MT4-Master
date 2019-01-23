@@ -307,7 +307,7 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
   {
     double lastRangeTrend    = 0.0;
     double lastRangeTerm     = fRange;
-  
+    
     for (RetraceType type=Type;type<RetraceTypes;type++)
     {    
       //--- Initialize retrace data by type
@@ -353,6 +353,8 @@ void CFractal::CalcRetrace(void)
   {
     RetraceType crStateMajor    = Expansion;
     RetraceType crStateMinor    = Expansion;
+    
+    bool        crRetracePeg    = Fibonacci(fStateMajor,Retrace,Max)<FiboPercent(Fibo50);
     
     //--- calc interior retraces    
     for (RetraceType type=Expansion;type<RetraceTypes;type++)
@@ -411,7 +413,12 @@ void CFractal::CalcRetrace(void)
       fEvents.SetEvent(NewMinor);
       
     if (IsChanged(fStateMajor,crStateMajor))
+    {
       fEvents.SetEvent(NewMajor);
+      
+      if (!crRetracePeg)
+        fEvents.SetEvent(UnpeggedDivergence);      
+    }
   }
 
   
@@ -444,14 +451,19 @@ void CFractal::UpdateFractal(int Direction)
     InsertFractal(f[Divergent]);
     
     if (IsChanged(fDirection,Direction))
+    {
       f[Expansion].Reversal    = true;
 
+      fEvents.SetEvent(NewReversal);
+    }
     else
     {
       InsertFractal(f[Convergent]);
       
       f[Expansion].Breakout    = true;
       f[Root].Peg              = true;
+
+      fEvents.SetEvent(NewBreakout);
     }
 
     fEvents.SetEvent(NewFractal);  //--- set new fractal alert

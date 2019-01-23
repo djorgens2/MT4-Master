@@ -15,6 +15,7 @@
 //--- Input params
 input string    appHeader          = "";    //+------ Application inputs ------+
 input int       inpMarketIdle      = 50;    // Market Idle Alert (pipMA periods)
+input bool      inpShowFiboArrow   = true;  // Display PipMA fibonacci arrows
 
 input string    PipMAHeader        = "";    //+------ PipMA inputs ------+
 input int       inpDegree          = 6;     // Degree of poly regression
@@ -78,12 +79,15 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
     string  cpMessage      = EnumToString(Event)+" alert detected on "+Indicator+"\n";
     int     cpStyle        = BoolToInt(Action==OP_NO_ACTION,MB_OKCANCEL|MB_ICONEXCLAMATION,MB_YESNOCANCEL|MB_ICONQUESTION);
     
+    if (Event==NoEvent)
+      return;
+
     if (LockEvent==NoEvent || Event==LockEvent)
       if (Monitoring(Indicator))
         if (EventClass[Class])
-        {
+        {            
           if (Action!=OP_NO_ACTION)
-            Append(cpMessage,ActionText(Action)+" triggered, click Yes to "+ActionText(Action)+", No to trade contrarian ("+ActionText(Action)+")","\n");
+            Append(cpMessage,ActionText(Action)+" triggered, click Yes to "+ActionText(Action)+", No to trade contrarian.","\n");
 
           cpResponse = Pause(cpMessage,EnumToString(Class)+" Alert",cpStyle);
       
@@ -113,7 +117,8 @@ void GetData(void)
     lfractal.Update();
     pfractal.Update();
     
-    pfractal.ShowFiboArrow();
+    if (inpShowFiboArrow)
+      pfractal.ShowFiboArrow();
 
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
@@ -129,7 +134,11 @@ void GetData(void)
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
-  {        
+  {
+    if (fractal.Event(MarketCorrection))
+      NewArrow(BoolToInt(fractal.Direction(fractal.State(Now))==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+               DirColor(fractal.Direction(fractal.State(Now)),clrYellow),"Correction-"+
+               DirText(fractal.Direction(fractal.State(Major))));
   }
 
 //+------------------------------------------------------------------+
@@ -219,18 +228,36 @@ void ExecFractal(void)
       
       if (fractal.IsDivergent())
         efEvent              = NewDivergence;
-      else
-      if (fractal.IsBreakout(Term))
-        efEvent              = NewBreakout;
-      else
-      if (fractal.IsReversal(Term))
-        efEvent              = NewReversal;
     }
     
     if (fractal.Event(MarketCorrection))
     {
-      efClass                = Major;      
       efEvent                = MarketCorrection;
+      efClass                = Minor;
+      
+      if (fractal.IsMajor(fractal.State(Now)))
+        efClass              = Major;
+    }
+    
+    if (fractal.Event(NewFractal))
+    {
+      efClass                = Major;
+      efEvent                = NewFractal;
+
+      if (fractal.Event(NewBreakout))
+        efEvent              = NewBreakout;
+
+      if (fractal.Event(NewReversal))
+        efEvent              = NewReversal;
+      
+    }
+    
+    if (fractal.Event(UnpeggedDivergence))
+    {
+      NewArrow(SYMBOL_CHECKSIGN,DirColor(fractal.Direction(fractal.State(Major)),clrYellow),"Divergence-"+
+                                DirText(fractal.Direction(fractal.State(Major))));
+      efClass                = Major;
+      efEvent                = UnpeggedDivergence;      
     }
 
     CallPause(efClass,efEvent,"Fractal",efAction);
@@ -375,15 +402,11 @@ void SetEventLock(string EventName)
 //+------------------------------------------------------------------+
 void SetMonitorLock(string Indicator)
   {
-    ArrayInitialize(Monitor,true);
-  
+    ArrayInitialize(Monitor,false);
+
     for (int ind=0;ind<ArraySize(Monitor);ind++)
       if (IndicatorName[ind]==Indicator)
-      {
-        ArrayInitialize(Monitor,false);
         Monitor[ind]       = true;
-        break;
-      }
   }
 
 //+------------------------------------------------------------------+
