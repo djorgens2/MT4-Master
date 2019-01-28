@@ -1,4 +1,4 @@
-//+------------------------------------------------------------------+
+`//+------------------------------------------------------------------+
 //|                                                        hm-v3.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
@@ -16,6 +16,7 @@
 input string    appHeader          = "";    //+------ Application inputs ------+
 input int       inpMarketIdle      = 50;    // Market Idle Alert (pipMA periods)
 input bool      inpShowFiboArrow   = true;  // Display PipMA fibonacci arrows
+input int       inpDailyTarget     = 12;    // Daily Target In Percentage
 
 input string    PipMAHeader        = "";    //+------ PipMA inputs ------+
 input int       inpDegree          = 6;     // Degree of poly regression
@@ -24,10 +25,7 @@ input double    inpTolerance       = 0.5;   // Trend change tolerance (sensitivi
 input int       inpIdleTime        = 50;    // Market idle time in Pips
 
 input string    fractalHeader      = "";    //+------ Fractal inputs ------+
-input int       inpRangeMax        = 120;   // Maximum fractal pip range
-input int       inpRangeMin        = 60;    // Minimum fractal pip range
-input int       inpRangeLT         = 600;   // Long term fractal pip range
-input int       inpRangeST         = 300;   // Short term fractal pip range
+input int       inpFractalRange    = 60;    // Fractal test range in Pips
 
 input string    SessionHeader      = "";    //+---- Session Hours -------+
 input int       inpAsiaOpen        = 1;     // Asian market open hour
@@ -39,8 +37,7 @@ input int       inpUSClose         = 23;    // US market close hour
 
 
 //--- Class defs
-  CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
-  CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
+  CFractal     *fractal            = new CFractal(inpFractalRange*2,inpFractalRange);
   CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
 
   CSession     *session[SessionTypes];
@@ -53,6 +50,9 @@ input int       inpUSClose         = 23;    // US market close hour
 
   //-- Operationals                   
   int           pfPolyDir          = DirectionNone;
+  double        fMajor             = 0.00;
+  double        fMinor             = 0.00;
+  double        fRetrace           = 0.00;
 
   int           hmOrderAction      = OP_NO_ACTION;
   string        hmOrderReason      = "";
@@ -135,6 +135,10 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    UpdateLine("fRetrace",fRetrace,STYLE_DOT,clrRed);
+    UpdateLine("fMinor",fMinor,STYLE_DASH,clrSteelBlue);
+    UpdateLine("fMajor",fMajor,STYLE_SOLID,clrGoldenrod);
+
     if (fractal.Event(MarketCorrection))
       NewArrow(BoolToInt(fractal.Direction(fractal.State(Now))==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
                DirColor(fractal.Direction(fractal.State(Now)),clrYellow),"Correction-"+
@@ -252,13 +256,13 @@ void ExecFractal(void)
       
     }
     
-    if (fractal.Event(UnpeggedDivergence))
-    {
-      NewArrow(SYMBOL_CHECKSIGN,DirColor(fractal.Direction(fractal.State(Major)),clrYellow),"Divergence-"+
-                                DirText(fractal.Direction(fractal.State(Major))));
-      efClass                = Major;
-      efEvent                = UnpeggedDivergence;      
-    }
+    if (fractal.IsMajor(fractal.State(Now)))
+      fMajor                  = fractal.Price(fractal.State(Major),Fibo50);
+    else
+    if (fractal.IsMinor(fractal.State(Now)))
+      fMinor                  = fractal.Price(fractal.State(Minor),Fibo50);
+    else
+      fRetrace                = fractal.Price(fractal.Next(fractal.State(Minor)),Fibo50);
 
     CallPause(efClass,efEvent,"Fractal",efAction);
   }
@@ -311,7 +315,7 @@ void ExecRiskManagement(void)
 
     if (pfractal.Event(NewMajor))
     {
-      OpenDCAPlan(Action(pfractal.Direction(Term),InDirection,InContrarian),1,CloseAll);
+      OpenDCAPlan(Action(pfractal.Direction(Term),InDirection,InContrarian),EquityPercent()+ordEQMinProfit,CloseAll);
      // Pause("I got here","DCA Plan Open for "+ActionText(Action(pfractal.Direction(Term),InDirection,InContrarian)));
     }
         
@@ -476,14 +480,10 @@ int OnInit()
 
     ArrayInitialize(EventClass,true);
     
-    NewLine("pfBase");
-    NewLine("pfRoot");
-    NewLine("pfExpansion");
-    
-    NewPriceLabel("hmTrade(r)");
-    NewPriceLabel("hmTrade(e)");
-    NewPriceLabel("hmIdle",0,True);
-    
+    NewLine("fRetrace",fRetrace,STYLE_DOT,clrRed);
+    NewLine("fMinor",fMinor,STYLE_DASH,clrSteelBlue);
+    NewLine("fMajor",fMajor,STYLE_SOLID,clrGoldenrod);
+
     return(INIT_SUCCEEDED);
   }
 

@@ -404,8 +404,8 @@ void CSession::UpdateTrendState(TrendRecType Type)
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {
-    ReservedWords stsState             = NoState;
-    ReservedWords stsHighState         = NoState;
+    ReservedWords usState              = NoState;
+    ReservedWords usHighState          = NoState;
     
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
@@ -413,15 +413,15 @@ void CSession::UpdateSession(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionUp))
-        stsState                       = Rally;
+        usState                        = Rally;
 
       if (IsHigher(srec[ActiveSession].High,srec[ActiveSession].Resistance,NoUpdate))
         if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp))
-          stsState                     = Reversal;
+          usState                      = Reversal;
         else
-          stsState                     = Breakout;
+          usState                      = Breakout;
           
-      stsHighState                     = stsState;   //-- Retain high on outside reversal
+      usHighState                      = usState;   //-- Retain high on outside reversal
     }
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
@@ -430,13 +430,13 @@ void CSession::UpdateSession(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionDown))
-        stsState                       = Pullback;
+        usState                        = Pullback;
 
       if (IsLower(srec[ActiveSession].Low,srec[ActiveSession].Support,NoUpdate))
         if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown))
-          stsState                     = Reversal;
+          usState                      = Reversal;
         else
-          stsState                     = Breakout;
+          usState                      = Breakout;
     }
     
     //-- Apply outside reversal correction possible only during historical analysis
@@ -445,7 +445,7 @@ void CSession::UpdateSession(void)
       if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
         if (srec[ActiveSession].Direction==DirectionUp)
         {
-          stsState                     = stsHighState;  //-- Outside reversal; use retained high
+          usState                      = usHighState;  //-- Outside reversal; use retained high
           sEvent.ClearEvent(NewLow);
         }
         else
@@ -455,7 +455,7 @@ void CSession::UpdateSession(void)
     if (sEvent[NewBoundary])          
       srec[ActiveSession].ActiveClose  = ActiveMid();
 
-    if (NewState(srec[ActiveSession].State,stsState))
+    if (NewState(srec[ActiveSession].State,usState))
       sStateTime                       = Time[sBar];
   }
   

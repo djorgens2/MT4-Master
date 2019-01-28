@@ -354,11 +354,13 @@ void CFractal::CalcRetrace(void)
     RetraceType crStateMajor    = Expansion;
     RetraceType crStateMinor    = Expansion;
     
-    bool        crRetracePeg    = Fibonacci(fStateMajor,Retrace,Max)<FiboPercent(Fibo50);
+    bool        crRetracePeg    = false;
     
     //--- calc interior retraces    
     for (RetraceType type=Expansion;type<RetraceTypes;type++)
     {
+      crRetracePeg              = f[type].Peg;
+
       if (this.Direction(type) == DirectionUp)
         if (f[type].Bar == NoValue)
           UpdateRetrace(type,fBarNow,High[fBarNow]);
@@ -413,12 +415,7 @@ void CFractal::CalcRetrace(void)
       fEvents.SetEvent(NewMinor);
       
     if (IsChanged(fStateMajor,crStateMajor))
-    {
       fEvents.SetEvent(NewMajor);
-      
-      if (!crRetracePeg)
-        fEvents.SetEvent(UnpeggedDivergence);      
-    }
   }
 
   
@@ -697,7 +694,7 @@ RetraceType CFractal::State(ReservedWords Level=Now)
   }
 
 //+------------------------------------------------------------------+
-//| Price - Returns the forecasted Non-Origin fibonacci price        |
+//| Price - Returns the forecasted Origin fibonacci price            |
 //+------------------------------------------------------------------+
 double CFractal::Price(ReservedWords Type, FibonacciLevel Level)
   {

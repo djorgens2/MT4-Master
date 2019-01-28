@@ -56,9 +56,15 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdateLine("mRetrace",mRetrace,STYLE_DOT,clrRed);
-    UpdateLine("mMinor",mMinor,STYLE_DASH,clrSteelBlue);
-    UpdateLine("mMajor",mMajor,STYLE_SOLID,clrGoldenrod);
+    //UpdateLine("mRetrace",mRetrace,STYLE_DOT,clrRed);
+    //UpdateLine("mMinor",mMinor,STYLE_DASH,clrSteelBlue);
+    //UpdateLine("mMajor",mMajor,STYLE_SOLID,clrGoldenrod);
+//    UpdateLine("oTop",fractal.Price(Origin,Top),STYLE_DOT,clrRed);
+//    UpdateLine("oBottom",fractal.Price(Origin,Bottom),STYLE_DASH,clrSteelBlue);
+//    UpdateLine("oRetrace",fractal.Price(Origin,Retrace),STYLE_SOLID,clrGoldenrod);
+      UpdateLine("fExpansion",fractal[Expansion].Price,STYLE_DOT,clrRed);
+      UpdateLine("fRoot",BoolToDouble(fractal.Direction(Expansion)==DirectionUp,fractal.Price(Trend,Bottom),fractal.Price(Trend,Top)),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("fBase",fractal.Price(Trend,Previous),STYLE_DASH,clrGoldenrod);
   }
 
 //+------------------------------------------------------------------+
@@ -111,6 +117,14 @@ int OnInit()
     NewLine("mMinor");
     NewLine("mMajor");
     
+    NewLine("oTop");
+    NewLine("oBottom");
+    NewLine("oRetrace");
+    
+    NewLine("fBase");
+    NewLine("fRoot");
+    NewLine("fExpansion");
+
     return(INIT_SUCCEEDED);
   }
 
