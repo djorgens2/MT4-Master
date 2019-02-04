@@ -1,4 +1,4 @@
-`//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //|                                                        hm-v3.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
@@ -39,12 +39,15 @@ input int       inpUSClose         = 23;    // US market close hour
 //--- Class defs
   CFractal     *fractal            = new CFractal(inpFractalRange*2,inpFractalRange);
   CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
+  CEvent       *tevent             = new CEvent();
 
   CSession     *session[SessionTypes];
   CSession     *leadSession;
   
   ReservedWords EventClass[WordCount];
-  EventType     LockEvent          = NoEvent;
+  EventType     EventAlert[EventTypes];
+ 
+  EventType     EventLock          = NoEvent;
   string        IndicatorName[3]   = {"PIPFRACTAL","FRACTAL","SESSION"};
   bool          Monitor[3]         = {true,true,true};
 
@@ -56,7 +59,55 @@ input int       inpUSClose         = 23;    // US market close hour
 
   int           hmOrderAction      = OP_NO_ACTION;
   string        hmOrderReason      = "";
-  
+
+//+------------------------------------------------------------------+
+//| WordFound - validates reserved words and returns the enum id     |
+//+------------------------------------------------------------------+
+bool WordFound(string Name, ReservedWords &WordCode)
+  {
+    WordCode              = NoValue;
+    
+    for (ReservedWords word=0;word<WordCount;word++)
+      if (upper(EnumToString(word))==Name)
+      {
+        WordCode          = word;
+        return (true);
+      }
+
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| EventFound - validates event type and returns the enum id        |
+//+------------------------------------------------------------------+
+bool EventFound(string Name, EventType &EventCode)
+  {
+    EventCode              = NoValue;
+    
+    for (EventType event=0;event<EventTypes;event++)
+      if (upper(EnumToString(event))==Name)
+      {
+        EventCode          = event;
+        return (true);
+      }
+
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IndicatorFound - validates indicator name and returns the index  |
+//+------------------------------------------------------------------+
+bool IndicatorFound(string Name, int &IndicatorCode)
+  {
+    for (IndicatorCode=0;IndicatorCode<ArraySize(IndicatorName);IndicatorCode++)
+      if (IndicatorName[IndicatorCode]==Name)
+        return (true);
+
+    IndicatorCode          = NoValue;
+    
+    return (false);
+  }
+
 //+------------------------------------------------------------------+
 //| Monitoring - Returns true if this indicator is being monitored   |
 //+------------------------------------------------------------------+
@@ -81,11 +132,16 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
     
     if (Event==NoEvent)
       return;
+      
+    if (tevent[Event])
+      Pause(cpMessage,"Duplicate Event");
+    else
+      tevent.SetEvent(Event);
 
-    if (LockEvent==NoEvent || Event==LockEvent)
+    if (EventLock==NoEvent || Event==Event)
       if (Monitoring(Indicator))
-        if (EventClass[Class])
-        {            
+        if (EventClass[Class] && EventAlert[Event])
+        {
           if (Action!=OP_NO_ACTION)
             Append(cpMessage,ActionText(Action)+" triggered, click Yes to "+ActionText(Action)+", No to trade contrarian.","\n");
 
@@ -113,8 +169,9 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    tevent.ClearEvents();
+    
     fractal.Update();
-    lfractal.Update();
     pfractal.Update();
     
     if (inpShowFiboArrow)
@@ -211,7 +268,6 @@ void ExecPipFractal(void)
 
     if (pfractal.Event(MarketResume))
       CallPause(Tick,MarketResume,"PipFractal",epfAction);
-//      ExecOrders(Tick,MarketResume,"PipFractal",Action(fractal[fractal.State(Major)].Direction,InDirection));
 
     CallPause(epfClass,epfEvent,"PipFractal",epfAction);
   }
@@ -232,6 +288,8 @@ void ExecFractal(void)
       
       if (fractal.IsDivergent())
         efEvent              = NewDivergence;
+      else
+        efEvent              = NewExpansion;
     }
     
     if (fractal.Event(MarketCorrection))
@@ -253,7 +311,6 @@ void ExecFractal(void)
 
       if (fractal.Event(NewReversal))
         efEvent              = NewReversal;
-      
     }
     
     if (fractal.IsMajor(fractal.State(Now)))
@@ -271,38 +328,41 @@ void ExecFractal(void)
 //| ExecSession - Test for session events                            |
 //+------------------------------------------------------------------+
 void ExecSession(void)
-  {    
+  {
+    int           esAction   = leadSession.ActiveBias();
+
+    ReservedWords esClass    = Default;
+    EventType     esEvent    = NoEvent;
+      
     if (leadSession.Event(NewDirection))
       switch (leadSession.SessionHour())
       {
-        case 1:   CallPause(Tick,NewDirection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+        case 1:   esClass    = Tick;
+                  esEvent    = NewDirection;
                   break;
 
-        case 2:   CallPause(Minor,NewDirection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+        case 2:   esClass    = Minor;
+                  esEvent    = NewDirection;
                   break;
 
-        default:  CallPause(Major,NewBreakout,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+        default:  esClass    = Major;
+                  esEvent    = NewBreakout;
                   break;
       }
 
     if (leadSession.Event(MarketCorrection))
-      CallPause(Major,MarketCorrection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));
+    {
+      esClass    = Minor;
+      esEvent    = MarketCorrection;
+    }
 
     if (session[Daily].Event(MarketCorrection))
-      CallPause(Major,MarketCorrection,"Session",Action(leadSession[ActiveSession].Direction,InDirection));      
-  }
+    {
+      esClass    = Major;
+      esEvent    = MarketCorrection;
+    }
 
-//+------------------------------------------------------------------+
-//| ExecOrders - Processes Open Order triggers                       |
-//+------------------------------------------------------------------+
-void ExecOrders(ReservedWords Class, EventType Event, string Indicator, int Action=OP_NO_ACTION)
-  {
-    if (OpenOrder(Action,Indicator+"("+EnumToString(Event)+")"))
-      SetStopPrice(Action,fractal.Price(fractal.Previous(fractal.State(Major))));      
-    //{
-    //   hmOrderAction     = OP_NO_ACTION;
-    //   hmOrderReason     = "";
-    //}
+    CallPause(esClass,esEvent,"Session",esAction);      
   }
 
 //+------------------------------------------------------------------+
@@ -366,24 +426,9 @@ void Execute(void)
     ExecPipFractal();
     ExecFractal();
     ExecSession();
-    ExecRiskManagement();
+//    ExecRiskManagement();
     //ExecProfitManagement();
     //ExecOrders();
-  }
-
-//+------------------------------------------------------------------+
-//| AlertFound - validates reserved words and returns the enum id    |
-//+------------------------------------------------------------------+
-bool AlertFound(string EventName, ReservedWords &AlertCode)
-  {
-    for (ReservedWords alert=0;alert<WordCount;alert++)
-      if (upper(EnumToString(alert))==EventName)
-      {
-        AlertCode          = alert;
-        return (true);
-      }
-
-    return (false);
   }
 
 //+------------------------------------------------------------------+
@@ -391,12 +436,12 @@ bool AlertFound(string EventName, ReservedWords &AlertCode)
 //+------------------------------------------------------------------+
 void SetEventLock(string EventName)
   {
-    LockEvent              = NoEvent;
+    EventLock              = NoEvent;
   
     for (EventType event=0;event<EventTypes;event++)
       if (upper(EnumToString(event))==EventName)
       {
-        LockEvent          = event;
+        EventLock          = event;
         break;
       }
   }
@@ -418,25 +463,81 @@ void SetMonitorLock(string Indicator)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
-    ReservedWords eacAlertCode;
+    ReservedWords eacClass;
+    EventType     eacEvent;
+
+    int           eacIndicator;
+    string        eacMsg;
     
     if (Command[0] == "SET")
     {
-      if (AlertFound(Command[1],eacAlertCode))
-      {
-        if (Command[2] == "ON")
-          EventClass[eacAlertCode]  = true;
+      if (Command[1] == "CLASS")
+        if (WordFound(Command[2],eacClass))
+        {
+          if (Command[3] == "ON")
+            EventClass[eacClass]   = true;
           
-        if (Command[2] == "OFF")
-          EventClass[eacAlertCode]  = false;
-      }
+          if (Command[3] == "OFF")
+            EventClass[eacClass]   = false;
+        }
+      
+      if (Command[1] == "EVENT")
+        if (EventFound(Command[2],eacEvent))
+        {
+          if (Command[3] == "ON")
+            EventAlert[eacEvent]   = true;
+          
+          if (Command[3] == "OFF")
+            EventAlert[eacEvent]   = false;
+        }        
+        
+      if (Command[1] == "INDICATOR")
+        if (IndicatorFound(Command[2],eacIndicator))
+        {
+          if (Command[3] == "ON")
+            Monitor[eacIndicator]  = true;
+          
+          if (Command[3] == "OFF")
+            Monitor[eacIndicator]  = false;
+        }
     }
 
     if (Command[0] == "LOCK")
-      SetEventLock(Command[1]);
+    {
+      if (Command[1]=="EVENT")
+        SetEventLock(Command[2]);
 
-    if (Command[0] == "MONITOR")
-      SetMonitorLock(Command[1]);
+      if (Command[1] == "MONITOR")
+        SetMonitorLock(Command[2]);
+    }
+    
+      
+    if (Command[0] == "SHOW")
+    {
+      if (Command[1] == "MONITOR")
+      {
+        eacMsg   = "Indicators currently monitoring:\n";
+        
+        for (int ind=0;ind<ArraySize(Monitor);ind++)
+          if (Monitoring(IndicatorName[ind]))
+            Append(eacMsg,"  - "+IndicatorName[ind],"\n");
+       
+        eacMsg   += "\n\nEvents currently monitoring:\n";
+
+        for (EventType event=1;event<EventTypes;event++)
+          if (EventAlert[event])
+            Append(eacMsg,"  - "+EnumToString(event),"\n");
+       
+        eacMsg   += "\n\nEvent Class currently monitoring:\n";
+
+        for (ReservedWords word=0;word<WordCount;word++)
+          if (EventClass[word])
+            Append(eacMsg,"  - "+EnumToString(word),"\n");
+
+        Pause(eacMsg,"Monitors Currently Active",MB_OK|MB_ICONINFORMATION);
+      }
+      
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -478,8 +579,25 @@ int OnInit()
     
     leadSession           = session[Daily];
 
-    ArrayInitialize(EventClass,true);
+    ArrayInitialize(EventAlert,false);
     
+    EventAlert[NewBoundary]      = true;
+    EventAlert[NewPoly]          = true;
+    EventAlert[NewDivergence]    = true;
+    EventAlert[NewBreakout]      = true;
+    EventAlert[NewReversal]      = true;
+    EventAlert[NewExpansion]     = true;
+    EventAlert[MarketCorrection] = true;
+    EventAlert[NewFractal]       = true;
+    EventAlert[NewDirection]     = true;
+    
+    ArrayInitialize(EventClass,false);
+
+    EventClass[Boundary]  = true;
+    EventClass[Tick]      = true;
+    EventClass[Minor]     = true;
+    EventClass[Major]     = true;
+         
     NewLine("fRetrace",fRetrace,STYLE_DOT,clrRed);
     NewLine("fMinor",fMinor,STYLE_DASH,clrSteelBlue);
     NewLine("fMajor",fMajor,STYLE_SOLID,clrGoldenrod);
@@ -494,7 +612,6 @@ void OnDeinit(const int reason)
   {
     delete pfractal;
     delete fractal;
-    delete lfractal;
         
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];

@@ -32,6 +32,7 @@ protected:
                   NewTerm,
                   NewTrend,
                   NewDivergence,
+                  NewExpansion,
                   NewPoly,
                   NewHigh,
                   NewLow,

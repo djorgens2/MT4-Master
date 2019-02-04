@@ -132,7 +132,9 @@ void CPipFractal::CalcFiboChange(void)
       if (IsChanged(cfcBoundaryAge,fmin(ptrRangeAgeLow,ptrRangeAgeHigh)))
         if (cfcBoundaryAge>=ptrMarketIdleTime)
         {
-          SetEvent(MarketIdle);
+          if (!cfcMarketIdle)
+            SetEvent(MarketIdle);
+
           cfcMarketIdle    = true;
         }    
   }
