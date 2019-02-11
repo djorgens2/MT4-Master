@@ -39,17 +39,24 @@ input int       inpUSClose         = 23;    // US market close hour
 //--- Class defs
   CFractal     *fractal            = new CFractal(inpFractalRange*2,inpFractalRange);
   CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
-  CEvent       *tevent             = new CEvent();
 
   CSession     *session[SessionTypes];
   CSession     *leadSession;
   
   ReservedWords EventClass[WordCount];
   EventType     EventAlert[EventTypes];
+  
+  struct        hmEventRec
+                {
+                  ReservedWords Class;
+                  EventType Event;
+                  int Action;
+                };
  
   EventType     EventLock          = NoEvent;
   string        IndicatorName[3]   = {"PIPFRACTAL","FRACTAL","SESSION"};
   bool          Monitor[3]         = {true,true,true};
+  hmEventRec    hmEvent[3];
 
   //-- Operationals                   
   int           pfPolyDir          = DirectionNone;
@@ -129,22 +136,36 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
     bool    cpContrarian   = false;
     string  cpMessage      = EnumToString(Event)+" alert detected on "+Indicator+"\n";
     int     cpStyle        = BoolToInt(Action==OP_NO_ACTION,MB_OKCANCEL|MB_ICONEXCLAMATION,MB_YESNOCANCEL|MB_ICONQUESTION);
+    int     cpIndicator    = NoValue;
+    
+    if (IndicatorFound(Indicator,cpIndicator))
+    {
+      hmEvent[cpIndicator].Class   = Class;
+      hmEvent[cpIndicator].Event   = Event;
+      hmEvent[cpIndicator].Action  = Action;
+    }
     
     if (Event==NoEvent)
       return;
       
-    if (tevent[Event])
-      Pause(cpMessage,"Duplicate Event");
-    else
-      tevent.SetEvent(Event);
-
     if (EventLock==NoEvent || Event==Event)
       if (Monitoring(Indicator))
         if (EventClass[Class] && EventAlert[Event])
         {
           if (Action!=OP_NO_ACTION)
             Append(cpMessage,ActionText(Action)+" triggered, click Yes to "+ActionText(Action)+", No to trade contrarian.","\n");
+            
+          if (Event==MarketCorrection)
+            if (Indicator=="Session")
+            {
+              if (Class==Minor)
+                Append(cpMessage,"Minor marktet correction in Session "+EnumToString(leadSession.Type()),"\n");
 
+              if (Class==Major)
+                Append(cpMessage,"Major marktet correction in Daily Session ","\n");
+            }  
+            
+            
           cpResponse = Pause(cpMessage,EnumToString(Class)+" Alert",cpStyle);
       
           switch (cpStyle)
@@ -169,8 +190,6 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    tevent.ClearEvents();
-    
     fractal.Update();
     pfractal.Update();
     
