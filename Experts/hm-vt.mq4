@@ -48,14 +48,16 @@ input int       inpUSClose         = 23;    // US market close hour
   
   struct        hmEventRec
                 {
-                  ReservedWords Class;
-                  EventType Event;
-                  int Action;
+                  ReservedWords  Class;
+                  EventType      Event;
+                  int            Action;
+                  bool           Active;
+                  datetime       EventTime;
                 };
  
   EventType     EventLock          = NoEvent;
-  string        IndicatorName[3]   = {"PIPFRACTAL","FRACTAL","SESSION"};
-  bool          Monitor[3]         = {true,true,true};
+  string        hmIndicator[3]     = {"PIPFRACTAL","FRACTAL","SESSION"};
+  bool          hmMonitor[3]         = {true,true,true};
   hmEventRec    hmEvent[3];
 
   //-- Operationals                   
@@ -106,8 +108,8 @@ bool EventFound(string Name, EventType &EventCode)
 //+------------------------------------------------------------------+
 bool IndicatorFound(string Name, int &IndicatorCode)
   {
-    for (IndicatorCode=0;IndicatorCode<ArraySize(IndicatorName);IndicatorCode++)
-      if (IndicatorName[IndicatorCode]==Name)
+    for (IndicatorCode=0;IndicatorCode<ArraySize(hmIndicator);IndicatorCode++)
+      if (hmIndicator[IndicatorCode]==Name)
         return (true);
 
     IndicatorCode          = NoValue;
@@ -120,9 +122,9 @@ bool IndicatorFound(string Name, int &IndicatorCode)
 //+------------------------------------------------------------------+
 bool Monitoring(string Indicator)
   {
-    for (int ind=0;ind<ArraySize(Monitor);ind++)
-      if (upper(Indicator)==IndicatorName[ind])
-        return (Monitor[ind]);
+    for (int ind=0;ind<ArraySize(hmMonitor);ind++)
+      if (upper(Indicator)==hmIndicator[ind])
+        return (hmMonitor[ind]);
         
     return (false);
   }
@@ -140,9 +142,11 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
     
     if (IndicatorFound(Indicator,cpIndicator))
     {
-      hmEvent[cpIndicator].Class   = Class;
-      hmEvent[cpIndicator].Event   = Event;
-      hmEvent[cpIndicator].Action  = Action;
+      hmEvent[cpIndicator].Class      = Class;
+      hmEvent[cpIndicator].Event      = Event;
+      hmEvent[cpIndicator].Action     = Action;
+      hmEvent[cpIndicator].Active     = true;
+      hmEvent[cpIndicator].EventTime  = TimeCurrent();
     }
     
     if (Event==NoEvent)
@@ -190,6 +194,9 @@ void CallPause(ReservedWords Class, EventType Event, string Indicator, int Actio
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    for (int gdIndicator=0;gdIndicator<ArraySize(hmIndicator);gdIndicator++)
+      hmEvent[gdIndicator].Active           = false;
+      
     fractal.Update();
     pfractal.Update();
     
@@ -470,11 +477,11 @@ void SetEventLock(string EventName)
 //+------------------------------------------------------------------+
 void SetMonitorLock(string Indicator)
   {
-    ArrayInitialize(Monitor,false);
+    ArrayInitialize(hmMonitor,false);
 
-    for (int ind=0;ind<ArraySize(Monitor);ind++)
-      if (IndicatorName[ind]==Indicator)
-        Monitor[ind]       = true;
+    for (int ind=0;ind<ArraySize(hmMonitor);ind++)
+      if (hmIndicator[ind]==Indicator)
+        hmMonitor[ind]       = true;
   }
 
 //+------------------------------------------------------------------+
@@ -514,10 +521,10 @@ void ExecAppCommands(string &Command[])
         if (IndicatorFound(Command[2],eacIndicator))
         {
           if (Command[3] == "ON")
-            Monitor[eacIndicator]  = true;
+            hmMonitor[eacIndicator]  = true;
           
           if (Command[3] == "OFF")
-            Monitor[eacIndicator]  = false;
+            hmMonitor[eacIndicator]  = false;
         }
     }
 
@@ -537,9 +544,9 @@ void ExecAppCommands(string &Command[])
       {
         eacMsg   = "Indicators currently monitoring:\n";
         
-        for (int ind=0;ind<ArraySize(Monitor);ind++)
-          if (Monitoring(IndicatorName[ind]))
-            Append(eacMsg,"  - "+IndicatorName[ind],"\n");
+        for (int ind=0;ind<ArraySize(hmMonitor);ind++)
+          if (Monitoring(hmIndicator[ind]))
+            Append(eacMsg,"  - "+hmIndicator[ind],"\n");
        
         eacMsg   += "\n\nEvents currently monitoring:\n";
 
