@@ -65,6 +65,7 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
       bool           ActiveEvent(void)  {return(eActiveEvent);}
+      string         ActiveEvents(void);
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
@@ -102,6 +103,26 @@ void CEvent::ClearEvents(void)
   {
     ArrayInitialize(eEvents,false);
     eActiveEvent   = false;
+  }
+  
+//+------------------------------------------------------------------+
+//| ActiveEvents - Returns a string of crlf translated enums         |
+//+------------------------------------------------------------------+
+string CEvent::ActiveEvents(void)
+  {
+    string aeActiveEvents   = "No Active Events";
+    
+    if (this.ActiveEvent())
+    {
+      aeActiveEvents        = "Events Active\n------------------------------\n";
+      
+      for (EventType event=NewDirection;event<EventTypes;event++)
+        if (eEvents[event])
+          Append(aeActiveEvents, EnumToString(event), "\n");
+          
+    }
+    
+    return (aeActiveEvents);
   }
   
 //+------------------------------------------------------------------+

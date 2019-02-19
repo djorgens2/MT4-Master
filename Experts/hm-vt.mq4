@@ -388,7 +388,10 @@ void ExecSession(void)
       esEvent    = MarketCorrection;
     }
 
-    CallPause(esClass,esEvent,"Session",esAction);      
+    CallPause(esClass,esEvent,"Session",esAction);
+    
+    if (leadSession.ActiveEvent())
+      Pause(leadSession.ActiveEvents(),"Active Session Events");
   }
 
 //+------------------------------------------------------------------+

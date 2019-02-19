@@ -94,6 +94,8 @@ public:
              int           TrendBias(int Format=InAction);
              int           ActiveBias(int Format=InAction);
 
+             string        ActiveEvents(void) {return(sEvent.ActiveEvents());};
+             
              void          PrintSession(int Type);
              void          PrintTrend(TrendRecType Type, int Measure=Active);
              
@@ -270,18 +272,18 @@ void CSession::SetTrendState(void)
       if (trec[trTerm].Direction==DirectionUp)
       {
         stsState                    = Rally;
-        trec[trTrend].StateDir      = DirectionUp; 
+        trec[trTrend].StateDir      = DirectionUp;
       }
       else
       {
         stsState                    = Pullback;
-        trec[trTrend].StateDir      = DirectionDown; 
+        trec[trTrend].StateDir      = DirectionDown;
       }
     }
     else
     if (IsHigher(ActiveMid(),trec[trTrend].Root))
     {
-      trec[trTrend].StateDir        = DirectionUp; 
+      trec[trTrend].StateDir        = DirectionUp;
 
       //-- Handle up trends
       if (IsChanged(trec[trTrend].Direction,DirectionUp))
@@ -292,7 +294,7 @@ void CSession::SetTrendState(void)
     else
     if (IsLower(ActiveMid(),trec[trTrend].Root))
     {
-      trec[trTrend].StateDir        = DirectionDown; 
+      trec[trTrend].StateDir        = DirectionDown;
 
       //-- Handle down trends
       if (IsChanged(trec[trTrend].Direction,DirectionDown))
