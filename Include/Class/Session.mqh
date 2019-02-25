@@ -47,10 +47,10 @@ public:
              //-- Session Types
              enum SessionType
              {
+               Daily,
                Asia,
                Europe,
                US,
-               Daily,
                SessionTypes
              };
 
@@ -91,7 +91,7 @@ public:
              
              TrendRec      Trend(TrendRecType Type);
 
-             int           TrendBias(int Format=InAction);
+             int           TradeBias(int Format=InAction);
              int           ActiveBias(int Format=InAction);
 
              string        ActiveEvents(void) {return(sEvent.ActiveEvents());};
@@ -329,7 +329,7 @@ void CSession::SetTrendState(void)
 //+------------------------------------------------------------------+
 void CSession::SetTermState(void)
   {
-    if (IsChanged(trec[trTerm].Direction,TrendBias(InDirection)))
+    if (IsChanged(trec[trTerm].Direction,TradeBias(InDirection)))
     {
       if (trec[trTerm].Direction==DirectionUp)
         if (IsHigher(ActiveMid(),trec[trTerm].Base))
@@ -366,7 +366,7 @@ void CSession::UpdateTrendState(TrendRecType Type)
     EventType TrendEvent[TrendRecTypes] = {NewTerm,NewTrend,NewOrigin};
     
     if (sEvent[MarketCorrection])
-      if (this.TrendBias(InDirection)==trec[Type].Direction)
+      if (this.TradeBias(InDirection)==trec[Type].Direction)
       {
         trec[Type].State         = Recovery;
         trec[Type].StateDir      = trec[Type].Direction;
@@ -695,7 +695,7 @@ TrendRec CSession::Trend(TrendRecType Type)
 //+------------------------------------------------------------------+
 //| TradeBias - returns the formatted current trend bias             |
 //+------------------------------------------------------------------+
-int CSession::TrendBias(int Format=InAction)
+int CSession::TradeBias(int Format=InAction)
   {
     switch (Format)
     {

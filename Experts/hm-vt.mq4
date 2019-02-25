@@ -390,8 +390,9 @@ void ExecSession(void)
 
     CallPause(esClass,esEvent,"Session",esAction);
     
-    if (leadSession.ActiveEvent())
-      Pause(leadSession.ActiveEvents(),"Active Session Events");
+//    if (leadSession.ActiveEvent())
+    if (session[Asia].ActiveEvent())
+      Pause(leadSession.ActiveEvents(),EnumToString(leadSession.Type())+" Session Events");
   }
 
 //+------------------------------------------------------------------+
