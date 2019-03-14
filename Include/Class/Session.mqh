@@ -10,6 +10,7 @@
 
 #include <Class/Event.mqh>
 #include <Class/ArrayDouble.mqh>
+#include <std_utility.mqh>
 
 //+------------------------------------------------------------------+
 //| SessionArray Class - Collects session data, states, and events   |
@@ -185,6 +186,8 @@ void CSession::UpdateSession(void)
     ReservedWords usState              = NoState;
     ReservedWords usHighState          = NoState;
     
+    SessionRec    usLastSession        = srec[RecordType(Active)];
+
     if (IsHigher(High[sBar],srec[RecordType(Active)].High))
     {
       sEvent.SetEvent(NewHigh);
@@ -216,7 +219,7 @@ void CSession::UpdateSession(void)
         else
           usState                      = Breakout;
     }
-    
+        
     //-- Apply outside reversal correction possible only during historical analysis
     if (sEvent[NewHigh] && sEvent[NewLow])
     {
@@ -230,11 +233,38 @@ void CSession::UpdateSession(void)
           sEvent.ClearEvent(NewHigh);
     }
     
-    if (sEvent[NewBoundary])          
+    if (sEvent[NewBoundary])
+    {
       srec[RecordType(Active)].PivotClose  = Pivot(Active);
+      
+//      if (SessionHour()>5)
+//        if (sEvent[NewDirection])
+//        {
+//          if (sEvent[NewHigh])
+//            NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-Long",usLastSession.High,sBar);
+//
+//          if (sEvent[NewLow])
+//            NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-Short",usLastSession.Low,sBar);
+//        }
+//        else
+//        {
+//          if (srec[RecordType(OffSession)].Direction!=srec[RecordType(Active)].Direction)
+//            if (IsChanged(
+//        }
+    }
 
     if (NewState(srec[RecordType(Active)].State,usState))
+    {
       sStateTime                       = Time[sBar];
+      if (usState==Reversal || usState==Breakout)
+      {
+        if (sEvent[NewHigh])
+          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
+
+        if (sEvent[NewLow])
+          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
+      }
+    }
   }
   
 //+------------------------------------------------------------------+
