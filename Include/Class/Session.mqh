@@ -30,6 +30,8 @@ public:
                double         PivotClose;
                double         High;
                double         Low;
+               double         Base;
+               double         Root;
                double         Support;
                double         Resistance;
              };
@@ -53,15 +55,15 @@ public:
              
              bool          Event(EventType Type)            {return (sEvent[Type]);}
              bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
-
-             string        ActiveEvents(void) {return(sEvent.ActiveEvents());};             
+             string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};             
              
              double        Pivot(const int Type);
+             int           Bias(const int Type);
 
              void          Update(void);
              void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[]);
 
-             string        SessionInfo(int Type);
+             string        SessionText(int Type);
              
              int           RecordType(int Type); 
              SessionRec    operator[](const int Type)       {return(srec[RecordType(Type)]);}
@@ -73,8 +75,6 @@ private:
              SessionType   sType;
              
              bool          sSessionIsOpen;
-             int           sTrendBias;             //--- Trend action
-             int           sActiveBias;            //--- Active action
 
              int           sHourOpen;
              int           sHourClose;
@@ -82,7 +82,6 @@ private:
              int           sBars;
              int           sBarDay;
              int           sBarHour;
-             datetime      sStateTime;
 
              //--- Private class collections
              SessionRec    srec[6];
@@ -255,7 +254,6 @@ void CSession::UpdateSession(void)
 
     if (NewState(srec[RecordType(Active)].State,usState))
     {
-      sStateTime                       = Time[sBar];
       if (usState==Reversal || usState==Breakout)
       {
         if (sEvent[NewHigh])
@@ -278,13 +276,14 @@ void CSession::OpenSession(void)
     //-- Set support/resistance (ActiveSession is OffSession data)
     srec[RecordType(Active)].Resistance   = fmax(srec[RecordType(Active)].High,srec[RecordType(Prior)].High);
     srec[RecordType(Active)].Support      = fmin(srec[RecordType(Active)].Low,srec[RecordType(Prior)].Low);
+    srec[RecordType(Active)].Base         = Pivot(Prior);
+    srec[RecordType(Active)].Root         = Pivot(OffSession);
 
     //-- Update indicator buffers
     sOffMidBuffer.SetValue(sBar,Pivot(Active));
-    sPriorMidBuffer.SetValue(sBar,Pivot(Prior));
 
     //-- Reset Active Record
-    srec[RecordType(Active)].PivotOpen      = Pivot(Active);
+    srec[RecordType(Active)].PivotOpen    = Pivot(Active);
     srec[RecordType(Active)].High         = High[sBar];
     srec[RecordType(Active)].Low          = Low[sBar];
 
@@ -303,6 +302,10 @@ void CSession::CloseSession(void)
     //-- Reset Active Record
     srec[RecordType(Active)].Resistance     = srec[RecordType(Active)].High;
     srec[RecordType(Active)].Support        = srec[RecordType(Active)].Low;
+    srec[RecordType(Active)].Base           = Pivot(OffSession);
+    srec[RecordType(Active)].Root           = Pivot(Prior);
+    
+    sPriorMidBuffer.SetValue(sBar,Pivot(Prior));    
 
     srec[RecordType(Active)].High           = High[sBar];
     srec[RecordType(Active)].Low            = Low[sBar];
@@ -379,7 +382,6 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose)
     sHourOpen                        = HourOpen;
     sHourClose                       = HourClose;
     sSessionIsOpen                   = false;
-    sTrendBias                       = NoValue;
     
     sEvent                           = new CEvent();
 
@@ -438,16 +440,6 @@ void CSession::Update(void)
         CloseSession();
 
     UpdateSession();
-    
-    //if (Event(SessionOpen))
-    //{
-    //  Print(TimeToStr(Time[sBar])+"|"
-    //        +DoubleToStr(Pivot(Prior),Digits)+"|"
-    //        +DoubleToStr(Pivot(OffSession),Digits)+"|"
-    //        +DoubleToStr(Pivot(Active),Digits)+"|");
-    //  Print("OffSession: "+SessionInfo(OffSession));
-    //  Print("Prior: "+SessionInfo(Prior));
-    //}
   }
   
 //+------------------------------------------------------------------+
@@ -475,22 +467,35 @@ bool CSession::IsOpen(void)
 //+------------------------------------------------------------------+
 //| Pivot - returns the mid price for the supplied type              |
 //+------------------------------------------------------------------+
-double CSession::Pivot(int Type)
+double CSession::Pivot(const int Type)
   {
     return(fdiv(srec[RecordType(Type)].High+srec[RecordType(Type)].Low,2,Digits));
   }
-  
+
+//+------------------------------------------------------------------+
+//| Bias - returns the order action relative to the root             |
+//+------------------------------------------------------------------+
+int CSession::Bias(const int Type)
+  {
+    if (Close[0]>srec[RecordType(Type)].Root)
+      return (OP_BUY);
+
+    if (Close[0]<srec[RecordType(Type)].Root)
+      return (OP_SELL);
+
+    return (OP_NO_ACTION);
+  }
+
   
 //+------------------------------------------------------------------+
 //| SessionIno - Prints Session Record details for the supplied type |
 //+------------------------------------------------------------------+
-string CSession::SessionInfo(int Type)
+string CSession::SessionText(int Type)
   {  
     string siSessionInfo        = EnumToString(this.Type())+"|"
                                 + TimeToStr(Time[sBar])+"|"
                                 + BoolToStr(this.IsOpen(),"Open|","Closed|")
                                 + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
-                                + TimeToStr(sStateTime)+"|"
                                 + DoubleToStr(Pivot(Active),Digits)+"|"
                                 + BoolToStr(srec[RecordType(Type)].Direction==DirectionUp,"Long|","Short|")                              
                                 + EnumToString(srec[RecordType(Type)].State)+"|"

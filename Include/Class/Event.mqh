@@ -65,7 +65,7 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
       bool           ActiveEvent(void)  {return(eActiveEvent);}
-      string         ActiveEvents(void);
+      string         ActiveEventText(void);
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
@@ -108,7 +108,7 @@ void CEvent::ClearEvents(void)
 //+------------------------------------------------------------------+
 //| ActiveEvents - Returns a string of crlf translated enums         |
 //+------------------------------------------------------------------+
-string CEvent::ActiveEvents(void)
+string CEvent::ActiveEventText(void)
   {
     string aeActiveEvents   = "No Active Events";
     

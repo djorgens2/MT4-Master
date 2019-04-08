@@ -183,15 +183,15 @@ void RefreshScreen(int Bar=0)
 
       UpdateLine("lnSupport",session[Active].Support,STYLE_SOLID,clrFireBrick);
       UpdateLine("lnResistance",session[Active].Resistance,STYLE_SOLID,clrForestGreen);
-//      UpdateLine("lnHedge",session[ActiveRec].Hedge,STYLE_DOT,clrFireBrick);
-//      UpdateLine("lnCorrection",session[ActiveRec].Correction,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnBase",session[Active].Base,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnRoot",session[Active].Root,STYLE_DOT,clrForestGreen);
       UpdateLine("lnHigh",session[Active].High,STYLE_DOT,clrForestGreen);
       UpdateLine("lnLow",session[Active].Low,STYLE_DOT,clrFireBrick);
     }
     
     if (inpShowData>dpNone)
     {
-      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())/*+" "+proper(ActionText(session.TradeBias()))*/,BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias(Active))),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[Active].Direction,DirColor(session[Active].Direction),20);
       UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[Active].State),DirColor(session[Active].BreakoutDir),8);
             
@@ -282,8 +282,8 @@ int OnInit()
       NewLine("lnOffMid");
       NewLine("lnSupport");
       NewLine("lnResistance");
-      NewLine("lnHedge");
-      NewLine("lnCorrection");
+      NewLine("lnBase");
+      NewLine("lnRoot");
       NewLine("lnHigh");
       NewLine("lnLow");
     }
