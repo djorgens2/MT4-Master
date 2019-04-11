@@ -58,7 +58,7 @@ public:
              string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};             
              
              double        Pivot(const int Type);
-             int           Bias(const int Type);
+             int           Bias(const int Type, ReservedWords Measure=Price);
 
              void          Update(void);
              void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[]);
@@ -97,6 +97,7 @@ private:
              void          UpdateSession(void);
              void          UpdateBuffers(void);
 
+             void          CalcFibo(void);
              void          LoadHistory(void);
              
              bool          NewDirection(int &Direction, int NewDirection);
@@ -137,8 +138,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection)
       sEvent.SetEvent(NewDirection);
       return(true);
     }
-      
-    return(false);
+          return(false);
   }
     
 //+------------------------------------------------------------------+
@@ -169,6 +169,8 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
                           break;
         case Pullback:    sEvent.SetEvent(NewPullback);
                           break;
+        case Correction:  sEvent.SetEvent(MarketCorrection);
+                          break;
       }
       
       return(true);
@@ -177,6 +179,34 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
     return(false);
   }
     
+//+------------------------------------------------------------------+
+//| CalcFibo - Compute fibonacci points and states                   |
+//+------------------------------------------------------------------+
+void CSession::CalcFibo(void)
+  {
+    int cfDirNow;
+    
+    //-- Calculate Term Fibo
+    cfDirNow = Direction(Pivot(Active)-Pivot(Prior));
+    
+               //int            Direction;
+               //ReservedWords  State;
+               //int            BreakoutDir;
+               //double         PivotOpen;
+               //double         PivotClose;
+               //double         High;
+               //double         Low;
+               //double         Base;
+               //double         Root;
+               //double         Support;
+               //double         Resistance;
+     
+
+    if (NewDirection(srec[RecordType(Term)].Direction,cfDirNow))
+    {
+    }
+  };
+
 //+------------------------------------------------------------------+
 //| UpdateSession - Sets active state, bounds and alerts on the tick |
 //+------------------------------------------------------------------+
@@ -270,19 +300,15 @@ void CSession::UpdateSession(void)
 //+------------------------------------------------------------------+
 void CSession::OpenSession(void)
   {    
-    //-- Update Offsession Record
+    //-- Update OffSession Record and Indicator Buffer
     srec[RecordType(OffSession)]          = srec[RecordType(Active)];
+    sOffMidBuffer.SetValue(sBar,Pivot(Active));
 
     //-- Set support/resistance (ActiveSession is OffSession data)
     srec[RecordType(Active)].Resistance   = fmax(srec[RecordType(Active)].High,srec[RecordType(Prior)].High);
     srec[RecordType(Active)].Support      = fmin(srec[RecordType(Active)].Low,srec[RecordType(Prior)].Low);
     srec[RecordType(Active)].Base         = Pivot(Prior);
     srec[RecordType(Active)].Root         = Pivot(OffSession);
-
-    //-- Update indicator buffers
-    sOffMidBuffer.SetValue(sBar,Pivot(Active));
-
-    //-- Reset Active Record
     srec[RecordType(Active)].PivotOpen    = Pivot(Active);
     srec[RecordType(Active)].High         = High[sBar];
     srec[RecordType(Active)].Low          = Low[sBar];
@@ -296,17 +322,18 @@ void CSession::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
   {        
-    //-- Update Prior Record
+    //-- Update fibonacci pattern data
+    CalcFibo();
+    
+    //-- Update Prior Record and Indicator Buffer
     srec[RecordType(Prior)]                 = srec[RecordType(Active)];
+    sPriorMidBuffer.SetValue(sBar,Pivot(Prior));    
 
     //-- Reset Active Record
     srec[RecordType(Active)].Resistance     = srec[RecordType(Active)].High;
     srec[RecordType(Active)].Support        = srec[RecordType(Active)].Low;
     srec[RecordType(Active)].Base           = Pivot(OffSession);
     srec[RecordType(Active)].Root           = Pivot(Prior);
-    
-    sPriorMidBuffer.SetValue(sBar,Pivot(Prior));    
-
     srec[RecordType(Active)].High           = High[sBar];
     srec[RecordType(Active)].Low            = Low[sBar];
 
@@ -475,14 +502,26 @@ double CSession::Pivot(const int Type)
 //+------------------------------------------------------------------+
 //| Bias - returns the order action relative to the root             |
 //+------------------------------------------------------------------+
-int CSession::Bias(const int Type)
+int CSession::Bias(const int Type, ReservedWords Measure=Price)
   {
-    if (Close[0]>srec[RecordType(Type)].Root)
-      return (OP_BUY);
+  
+    if (Measure==Price)
+    {
+      if (Close[0]>srec[RecordType(Type)].Root)
+        return (OP_BUY);
 
-    if (Close[0]<srec[RecordType(Type)].Root)
-      return (OP_SELL);
+      if (Close[0]<srec[RecordType(Type)].Root)
+        return (OP_SELL);
+    };
 
+    if (Measure==Pivot)
+    {
+      if (Pivot(Type)>srec[RecordType(Type)].Root)
+        return (OP_BUY);
+
+      if (Pivot(Type)<srec[RecordType(Type)].Root)
+        return (OP_SELL);
+    };
     return (OP_NO_ACTION);
   }
 
