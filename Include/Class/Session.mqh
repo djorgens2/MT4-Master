@@ -138,7 +138,8 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection)
       sEvent.SetEvent(NewDirection);
       return(true);
     }
-          return(false);
+    
+    return(false);
   }
     
 //+------------------------------------------------------------------+
@@ -184,10 +185,7 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
 //+------------------------------------------------------------------+
 void CSession::CalcFibo(void)
   {
-    int cfDirNow;
-    
-    //-- Calculate Term Fibo
-    cfDirNow = Direction(Pivot(Active)-Pivot(Prior));
+    int  cfDirNow = Direction(Pivot(Active)-Pivot(Prior));
     
                //int            Direction;
                //ReservedWords  State;
@@ -202,9 +200,18 @@ void CSession::CalcFibo(void)
                //double         Resistance;
      
 
+    //-- Calculate Term Fibo
     if (NewDirection(srec[RecordType(Term)].Direction,cfDirNow))
     {
+      sEvent.SetEvent(NewTerm);
+
     }
+      
+//    if (IsBetween(Pivot(Active),srec[RecordType(Term)].Resistance,srec[RecordType(Term)].Support))
+//      if (cfDirNow==DirectionUp)
+//        if (cf
+//    else
+//    {}    
   };
 
 //+------------------------------------------------------------------+
