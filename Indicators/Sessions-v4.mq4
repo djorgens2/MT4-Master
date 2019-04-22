@@ -68,7 +68,7 @@ datetime             sessionOpenTime;
 double               sessionHigh;
 double               sessionLow;
 string               sessionIndex       = IntegerToString(inpShowData);
-int                  sessionOffset      = inpShowData*40;
+int                  sessionOffset      = inpShowData*60;
 
 //+------------------------------------------------------------------+
 //| SessionColor - Returns the color for session ranges              |
@@ -193,7 +193,7 @@ void RefreshScreen(int Bar=0)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias(Active))),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[Active].Direction,DirColor(session[Active].Direction),20);
-      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[Active].State),DirColor(session[Active].BreakoutDir),8);
+      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[Active].State),DirColor(session[Active].Direction),8);
             
       UpdateDirection("lbTermDir"+sessionIndex,session[Term].Direction,DirColor(session[Term].Direction),20);
       UpdateLabel("lbTermState"+sessionIndex,EnumToString(session[Term].State),DirColor(session[Term].Direction),8);
@@ -203,17 +203,7 @@ void RefreshScreen(int Bar=0)
 
       UpdateDirection("lbOriginDir"+sessionIndex,session[Origin].Direction,DirColor(session[Origin].Direction),20);
       UpdateLabel("lbOriginState"+sessionIndex,EnumToString(session[Origin].State),DirColor(session[Origin].Direction),8);
-//
-//      if (session.Event(MarketCorrection))
-//        NewArrow(SYMBOL_RIGHTPRICE,DirColor(session.TradeBias(InDirection),clrYellow,clrRed));
-//                 
-//      if (session.Event(NewTradeBias))
-//        NewArrow(BoolToInt(session.ActiveBias()==OP_BUY,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-//                 DirColor(Direction(session.ActiveBias(),InAction),clrYellow,clrRed));
-//
-////      UpdateDirection("lbTrendDir"+sessionIndex,session.Trend().TrendDir,DirColor(session.Trend().TrendDir),20);
-////      UpdateDirection("lbOriginDir"+sessionIndex,session.Trend().OriginDir,DirColor(session.Trend().OriginDir),20);
-//
+
       if (session.IsOpen())
         if (TimeHour(Time[0])>inpHourClose-3)
           UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
@@ -224,16 +214,11 @@ void RefreshScreen(int Bar=0)
           UpdateLabel("lbSessionTime"+sessionIndex,"Early Session ("+IntegerToString(session.SessionHour())+")",clrLawnGreen);
       else
         UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
-////
-////      if (session.Event(NewBreakout) || session.Event(NewReversal))
-////        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrYellow);
-////      else
-////      if (session.Event(NewRally) || session.Event(NewPullback))
-////        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrWhite);
-////      else
-////        UpdateLabel("lbTermState"+sessionIndex,EnumToString(session.State(Term)),clrDarkGray);
-////        
-////      UpdateLabel("lbTrendState"+sessionIndex,EnumToString(session.State(Trend)),clrDarkGray);
+
+      UpdateDirection("lbActiveBrkDir"+sessionIndex,session[Active].BreakoutDir,DirColor(session[Active].BreakoutDir));
+      UpdateDirection("lbTermBrkDir"+sessionIndex,session[Term].BreakoutDir,DirColor(session[Term].BreakoutDir));
+      UpdateDirection("lbTrendBrkDir"+sessionIndex,session[Trend].BreakoutDir,DirColor(session[Trend].BreakoutDir));
+      UpdateDirection("lbOriginBrkDir"+sessionIndex,session[Origin].BreakoutDir,DirColor(session[Origin].BreakoutDir));
     }
   }
  
@@ -299,6 +284,10 @@ int OnInit()
     
     if (inpShowData>dpNone)
     {
+      NewLabel("lbActiveBrkDir"+sessionIndex,"",170,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermBrkDir"+sessionIndex,"",120,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendBrkDir"+sessionIndex,"",70,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginBrkDir"+sessionIndex,"",20,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbSessionType"+sessionIndex,"",260,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveDir"+sessionIndex,"",180,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbTermDir"+sessionIndex,"",130,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
@@ -306,9 +295,9 @@ int OnInit()
       NewLabel("lbOriginDir"+sessionIndex,"",30,170+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbSessionTime"+sessionIndex,"",260,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveState"+sessionIndex,"",180,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTermState"+sessionIndex,"",130,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTrendState"+sessionIndex,"",80,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbOriginState"+sessionIndex,"",30,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTermState"+sessionIndex,"",125,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbTrendState"+sessionIndex,"",70,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbOriginState"+sessionIndex,"",15,195+sessionOffset,clrDarkGray,SCREEN_UR,0);
     }
 
     DeleteRanges();
@@ -341,15 +330,24 @@ void OnDeinit(const int reason)
     ObjectDelete("lnHigh");
     ObjectDelete("lnLow");
     
-    ObjectDelete("lbhSession");
-    ObjectDelete("lbhTerm");
-    ObjectDelete("lbhTrend");
-    ObjectDelete("lbhOrigin");
+    ObjectDelete("lbActiveBrkDir"+sessionIndex);
+    ObjectDelete("lbTermBrkDir"+sessionIndex);
+    ObjectDelete("lbTrendBrkDir"+sessionIndex);
+    ObjectDelete("lbOriginBrkDir"+sessionIndex);
     ObjectDelete("lbSessionType"+sessionIndex);
+    ObjectDelete("lbActiveDir"+sessionIndex);
     ObjectDelete("lbTermDir"+sessionIndex);
     ObjectDelete("lbTrendDir"+sessionIndex);
     ObjectDelete("lbOriginDir"+sessionIndex);
     ObjectDelete("lbSessionTime"+sessionIndex);
+    ObjectDelete("lbActiveState"+sessionIndex);
     ObjectDelete("lbTermState"+sessionIndex);
     ObjectDelete("lbTrendState"+sessionIndex);
+    ObjectDelete("lbOriginState"+sessionIndex);
+
+    ObjectDelete("lbhSession");
+    ObjectDelete("lbhActive");
+    ObjectDelete("lbhTerm");
+    ObjectDelete("lbhTrend");
+    ObjectDelete("lbhOrigin");
   }

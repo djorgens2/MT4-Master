@@ -263,7 +263,7 @@ void CSession::UpdateActive(void)
   {
     ReservedWords usState              = NoState;
     ReservedWords usHighState          = NoState;
-    
+
     SessionRec    usLastSession        = srec[RecordType(Active)];
 
     if (IsHigher(High[sBar],srec[RecordType(Active)].High))
@@ -544,12 +544,14 @@ bool CSession::IsOpen(void)
 //+------------------------------------------------------------------+
 double CSession::Pivot(const int Type)
   {
+    //-- Returns the Support or Resistance if specified
     switch (Type)
     {
       case Support:    return(fmin(Pivot(Active),fmin(Pivot(Prior),Pivot(OffSession))));
       case Resistance: return(fmax(Pivot(Active),fmax(Pivot(Prior),Pivot(OffSession))));
     }
     
+    //-- Returns the pivot for the specified Type
     return(fdiv(srec[RecordType(Type)].High+srec[RecordType(Type)].Low,2,Digits));
   }
 
