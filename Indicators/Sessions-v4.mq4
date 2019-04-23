@@ -191,7 +191,7 @@ void RefreshScreen(int Bar=0)
     
     if (inpShowData>dpNone)
     {
-      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias(Active))),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias(Active,Pivot))),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[Active].Direction,DirColor(session[Active].Direction),20);
       UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[Active].State),DirColor(session[Active].Direction),8);
             

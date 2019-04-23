@@ -571,11 +571,24 @@ int CSession::Bias(const int Type, ReservedWords Measure=Price)
 
     if (Measure==Pivot)
     {
-      if (Pivot(Type)>srec[RecordType(Type)].Root)
-        return (OP_BUY);
+      if (IsOpen())
+      {
+        if (Pivot(Type)>srec[RecordType(Type)].PivotOpen)
+          return (OP_BUY);
 
-      if (Pivot(Type)<srec[RecordType(Type)].Root)
-        return (OP_SELL);
+        if (Pivot(Type)<srec[RecordType(Type)].PivotOpen)
+          return (OP_SELL);
+      }      
+      else
+      {
+        if (Pivot(Type)>srec[RecordType(Type)].Root)
+          return (OP_BUY);
+
+        if (Pivot(Type)<srec[RecordType(Type)].Root)
+          return (OP_SELL);
+      }
+      
+      return (Action(srec[RecordType(Type)].Direction,InDirection));
     };
 
     return (OP_NO_ACTION);
@@ -590,7 +603,6 @@ string CSession::SessionText(int Type)
     string siSessionInfo        = EnumToString(this.Type())+"|"
                                 + TimeToStr(Time[sBar])+"|"
                                 + BoolToStr(this.IsOpen(),"Open|","Closed|")
-                                + BoolToStr(this.sSessionIsOpen,"Open|","Closed|")
                                 + DoubleToStr(Pivot(Active),Digits)+"|"
                                 + DoubleToStr(Pivot(Resistance),Digits)+"|"
                                 + DoubleToStr(Pivot(Support),Digits)+"|"
