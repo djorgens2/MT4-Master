@@ -169,24 +169,13 @@ void RefreshScreen(int Bar=0)
     if (inpShowPriceLines)
     {
       UpdateLine("lnActiveMid",session.Pivot(Active),STYLE_SOLID,clrSteelBlue);
-    
-      if (session.IsOpen())
-      {
-        UpdateLine("lnPriorMid",session.Pivot(Prior),STYLE_SOLID,clrGoldenrod);
-        UpdateLine("lnOffsessionMid",session.Pivot(OffSession),STYLE_SOLID,clrGray);
-      }
-      else
-      {
-        UpdateLine("lnPriorMid",session.Pivot(Prior),STYLE_DOT,clrGoldenrod);
-        UpdateLine("lnOffsessionMid",session.Pivot(OffSession),STYLE_DOT,clrGray);
-      }    
-
-      UpdateLine("lnSupport",session[Active].Support,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnResistance",session[Active].Resistance,STYLE_SOLID,clrForestGreen);
-      UpdateLine("lnBase",session[Active].Base,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnRoot",session[Active].Root,STYLE_DOT,clrForestGreen);
-      UpdateLine("lnHigh",session[Active].High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnSupport",session[Active].Support,STYLE_SOLID,clrRed);
+      UpdateLine("lnResistance",session[Active].Resistance,STYLE_SOLID,clrLawnGreen);
       UpdateLine("lnLow",session[Active].Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnHigh",session[Active].High,STYLE_DOT,clrForestGreen);
+
+      UpdatePriceLabel("plBase",session[Active].Base,clrFireBrick);
+      UpdatePriceLabel("plRoot",session[Active].Root,clrForestGreen);
     }
     
     if (inpShowData>dpNone)
@@ -263,14 +252,13 @@ int OnInit()
     if (inpShowPriceLines)
     {
       NewLine("lnActiveMid");
-      NewLine("lnPriorMid");
-      NewLine("lnOffMid");
       NewLine("lnSupport");
       NewLine("lnResistance");
-      NewLine("lnBase");
-      NewLine("lnRoot");
       NewLine("lnHigh");
       NewLine("lnLow");
+
+      NewPriceLabel("plBase");
+      NewPriceLabel("plRoot");
     }
     
     if (inpShowData==dpFirst)
@@ -321,8 +309,6 @@ void OnDeinit(const int reason)
     delete session;    
 
     ObjectDelete("lnActiveMid");
-    ObjectDelete("lnPriorMid");
-    ObjectDelete("lnOffMid");
     ObjectDelete("lnSupport");
     ObjectDelete("lnResistance");
     ObjectDelete("lnHedge");

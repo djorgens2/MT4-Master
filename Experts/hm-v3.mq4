@@ -39,7 +39,7 @@ input int       inpUSClose         = 23;    // US market close hour
 //--- Class defs
   CFractal     *fractal            = new CFractal(inpRangeMax,inpRangeMin);
   CFractal     *lfractal           = new CFractal(inpRangeLT,inpRangeST);
-  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
+  CPipFractal  *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpMarketIdle,fractal);
   CEvent       *events             = new CEvent();
 
   CSession     *session[SessionTypes];

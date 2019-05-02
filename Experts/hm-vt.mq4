@@ -355,7 +355,7 @@ void ExecFractal(void)
 //+------------------------------------------------------------------+
 void ExecSession(void)
   {
-    int           esAction   = leadSession.ActiveBias();
+    int           esAction   = leadSession.Bias(Active,Pivot);
 
     ReservedWords esClass    = Default;
     EventType     esEvent    = NoEvent;
@@ -392,7 +392,7 @@ void ExecSession(void)
     
 //    if (leadSession.ActiveEvent())
     if (session[Asia].ActiveEvent())
-      Pause(leadSession.ActiveEvents(),EnumToString(leadSession.Type())+" Session Events");
+      Pause(leadSession.ActiveEventText(),EnumToString(leadSession.Type())+" Session Events");
   }
 
 //+------------------------------------------------------------------+

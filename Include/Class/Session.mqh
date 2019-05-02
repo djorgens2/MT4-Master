@@ -161,7 +161,7 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
       
     if (IsChanged(State,ChangeState))
     {
-      sEvent.SetEvent(NewState); 
+      sEvent.SetEvent(NewState);
       
       switch (State)
       {
@@ -219,9 +219,12 @@ void CSession::CalcFibo(void)
 void CSession::UpdateFractal(int Type, EventType Event)
   {
     ReservedWords cfState              = NoState;
+    EventType     cfSeverity           = NoEvent;
     
     if (IsHigher(High[sBar],srec[RecordType(Type)].High))
     {
+      cfSeverity                       = NewMajor;
+
       if (NewDirection(srec[RecordType(Type)].BreakoutDir,DirectionUp))
         cfState                        = Reversal;
       else
@@ -230,6 +233,8 @@ void CSession::UpdateFractal(int Type, EventType Event)
     else
     if (IsLower(Low[sBar],srec[RecordType(Type)].Low))
     {
+      cfSeverity                       = NewMajor;
+
       if (NewDirection(srec[RecordType(Type)].BreakoutDir,DirectionDown))
         cfState                        = Reversal;
       else
@@ -237,6 +242,8 @@ void CSession::UpdateFractal(int Type, EventType Event)
     }
     else
     {
+      cfSeverity                       = NewMinor;
+
       if (srec[RecordType(Type)].BreakoutDir==DirectionUp)
         if (Low[sBar]<Pivot(Support))
           if (Bias(Active,Pivot)==OP_BUY)
@@ -253,7 +260,10 @@ void CSession::UpdateFractal(int Type, EventType Event)
     }
           
     if (NewState(srec[RecordType(Type)].State,cfState))
+    {
       sEvent.SetEvent(Event);
+      sEvent.SetEvent(cfSeverity);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -333,7 +343,9 @@ void CSession::UpdateActive(void)
 void CSession::UpdateSession(void)
   {
     UpdateActive();
-    UpdateFractal(Term,NewMinor);
+    UpdateFractal(Term,NewTerm);
+    UpdateFractal(Trend,NewTrend);
+    UpdateFractal(Origin,NewOrigin);
   }
   
 //+------------------------------------------------------------------+

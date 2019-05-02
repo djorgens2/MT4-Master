@@ -15,6 +15,7 @@
 
 input string   EAHeader                = "";    //+---- Application Options -------+
 input int      inpIdleTrigger          = 50;    // Market idle trigger
+input int      inpEQChgPct             = 2;     // Market equity% change alert
   
 input string   fractalHeader           = "";    //+------ Fractal Options ---------+
 input int      inpRangeMin             = 60;    // Minimum fractal pip range
@@ -39,55 +40,29 @@ input int      inpUSClose              = 23;    // US market close hour
 
   //--- Class Objects
   CSessionArray      *session[SessionTypes];
-  CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,fractal);
-  CEvent             *events                 = new CEvent();
-
-  CArrayDouble       *dbBounds               = new CArrayDouble(6);
   CSessionArray      *leadSession;
+
+  CFractal           *fractal                = new CFractal(inpRangeMax,inpRangeMin);
+  CPipFractal        *pfractal               = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,inpIdleTrigger,fractal);
+  CEvent             *events                 = new CEvent();
   
-  //--- Enum Defs
-  enum ActionProtocol {
-                        NoProtocol,
-                        CoverBreakout,
-                        CoverReversal,
-                        Hedging,
-                        PullbackEntry,
-                        RallyEntry,
-                        DCAExit,
-                        LossExit,
-                        ActionProtocols
+  //--- Operational Switches
+  enum                EquityType
+                      {
+                        EquityMin,
+                        EquityMax,
+                        EquityTypes
                       };
-  
+
+  //--- Operational Switches
   bool                PauseOn                = true;
-    
-  int                 rsIdx            = 0;
-  string              rsBiasFireName   = "";
- 
-  ActionProtocol      opProtocol;
-  int                 pfPolyDir;
-  double              pfPolyBounds[2];
-  int                 fTrendAction;
-  
-  int                 dbDailyAction;
-  int                 dbBoundsCount;
-  int                 dbPriceZone;
-  int                 dbUpperBound;
-  int                 dbLowerBound;
 
   //--- Check Performance Operationals
-  int                 cpTermDir              = DirectionNone;
-  bool                cpTermFire             = false;
-  int                 cpTermFibo             = NoValue;
-  double              cpTermPivot[2]         = {NoValue,NoValue};
+  double              eqBounds[3][2];
   
-  int                 cpBiasDir              = DirectionNone;
-  SignalType          cpBiasSignal           = Inactive;
-  bool                cpBiasIdle             = false;
-  bool                cpBiasFire             = false;
-  int                 cpBiasOpenDir          = DirectionNone;
-  int                 cpBiasCloseDir         = DirectionNone;
-  double              cpBiasPivot[2]         = {NoValue,NoValue};
+  //--- PipFractal metrics
+  int                 pfPolyDir              = DirectionNone;
+  double              pfPolyBounds[2]        = {0.00,0.00};
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -110,35 +85,25 @@ void GetData(void)
     
     pfractal.ShowFiboArrow();
     
-    for (SessionType type=Asia;type<SessionTypes;type++)
+    for (SessionType type=Daily;type<SessionTypes;type++)
     {
       session[type].Update();
-      
-//      if (session[type].ActiveEvent())
-//      {
-//        udActiveEvent    = true;
-//
-//        for (EventType event=0;event<EventTypes;event++)
-//          if (session[type].Event(event))
-//            udEvent.SetEvent(event);
-//      }
-//            
-      if (type<Daily)
-        if (session[type].IsOpen())
-          leadSession    = session[type];
+
+      if (session[type].IsOpen())
+        leadSession    = session[type];
     }
     
     if (pfractal.HistoryLoaded())
     {
-     if (pfractal.Event(NewHigh))
-       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
-         if (IsChanged(pfPolyDir,DirectionUp))
-           pfPolyBounds[OP_BUY]=High[0];
+      if (pfractal.Event(NewHigh))
+        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Top)))
+          if (IsChanged(pfPolyDir,DirectionUp))
+            pfPolyBounds[OP_BUY]=High[0];
          
-     if (pfractal.Event(NewLow))
-       if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
-         if (IsChanged(pfPolyDir,DirectionDown))
-           pfPolyBounds[OP_SELL]=Low[0];
+      if (pfractal.Event(NewLow))
+        if (IsEqual(pfractal.Poly(Head),pfractal.Poly(Bottom)))
+          if (IsChanged(pfPolyDir,DirectionDown))
+            pfPolyBounds[OP_SELL]=Low[0];
     }
   }
 
@@ -147,115 +112,56 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string          rsComment        = "Dir: "+DirText(cpTermDir)+"\n"
-                                       + "Age: "+IntegerToString(pfractal.Age(Boundary))+"\n"
-                                       + "Fibo ("+BoolToStr(pfractal.Direction(Trend)==DirectionUp,"^","v")+"): "+DoubleToStr(FiboPercent(cpTermFibo,InPercent),1)+"%\n"
-                                       + "State: "+EnumToString((ReservedWords) pfractal.State());
+    string          rsComment        = ActionText(pfPolyDir);
 
     if (pfractal.Direction(Term)!=pfractal.Direction(Boundary))
       Append(rsComment,"Divergence","\n");
       
     if (pfractal.Direction(Range)!=pfractal.Direction(Boundary))
       Append(rsComment,"Reversal","\n");
-      
-    if (cpBiasIdle)
-      Append(rsComment,"Idle: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%","\n");
 
-    if (cpTermFire)
-      Append(rsComment,"Fire: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Max,InPercent),1)+"%","\n");
-
-//    UpdatePriceLabel("pfUpperBound",pfPolyBounds[OP_BUY],clrYellow);
-//    UpdatePriceLabel("pfLowerBound",pfPolyBounds[OP_SELL],clrRed);
-    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);
-    
-    if (cpBiasSignal==Triggered)
-    {
-      rsBiasFireName            = "MarketIdle-"+IntegerToString(++rsIdx);
-      NewPriceLabel(rsBiasFireName,Close[0],true);
-      UpdatePriceLabel(rsBiasFireName,Close[0],DirColor(cpBiasOpenDir,clrForestGreen,clrFireBrick));
-    }
-    
-    if (cpBiasFire)
-      NewArrow(BoolToInt(cpBiasCloseDir==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
-               BoolToInt(cpBiasCloseDir==DirectionUp,clrYellow,clrRed),
-               EnumToString(cpBiasSignal)+"-"+IntegerToString(rsIdx));
-    
-    //for (int bound=0;bound<6;bound++)
-    //  if (dbPriceZone==0 || dbPriceZone==dbBoundsCount)
-    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_SOLID,clrGoldenrod);
-    //  else
-    //  if (bound==dbUpperBound)
-    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrForestGreen);
-    //  else
-    //  if (bound==dbLowerBound)
-    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrFireBrick);
-    //  else
-    //  if (bound==dbPriceZone)
-    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrGoldenrod);
-    //  else
-    //    UpdateLine("dbBounds"+IntegerToString(bound),dbBounds[bound],STYLE_DOT,clrDarkGray);
-
+    UpdateDirection("lbActiveDir",pfPolyDir,DirColor(pfPolyDir),16);      
+//    if (cpBiasIdle)
+//      Append(rsComment,"Idle: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%","\n");
+//
+//    if (cpTermFire)
+//      Append(rsComment,"Fire: "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Max,InPercent),1)+"%","\n");
+//    
     Comment(rsComment);
   }
 
 //+------------------------------------------------------------------+
-//| SetTrend - Signals short term/long term trend                    |
+//| EquityCheck - seeks to preserve equity by monitoring eq% change  |
 //+------------------------------------------------------------------+
-void SetTrend(ActionProtocol Protocol, int Direction)
+void EquityCheck(void)
   {
-    opProtocol     = Protocol;
+    const int ecHigh        = 0;
+    const int ecLow         = 1;
+    const int ecNet         = 2;
     
-    switch (Protocol)
+    string ecMessage        = "";
+    double ecLotValue       = 0.00;
+    
+    for (int ec=OP_NO_ACTION;ec<=OP_SELL;ec++)
     {
-      default:        /* do something */;
+      ecLotValue          = LotValue(ec,Net,InEquity);
+
+      if (IsLower(ecLotValue,eqBounds[BoolToInt(ec==OP_NO_ACTION,ecNet,ec)][ecLow]))
+        ecMessage +="New Low on "+BoolToStr(ec==OP_NO_ACTION,"All Trades",ActionText(ec))+"\n";
+          
+      if (IsHigher(ecLotValue,eqBounds[BoolToInt(ec==OP_NO_ACTION,ecNet,ec)][ecHigh]))
+        ecMessage +="New High on "+BoolToStr(ec==OP_NO_ACTION,"All Trades",ActionText(ec))+"\n";
     }
-     
-    UpdateLabel("lbStrategy",EnumToString(Protocol),clrGoldenrod,24);    
+    
+    if (StringLen(ecMessage)>0)
+      CallPause(ecMessage);
   }
-  
+
 //+------------------------------------------------------------------+
-//| SetDailyAction - sets the trend hold/hedge parameters            |
+//| SetDailyAction - sets up the daily trade ranges and strategy     |
 //+------------------------------------------------------------------+
 void SetDailyAction(void)
-  {  
-    dbBoundsCount        = 0;
-    
-    //--- Set Daily Bias and Limits
-    dbDailyAction        = Action(session[Daily].TradeBias(),InDirection);
-
-    dbBounds.Initialize(NoValue);
-
-    for (SessionType type=Asia;type<Daily;type++)
-    {
-      if (dbBounds.Find(session[type].History(0).TermHigh)==NoValue)
-        dbBounds.SetValue(dbBoundsCount++,session[type].History(0).TermHigh);
-
-      if (dbBounds.Find(session[type].History(0).TermLow)==NoValue)
-        dbBounds.SetValue(dbBoundsCount++,session[type].History(0).TermLow);
-    }
-    
-    dbBounds.Sort(0,dbBoundsCount-1);
-        
-    for (dbPriceZone=0;dbPriceZone<6;dbPriceZone++)
-      if (Close[0]<dbBounds[dbPriceZone])
-        break;
-
-    dbUpperBound        = dbPriceZone;
-    dbLowerBound        = --dbPriceZone-1;
-    
-      
-    Print("PZ: "+IntegerToString(dbPriceZone)+" Close: "+DoubleToStr(Close[0],Digits));
-    //--- Set Fractal Direction and Limits
-    
-    //--- Set Hedging Indicator and Limits
-  }
-
-//+------------------------------------------------------------------+
-//| BalanceCheck - validate open positions & margin requirements     |
-//+------------------------------------------------------------------+
-void BalanceCheck(void)
   {
-    CallPause("Auto balance open positions");
   }
 
 //+------------------------------------------------------------------+
@@ -282,105 +188,6 @@ void SendOrder(int Direction, bool Contrarian)
 
 
 //+------------------------------------------------------------------+
-//| CheckPerformance - verifies that the trade plan is working       |
-//+------------------------------------------------------------------+
-void CheckPerformance(void)
-  {
-    static bool cpExcessiveIdle        = false;
-    
-    cpBiasFire                  = false;
-
-    if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
-    {
-      if (FiboLevel(pfractal.Fibonacci(Term,Expansion,Now)>cpTermFibo))
-      {
-        cpTermFire              = true;
-        events.SetEvent(NewFractal);
-      }
-
-      if (IsChanged(cpTermDir,pfractal.Direction(Trend)))
-      {
-        cpTermFire              = true;
-        events.SetEvent(NewTerm);
-      }
-        
-      if (cpTermFire)
-      {
-        cpTermFibo              = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));
-      }
-    }
-
-    if (cpTermFire)
-    {
-      //Pause("Fibo "+DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1)+"%","Fibo Expansion");
-      cpTermFire                = false;
-    }
-      
-    if (fmod(pfractal.Age(Boundary),inpIdleTrigger)==0.00)
-      if (fdiv(pfractal.Age(Boundary),inpIdleTrigger)>1)
-      {
-        if (!cpExcessiveIdle)
-        {
-          CallPause("Excessive idle event, take action?");
-          ObjectSet(rsBiasFireName,OBJPROP_COLOR,clrWhite);
-          cpExcessiveIdle       = true;
-        }
-        
-        cpBiasSignal            = Idle;
-      }
-      else
-      if (cpBiasIdle)
-        cpBiasSignal            = Waiting;
-      else
-      {          
-        if (pfractal.Fibonacci(Term,Expansion,Now)>FiboPercent(Fibo100))
-          SendOrder(cpBiasOpenDir,InContrarian);
-        else
-          CallPause("Trend action");
-            
-        cpBiasIdle              = true;
-        cpBiasSignal            = Triggered;
-        
-        CallPause("The market is idle");
-        events.SetEvent(MarketIdle);
-      }
-    else
-      if (cpBiasIdle)
-      {
-        cpBiasSignal            = Waiting;
-        cpExcessiveIdle         = false;
-      
-        if (pfractal.Event(NewBoundary))
-        {
-          if (pfractal.Event(NewHigh))
-            cpBiasCloseDir      = DirectionUp;
-
-          if (pfractal.Event(NewLow))
-            cpBiasCloseDir      = DirectionDown;
-          
-          if (cpBiasCloseDir==cpBiasOpenDir)
-            cpBiasSignal        = Confirmed;
-          else  
-            cpBiasSignal        = Rejected;
-
-          CallPause("Time to act");
-
-          cpBiasIdle            = false;
-          cpBiasFire            = true;
-
-          BalanceCheck();
-          events.SetEvent(MarketResume);
-        }
-      }
-
-    if (pfractal.Event(NewHigh))
-      cpBiasOpenDir               = DirectionUp;
-
-    if (pfractal.Event(NewLow))
-      cpBiasOpenDir               = DirectionDown;
-  }
-
-//+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
@@ -391,13 +198,7 @@ void Execute(void)
     if (leadSession.Event(SessionOpen))
       CallPause("Lead session open: "+EnumToString(leadSession.Type()));
 
-    if (pfractal.HistoryLoaded())
-      CheckPerformance();
-    
-    switch (opProtocol)
-    {
-      case NoProtocol:  break;
-    }
+    EquityCheck();
   }
 
 //+------------------------------------------------------------------+
@@ -444,7 +245,7 @@ int OnInit()
   {
     ManualInit();
     
-    session[Daily]        = new CSessionArray(Daily,inpAsiaOpen,inpUSClose);
+    session[Daily]        = new CSessionArray(Daily,0,23);
     session[Asia]         = new CSessionArray(Asia,inpAsiaOpen,inpAsiaClose);
     session[Europe]       = new CSessionArray(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]           = new CSessionArray(US,inpUSOpen,inpUSClose);
@@ -453,11 +254,6 @@ int OnInit()
     
     NewLabel("lbStrategy","Scalper",1200,5,clrDarkGray);
     NewLabel("lbActiveDir","",1175,5,clrDarkGray);
-    NewPriceLabel("pfUpperBound");
-    NewPriceLabel("pfLowerBound");
-
-    for (int x=0;x<6;x++)
-      NewLine("dbBounds"+IntegerToString(x));
 
     return(INIT_SUCCEEDED);
   }
@@ -470,14 +266,7 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete events;
-    delete dbBounds;
-    
-    ObjectDelete("mvUpperBound");
-    ObjectDelete("mvLowerBound");
     
     for (SessionType type=Asia;type<SessionTypes;type++)
       delete session[type];
-      
-    for (int x=0;x<6;x++)
-      ObjectDelete("dbBounds"+IntegerToString(x));
   }
