@@ -328,6 +328,8 @@ void CSession::UpdateActive(void)
     {
       if (usState==Reversal || usState==Breakout)
       {
+        if (sBar==0)
+          Pause(BoolToStr(sEvent[NewReversal],"Reversal","Breakout"),"State Change");
         if (sEvent[NewHigh])
           NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
 

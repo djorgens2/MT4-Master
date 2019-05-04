@@ -174,8 +174,8 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnLow",session[Active].Low,STYLE_DOT,clrFireBrick);
       UpdateLine("lnHigh",session[Active].High,STYLE_DOT,clrForestGreen);
 
-      UpdatePriceLabel("plBase",session[Active].Base,clrFireBrick);
-      UpdatePriceLabel("plRoot",session[Active].Root,clrForestGreen);
+      UpdatePriceLabel("plBase",session[Active].Base,clrRed);
+      UpdatePriceLabel("plRoot",session[Active].Root,clrGoldenrod);
     }
     
     if (inpShowData>dpNone)

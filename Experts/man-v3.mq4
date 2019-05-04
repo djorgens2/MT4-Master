@@ -47,14 +47,6 @@ input int      inpUSClose              = 23;    // US market close hour
   CEvent             *events                 = new CEvent();
   
   //--- Operational Switches
-  enum                EquityType
-                      {
-                        EquityMin,
-                        EquityMax,
-                        EquityTypes
-                      };
-
-  //--- Operational Switches
   bool                PauseOn                = true;
 
   //--- Check Performance Operationals
