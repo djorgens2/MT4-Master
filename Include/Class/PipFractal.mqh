@@ -342,10 +342,9 @@ void CPipFractal::CalcPipFractal(void)
 //+------------------------------------------------------------------+
 CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime, CFractal &Fractal) : CPipRegression(Degree,Periods,Tolerance,IdleTime)
   {
-    RetraceType   state        = Actual;
+    RetraceType   state        = Fractal.State();
     
     //--- PipFractal Initialization
-    state                      = Fractal.State();
     pf[Term].Direction         = Fractal[state].Direction;
 
     for (int idx=0;idx<5;idx++)

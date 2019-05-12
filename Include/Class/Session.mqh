@@ -156,8 +156,12 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
     if (State==NoState)
       State                       = ChangeState;
 
-    if (State==Reversal && ChangeState==Breakout)
-      ChangeState                 = State;
+    if (State==Reversal)
+      if (ChangeState==Breakout)
+        ChangeState               = State;
+      else
+      if (ChangeState==Reversal && sEvent[NewDirection])
+        State                     = Breakout;
       
     if (IsChanged(State,ChangeState))
     {
@@ -328,13 +332,14 @@ void CSession::UpdateActive(void)
     {
       if (usState==Reversal || usState==Breakout)
       {
-        if (sBar==0)
-          Pause(BoolToStr(sEvent[NewReversal],"Reversal","Breakout"),"State Change");
-        if (sEvent[NewHigh])
-          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
-
-        if (sEvent[NewLow])
-          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
+//        if (sBar==0)
+//          Pause(BoolToStr(sEvent[NewReversal],"Reversal","Breakout"),"State Change");
+          
+//        if (sEvent[NewHigh])
+//          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
+//
+//        if (sEvent[NewLow])
+//          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
       }
     }
   }
@@ -345,9 +350,9 @@ void CSession::UpdateActive(void)
 void CSession::UpdateSession(void)
   {
     UpdateActive();
-    UpdateFractal(Term,NewTerm);
-    UpdateFractal(Trend,NewTrend);
-    UpdateFractal(Origin,NewOrigin);
+    //UpdateFractal(Term,NewTerm);
+    //UpdateFractal(Trend,NewTrend);
+    //UpdateFractal(Origin,NewOrigin);
   }
   
 //+------------------------------------------------------------------+
@@ -365,8 +370,8 @@ void CSession::OpenSession(void)
     srec[RecordType(Active)].Base         = Pivot(Prior);
     srec[RecordType(Active)].Root         = Pivot(OffSession);
     srec[RecordType(Active)].PivotOpen    = Pivot(Active);
-    srec[RecordType(Active)].High         = High[sBar];
-    srec[RecordType(Active)].Low          = Low[sBar];
+    srec[RecordType(Active)].High         = Close[fmin(Bars-1,sBar+1)];
+    srec[RecordType(Active)].Low          = Close[fmin(Bars-1,sBar+1)];
 
     //-- Set OpenSession flag
     sEvent.SetEvent(SessionOpen);
@@ -389,8 +394,8 @@ void CSession::CloseSession(void)
     srec[RecordType(Active)].Support        = srec[RecordType(Active)].Low;
     srec[RecordType(Active)].Base           = Pivot(OffSession);
     srec[RecordType(Active)].Root           = Pivot(Prior);
-    srec[RecordType(Active)].High           = High[sBar];
-    srec[RecordType(Active)].Low            = Low[sBar];
+    srec[RecordType(Active)].High           = Close[fmin(Bars-1,sBar+1)];
+    srec[RecordType(Active)].Low            = Close[fmin(Bars-1,sBar+1)];
     
     sEvent.SetEvent(SessionClose);
   }
