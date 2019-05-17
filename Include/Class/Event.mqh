@@ -23,6 +23,7 @@ protected:
                   NewFractal,
                   NewFibonacci,
                   NewPivot,
+                  NewStdDev,
                   NewMajor,
                   NewMinor,
                   TrendWane,
