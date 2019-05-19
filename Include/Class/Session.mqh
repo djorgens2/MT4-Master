@@ -83,9 +83,12 @@ private:
              int           sBarDay;
              int           sBarHour;
 
+             int           sPriceZone;
+             int           sPivotZone;
+             
              //--- Private class collections
              SessionRec    srec[6];
-                          
+             
              CArrayDouble *sOffMidBuffer;
              CArrayDouble *sPriorMidBuffer;
              
@@ -100,6 +103,7 @@ private:
              void          UpdateActive(void);
              void          UpdateBuffers(void);
 
+             void          CalcZone(int Type);
              void          CalcFibo(void);
              void          LoadHistory(void);
              
@@ -203,9 +207,6 @@ void CSession::CalcFibo(void)
       srec[RecordType(Term)].Base         = Pivot(Prior);
       srec[RecordType(Term)].Resistance   = fmax(srec[RecordType(Active)].High,srec[RecordType(OffSession)].High);
       srec[RecordType(Term)].Support      = fmin(srec[RecordType(Active)].Low,srec[RecordType(OffSession)].Low);
-      
-      srec[RecordType(Term)].Low          = srec[RecordType(Term)].Support;
-      srec[RecordType(Term)].High         = srec[RecordType(Term)].Resistance;
     }
     else
     {
@@ -215,6 +216,13 @@ void CSession::CalcFibo(void)
     
     srec[RecordType(Term)].Root           = Pivot(Active);
     srec[RecordType(Term)].PivotClose     = Pivot(Active);
+    
+    if (sBar==1000)
+    {
+      Print("Term|"+SessionText(Term));
+      Print("Active|"+SessionText(Active));
+      Print("OffSession|"+SessionText(OffSession));
+    }
   };
 
 //+------------------------------------------------------------------+
@@ -224,11 +232,10 @@ void CSession::UpdateFractal(int Type, EventType Event)
   {
     ReservedWords cfState              = NoState;
     EventType     cfSeverity           = NoEvent;
-    
+
+    //-- Check pivot movement
     if (IsHigher(High[sBar],srec[RecordType(Type)].High))
     {
-      cfSeverity                       = NewMajor;
-
       if (NewDirection(srec[RecordType(Type)].BreakoutDir,DirectionUp))
         cfState                        = Reversal;
       else
@@ -326,8 +333,12 @@ void CSession::UpdateActive(void)
     }
     
     if (sEvent[NewBoundary])
+    {
       srec[RecordType(Active)].PivotClose  = Pivot(Active);
 
+      CalcZone(Term);
+    }
+    
     if (NewState(srec[RecordType(Active)].State,usState))
     {
       if (usState==Reversal || usState==Breakout)
@@ -345,12 +356,44 @@ void CSession::UpdateActive(void)
   }
 
 //+------------------------------------------------------------------+
+//| CalcZone - calculate zone price/pivot locations                  |
+//+------------------------------------------------------------------+
+void CSession::CalcZone(int Type)
+  {
+    double czZonePrice[4];
+    
+    int czPriceZone    = +2;
+    int czPivotZone    = +2;
+    
+    czZonePrice[0] = srec[RecordType(Type)].Resistance;
+    czZonePrice[1] = Pivot(Prior);
+    czZonePrice[2] = Pivot(OffSession);
+    czZonePrice[3] = srec[RecordType(Type)].Support;
+    
+    for (int zone=0;zone<4;zone++)
+    {
+      if (Pivot(Active)<czZonePrice[zone])
+        czPriceZone--;
+
+      if (Close[sBar]<czZonePrice[zone])
+        czPivotZone--;
+    }
+    
+//    if (IsChanged(sPriceZone,czPriceZone))
+//      sEvent.SetEvent();
+//      
+//    if (IsChanged(sPivotZone,czPivotZone))
+//      sEvent.SetEvent(NewPivot);
+    
+  }
+  
+//+------------------------------------------------------------------+
 //| UpdateSession - Calls update procedures for each fractal group   |
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {
     UpdateActive();
-    //UpdateFractal(Term,NewTerm);
+    UpdateFractal(Term,NewTerm);
     //UpdateFractal(Trend,NewTrend);
     //UpdateFractal(Origin,NewOrigin);
   }
@@ -359,7 +402,7 @@ void CSession::UpdateSession(void)
 //| OpenSession - Initializes active session start values on open    |
 //+------------------------------------------------------------------+
 void CSession::OpenSession(void)
-  {    
+  {
     //-- Update OffSession Record and Indicator Buffer
     srec[RecordType(OffSession)]          = srec[RecordType(Active)];
     sOffMidBuffer.SetValue(sBar,Pivot(Active));
@@ -433,7 +476,10 @@ void CSession::LoadHistory(void)
     sBars                            = Bars;
     sBarDay                          = NoValue;
     sBarHour                         = NoValue;
-
+    
+    sPriceZone                       = 0;
+    sPivotZone                       = 0;
+    
     //--- Initialize session records
     for (int type=0;type<ArraySize(srec);type++)
     {
