@@ -346,11 +346,11 @@ void CSession::UpdateActive(void)
 //        if (sBar==0)
 //          Pause(BoolToStr(sEvent[NewReversal],"Reversal","Breakout"),"State Change");
           
-//        if (sEvent[NewHigh])
-//          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
-//
-//        if (sEvent[NewLow])
-//          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
+        if (sEvent[NewHigh])
+          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
+
+        if (sEvent[NewLow])
+          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
       }
     }
   }

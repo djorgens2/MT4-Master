@@ -48,6 +48,7 @@ input int       inpUSClose              = 23;    // US market close hour
   
   //--- Application behavior switches
   bool           PauseOn                = true;
+  string         ShowData               = "APP";
 
   //--- Equity performance operationals
   enum EquityDimension {
@@ -184,13 +185,22 @@ void RefreshScreen(void)
     else
       UpdateLabel("lbSValidSession","HEDGE",DirColor(Direction(leadSession.Bias(Active,Pivot),InAction)),10);
 
-    UpdateLine("lnPivot",leadSession.Pivot(Active),STYLE_DOT,clrSteelBlue);
-    UpdateLine("lnOffSession",session[Daily].Pivot(OffSession),STYLE_DOT,clrGoldenrod);
-    UpdateLine("lnPrior",session[Daily].Pivot(Prior),STYLE_DOT,clrRed);
+    UpdateLine("lnPivot",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
+    UpdateLine("lnOffSession",session[Daily].Pivot(OffSession),STYLE_DOT,clrSteelBlue);
+    UpdateLine("lnPrior",session[Daily].Pivot(Prior),STYLE_DOT,clrGoldenrod);
     UpdateLine("lnResistance",leadSession[Active].Resistance,STYLE_SOLID,clrForestGreen);
     UpdateLine("lnSupport",leadSession[Active].Support,STYLE_SOLID,clrFireBrick);
 
-    Comment(rsComment);
+    if (ShowData=="FRACTAL"||ShowData=="FIBO")
+      fractal.RefreshScreen();
+    
+    if (ShowData=="PIPMA")
+      pfractal.RefreshScreen();
+    
+    if (ShowData=="APP")
+      Comment(rsComment);
+      
+    
   }
 
 //+------------------------------------------------------------------+
@@ -327,7 +337,14 @@ void ManageOrders(void)
 //+------------------------------------------------------------------+
 void AnalyzeSession(void)
   {
-//    InitializeSession(leadSession.Event(SessionOpen));
+    if (leadSession.Event(SessionOpen))
+    {
+      if (leadSession.Type()==Daily)
+        sDailyDir         = Direction(session[Daily].Pivot(OffSession)-session[Daily].Pivot(Prior));
+
+      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
+    }
+    
     if (IsChanged(sBiasDir,Direction(leadSession.Bias(Active,Pivot),InAction)))
       sAlert                           = true;
       
@@ -359,7 +376,6 @@ void AnalyzeSession(void)
 void SetDailyAction(void)
   {
     pfPolyChange      = 0;
-    sDailyDir         = Direction(session[Daily].Pivot(OffSession)-session[Daily].Pivot(Active));
     fDailyDir         = fractal.Direction(fractal.State(Major));
           
     sTrap                              = false;
@@ -378,9 +394,6 @@ void Execute(void)
     if (session[Daily].Event(SessionOpen))
       SetDailyAction();
       
-    if (leadSession.Event(SessionOpen))
-      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
-
     AnalyzePipMA();
     AnalyzeSession();
     
@@ -397,6 +410,9 @@ void ExecAppCommands(string &Command[])
 
     if (Command[0]=="PLAY")
         PauseOn    = false;
+        
+    if (Command[0]=="SHOW")
+        ShowData        = Command[1];
   }
 
 //+------------------------------------------------------------------+
@@ -487,6 +503,8 @@ void OnDeinit(const int reason)
     ObjectDelete("lbPMDiv");
     ObjectDelete("lbPMRev");
     ObjectDelete("lbPMStdDevDir");
+
+    ObjectDelete("lbSDailyDir");
 
     ObjectDelete("lbSHead");
     ObjectDelete("lbSSubHead");
