@@ -43,6 +43,7 @@ protected:
                   NewReversal,
                   NewRally,
                   NewPullback,
+                  NewTrap,
                   MarketCorrection,
                   MarketIdle,
                   MarketResume,

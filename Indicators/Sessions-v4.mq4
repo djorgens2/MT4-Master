@@ -168,19 +168,21 @@ void RefreshScreen(int Bar=0)
 
     if (inpShowPriceLines)
     {
-      UpdateLine("lnActiveMid",session.Pivot(Active),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnSupport",session[Active].Support,STYLE_SOLID,clrRed);
-      UpdateLine("lnResistance",session[Active].Resistance,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnLow",session[Active].Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnHigh",session[Active].High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnS_ActiveMid",session.Pivot(Active),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnS_Support",session[Active].Support,STYLE_SOLID,clrRed);
+      UpdateLine("lnS_Resistance",session[Active].Resistance,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnS_Low",session[Active].Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High",session[Active].High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnS_PriorHigh",session[Prior].High,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnS_PriorLow",session[Prior].Low,STYLE_SOLID,clrFireBrick);
 
-      UpdatePriceLabel("plBase",session[Active].Base,clrRed);
-      UpdatePriceLabel("plRoot",session[Active].Root,clrGoldenrod);
+      //UpdatePriceLabel("plBase",session[Active].Base,clrRed);
+      //UpdatePriceLabel("plRoot",session[Active].Root,clrGoldenrod);
     }
     
     if (inpShowData>dpNone)
     {
-      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias(Active,Pivot))),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[Active].Direction,DirColor(session[Active].Direction),20);
       UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[Active].State),DirColor(session[Active].Direction),8);
             
@@ -251,11 +253,13 @@ int OnInit()
     
     if (inpShowPriceLines)
     {
-      NewLine("lnActiveMid");
-      NewLine("lnSupport");
-      NewLine("lnResistance");
-      NewLine("lnHigh");
-      NewLine("lnLow");
+      NewLine("lnS_ActiveMid");
+      NewLine("lnS_Support");
+      NewLine("lnS_Resistance");
+      NewLine("lnS_High");
+      NewLine("lnS_Low");
+      NewLine("lnS_PriorHigh");
+      NewLine("lnS_PriorLow");
 
       NewPriceLabel("plBase");
       NewPriceLabel("plRoot");
@@ -308,13 +312,13 @@ void OnDeinit(const int reason)
     
     delete session;    
 
-    ObjectDelete("lnActiveMid");
-    ObjectDelete("lnSupport");
-    ObjectDelete("lnResistance");
-    ObjectDelete("lnHedge");
-    ObjectDelete("lnCorrection");
-    ObjectDelete("lnHigh");
-    ObjectDelete("lnLow");
+    ObjectDelete("lnS_ActiveMid");
+    ObjectDelete("lnS_Support");
+    ObjectDelete("lnS_Resistance");
+    ObjectDelete("lnS_High");
+    ObjectDelete("lnS_Low");
+    ObjectDelete("lnS_PriorHigh");
+    ObjectDelete("lnS_PriorLow");
     
     ObjectDelete("lbActiveBrkDir"+sessionIndex);
     ObjectDelete("lbTermBrkDir"+sessionIndex);
