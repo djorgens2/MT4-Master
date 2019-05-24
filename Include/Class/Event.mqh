@@ -28,6 +28,7 @@ protected:
                   NewMinor,
                   TrendWane,
                   TrendResume,
+                  NewStrategy,
                   NewState,
                   NewTerm,
                   NewTrend,

@@ -51,15 +51,24 @@ input int       inpUSClose              = 23;    // US market close hour
   bool           PauseOn                = true;
   string         ShowData               = "APP";
 
-  //--- Equity performance operationals
-  enum EquityDimension {
-                         eqHigh,
-                         eqLow,
-                         eqNet
+  //--- Application strategy
+  struct StrategyRec {
+                       ReservedWords Strategy;
+                       int           Direction;
+                       int           Action;
+                       double        Open;
+                       double        High;
+                       double        Low;
+                       double        EquityMin[3];
+                       double        EquityMax[3];
+                       int           Strength;
+                       int           EquityAlert;
+                       bool          IsValid;
                        };
                        
-  double         eqBounds[3][2];
-    
+  const int      OP_NET                 = 2;
+  StrategyRec    strec;                       
+   
   //--- PipFractal metrics
   int            pfPolyDir              = DirectionNone;
   double         pfPolyBounds[2]        = {0.00,0.00};
@@ -81,7 +90,7 @@ input int       inpUSClose              = 23;    // US market close hour
 
   //--- Fractal metrics
   int            fDailyDir              = DirectionNone;
-  int            fState                 = NoState;  
+  int            fState                 = NoState;
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -115,7 +124,7 @@ void GetData(void)
       if (session[type].IsOpen())
         leadSession    = session[type];
         
-      if (session[type].Event(NewBreakout))
+      if (session[type].Event(NewTrap))
       {
         sevents.SetEvent(NewTrap);
         sTrap                          = true;
@@ -138,6 +147,18 @@ void GetData(void)
       SetDailyAction();
   }
 
+
+//+------------------------------------------------------------------+
+//| RefreshScreen                                                    |
+//+------------------------------------------------------------------+
+string StrategyText(void)
+  {
+    return ("Strategy: "+EnumToString(strec.Strategy)+" ("+DirText(strec.Direction)+")  "+ActionText(strec.Action)+
+                "  ("+BoolToStr(strec.IsValid,"OK","HOLD")+")  "+"\n"+
+            "Equity "+BoolToStr(strec.EquityAlert==OP_NO_ACTION,"OK","CHECK")+"  "+BoolToStr(strec.EquityAlert==OP_NO_ACTION,"",
+                       BoolToStr(strec.EquityAlert==OP_NET,": NET",": "+ActionText(strec.EquityAlert))));
+  }
+
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
@@ -146,7 +167,8 @@ void RefreshScreen(void)
     string          rsComment        = EnumToString(leadSession.Type())+" "+ActionText(pfPolyDir);
       
     Append(rsComment,"Long: "+DoubleToStr(OrderMargin(OP_BUY),1)+"%\n"+
-                     "Short: "+DoubleToStr(OrderMargin(OP_SELL),1)+"%\n","\n");
+                     "Short: "+DoubleToStr(OrderMargin(OP_SELL),1)+"%\n"+
+                     StrategyText(),"\n");
 
     //--- PipMA Display
     UpdateDirection("lbPMPolyDir",pfPolyDir,DirColor(pfPolyDir),10);
@@ -170,10 +192,9 @@ void RefreshScreen(void)
     UpdateDirection("lbSBiasDir",sBiasDir,DirColor(sBiasDir),10);
     
     if (sTrap)
-      UpdateDirection("lbSTrap",leadSession[Active].BreakoutDir,leadSession[Active].BreakoutDir,10);
+      UpdateDirection("lbSTrap",leadSession[Active].BreakoutDir,DirColor(leadSession[Active].BreakoutDir),10);
     else
       UpdateDirection("lbSTrap",DirectionNone,clrLightGray,10);
-      
 
     if (sAlert)
       UpdateDirection("lbSAlert",sBiasDir,DirColor(sBiasDir),10);
@@ -200,24 +221,17 @@ void RefreshScreen(void)
     else
       UpdateLabel("lbSValidSession","HEDGE",DirColor(Direction(leadSession.Bias(),InAction)),10);
 
-    //--- Support/Resistance (Asia Only)
-    UpdateLine("lnResistance",session[Asia][Active].Resistance,STYLE_SOLID,clrForestGreen);
-    UpdateLine("lnSupport",session[Asia][Active].Support,STYLE_SOLID,clrFireBrick);
-
-    UpdateLine("lnPriorHigh",session[Asia][Prior].High,STYLE_DOT,clrForestGreen);
-    UpdateLine("lnPriorLow",session[Asia][Prior].Low,STYLE_DOT,clrFireBrick);
-    
     //--- Support/Resistance
-//    UpdateLine("lnResistance",leadSession[Active].Resistance,STYLE_SOLID,clrForestGreen);
-//    UpdateLine("lnSupport",leadSession[Active].Support,STYLE_SOLID,clrFireBrick);
-//
-//    UpdateLine("lnPriorHigh",leadSession[Prior].High,STYLE_SOLID,clrForestGreen);
-//    UpdateLine("lnPriorLow",leadSession[Prior].Low,STYLE_SOLID,clrFireBrick);
+    UpdateLine("lnResistance",leadSession[Active].Resistance,STYLE_SOLID,clrForestGreen);
+    UpdateLine("lnSupport",leadSession[Active].Support,STYLE_SOLID,clrFireBrick);
+
+    UpdateLine("lnPriorHigh",leadSession[Prior].High,STYLE_SOLID,clrForestGreen);
+    UpdateLine("lnPriorLow",leadSession[Prior].Low,STYLE_SOLID,clrFireBrick);
 
     //--- Pivots
-//    UpdateLine("lnPivot",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
-//    UpdateLine("lnOffSession",session[Daily].Pivot(OffSession),STYLE_DOT,clrSteelBlue);
-//    UpdateLine("lnPrior",session[Daily].Pivot(Prior),STYLE_DOT,clrGoldenrod);
+    UpdateLine("lnPivot",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
+    UpdateLine("lnOffSession",session[Daily].Pivot(OffSession),STYLE_DOT,clrSteelBlue);
+    UpdateLine("lnPrior",session[Daily].Pivot(Prior),STYLE_DOT,clrGoldenrod);
 
     if (ShowData=="FRACTAL"||ShowData=="FIBO")
       fractal.RefreshScreen();
@@ -227,29 +241,6 @@ void RefreshScreen(void)
     
     if (ShowData=="APP")
       Comment(rsComment);
-  }
-
-//+------------------------------------------------------------------+
-//| EquityCheck - seeks to preserve equity by monitoring eq% change  |
-//+------------------------------------------------------------------+
-void EquityCheck(void)
-  {    
-    string ecMessage        = "";
-    double ecLotValue       = 0.00;
-    
-    for (int ec=OP_NO_ACTION;ec<=OP_SELL;ec++)
-    {
-      ecLotValue          = LotValue(ec,Net,InEquity);
-
-      if (IsLower(ecLotValue,eqBounds[BoolToInt(ec==OP_NO_ACTION,eqNet,ec)][eqLow]))
-        ecMessage +="New Low on "+BoolToStr(ec==OP_NO_ACTION,"All Trades",ActionText(ec))+"\n";
-          
-      if (IsHigher(ecLotValue,eqBounds[BoolToInt(ec==OP_NO_ACTION,eqNet,ec)][eqHigh]))
-        ecMessage +="New High on "+BoolToStr(ec==OP_NO_ACTION,"All Trades",ActionText(ec))+"\n";
-    }
-//    if (IsEqual(OrderMargin(Action(sTradeDir,InDirection)),0.00))    
-//    if (StringLen(ecMessage)>0)
-//      CallPause(ecMessage);
   }
 
 //+------------------------------------------------------------------+
@@ -272,6 +263,86 @@ void SendOrder(int Direction, bool Contrarian)
     //  OpenOrder(soAction,BoolToStr(Contrarian,"Contrarian"+soFibo,"Trend"+soFibo));
     //  CallPause("New Order entry");
     //}
+  }
+
+//+------------------------------------------------------------------+
+//| CheckEquity - seeks to preserve equity by monitoring eq% change  |
+//+------------------------------------------------------------------+
+void CheckEquity(bool Initialize=false)
+  {    
+    string ecMessage               = "";
+    double ecLotValue              = 0.00;
+        
+    for (int ec=OP_NO_ACTION;ec<=OP_SELL;ec++)
+    {
+      ecLotValue                   = LotValue(ec,Net,InEquity);
+
+      if (Initialize)
+      {
+        strec.EquityMin[BoolToInt(ec==OP_NO_ACTION,OP_NET,ec)] = ecLotValue;
+        strec.EquityMax[BoolToInt(ec==OP_NO_ACTION,OP_NET,ec)] = ecLotValue;
+        strec.EquityAlert          = OP_NO_ACTION;
+      }
+      else
+      {
+        if (IsLower(ecLotValue,strec.EquityMin[BoolToInt(ec==OP_NO_ACTION,OP_NET,ec)]))
+          strec.EquityAlert        = BoolToInt(ec==OP_NO_ACTION,OP_NET,ec);
+          
+        if (IsHigher(ecLotValue,strec.EquityMax[BoolToInt(ec==OP_NO_ACTION,OP_NET,ec)]))
+          strec.EquityAlert        = OP_NO_ACTION;
+      }
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| SetStrength - Sets the strength of the strategy                  |
+//+------------------------------------------------------------------+
+void SetStrength(int Action)
+  {
+//    if (appAction==Action);
+      
+
+  }
+
+//+------------------------------------------------------------------+
+//| CheckStrategy - Validates the strategy and sets strength         |
+//+------------------------------------------------------------------+
+void CheckStrategy(void)
+  {
+    if (IsHigher(Close[0],strec.High))
+      SetStrength(OP_BUY);
+    
+    if (IsLower(Close[0],strec.Low))
+      SetStrength(OP_SELL);
+  }
+
+//+------------------------------------------------------------------+
+//| SetStrategy - validates current strategy, sets bounds and limits |
+//+------------------------------------------------------------------+
+void SetStrategy(void)
+  {
+    strec.Direction        = leadSession[Active].Direction;
+    strec.IsValid          = false;
+
+    strec.Open             = Close[0];
+    strec.High             = Close[0];
+    strec.Low              = Close[0];
+
+    CheckEquity(true);    
+
+    switch (strec.Strategy)
+    {
+      case Trap:      strec.Action    = Action(leadSession[Active].Direction,InDirection,InContrarian);
+                      break;
+      case Rally:     strec.Action    = Action(leadSession[Active].Direction,InDirection,InContrarian);
+                      break;
+      case Pullback:  strec.Action    = Action(leadSession[Active].Direction,InDirection,InContrarian);
+                      break;
+      case Breakout:  strec.Action    = Action(leadSession[Active].Direction,InDirection);
+                      break;
+      case Reversal:  strec.Action    = Action(leadSession[Active].Direction,InDirection);
+                      break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -345,7 +416,7 @@ void AnalyzeFractal(void)
 void AnalyzeSession(void)
   {    
     if (leadSession.Event(SessionOpen))
-      CallPause("Lead session open: "+EnumToString(leadSession.Type()));
+      sevents.SetEvent(SessionOpen);
     
     if (IsChanged(sBiasDir,Direction(leadSession.Bias(),InAction)))
       sAlert                           = true;
@@ -360,39 +431,24 @@ void AnalyzeSession(void)
       sAlert                           = true;
       sValidSession                    = false;
     }
+    
+    if (IsChanged(strec.Strategy,leadSession[Active].State))
+      SetStrategy();
       
-    if (IsBetween(Close[0],leadSession[Active].Support,leadSession[Active].Resistance))
-    {
-      if (sReversal||sBreakout)
-        sTrap                          = true;
-    }
-    else
-      if (sReversal)
-        sCorrection                    = true;
+    //if (IsBetween(Close[0],leadSession[Active].Support,leadSession[Active].Resistance))
+    //{
+    //  if (sReversal||sBreakout)
+    //    sTrap                          = true;
+    //}
+    //else
+    //  if (sReversal)
+    //    sCorrection                    = true;
 
     if (sevents.ActiveEvent())
       CallPause("New session alerts\n"+sevents.ActiveEventText());
   }
 
 //+------------------------------------------------------------------+
-//| ManageOrders - Looks for entry points and executes trades        |
-//+------------------------------------------------------------------+
-void ManageOrders(void)
-  {
-    if (sDailyDir==sBiasDir)
-      sHedging     = false;
-    else
-      sHedging     = true;
-      
-    if (sHedging)
-    {}
-    else
-    {
-      //if (LotCount(Action(sBiasDir,InDirection))*Spread(InPips)<EquityPercent())
-    }    
-  }
-
-//+--------------------------------`----------------------------------+
 //| SetDailyAction - sets up the daily trade ranges and strategy     |
 //+------------------------------------------------------------------+
 void SetDailyAction(void)
@@ -401,12 +457,12 @@ void SetDailyAction(void)
     fDailyDir         = fractal.Direction(fractal.State(Major));
     sDailyDir         = Direction(session[Daily].Pivot(Active)-session[Daily].Pivot(Prior));
           
-    sTrap                              = false;
-    sAlert                             = false;
-    sCorrection                        = false;
-    sReversal                          = false;
-    sBreakout                          = false;
-    sValidSession                      = false;
+    sTrap             = false;
+    sAlert            = false;
+    sCorrection       = false;
+    sReversal         = false;
+    sBreakout         = false;
+    sValidSession     = false;
   }
 
 //+------------------------------------------------------------------+
@@ -419,8 +475,10 @@ void Execute(void)
       
     AnalyzePipMA();
     AnalyzeSession();
+    AnalyzeFractal();
     
-    EquityCheck();
+    CheckStrategy();
+    CheckEquity();
   }
 
 //+------------------------------------------------------------------+

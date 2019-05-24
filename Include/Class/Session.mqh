@@ -96,7 +96,7 @@ private:
              void          UpdateActive(void);
              void          UpdateBuffers(void);
 
-             void          CalcFibo(void);
+             void          CalcFractal(void);
              void          LoadHistory(void);
              
              bool          NewDirection(int &Direction, int NewDirection);
@@ -186,10 +186,12 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
   }
 
 //+------------------------------------------------------------------+
-//| CalcFibo - Compute fibonacci points and states on session close  |
+//| CalcFractal - Updates fibonacci points and states                |
 //+------------------------------------------------------------------+
-void CSession::CalcFibo(void)
+void CSession::CalcFractal(void)
   {
+     sEvent.SetEvent(NewTerm);
+
   };
 
 //+------------------------------------------------------------------+
@@ -197,48 +199,18 @@ void CSession::CalcFibo(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateFractal(void)
   {
-//    -- Check pivot movement
-//    if (IsHigher(High[sBar],srec[RecordType(Type)].High))
-//    {
-//      if (NewDirection(srec[RecordType(Type)].BreakoutDir,DirectionUp))
-//        cfState                        = Reversal;
-//      else
-//        cfState                        = Breakout;
-//    }
-//    else
-//    if (IsLower(Low[sBar],srec[RecordType(Type)].Low))
-//    {
-//      cfSeverity                       = NewMajor;
-//
-//      if (NewDirection(srec[RecordType(Type)].BreakoutDir,DirectionDown))
-//        cfState                        = Reversal;
-//      else
-//        cfState                        = Breakout;
-//    }
-//    else
-//    {
-//      cfSeverity                       = NewMinor;
-//
-//      if (srec[RecordType(Type)].BreakoutDir==DirectionUp)
-//        if (Low[sBar]<Pivot(Support))
-//          if (Bias(Active,Pivot)==OP_BUY)
-//            cfState                    = Pullback;
-//          else
-//            cfState                    = Correction;
-//      
-//      if (srec[RecordType(Type)].BreakoutDir==DirectionDown)
-//        if (High[sBar]>Pivot(Resistance))
-//          if (Bias(Active,Pivot)==OP_SELL)
-//            cfState                    = Rally;
-//          else
-//            cfState                    = Correction;
-//    }
-//          
-//    if (NewState(srec[RecordType(Type)].State,cfState))
-//    {
-//      sEvent.SetEvent(Event);
-//      sEvent.SetEvent(cfSeverity);
-//    }
+    if (sEvent[NewBoundary])
+    {
+      if (sEvent[NewReversal])
+        CalcFractal();    
+      
+      for (int fibo=0;fibo<Prior;fibo++)
+      {
+        srec[fibo].High      = fmax(High[sBar],srec[fibo].High);
+        srec[fibo].Low       = fmin(Low[sBar],srec[fibo].Low);
+      }
+      
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -260,7 +232,7 @@ void CSession::UpdateActive(void)
         usState                        = Rally;
 
       if (IsHigher(srec[RecordType(Active)].High,srec[RecordType(Prior)].High,NoUpdate))
-        usState                      = Trap;
+        usState                        = Trap;
               
       if (IsHigher(srec[RecordType(Active)].High,srec[RecordType(Active)].Resistance,NoUpdate))
         if (NewDirection(srec[RecordType(Active)].BreakoutDir,DirectionUp))
@@ -348,9 +320,6 @@ void CSession::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
   {        
-    //-- Update fibonacci pattern data
-    CalcFibo();
-        
     //-- Update Prior Record and Indicator Buffer
     srec[RecordType(Prior)]                 = srec[RecordType(Active)];
     sPriorMidBuffer.SetValue(sBar,Pivot(Prior));
@@ -523,14 +492,6 @@ bool CSession::IsOpen(void)
 //+------------------------------------------------------------------+
 double CSession::Pivot(const int Type)
   {
-    //-- Returns the Support or Resistance if specified
-    switch (Type)
-    {
-      case Support:    return(fmin(Pivot(Active),fmin(Pivot(Prior),Pivot(OffSession))));
-      case Resistance: return(fmax(Pivot(Active),fmax(Pivot(Prior),Pivot(OffSession))));
-    }
-    
-    //-- Returns the pivot for the specified Type
     return(fdiv(srec[RecordType(Type)].High+srec[RecordType(Type)].Low,2,Digits));
   }
 
@@ -568,8 +529,6 @@ string CSession::SessionText(int Type)
                                 + TimeToStr(Time[sBar])+"|"
                                 + BoolToStr(this.IsOpen(),"Open|","Closed|")
                                 + DoubleToStr(Pivot(Active),Digits)+"|"
-                                + DoubleToStr(Pivot(Resistance),Digits)+"|"
-                                + DoubleToStr(Pivot(Support),Digits)+"|"
                                 + BoolToStr(srec[RecordType(Type)].Direction==DirectionUp,"Long|","Short|")                              
                                 + EnumToString(srec[RecordType(Type)].State)+"|"
                                 + DoubleToStr(srec[RecordType(Type)].High,Digits)+"|"
