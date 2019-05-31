@@ -18,8 +18,17 @@
 class CSession
   {
 
-public:
-             
+public:             
+             //-- Session Types
+             enum SessionType
+             {
+               Daily,
+               Asia,
+               Europe,
+               US,
+               SessionTypes
+             };
+
              //-- Session Record Definition
              struct SessionRec
              {
@@ -32,14 +41,16 @@ public:
                double         Resistance;
              };
 
-             //-- Session Types
-             enum SessionType
+             //-- Session Record Definition
+             struct FiboRec
              {
-               Daily,
-               Asia,
-               Europe,
-               US,
-               SessionTypes
+               int            Direction;
+               ReservedWords  State;
+               int            BreakoutDir;
+               double         Retrace;
+               double         Expansion;
+               double         Base;
+               double         Root;
              };
 
              CSession(SessionType Type, int HourOpen, int HourClose);
@@ -51,7 +62,8 @@ public:
              
              bool          Event(EventType Type)            {return (sEvent[Type]);}
              bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
-             string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};             
+             string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};
+             void          ShowDirArrow(bool Show)          {sShowDirArrow=Show;};
              
              double        Pivot(const int Type);
              int           Bias(void);
@@ -61,7 +73,7 @@ public:
 
              string        SessionText(int Type);
              
-             int           RecordType(int Type); 
+             FiboRec       Fibo(int Type);
              SessionRec    operator[](const int Type)       {return(srec[RecordType(Type)]);}
              
                                  
@@ -78,6 +90,7 @@ private:
              int           sBars;
              int           sBarDay;
              int           sBarHour;
+             bool          sShowDirArrow;
 
              //--- Private class collections
              SessionRec    srec[6];
@@ -88,6 +101,8 @@ private:
              CEvent       *sEvent;
              
              //--- Private Methods
+             int           RecordType(int Type);
+
              void          OpenSession(void);
              void          CloseSession(void);
 
@@ -191,7 +206,12 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
 void CSession::CalcFractal(void)
   {
      sEvent.SetEvent(NewTerm);
-
+     
+     if (srec[Term].Direction==DirectionUp)
+       srec[Term].Support             = srec[Term].Low;
+       
+     if (srec[Term].Direction==DirectionDown)
+       srec[Term].Resistance          = srec[Term].High;
   };
 
 //+------------------------------------------------------------------+
@@ -232,7 +252,8 @@ void CSession::UpdateActive(void)
         usState                        = Rally;
 
       if (IsHigher(srec[RecordType(Active)].High,srec[RecordType(Prior)].High,NoUpdate))
-        usState                        = Trap;
+        if (!sSessionIsOpen)
+          usState                      = Trap;
               
       if (IsHigher(srec[RecordType(Active)].High,srec[RecordType(Active)].Resistance,NoUpdate))
         if (NewDirection(srec[RecordType(Active)].BreakoutDir,DirectionUp))
@@ -252,7 +273,8 @@ void CSession::UpdateActive(void)
         usState                        = Pullback;
 
       if (IsLower(srec[RecordType(Active)].Low,srec[RecordType(Prior)].Low,NoUpdate))
-        usState                        = Trap;
+        if (!sSessionIsOpen)
+          usState                      = Trap;
       
       if (IsLower(srec[RecordType(Active)].Low,srec[RecordType(Active)].Support,NoUpdate))
         if (NewDirection(srec[RecordType(Active)].BreakoutDir,DirectionDown))
@@ -276,13 +298,14 @@ void CSession::UpdateActive(void)
     
     if (NewState(srec[RecordType(Active)].State,usState))
       if (usState==Reversal || usState==Breakout)
-      {
-        if (sEvent[NewHigh])
-          NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
+        if (sShowDirArrow)
+        {
+          if (sEvent[NewHigh])
+            NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Resistance,sBar);
 
-        if (sEvent[NewLow])
-          NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
-      }
+          if (sEvent[NewLow])
+            NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usLastSession.Support,sBar);
+        }
   }
   
 //+------------------------------------------------------------------+
@@ -402,6 +425,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose)
     sHourOpen                        = HourOpen;
     sHourClose                       = HourClose;
     sSessionIsOpen                   = false;
+    sShowDirArrow                    = true;
     
     sEvent                           = new CEvent();
 

@@ -76,7 +76,7 @@ void RefreshScreen()
     if (pfractal.TrendWane())
       ObjectSet("piprMean", OBJPROP_COLOR, clrYellow);
     else
-      ObjectSet("piprMean", OBJPROP_COLOR, DirColor(pfractal.FOCDirection()));   
+      ObjectSet("piprMean", OBJPROP_COLOR, DirColor(pfractal.FOCDirection()));
 
     UpdatePriceLabel("piprHead",pfractal.Trendline(Head),DirColor(pfractal.Direction(Trendline)));
     UpdatePriceLabel("piprTail",pfractal.Trendline(Tail),DirColor(pfractal.Direction(Trendline)));

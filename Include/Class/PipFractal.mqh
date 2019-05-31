@@ -628,7 +628,12 @@ void CPipFractal::ShowFiboArrow(void)
 void CPipFractal::RefreshScreen(void)
   { 
     Comment("\n*--- PipFractal ---*\n"
-           +"  FOC: "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)+"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n\n"
+           +"  FOC: "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)+"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
+           +"  Std Dev: "+DoubleToStr(Pip(StdDev(Now)),1)
+               +" x:"+DoubleToStr(fmax(Pip(StdDev(Positive)),fabs(Pip(StdDev(Negative)))),1)
+               +" p:"+DoubleToStr(Pip(StdDev()),1)
+               +" +"+DoubleToStr(Pip(StdDev(Positive)),1)
+               +" "+DoubleToStr(Pip(StdDev(Negative)),1)+"\n\n"
            +"  Term: "+DirText(this.Direction(Term))+" ("+IntegerToString(this.Count(Term))+")\n"
            +"     Base: "+DoubleToStr(pf[Term].Base,Digits)+" Root: "+DoubleToStr(pf[Term].Root,Digits)+" Expansion: "+DoubleToStr(pf[Term].Expansion,Digits)+"\n"
            +"     Retrace: "+DoubleToStr(Fibonacci(Term,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Term,Retrace,Max,InPercent),1)+"%"

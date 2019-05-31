@@ -44,7 +44,7 @@ enum DataPosition
     dpFourth  = Fourth    //Fourth
   };
 
-//--- Operational Inputs
+//--- Indicator Inputs
 input SessionType    inpType            = SessionTypes;    // Indicator session
 input int            inpHourOpen        = NoValue;         // Session Opening Hour
 input int            inpHourClose       = NoValue;         // Session Closing Hour
@@ -52,6 +52,7 @@ input bool           inpShowRange       = true;            // Display session ra
 input bool           inpShowBuffer      = true;            // Display trend lines?
 input bool           inpShowPriceLines  = true;            // Show price Lines?
 input DataPosition   inpShowData        = dpNone;          // Indicator data position
+input YesNoType      inpShowDir         = Yes;             // Show Breakout Arrows
 
 const color          AsiaColor          = C'0,32,0';       // Asia session box color
 const color          EuropeColor        = C'48,0,0';       // Europe session box color
@@ -243,6 +244,9 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 int OnInit()
   {
+    if (inpShowDir==Yes)
+      session.ShowDirArrow(true);
+      
     SetIndexBuffer(0,indPriorMidBuffer);
     SetIndexEmptyValue(0, 0.00);
     SetIndexStyle(0,DRAW_SECTION);

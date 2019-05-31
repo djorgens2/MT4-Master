@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                   dj-live-v1.mq4 |
+//|                                                   dj-live-v2.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -472,13 +472,13 @@ void AnalyzePipMA(void)
              pfStdDevMax                       = false;
              SetTrigger(Action(pfractal.Direction(StdDev),InDirection,InContrarian),"StdDev Max Cleared");
              
-             CallPause("StdDev blast over");
+//             CallPause("StdDev blast over");
            }
 
-        if (IsEqual(pfractal.StdDev(Now),0.00))
-          if (IsEqual(pfractal.StdDev(),BoolToDouble(pfractal.Direction(StdDev)==DirectionUp,pfractal.StdDev(Positive),pfractal.StdDev(Negative)),1))
-            CallPause("StdDev Boundary "+DoubleToStr(pfractal.StdDev(),1)+"%  "+
-                      DoubleToStr(BoolToDouble(pfractal.Direction(StdDev)==DirectionUp,pfractal.StdDev(Positive),pfractal.StdDev(Negative)),1)+"%");
+        //if (IsEqual(pfractal.StdDev(Now),0.00))
+        //  if (IsEqual(pfractal.StdDev(),BoolToDouble(pfractal.Direction(StdDev)==DirectionUp,pfractal.StdDev(Positive),pfractal.StdDev(Negative)),1))
+        //    CallPause("StdDev Boundary "+DoubleToStr(pfractal.StdDev(),1)+"%  "+
+        //              DoubleToStr(BoolToDouble(pfractal.Direction(StdDev)==DirectionUp,pfractal.StdDev(Positive),pfractal.StdDev(Negative)),1)+"%");
        }
     }
         
@@ -624,11 +624,11 @@ void CheckTriggers(void)
   {
     if (triggerSet)
     {
-//      while (OrderMargin(triggerAction)<=ordEQMaxRisk)
-      {
-        Print(DoubleToStr(OrderMargin(triggerAction),2)+":"+DoubleToStr(ordEQMaxRisk,2));
-//        SendOrder(triggerAction,triggerRemarks);
-      }
+      //while (OrderMargin(triggerAction)<=ordEQMaxRisk)
+      //{
+      //  Print(DoubleToStr(OrderMargin(triggerAction),2)+":"+DoubleToStr(ordEQMaxRisk,2));
+      //  SendOrder(triggerAction,triggerRemarks);
+      //}
 
       triggerSet       = false;
     }
