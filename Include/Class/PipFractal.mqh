@@ -77,7 +77,7 @@ class CPipFractal : public CPipRegression
           int        State(void) { return (pfState); };
           double     Price(int TimeRange, int Measure=Expansion);
           double     Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
-          bool       IsPegged(void)  {return (pfPeg); }
+          bool       IsPegged(void)                           {return (pfPeg); };
           
           void       RefreshScreen(void);
           void       ShowFiboArrow(void);
@@ -586,12 +586,13 @@ void CPipFractal::ShowFiboArrow(void)
     static string    arrowName      = "";
     static int       arrowDir       = DirectionNone;
     static double    arrowPrice     = 0.00;
+    static int       arrowIdx       = 0;
            uchar     arrowCode      = SYMBOL_DASH;
 
     if (IsChanged(arrowDir,this.Direction(Term)))
     {
       arrowPrice                    = Close[0];
-      arrowName                     = NewArrow(arrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir),arrowPrice);
+      arrowName                     = NewArrow(arrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir)+IntegerToString(arrowIdx++),arrowPrice);
     }
      
     if (this.Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo823))

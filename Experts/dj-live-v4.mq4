@@ -15,6 +15,7 @@
 
 input string    EAHeader                = "";    //+---- Application Options -------+
 input YesNoType inpShowPolyArrows       = No;    // Show poly direction change arrows
+input YesNoType inpShowBreakouts        = No;    // Show session breakouts/reversals
 input double    inpDailyTarget          = 10;    // Daily % growth objective
   
 input string    fractalHeader           = "";    //+------ Fractal Options ---------+
@@ -36,6 +37,13 @@ input int       inpEuropeOpen           = 8;     // Europe market open hour
 input int       inpEuropeClose          = 18;    // Europe market close hour
 input int       inpUSOpen               = 14;    // US market open hour
 input int       inpUSClose              = 23;    // US market close hour
+
+  //--- Indicators
+  enum IndicatorType  {
+                        indFractal,
+                        indPipMA,
+                        indSession  
+                      };
 
   //--- Class Objects
   CSession      *session[SessionTypes];
@@ -61,6 +69,7 @@ input int       inpUSClose              = 23;    // US market close hour
   double         triggerStop            = 0.00;
   
   //--- Session metrics
+  int            sDailyAction           = OP_NO_ACTION;
   int            sDailyDir              = DirectionNone;
   int            sBiasDir               = DirectionNone;
   ReservedWords  sBiasState             = NoState;
@@ -69,6 +78,9 @@ input int       inpUSClose              = 23;    // US market close hour
   int            pfDir                  = DirectionNone;
   double         pfHighBar              = 0.00;
   double         pfLowBar               = 0.00;
+  int            pfDevDir               = DirectionNone;
+  int            pfDevDirfIdx           = 0;
+  
   
   //--- Fractal metrics
   int            fDailyDir              = DirectionNone;
@@ -82,6 +94,28 @@ void CallPause(string Message)
     if (pfractal.HistoryLoaded())
       if (PauseOn)
         Pause(Message,"Event Trapper");
+
+    if (IsEqual(Close[0],StopPrice))
+    {
+      if (PauseOn)
+        Pause(Message,"Price Trapper");
+
+//      for (int ord=0;ord<6;ord++)
+        OpenOrder(StopAction,"Test");
+
+      //CloseOrders(CloseAll,Action(StopAction,InAction,InContrarian));
+      //if (Test)
+      //  if (++tidx<ArraySize(trec))
+      //  {
+      //    StopPrice   = trec[tidx].price;
+      //    StopAction  = trec[tidx].action;
+      //  }
+      //  else
+      //    Test     = false;
+      //else
+        StopPrice = 0.00;
+    }
+
   }
 
 //+------------------------------------------------------------------+
@@ -108,13 +142,17 @@ void GetData(void)
       SetDailyAction();
   }
 
-
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string          rsComment        = EnumToString(leadSession.Type());
+    string          rsComment        = "Daily:  "+ActionText(sDailyAction)+" "+DirText(sDailyDir)
+                                                 +"  ("+BoolToStr(sDailyDir==Direction(session[Daily].Bias(),InAction),"Hold","Hedge")+")\n"+
+                                       "Lead:   "+EnumToString(leadSession.Type())+" "
+                                                 +ActionText(leadSession.Bias(),InAction)+" "
+                                                 +EnumToString(leadSession[Active].State)
+                                                 +"  ("+BoolToStr(sDailyDir==Direction(leadSession.Bias(),InAction),"Hold","Hedge")+")\n";
       
     if (triggerSet)
       UpdateLabel("lbTriggerState","Fired "+ActionText(triggerAction),clrYellow);
@@ -124,8 +162,10 @@ void RefreshScreen(void)
                   " b:"+DoubleToStr(pfLowBar,Digits),clrDarkGray);
       
  
-    Append(rsComment,"Long: "+DoubleToStr(OrderMargin(OP_BUY),1)+"%\n"+
+    Append(rsComment,"\nMargin Analysis\n"+"-----------------------\n"+
+                     "Long: "+DoubleToStr(OrderMargin(OP_BUY),1)+"%\n"+
                      "Short: "+DoubleToStr(OrderMargin(OP_SELL),1)+"%\n"+
+                     "\nStrategy\n"+"-----------------------\n"+
                      "Bias: "+DirText(sBiasDir)+" "+EnumToString(sBiasState)+"\n"+
                      "Goal: "+DoubleToStr(objDailyGoal,0),"\n");
                      
@@ -136,7 +176,12 @@ void RefreshScreen(void)
       pfractal.RefreshScreen();
     
     if (ShowData=="APP")
+    {
+//      UpdateLine("lnDailyOffsession",session[Daily].Pivot(OffSession),STYLE_DOT,clrGoldenrod);
+//      UpdateLine("lnDailyActive",session[Daily].Pivot(Active),STYLE_DOT,clrSteelBlue);
+//      UpdateLine("lnLeadActive",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
       Comment(rsComment);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -171,28 +216,13 @@ void SetTrigger(EventType Event)
 //+------------------------------------------------------------------+
 //| Rebalance - Rebalance Equity Load based on event                 |
 //+------------------------------------------------------------------+
-void Rebalance(EventType Event)
+void Rebalance(EventType Event, IndicatorType Indicator)
   {
-    CallPause("Rebalancing event "+EnumToString(Event));
-
-//    if (triggerSet)
-//      triggerSet                     = false;
-      
+    CallPause("Rebalancing event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3));
+    
     pfHighBar                        = pfractal.Range(Top);
     pfLowBar                         = pfractal.Range(Bottom);
     
-    if (Event==NewMinor)
-    {
-      if (pfractal.Fibonacci(Origin,Expansion,Expansion,InDecimal)>FiboPercent(Fibo23))
-      {
-        CallPause("Good time to trade contrarian?");
-      }
-    }
-    else
-    {
-//      SetTrigger(Event);
-//      CheckEquity();
-    }    
 //      SetStopPrice(OP_SELL,leadSession[Active].Resistance);
 //      SetStopPrice(OP_BUY,leadSession[Active].Support);
   }
@@ -202,33 +232,70 @@ void Rebalance(EventType Event)
 //+------------------------------------------------------------------+
 void AnalyzePipMA(void)
   {
+    bool   apTrig    = false;
+    double apPivot   = 0.00;
+    
     if (pfractal.HistoryLoaded())
     {
       if (pfractal.Event(NewHigh))
         if (IsChanged(pfDir,DirectionUp))
-          Rebalance(NewHigh);
+          Rebalance(NewHigh,indPipMA);
 
       if (pfractal.Event(NewLow))
         if (IsChanged(pfDir,DirectionDown))
-          Rebalance(NewLow);
+          Rebalance(NewLow,indPipMA);
           
       if (pfractal.Event(NewMajor))
-        CallPause("pipMA-New Major");
+        Rebalance(NewMajor,indPipMA);
           
       if (pfractal.Event(NewMinor))
-        CallPause("pipMA-New Minor");
+        Rebalance(NewMinor,indPipMA);
 
-//       if (IsLower(pfractal.Range(Top),pfHighBar))
-//         SetTrigger(OP_SELL,"pfHighBar Drop @"+DoubleToStr(pfHighBar,Digits),pfLowBar,pfHighBar);
-//
-//       if (IsHigher(pfractal.Range(Bottom),pfLowBar))
-//         SetTrigger(OP_BUY,"pfHighBar Rise @"+DoubleToStr(pfLowBar,Digits),pfHighBar,pfLowBar);
+      if (IsLower(pfractal.Range(Top),pfHighBar))
+        Rebalance(NewContraction,indPipMA);
+
+      if (IsHigher(pfractal.Range(Bottom),pfLowBar))
+        Rebalance(NewContraction,indPipMA);
+
+      if (pfractal.Event(NewMinor) || pfractal.Event(NewMajor))
+        apTrig          = true;
+        
+      if (apTrig)
+      {
+        if (IsChanged(pfDevDir,pfractal.Direction(Pivot)))
+        {
+           NewArrow(SYMBOL_DASH,DirColor(pfDevDir,clrYellow,clrRed),"pfDev-"+IntegerToString(pfDevDirfIdx++));
+
+           apPivot         = pfractal.Direction(Pivot);
+           apTrig          = false;           
+        }
+      }
     }
     else
     {
       pfHighBar       = pfractal.Range(Top);
       pfLowBar        = pfractal.Range(Bottom);
     }
+
+    UpdateLine("lnLeadActive",apPivot,STYLE_SOLID,DirColor(pfractal.Direction(Pivot)));
+  }
+
+//+------------------------------------------------------------------+
+//| AnalyzeFractal - Fractal Analysis routine                        |
+//+------------------------------------------------------------------+
+void AnalyzeFractal(void)
+  {    
+    if (fractal.Event(NewMinor))
+      Rebalance(NewMinor,indFractal);
+
+    if (fractal.Event(NewMajor))
+      Rebalance(NewMajor,indFractal);
+
+    if (fractal.Event(MarketCorrection))
+      Rebalance(MarketCorrection,indFractal);
+
+    if (fractal.Event(MarketResume))
+      Rebalance(MarketResume,indFractal);
   }
 
 //+------------------------------------------------------------------+
@@ -240,10 +307,10 @@ void AnalyzeSession(void)
 //      sevents.SetEvent(SessionOpen);
     
     if (IsChanged(sBiasDir,Direction(leadSession.Bias(),InAction)))
-      Rebalance(NewTradeBias);
+      Rebalance(NewTradeBias,indSession);
       
-//    if (IsChanged(sBiasState,leadSession[Active].State))
-//      Rebalance(NewState);
+    if (IsChanged(sBiasState,leadSession[Active].State))
+      Rebalance(NewState,indSession);
   }
 
 //+------------------------------------------------------------------+
@@ -253,6 +320,7 @@ void SetDailyAction(void)
   {
     fDailyDir         = fractal.Direction(fractal.State(Major));
     sDailyDir         = Direction(session[Daily].Pivot(Active)-session[Daily].Pivot(Prior));
+    sDailyAction      = Action(sDailyDir,InDirection);
     
     objDailyGoal      = (AccountBalance()*(inpDailyTarget/100))+AccountBalance();
     
@@ -273,7 +341,6 @@ void CheckTriggers(void)
       if (!IsBetween(Close[0],triggerEntry,triggerStop))
         triggerSet       = false;
     }
-    
   }
 
 //+------------------------------------------------------------------+
@@ -291,6 +358,7 @@ void Execute(void)
       CallPause("Stop Price hit @"+DoubleToStr(StopPrice,Digits));
       
     AnalyzePipMA();
+    AnalyzeFractal();
     AnalyzeSession();
     CheckTriggers();
   }
@@ -355,8 +423,18 @@ int OnInit()
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose);
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose);
     session[US]           = new CSession(US,inpUSOpen,inpUSClose);
+    
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (inpShowBreakouts==Yes)
+        session[type].ShowDirArrow(true);
+      else
+        session[type].ShowDirArrow(false);
 
     NewLabel("lbTriggerState","",350,5);
+
+    NewLine("lnDailyOffsession");
+    NewLine("lnDailyActive");
+    NewLine("lnLeadActive");
     
     leadSession           = session[Daily];
     return(INIT_SUCCEEDED);

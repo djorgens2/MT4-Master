@@ -39,13 +39,9 @@
 
 
 //---- Format Constants
-#define IN_PIPS                0
-#define IN_PRICE               1
-#define IN_INTEGER             2
-#define IN_DOLLAR              3
-#define IN_EQUITY              4
-#define IN_ACTION              5
-#define IN_DIRECTION           6
+#define IN_DIRECTION           8
+#define IN_ACTION              9
+
 
 //---- Screen Locations
 #define SCREEN_UL              0

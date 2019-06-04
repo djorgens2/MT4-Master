@@ -35,6 +35,7 @@ protected:
                   NewOrigin,
                   NewDivergence,
                   NewExpansion,
+                  NewContraction,
                   NewPoly,
                   NewHigh,
                   NewLow,

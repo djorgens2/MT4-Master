@@ -425,7 +425,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose)
     sHourOpen                        = HourOpen;
     sHourClose                       = HourClose;
     sSessionIsOpen                   = false;
-    sShowDirArrow                    = true;
+    sShowDirArrow                    = false;
     
     sEvent                           = new CEvent();
 
