@@ -53,7 +53,7 @@ public:
                double         Root;
              };
 
-             CSession(SessionType Type, int HourOpen, int HourClose);
+             CSession(SessionType Type, int HourOpen, int HourClose, int GMTOffset);
             ~CSession();
 
              SessionType   Type(void)                       {return (sType);}
@@ -63,6 +63,8 @@ public:
              bool          Event(EventType Type)            {return (sEvent[Type]);}
              bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
              string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};
+             
+             datetime      ServerTime(int Bar=0);
              void          ShowDirArrow(bool Show)          {sShowDirArrow=Show;};
              
              double        Pivot(const int Type);
@@ -86,6 +88,7 @@ private:
 
              int           sHourOpen;
              int           sHourClose;
+             int           sHourOffset;
              int           sBar;
              int           sBars;
              int           sBarDay;
@@ -134,6 +137,16 @@ int CSession::RecordType(int Type)
     };
 
     return (NoValue);
+  };
+
+//+------------------------------------------------------------------+
+//| ServerTime - Returns the adjusted time based on server offset    |
+//+------------------------------------------------------------------+
+datetime CSession::ServerTime(int Bar=0)
+  {
+    //-- Time is set to reflect 5:00pm New York as end of trading day
+    
+    return(Time[Bar]+(PERIOD_H1*60*sHourOffset));
   };
 
 //+------------------------------------------------------------------+
@@ -418,14 +431,15 @@ void CSession::LoadHistory(void)
 //+------------------------------------------------------------------+
 //| Session Class Constructor                                        |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset)
   {
     //--- Init global session values
     sType                            = Type;
     sHourOpen                        = HourOpen;
     sHourClose                       = HourClose;
+    sHourOffset                      = HourOffset;
     sSessionIsOpen                   = false;
-    sShowDirArrow                    = false;
+    sShowDirArrow                    = true;
     
     sEvent                           = new CEvent();
 
@@ -441,7 +455,8 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose)
     sPriorMidBuffer.SetPrecision(Digits);
     sPriorMidBuffer.Initialize(0.00);
     
-    LoadHistory();    
+    Print("Server Time: "+TimeToString(ServerTime()));
+    LoadHistory();
   }
 
 //+------------------------------------------------------------------+
@@ -465,7 +480,7 @@ void CSession::Update(void)
     sEvent.ClearEvents();
 
     //--- Test for New Day; Force close
-    if (IsChanged(sBarDay,TimeDay(Time[sBar])))
+    if (IsChanged(sBarDay,TimeDay(ServerTime(sBar))))
     {
       sEvent.SetEvent(NewDay);
       
@@ -473,7 +488,7 @@ void CSession::Update(void)
         CloseSession();
     }
     
-    if (IsChanged(sBarHour,TimeHour(Time[sBar])))
+    if (IsChanged(sBarHour,TimeHour(ServerTime(sBar))))
       sEvent.SetEvent(NewHour);
 
     //--- Calc events session open/close
@@ -505,8 +520,9 @@ void CSession::Update(double &OffMidBuffer[], double &PriorMidBuffer[])
 //+------------------------------------------------------------------+
 bool CSession::IsOpen(void)
   {
-    if (TimeHour(Time[sBar])>=sHourOpen && TimeHour(Time[sBar])<sHourClose)
-      return (true);
+    if (TimeDayOfWeek(ServerTime(sBar))<6)
+      if (TimeHour(ServerTime(sBar))>=sHourOpen && TimeHour(ServerTime(sBar))<sHourClose)
+        return (true);
         
     return (false);
   }
@@ -574,7 +590,7 @@ int CSession::SessionHour(int Measure=Now)
       case SessionOpen:   return(sHourOpen);
       case SessionClose:  return(sHourClose);
       case Now:           if (sSessionIsOpen)
-                            return (TimeHour(Time[sBar])-sHourOpen+1);
+                            return (TimeHour(ServerTime(sBar))-sHourOpen+1);
     }
     
     return (NoValue);

@@ -42,6 +42,7 @@ input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
 input int    inpIdleTime        = 50;    // Market idle time in Pips
 input bool   inpShowFibo        = true;  // Display lines and fibonacci points
 input bool   inpShowComment     = false; // Display fibonacci data in Comment
+input bool   inpShowBounds      = true;  // Display trade boundary lines
 
 input string fractalHeader      = "";    //+------ Fractal inputs ------+
 input int    inpRangeMax        = 120;   // Maximum fractal pip range
@@ -183,7 +184,7 @@ void RefreshScreen()
     else
       UpdateLabel("lrEvent","No Event",clrGray,16);
 
-    if (inpShowFibo)
+    if (inpShowBounds)
     {
       if (pfractal.Event(NewLow))
         UpdateLine("piprRngLow",pfractal.Range(Bottom),STYLE_DOT,clrGoldenrod);
@@ -196,9 +197,10 @@ void RefreshScreen()
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,clrGoldenrod);
       else
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,DirColor(pfractal.Direction(RangeHigh)));
-
-      pfractal.ShowFiboArrow();
     }
+    
+    if (inpShowFibo)
+      pfractal.ShowFiboArrow();
     
     if (inpShowComment)
       pfractal.RefreshScreen();

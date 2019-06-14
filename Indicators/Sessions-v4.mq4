@@ -48,6 +48,7 @@ enum DataPosition
 input SessionType    inpType            = SessionTypes;    // Indicator session
 input int            inpHourOpen        = NoValue;         // Session Opening Hour
 input int            inpHourClose       = NoValue;         // Session Closing Hour
+input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input bool           inpShowRange       = true;            // Display session ranges?
 input bool           inpShowBuffer      = true;            // Display trend lines?
 input bool           inpShowPriceLines  = true;            // Show price Lines?
@@ -59,7 +60,7 @@ const color          EuropeColor        = C'48,0,0';       // Europe session box
 const color          USColor            = C'0,0,56';       // US session box color
 const color          DailyColor         = C'64,64,0';      // Daily session box color;
 
-CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose);
+CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset);
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
@@ -121,10 +122,10 @@ void UpdateRange(int Bar=0)
  {
    string urRangeId       = EnumToString(inpType)+IntegerToString(sessionRange);
 
-   if (TimeHour(Time[Bar])==sessionEOD)
+   if (TimeHour(session.ServerTime(Bar))==sessionEOD)
      sessionOpen          = false;
      
-   if (TimeHour(Time[Bar])==inpHourClose)
+   if (TimeHour(session.ServerTime(Bar))==inpHourClose)
    {
      if (sessionOpen)
        ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
@@ -161,7 +162,7 @@ void RefreshScreen(int Bar=0)
   {
     if (inpShowRange)
     {
-      if (TimeHour(Time[Bar])==inpHourOpen)
+      if (TimeHour(session.ServerTime(Bar))==inpHourOpen)
         CreateRange(Bar);
 
       UpdateRange(Bar);
@@ -244,8 +245,8 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    if (inpShowDir==Yes)
-      session.ShowDirArrow(true);
+    if (inpShowDir==No)
+      session.ShowDirArrow(false);
       
     SetIndexBuffer(0,indPriorMidBuffer);
     SetIndexEmptyValue(0, 0.00);

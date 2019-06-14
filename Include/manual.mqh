@@ -292,6 +292,8 @@ void GetManualRequest(string Command="")
 
               case 2:            if (params[1]=="ALL")
                                    CloseOrders(CloseAll);
+                                 if (params[1]=="FIFO")
+                                   CloseOrders(CloseFIFO);
                                  if (params[1]=="HALF")
                                    KillHalf();
                                  if (params[1]=="MIN")

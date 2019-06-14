@@ -79,7 +79,8 @@ input int       inpUSClose              = 23;    // US market close hour
   double         pfHighBar              = 0.00;
   double         pfLowBar               = 0.00;
   int            pfDevDir               = DirectionNone;
-  int            pfDevDirfIdx           = 0;
+  int            pfDevDirIdx            = 0;
+  
   
   
   //--- Fractal metrics
@@ -165,8 +166,6 @@ void RefreshScreen(void)
     Append(rsComment,"\nMargin Analysis\n"+"-----------------------\n"+
                      "Long: "+DoubleToStr(OrderMargin(OP_BUY),1)+"%\n"+
                      "Short: "+DoubleToStr(OrderMargin(OP_SELL),1)+"%\n"+
-                     "\nStrategy\n"+"-----------------------\n"+
-                     "Bias: "+DirText(sBiasDir)+" "+EnumToString(sBiasState)+"\n"+
                      "Goal: "+DoubleToStr(objDailyGoal,0),"\n");
                      
     if (ShowData=="FRACTAL"||ShowData=="FIBO")
@@ -246,19 +245,22 @@ void AnalyzePipMA(void)
           Rebalance(NewLow,indPipMA);
           
       if (pfractal.Event(NewMajor))
+      {
         Rebalance(NewMajor,indPipMA);
-          
+        apTrig          = true;
+      }
+  
       if (pfractal.Event(NewMinor))
+      {
         Rebalance(NewMinor,indPipMA);
+        apTrig          = true;
+      }
 
       if (IsLower(pfractal.Range(Top),pfHighBar))
         Rebalance(NewContraction,indPipMA);
 
       if (IsHigher(pfractal.Range(Bottom),pfLowBar))
         Rebalance(NewContraction,indPipMA);
-
-      if (pfractal.Event(NewMinor) || pfractal.Event(NewMajor))
-        apTrig          = true;
         
       if (apTrig)
       {

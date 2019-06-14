@@ -334,7 +334,7 @@ void CPipFractal::CalcPipFractal(void)
     if (Fibonacci(Origin,Expansion,Max)>=FiboPercent(Fibo100) ||
         Fibonacci(Origin,Expansion,Max)<=FiboPercent(FiboRoot)
        )
-      pfOriginDir                  = pf[Trend].Direction;  //<---- this may be broken (?)
+      pfOriginDir                  = pf[Trend].Direction;  //<---- this may be broken; see root breakout on uptrend 100-161f fibo
   }
 
 //+------------------------------------------------------------------+
