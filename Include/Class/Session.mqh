@@ -242,7 +242,7 @@ void CSession::UpdateFractal(void)
         srec[fibo].High      = fmax(High[sBar],srec[fibo].High);
         srec[fibo].Low       = fmin(Low[sBar],srec[fibo].Low);
       }
-      
+
     }
   }
 
@@ -262,7 +262,8 @@ void CSession::UpdateActive(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[RecordType(Active)].Direction,DirectionUp))
-        usState                        = Rally;
+//        if (this.Bias()==OP_BUY)
+          usState                      = Rally;
 
       if (IsHigher(srec[RecordType(Active)].High,srec[RecordType(Prior)].High,NoUpdate))
         if (!sSessionIsOpen)
@@ -283,7 +284,8 @@ void CSession::UpdateActive(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[RecordType(Active)].Direction,DirectionDown))
-        usState                        = Pullback;
+//        if (this.Bias()==OP_SELL) - How to get this work
+          usState                      = Pullback;
 
       if (IsLower(srec[RecordType(Active)].Low,srec[RecordType(Prior)].Low,NoUpdate))
         if (!sSessionIsOpen)

@@ -29,6 +29,7 @@ private:
          bool          Peg;
          bool          Reversal;
          bool          Breakout;
+         bool          Retrace;
          bool          Correction;
          datetime      Updated;
        };
@@ -321,6 +322,7 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
         f[type].Peg          = false;
         f[type].Breakout     = false;
         f[type].Reversal     = false;
+        f[type].Retrace      = false;        
         f[type].Correction   = false;        
       }
     }
@@ -353,14 +355,10 @@ void CFractal::CalcRetrace(void)
   {
     RetraceType crStateMajor    = Expansion;
     RetraceType crStateMinor    = Expansion;
-    
-    bool        crRetracePeg    = false;
-    
+
     //--- calc interior retraces    
     for (RetraceType type=Expansion;type<RetraceTypes;type++)
     {
-      crRetracePeg              = f[type].Peg;
-
       if (this.Direction(type) == DirectionUp)
         if (f[type].Bar == NoValue)
           UpdateRetrace(type,fBarNow,High[fBarNow]);
@@ -387,6 +385,19 @@ void CFractal::CalcRetrace(void)
         if (this.Fibonacci(type,Expansion,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,false))
             fEvents.SetEvent(MarketResume);
+
+        if (f[type].Correction)
+        {
+          if (this.Fibonacci(type,Expansion,Now)>=FiboPercent(Fibo50))
+            if (IsChanged(f[type].Retrace,false))
+              fEvents.SetEvent(NewRetrace);
+        }
+        else
+        {
+          if (this.Fibonacci(type,Retrace,Now)>=FiboPercent(Fibo50))
+            if (IsChanged(f[type].Retrace,true))
+              fEvents.SetEvent(NewRetrace);
+        }
       }
       
       if (this.IsMinor(type))
@@ -427,6 +438,7 @@ void CFractal::InsertFractal(FractalRec &Fractal)
     Fractal.Peg            = false;
     Fractal.Breakout       = false;
     Fractal.Reversal       = false;
+    Fractal.Retrace        = false;
     Fractal.Correction     = false;
         
     fOrigin                = f[Trend];
@@ -529,7 +541,6 @@ void CFractal::CalcFractal(void)
   {
     int    lastBarHigh    = fBarHigh;
     int    lastBarLow     = fBarLow;
-    bool   lastBasePeg    = f[Base].Peg;
     
     fEvents.ClearEvents();         //--- reset Events on the tick
     
@@ -636,6 +647,7 @@ CFractal::CFractal(int Range, int MinRange)
     f[Expansion].Peg        = false;
     f[Expansion].Breakout   = false;
     f[Expansion].Reversal   = false;
+    f[Expansion].Retrace    = false;
     f[Expansion].Correction = false;
 
     dOrigin.Bar             = NoValue;
