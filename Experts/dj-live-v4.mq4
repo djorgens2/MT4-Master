@@ -74,12 +74,17 @@ input int       inpGMTOffset            = 0;     // Offset from GMT+3 (Asia Open
   int            sDailyAction           = OP_NO_ACTION;
   int            sDailyDir              = DirectionNone;
   ReservedWords  sDailyState            = NoState;
+  bool           sDailyHold             = false;
   int            sBiasDir               = DirectionNone;
   ReservedWords  sBiasState             = NoState;
+  bool           sBiasHold              = false;
 
   //--- PipFractal metrics
   double         pfHighBar              = 0.00;
   double         pfLowBar               = 0.00;
+  double         pfPolyPivot[2]         = {0.00,0.00};
+  bool           pfConforming           = false;
+  bool           pfContrarian           = false;  
 
   int            pfDir                  = DirectionNone;
   int            pfDevDir               = DirectionNone;
@@ -102,19 +107,25 @@ void CallPause(string Message, int Action=OP_NO_ACTION)
     
     if (pfractal.HistoryLoaded())
     {
-      if (OrderOn && Action!=OP_NO_ACTION)
+      if (Action==OP_NO_ACTION)
       {
-        cpMBID = Pause(Message, "Open "+ActionText(Action)+" order?",MB_ICONQUESTION|MB_YESNOCANCEL|MB_DEFBUTTON2);
-      
-        if (cpMBID==IDYES)
-          OpenOrder(Action,Message);
-
-        if (cpMBID==IDNO)
-          OpenOrder(Action(Action,InAction,InContrarian),Message);          
+        if (PauseOn)
+          Pause(Message,"Event Trapper");
       }
       else
       if (PauseOn)
-        Pause(Message,"Event Trapper");
+        if (OrderOn)
+        {
+          cpMBID = Pause(Message, "Open "+ActionText(Action)+" order?",MB_ICONQUESTION|MB_YESNOCANCEL|MB_DEFBUTTON2);
+      
+          if (cpMBID==IDYES)
+            OpenOrder(Action,Message);
+
+          if (cpMBID==IDNO)
+            OpenOrder(Action(Action,InAction,InContrarian),Message);          
+        }
+        else
+          Pause(Message,"Event Trapper");
     }
     
     if (IsEqual(Close[0],StopPrice))
@@ -167,12 +178,13 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string          rsComment        = "Daily:  "+ActionText(sDailyAction)+" "+DirText(sDailyDir)+" "+EnumToString(session[Daily][Active].State)
-                                                 +"  ("+BoolToStr(sDailyDir==Direction(session[Daily].Bias(),InAction),"Hold","Hedge")+")\n"+
-                                       "Lead:   "+EnumToString(leadSession.Type())+" "
-                                                 +ActionText(leadSession.Bias(),InAction)+" "
-                                                 +EnumToString(leadSession[Active].State)
-                                                 +"  ("+BoolToStr(sDailyDir==Direction(leadSession.Bias(),InAction),"Hold","Hedge")+")\n";
+    string          rsComment        = "Daily:  ["+IntegerToString(session[Daily].SessionHour())+"] "+ActionText(sDailyAction)+" "+DirText(sDailyDir)
+                                                  +" "+EnumToString(session[Daily][Active].State)
+                                                  +"  ("+BoolToStr(sDailyHold,"Hold","Hedge")+")\n"+
+                                       "Lead:   ["+IntegerToString(leadSession.SessionHour())+"] "+EnumToString(leadSession.Type())+" "
+                                                  +ActionText(leadSession.Bias(),InAction)+" "
+                                                  +EnumToString(leadSession[Active].State)
+                                                  +"  ("+BoolToStr(sBiasHold,"Hold","Hedge")+")\n";
       
     if (triggerSet)
       UpdateLabel("lbTriggerState","Fired "+ActionText(triggerAction),clrYellow);
@@ -240,7 +252,10 @@ void SetTrigger(EventType Event)
 //+------------------------------------------------------------------+
 void Rebalance(EventType Event, IndicatorType Indicator)
   {
-    CallPause("Rebalancing event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3));
+    if (Event==NewContraction)
+    {}
+    else
+      CallPause("Rebalancing event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3));
     
     pfHighBar                        = pfractal.Range(Top);
     pfLowBar                         = pfractal.Range(Bottom);
@@ -251,12 +266,16 @@ void Rebalance(EventType Event, IndicatorType Indicator)
   
 
 //+------------------------------------------------------------------+
-//| EntryExit - Catches polyline changes for order events            |
+//| SetEntryExit - Catches polyline changes for order events         |
 //+------------------------------------------------------------------+
-void EntryExit(EventType Event, IndicatorType Indicator)
+void SetEntryExit(EventType Event, IndicatorType Indicator)
   {
-    CallPause("Entry/Exit event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),Action(pfPolyDirMinor,InDirection));
+    static bool   eeTrigger         = false;
+    int           eeAction          = Action(pfPolyDirMinor,InDirection);
     
+    
+
+    CallPause("Entry/Exit event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),Action(pfPolyDirMinor,InDirection));
   }
   
 //+------------------------------------------------------------------+
@@ -264,11 +283,20 @@ void EntryExit(EventType Event, IndicatorType Indicator)
 //+------------------------------------------------------------------+
 void AnalyzePipMA(void)
   {
-    bool   apTrig    = false;
-    double apPivot   = 0.00;
+    static double apFOCdeviation    = 0.00;
+
+    bool          apTrig            = false;
+    double        apPivot           = 0.00;
     
     if (pfractal.HistoryLoaded())
     {
+      //--- Check FOC State
+      if (IsHigher(pfractal.FOC(Deviation),apFOCdeviation))
+        pfContrarian                  = true;
+      else
+      if (IsLower(pfractal.FOC(Deviation),apFOCdeviation))
+        pfContrarian                  = false;
+    
       //--- Risk Management/Equity Check events
       if (pfractal.Event(NewHigh))
       {
@@ -320,8 +348,11 @@ void AnalyzePipMA(void)
       }
       
       //--- Entry/Exit events
+      if (IsChanged(pfConforming,pfractal.Direction(RangeHigh)==pfractal.Direction(RangeLow)))
+        Rebalance(NewRange,indPipMA);
+    
       if (IsChanged(pfPolyDirMinor,pfractal.Direction(Polyline)))
-        EntryExit(NewPoly,indPipMA);
+        SetEntryExit(NewPoly,indPipMA);
     }
     else
     {
@@ -358,9 +389,13 @@ void AnalyzeSession(void)
   {    
     if (leadSession.Event(SessionOpen))
       CallPause("New Lead Session Open: "+EnumToString(leadSession.Type()));
+      
+    if (IsChanged(sDailyHold,sDailyDir==Direction(session[Daily].Bias(),InAction)))
+      Rebalance(NewTradeBias,indSession);
     
     if (IsChanged(sBiasDir,Direction(leadSession.Bias(),InAction)))
-      Rebalance(NewTradeBias,indSession);
+      if (IsChanged(sBiasHold,sDailyDir==Direction(leadSession.Bias(),InAction)))
+        Rebalance(NewTradeBias,indSession);
     
     if (IsChanged(sBiasState,leadSession[Active].State))
       Rebalance(NewState,indSession);

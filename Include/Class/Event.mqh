@@ -30,6 +30,7 @@ protected:
                   TrendResume,
                   NewStrategy,
                   NewState,
+                  NewRange,
                   NewTerm,
                   NewTrend,
                   NewOrigin,
