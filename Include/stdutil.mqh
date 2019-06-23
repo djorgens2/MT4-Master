@@ -153,8 +153,10 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Tail,
                   Now,
                   Tick,   //--- Mandatory sequence
-                  Min,    //--- Tick, Min, Max
-                  Max,    //--- Do Not Change ---// 
+                  Min,    //--- Tick, Min, Max,
+                  Max,    //
+                  Minor,  //---  Minor, Major
+                  Major,  //--- Do Not Change ---//
                   All,
                   Next,
                   Last,
@@ -189,8 +191,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   History,
                   Fibonacci,
                   Pivot,
-                  Major,
-                  Minor,
                   Peg,
                   Origin,
                   OffSession,

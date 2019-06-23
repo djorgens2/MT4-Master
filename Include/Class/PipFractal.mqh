@@ -629,7 +629,9 @@ void CPipFractal::ShowFiboArrow(void)
 void CPipFractal::RefreshScreen(void)
   { 
     Comment("\n*--- PipFractal ---*\n"
-           +"  FOC: "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)+"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
+           +"  FOC: "+DirText(FOCDirection(trTrendlineTolerance))+" "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)
+           +"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"/"+DoubleToStr(Pip(Pivot(Max)),1)
+           +"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
            +"  Std Dev: "+DoubleToStr(Pip(StdDev(Now)),1)
                +" x:"+DoubleToStr(fmax(Pip(StdDev(Positive)),fabs(Pip(StdDev(Negative)))),1)
                +" p:"+DoubleToStr(Pip(StdDev()),1)

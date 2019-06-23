@@ -344,7 +344,6 @@ void MonitorRisk()
 //+------------------------------------------------------------------+
 void Execute()
   {
-    static int eIdx        = 0;
     static int eTimeHour   = 0;
     
     if (IsChanged(eTimeHour,TimeHour(Time[0])))
@@ -361,13 +360,13 @@ void Execute()
     
     if (IsHigher(Close[0],b6_High))
       if (eTimeHour>5)
-      if (NewDirection(b6_Trend,Up))
-         MonitorRisk();
+        if (NewDirection(b6_Trend,Up))
+          MonitorRisk();
     
     if (IsLower(Close[0],b6_Low))
       if (eTimeHour>5)
         if (NewDirection(b6_Trend,Down))
-         MonitorRisk();
+          MonitorRisk();
   }
   
 //+------------------------------------------------------------------+
