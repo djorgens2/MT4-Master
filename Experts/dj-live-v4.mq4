@@ -81,6 +81,8 @@ input int       inpGMTOffset            = 0;     // Offset from GMT+3 (Asia Open
   int            sBiasDir               = DirectionNone;
   ReservedWords  sBiasState             = NoState;
   bool           sBiasHold              = false;
+  double         sHedgeMajor            = 0.00;
+  double         sHedgeMinor            = 0.00;
 
   //--- PipFractal metrics
   double         pfHighBar              = 0.00;
@@ -312,31 +314,27 @@ void SetTrigger(EventType Event)
 //+------------------------------------------------------------------+
 void Rebalance(EventType Event, IndicatorType Indicator, ReservedWords EventLevel)
   {
-    if (Event==NewTrend && Indicator==indPipMA)
+    switch (Event)
     {
-      CallPause("New Trend on PipMA",EventLevel);
-
-      NewPriceLabel("lbPivotDir:"+IntegerToString(++pfPivotDirIdx),Close[0],true);
-      UpdatePriceLabel("lbPivotDir:"+IntegerToString(pfPivotDirIdx),Close[0],DirColor(pfDevDir,clrYellow,clrRed));
+      case NewTradeBias:    if (EventLevel==Major)
+                              sHedgeMajor        = Close[0];
+                            if (EventLevel==Minor)
+                              sHedgeMajor        = Close[0];
+                            break;                            
+      case NewTrend:        if (Indicator==indPipMA)
+                              CallPause("New Trend on PipMA",EventLevel);
+                            break;
+      case NewDirection:    if (Indicator==indPipMA)
+                              CallPause("New Direction on PipMA",EventLevel);
+                            break;
+      case NewFOC:          CallPause("Rebalancing on FOC Change: "+EnumToString(pfFOCEvent)+" on "+StringSubstr(EnumToString(Indicator),3),EventLevel);
+                            break;
+      case NewContraction:  CallPause("Contracting trade range");
+                            break;
+      default:              CallPause("Rebalancing event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),EventLevel);
     }
-    else
-    if (Event==NewDirection && Indicator==indPipMA)
-    {
-      CallPause("New Direction on PipMA",EventLevel);
-
-      NewPriceLabel("lbPivotDir:"+IntegerToString(++pfPivotDirIdx),Close[0]);
-      UpdatePriceLabel("lbPivotDir:"+IntegerToString(pfPivotDirIdx),Close[0],DirColor(pfDevDir,clrYellow,clrRed));
-    }
-    else
-    if (Event==NewFOC)
-      CallPause("Rebalancing on FOC Change: "+EnumToString(pfFOCEvent)+" on "+StringSubstr(EnumToString(Indicator),3),EventLevel);
-    else
-    if (Event==NewContraction)
-    {
-      CallPause("Contracting trade range");
-    }
-    else
-      CallPause("Rebalancing event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),EventLevel);
+    
+    
     
     pfHighBar                        = pfractal.Range(Top);
     pfLowBar                         = pfractal.Range(Bottom);
@@ -353,8 +351,12 @@ void SetEntryExit(EventType Event, IndicatorType Indicator)
   {
     static bool   eeTrigger         = false;
     int           eeAction          = Action(pfPolyDirMinor,InDirection);
+    ReservedWords eeEventLevel      = Tick;
+    
+    if (OrderOn)
+      eeEventLevel                  = Major;
 
-    CallPause("Entry/Exit event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),Tick,Action(pfPolyDirMinor,InDirection));
+    CallPause("Entry/Exit event "+EnumToString(Event)+" on "+StringSubstr(EnumToString(Indicator),3),eeEventLevel,Action(pfPolyDirMinor,InDirection));
   }
   
 //+------------------------------------------------------------------+
@@ -594,6 +596,13 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void ExecAppCommands(string &Command[])
   {
+//    if (Command[0]=="PLAN")
+//    {
+//      planAction           = ActionCode(Command[2]);
+//      planPrice            = StrToDouble(Command[1]);
+//
+//    }    
+
     if (Command[0]=="PRICE")
     {
       StopPrice            = StrToDouble(Command[1]);
@@ -691,6 +700,8 @@ int OnInit()
     NewLine("lnLeadActive");
     NewLine("lnLeadSupport");
     NewLine("lnLeadResistance");
+    NewLine("lnMajorBias");
+    NewLine("lnMinorBias");
     
     NewLine("lnBreak6Bottom");
     NewLine("lnBreak6Top");
