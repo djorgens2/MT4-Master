@@ -222,10 +222,10 @@ void ShowLines(void)
     switch (slIndicator)
     {
       case indSession:    UpdateLine("lnDailyOffsession",session[Daily].Pivot(OffSession),STYLE_DOT,clrGoldenrod);
-                          UpdateLine("lnDailyActive",session[Daily].Pivot(ActiveSession),STYLE_DOT,clrSteelBlue);
-                          UpdateLine("lnLeadActive",leadSession.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
-                          UpdateLine("lnLeadSupport",leadSession[ActiveSession].Support,STYLE_SOLID,clrFireBrick);
-                          UpdateLine("lnLeadResistance",leadSession[ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
+                          UpdateLine("lnDailyActive",session[Daily].Pivot(Active),STYLE_DOT,clrSteelBlue);
+                          UpdateLine("lnLeadActive",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
+                          UpdateLine("lnLeadSupport",leadSession[Active].Support,STYLE_SOLID,clrFireBrick);
+                          UpdateLine("lnLeadResistance",leadSession[Active].Resistance,STYLE_SOLID,clrForestGreen);
                           break;
       case indBreak6:     UpdateLine("lnBreak6Bottom",b6_Bottom,STYLE_SOLID,clrFireBrick);
                           UpdateLine("lnBreak6Top",b6_Top,STYLE_SOLID,clrForestGreen);
@@ -242,11 +242,11 @@ void ShowLines(void)
 void RefreshScreen(void)
   {
     string          rsComment        = "Daily:  ["+IntegerToString(session[Daily].SessionHour())+"] "+ActionText(sDailyAction)+" "+DirText(sDailyDir)
-                                                  +" "+EnumToString(session[Daily][ActiveSession].State)
+                                                  +" "+EnumToString(session[Daily][Active].State)
                                                   +"  ("+BoolToStr(sDailyHold,"Hold","Hedge")+")\n"+
                                        "Lead:   ["+IntegerToString(leadSession.SessionHour())+"] "+EnumToString(leadSession.Type())+" "
                                                   +ActionText(leadSession.Bias(),InAction)+" "
-                                                  +EnumToString(leadSession[ActiveSession].State)
+                                                  +EnumToString(leadSession[Active].State)
                                                   +"  ("+BoolToStr(sBiasHold,"Hold","Hedge")+")\n"+
                                        "Break-6: "+DirText(b6_Dir)+"\n"+
                                        "pipMA:   "+DirText(pfFOCDir)+" ["+EnumToString(pfFOCEvent)+"] "+BoolToStr(pfContrarian,"Contrarian","Conforming")+"\n";
@@ -530,14 +530,14 @@ void AnalyzeSession(void)
       if (IsChanged(sBiasHold,sDailyDir==Direction(leadSession.Bias(),InAction)))
         Rebalance(NewTradeBias,indSession,Minor);
     
-    if (IsChanged(sBiasState,leadSession[ActiveSession].State))
+    if (IsChanged(sBiasState,leadSession[Active].State))
       Rebalance(NewState,indSession,Minor);
         
     //--- Daily Session Events
     if (IsChanged(sDailyHold,sDailyDir==Direction(session[Daily].Bias(),InAction)))
       Rebalance(NewTradeBias,indSession,Major);
 
-    if (IsChanged(sDailyState,session[Daily][ActiveSession].State))
+    if (IsChanged(sDailyState,session[Daily][Active].State))
       Rebalance(NewState,indSession,Major);
   }
 
@@ -547,7 +547,7 @@ void AnalyzeSession(void)
 void SetDailyAction(void)
   {
     fDailyDir         = fractal.Direction(fractal.State(Major));
-    sDailyDir         = Direction(session[Daily].Pivot(ActiveSession)-session[Daily].Pivot(PriorSession));
+    sDailyDir         = Direction(session[Daily].Pivot(Active)-session[Daily].Pivot(Prior));
     sDailyAction      = Action(sDailyDir,InDirection);
     
     objDailyGoal      = (AccountBalance()*(inpDailyTarget/100))+AccountBalance();

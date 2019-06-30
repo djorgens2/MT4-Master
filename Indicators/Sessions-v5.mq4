@@ -43,6 +43,7 @@ input int            inpEuropeOpen   = 8;            // Europe Session Opening H
 input int            inpEuropeClose  = 18;           // Europe Session Closing Hour
 input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
+input int            inpGMTOffset    = 0;            // Offset from GMT+3
 input YesNoType      inpShowSRLines  = No;           // Display Support/Resistance Lines
 input YesNoType      inpShowMidLines = No;           // Display Mid-Price Lines
 
@@ -144,7 +145,7 @@ void UpdateRange(SessionType Type, int Bar=0)
 //+------------------------------------------------------------------+
 void DeleteRanges()
   {
-    for (SessionType type=Asia;type<Daily;type++)
+    for (SessionType type=Daily;type<SessionTypes;type++)
       for (int doRangeId=0;doRangeId<=data[type].Range;doRangeId++)
         ObjectDelete(EnumToString(type)+IntegerToString(doRangeId));
   }
@@ -164,12 +165,11 @@ void RefreshScreen(int Bar=0)
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
-      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].Bias(Active,Pivot))),BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
-      UpdateDirection("lbActiveDir"+EnumToString(type),session[type][Active].Direction,DirColor(session[type][Active].Direction),20);
-      UpdateDirection("lbTermDir"+EnumToString(type),session[type].Active().TermDir,DirColor(session[type].Active().TermDir),20);
-      UpdateDirection("lbTrendDir"+EnumToString(type),session[type].Trend().TrendDir,DirColor(session[type].Trend().TrendDir),20);
-      UpdateDirection("lbOriginDir"+EnumToString(type),session[type].Trend().OriginDir,DirColor(session[type].Trend().OriginDir),20);
+      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].Bias())),BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
 
+      UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
+      UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,DirColor(session[type][ActiveSession].BreakoutDir));
+      
       if (session[type].IsOpen())
         if (TimeHour(Time[0])>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
@@ -182,27 +182,29 @@ void RefreshScreen(int Bar=0)
         UpdateLabel("lbSessionTime"+EnumToString(type),"Session Is Closed",clrDarkGray);
 
       if (session[type].Event(NewBreakout) || session[type].Event(NewReversal))
-        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrYellow);
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrWhite);
       else
       if (session[type].Event(NewRally) || session[type].Event(NewPullback))
-        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrWhite);
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrYellow);
       else
-        UpdateLabel("lbTermState"+EnumToString(type),EnumToString(session[type].State(Term)),clrDarkGray);
-        
-      UpdateLabel("lbTrendState"+EnumToString(type),EnumToString(session[type].State(Trend)),clrDarkGray);
+      if (session[type][ActiveSession].State==Trap)
+        UpdateLabel("lbActiveState"+EnumToString(type),BoolToStr(session[type][ActiveSession].Direction==DirectionUp,"Bull","Bear")+
+                     " "+EnumToString(session[type][ActiveSession].State),clrYellow);
+      else
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrDarkGray);
     }
 
     if (inpShowSRLines==Yes)
     {
-      UpdateLine("lnSupport",session[Daily].Active().Support,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnResistance",session[Daily].Active().Resistance,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnSupport",session[Daily][ActiveSession].Support,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnResistance",session[Daily][ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
     }
 
     if (inpShowMidLines==Yes)
     {
-      UpdateLine("lnActiveMid",session[Daily].ActiveMid(),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnPriorMid",session[Daily].Active().PriorMid,STYLE_SOLID,DirColor(Direction(session[Daily].ActiveMid()-session[Daily].Active().PriorMid)));
-      UpdateLine("lnOffMid",session[Daily].Active().OffMid,STYLE_DASHDOT,clrSteelBlue);
+      UpdateLine("lnActiveMid",session[Daily].Pivot(ActiveSession),STYLE_DOT,clrSteelBlue);
+      UpdateLine("lnPriorMid",session[Daily].Pivot(PriorSession),STYLE_SOLID,clrGoldenrod);
+      UpdateLine("lnOffMid",session[Daily].Pivot(OffSession),STYLE_SOLID,clrSteelBlue);
     }
   }
  
@@ -252,30 +254,26 @@ int OnInit()
     NewLine("lnResistance");
     
     
-    session[Daily]        = new CSession(Daily,inpAsiaOpen,inpUSClose);
-    session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose);
-    session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose);
-    session[US]           = new CSession(US,inpUSOpen,inpUSClose);
+    session[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    session[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
     
     DeleteRanges();
     
-    NewLabel("lbhSession","Session",280,200,clrGoldenrod,SCREEN_UR,0);
-    NewLabel("lbhTerm","Term",180,200,clrGoldenrod,SCREEN_UR,0);
-    NewLabel("lbhTrend","Trend",100,200,clrGoldenrod,SCREEN_UR,0);
-    NewLabel("lbhOrigin","Origin",20,200,clrGoldenrod,SCREEN_UR,0);
-
-    for (SessionType type=Asia;type<SessionTypes;type++)
+    NewLabel("lbhSession","Session",280,240,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhState","State",180,240,clrGoldenrod,SCREEN_UR,0);
+      
+    for (SessionType type=Daily;type<SessionTypes;type++)
     {
       data[type].IsOpen   = false;
       data[type].Range    = 0;
       
-      NewLabel("lbSessionType"+EnumToString(type),"",260,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTermDir"+EnumToString(type),"",150,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTrendDir"+EnumToString(type),"",70,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbOriginDir"+EnumToString(type),"",10,210+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbSessionTime"+EnumToString(type),"",260,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTermState"+EnumToString(type),"",150,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbTrendState"+EnumToString(type),"",70,235+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionType"+EnumToString(type),"",260,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveDir"+EnumToString(type),"",180,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveBrkDir"+EnumToString(type),"",170,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionTime"+EnumToString(type),"",260,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveState"+EnumToString(type),"",175,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
     }
     
     for (int bar=Bars-24;bar>0;bar--)
@@ -302,20 +300,16 @@ void OnDeinit(const int reason)
     ObjectDelete("lnResistance");
 
     ObjectDelete("lbhSession");
-    ObjectDelete("lbhTerm");
-    ObjectDelete("lbhTrend");
-    ObjectDelete("lbhOrigin");
+    ObjectDelete("lbhState");
     
-    for (SessionType type=Asia;type<SessionTypes;type++)
+    for (SessionType type=Daily;type<SessionTypes;type++)
     {
       delete session[type];
-      
+
       ObjectDelete("lbSessionType"+EnumToString(type));
-      ObjectDelete("lbTermDir"+EnumToString(type));
-      ObjectDelete("lbTrendDir"+EnumToString(type));
-      ObjectDelete("lbOriginDir"+EnumToString(type));
       ObjectDelete("lbSessionTime"+EnumToString(type));
-      ObjectDelete("lbTermState"+EnumToString(type));
-      ObjectDelete("lbTrendState"+EnumToString(type));
+      ObjectDelete("lbActiveDir"+EnumToString(type));
+      ObjectDelete("lbActiveBrkDir"+EnumToString(type));
+      ObjectDelete("lbActiveState"+EnumToString(type));
     }
   }
