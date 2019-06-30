@@ -64,7 +64,7 @@ struct SessionData
 const int            sessionEOD      = 0;            // Session End-of-Day hour
 const int            sessionOffset   = 40;           // Display offset
 
-CSession       *session[SessionTypes];
+CSession            *session[SessionTypes];
 SessionData          data[SessionTypes];
 
 //+------------------------------------------------------------------+
@@ -165,7 +165,10 @@ void RefreshScreen(int Bar=0)
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
-      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+" "+proper(ActionText(session[type].Bias())),BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
+      UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+
+                  " "+proper(ActionText(session[type].Bias()))+
+                  " "+BoolToStr(session[type].Bias()==Action(session[type][ActiveSession].BreakoutDir,InDirection),"Hold","Hedge"),
+                  BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
 
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,DirColor(session[type][ActiveSession].BreakoutDir));
@@ -261,19 +264,19 @@ int OnInit()
     
     DeleteRanges();
     
-    NewLabel("lbhSession","Session",280,240,clrGoldenrod,SCREEN_UR,0);
-    NewLabel("lbhState","State",180,240,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhSession","Session",120,240,clrGoldenrod,SCREEN_UR,0);
+    NewLabel("lbhState","State",30,240,clrGoldenrod,SCREEN_UR,0);
       
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       data[type].IsOpen   = false;
       data[type].Range    = 0;
       
-      NewLabel("lbSessionType"+EnumToString(type),"",260,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveDir"+EnumToString(type),"",180,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveBrkDir"+EnumToString(type),"",170,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbSessionTime"+EnumToString(type),"",260,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveState"+EnumToString(type),"",175,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionType"+EnumToString(type),"",100,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveDir"+EnumToString(type),"",30,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveBrkDir"+EnumToString(type),"",20,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
     }
     
     for (int bar=Bars-24;bar>0;bar--)

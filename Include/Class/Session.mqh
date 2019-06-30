@@ -90,12 +90,20 @@ private:
              int           sBarDay;
              int           sBarHour;
              bool          sShowDirArrow;
+             
+             //--- Fractal Points
+             int           sFractalDir;
+             double        sFractalRoot;
+             double        sFractalExpansion;
+             int           sFractalRootBar;
+             int           sFractalExpansionBar;
 
              //--- Private class collections
-             SessionRec    srec[6];
+             SessionRec    srec[PeriodTypes];
              
              CArrayDouble *sOffMidBuffer;
              CArrayDouble *sPriorMidBuffer;
+             CArrayDouble *sFractalBuffer;
              
              CEvent       *sEvent;
              
@@ -393,6 +401,12 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sPriorMidBuffer.SetPrecision(Digits);
     sPriorMidBuffer.Initialize(0.00);
     
+    sFractalBuffer                   = new CArrayDouble(Bars);
+    sFractalBuffer.Truncate          = false;
+    sFractalBuffer.AutoExpand        = true;
+    sFractalBuffer.SetPrecision(Digits);
+    sFractalBuffer.Initialize(0.00);
+    
     Print("Server Time: "+TimeToString(ServerTime()));
     LoadHistory();
   }
@@ -405,6 +419,7 @@ CSession::~CSession()
     delete sEvent;
     delete sOffMidBuffer;
     delete sPriorMidBuffer;
+    delete sFractalBuffer;
   }
 
 //+------------------------------------------------------------------+

@@ -20,18 +20,49 @@ class CSessionFractal
   {
 
 public:
+  enum               FractalType
+                     {
+                       ftTerm,
+                       ftTrend,
+                       ftOrigin,
+                       ftFractalTypes
+                     };
+
+  struct             FiboRec
+                     {
+                       int    Direction;
+                       int    State;
+                       double Prior;
+                       double Base;
+                       double Root;
+                       double Expansion;
+                       double Retrace;
+                       double Recovery;
+                     };
+
                      CSessionFractal(int AsiaOpen, int AsiaClose, int EUOpen, int EUClose, int USOpen, int USClose, int GMTOffset);
                     ~CSessionFractal();
                     
+  //--- Public Methods
+
                      void Update(void);
 
 
 private:
 
+  //--- Private Classes
+  
   CSession     *sf[SessionTypes];
   CEvent       *sEvent;
   
-               void CSessionFractal::UpdateFractal(void);
+  //--- Private Properties
+  
+  FiboRec       ft[ftFractalTypes];
+
+  //--- Private Methods
+
+                void CSessionFractal::UpdateFractal(void);
+
 
   };
 
