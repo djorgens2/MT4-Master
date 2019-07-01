@@ -116,10 +116,10 @@ void UpdateRange(SessionType Type, int Bar=0)
  {
    string urRangeId       = EnumToString(Type)+IntegerToString(data[Type].Range);
 
-   if (TimeHour(Time[Bar])==sessionEOD)
+   if (TimeHour(session[Type].ServerTime(Bar))==sessionEOD)
      data[Type].IsOpen    = false;
      
-   if (TimeHour(Time[Bar])==session[Type].SessionHour(SessionClose))
+   if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionClose))
    {
      if (data[Type].IsOpen)
        ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
@@ -157,7 +157,7 @@ void RefreshScreen(int Bar=0)
   {
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
-      if (TimeHour(Time[Bar])==session[type].SessionHour(SessionOpen))
+      if (TimeHour(session[type].ServerTime(Bar))==session[type].SessionHour(SessionOpen))
         CreateRange(type,Bar);
 
       UpdateRange(type,Bar);
