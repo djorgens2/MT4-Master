@@ -8,6 +8,16 @@
 #property version   "1.00"
 #property strict
 
+#include <Class\PipFractal.mqh>
+
+//--- Application Inputs
+input string    RegressionHeader        = "";    //+------ Regression Options ------+
+input int       inpDegree               = 6;     // Degree of poly regression
+input int       inpSmoothFactor         = 3;     // MA Smoothing factor
+input double    inpTolerance            = 0.5;   // Directional sensitivity
+input int       inpPipPeriods           = 200;   // Trade analysis periods (PipMA)
+input int       inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
+
 //--- Order constants
 #define OP_NO_ACTION            -1
 
