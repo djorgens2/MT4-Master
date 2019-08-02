@@ -44,7 +44,8 @@ input int       inpGMTOffset            = 0;     // Offset from GMT+3 (Asia Open
                         indFractal,
                         indPipMA,
                         indSession,
-                        indBreak6
+                        indBreak6,
+                        indHedge
                       };
 
   //--- Class Objects
@@ -203,6 +204,10 @@ void ShowLines(void)
     {
       switch (slIndicator)
       {
+      case indHedge:      UpdateLine("lnHedgeMinor",0.00,STYLE_DOT,clrSteelBlue);
+                          UpdateLine("lnHedgeMajor",0.00,STYLE_SOLID,clrSteelBlue);
+                          break;
+
         case indSession:  UpdateLine("lnDailyOffsession",0.00,STYLE_DOT,clrGoldenrod);
                           UpdateLine("lnDailyActive",0.00,STYLE_DOT,clrSteelBlue);
                           UpdateLine("lnLeadActive",0.00,STYLE_SOLID,clrSteelBlue);
@@ -221,11 +226,16 @@ void ShowLines(void)
     
     switch (slIndicator)
     {
+      case indHedge:      UpdateLine("lnHedgeMinor",sHedgeMinor,STYLE_DOT,clrSteelBlue);
+                          UpdateLine("lnHedgeMajor",sHedgeMajor,STYLE_SOLID,clrSteelBlue);
+                          break;
+
       case indSession:    UpdateLine("lnDailyOffsession",session[Daily].Pivot(OffSession),STYLE_DOT,clrGoldenrod);
-                          UpdateLine("lnDailyActive",session[Daily].Pivot(Active),STYLE_DOT,clrSteelBlue);
-                          UpdateLine("lnLeadActive",leadSession.Pivot(Active),STYLE_SOLID,clrSteelBlue);
-                          UpdateLine("lnLeadSupport",leadSession[Active].Support,STYLE_SOLID,clrFireBrick);
-                          UpdateLine("lnLeadResistance",leadSession[Active].Resistance,STYLE_SOLID,clrForestGreen);
+                          UpdateLine("lnDailyActive",session[Daily].Pivot(ActiveSession),STYLE_DOT,clrSteelBlue);
+                          UpdateLine("lnLeadActive",leadSession.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
+                          UpdateLine("lnLeadSupport",leadSession[ActiveSession].Support,STYLE_SOLID,clrFireBrick);
+                          UpdateLine("lnLeadResistance",leadSession[ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
+
                           break;
       case indBreak6:     UpdateLine("lnBreak6Bottom",b6_Bottom,STYLE_SOLID,clrFireBrick);
                           UpdateLine("lnBreak6Top",b6_Top,STYLE_SOLID,clrForestGreen);
@@ -242,11 +252,11 @@ void ShowLines(void)
 void RefreshScreen(void)
   {
     string          rsComment        = "Daily:  ["+IntegerToString(session[Daily].SessionHour())+"] "+ActionText(sDailyAction)+" "+DirText(sDailyDir)
-                                                  +" "+EnumToString(session[Daily][Active].State)
+                                                  +" "+EnumToString(session[Daily][ActiveSession].State)
                                                   +"  ("+BoolToStr(sDailyHold,"Hold","Hedge")+")\n"+
                                        "Lead:   ["+IntegerToString(leadSession.SessionHour())+"] "+EnumToString(leadSession.Type())+" "
                                                   +ActionText(leadSession.Bias(),InAction)+" "
-                                                  +EnumToString(leadSession[Active].State)
+                                                  +EnumToString(leadSession[ActiveSession].State)
                                                   +"  ("+BoolToStr(sBiasHold,"Hold","Hedge")+")\n"+
                                        "Break-6: "+DirText(b6_Dir)+"\n"+
                                        "pipMA:   "+DirText(pfFOCDir)+" ["+EnumToString(pfFOCEvent)+"] "+BoolToStr(pfContrarian,"Contrarian","Conforming")+"\n";
@@ -319,7 +329,7 @@ void Rebalance(EventType Event, IndicatorType Indicator, ReservedWords EventLeve
       case NewTradeBias:    if (EventLevel==Major)
                               sHedgeMajor        = Close[0];
                             if (EventLevel==Minor)
-                              sHedgeMajor        = Close[0];
+                              sHedgeMinor        = Close[0];
                             break;                            
       case NewTrend:        if (Indicator==indPipMA)
                               CallPause("New Trend on PipMA",EventLevel);
@@ -530,14 +540,14 @@ void AnalyzeSession(void)
       if (IsChanged(sBiasHold,sDailyDir==Direction(leadSession.Bias(),InAction)))
         Rebalance(NewTradeBias,indSession,Minor);
     
-    if (IsChanged(sBiasState,leadSession[Active].State))
+    if (IsChanged(sBiasState,leadSession[ActiveSession].State))
       Rebalance(NewState,indSession,Minor);
         
     //--- Daily Session Events
     if (IsChanged(sDailyHold,sDailyDir==Direction(session[Daily].Bias(),InAction)))
       Rebalance(NewTradeBias,indSession,Major);
 
-    if (IsChanged(sDailyState,session[Daily][Active].State))
+    if (IsChanged(sDailyState,session[Daily][ActiveSession].State))
       Rebalance(NewState,indSession,Major);
   }
 
@@ -547,7 +557,7 @@ void AnalyzeSession(void)
 void SetDailyAction(void)
   {
     fDailyDir         = fractal.Direction(fractal.State(Major));
-    sDailyDir         = Direction(session[Daily].Pivot(Active)-session[Daily].Pivot(Prior));
+    sDailyDir         = Direction(session[Daily].Pivot(ActiveSession)-session[Daily].Pivot(PriorSession));
     sDailyAction      = Action(sDailyDir,InDirection);
     
     objDailyGoal      = (AccountBalance()*(inpDailyTarget/100))+AccountBalance();
@@ -621,6 +631,10 @@ void ExecAppCommands(string &Command[])
       else
       if (Command[1]=="FRACTAL")
         ShowLines          = indFractal;
+      else
+      if (Command[1]=="HEDGE")
+        ShowLines          = indHedge;
+
 
     if (Command[0]=="ALERT")
       if (Command[1]=="MINOR")
@@ -708,7 +722,11 @@ int OnInit()
     NewLine("lnBreak6Low");
     NewLine("lnBreak6High");
     
+    NewLine("lnHedgeMajor");
+    NewLine("lnHedgeMinor");
+    
     leadSession           = session[Daily];
+    
     return(INIT_SUCCEEDED);
   }
 
