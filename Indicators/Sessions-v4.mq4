@@ -49,9 +49,10 @@ input SessionType    inpType            = SessionTypes;    // Indicator session
 input int            inpHourOpen        = NoValue;         // Session Opening Hour
 input int            inpHourClose       = NoValue;         // Session Closing Hour
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
-input bool           inpShowRange       = true;            // Display session ranges?
-input bool           inpShowBuffer      = true;            // Display trend lines?
-input bool           inpShowPriceLines  = true;            // Show price Lines?
+input YesNoType      inpShowRange       = No;              // Display session ranges?
+input YesNoType      inpShowBuffer      = No;              // Display trend lines?
+input YesNoType      inpShowPriceLines  = No;              // Show price Lines?
+input YesNoType      inpShowOriginLines = No;              // Show Origin Lines?
 input DataPosition   inpShowData        = dpNone;          // Indicator data position
 input YesNoType      inpShowDir         = Yes;             // Show Breakout Arrows
 
@@ -160,7 +161,7 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
-    if (inpShowRange)
+    if (inpShowRange==Yes)
     {
       if (TimeHour(session.ServerTime(Bar))==inpHourOpen)
         CreateRange(Bar);
@@ -168,7 +169,7 @@ void RefreshScreen(int Bar=0)
       UpdateRange(Bar);
     }
 
-    if (inpShowPriceLines)
+    if (inpShowPriceLines==Yes)
     {
       UpdateLine("lnS_ActiveMid",session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
       UpdateLine("lnS_Support",session[ActiveSession].Support,STYLE_SOLID,clrRed);
@@ -178,15 +179,21 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_PriorHigh",session[PriorSession].High,STYLE_SOLID,clrForestGreen);
       UpdateLine("lnS_PriorLow",session[PriorSession].Low,STYLE_SOLID,clrFireBrick);
     }
+
+    if (inpShowOriginLines==Yes)
+    {
+      UpdateLine("lnS_Top",session[ActiveSession].Top,STYLE_SOLID,clrRed);
+      UpdateLine("lnS_Bottom",session[ActiveSession].Bottom,STYLE_SOLID,clrLawnGreen);
+    }
     
     if (inpShowData>dpNone)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,DirColor(session[ActiveSession].Direction),20);
-      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].Direction),8);
+      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].TermState),DirColor(session[ActiveSession].Direction),8);
             
       if (session.IsOpen())
-        if (TimeHour(Time[0])>inpHourClose-3)
+        if (TimeHour(session.ServerTime(Bar))>inpHourClose-3)
           UpdateLabel("lbSessionTime"+sessionIndex,"Late Session ("+IntegerToString(session.SessionHour())+")",clrRed);
         else
         if (session.SessionHour()>3)
@@ -196,7 +203,7 @@ void RefreshScreen(int Bar=0)
       else
         UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
 
-      UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,DirColor(session[ActiveSession].BreakoutDir));
+      UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].TermDir,DirColor(session[ActiveSession].TermDir));
     }
   }
  
@@ -241,7 +248,7 @@ int OnInit()
     SetIndexEmptyValue(1, 0.00);
     SetIndexStyle(1,DRAW_SECTION);
     
-    if (inpShowPriceLines)
+    if (inpShowPriceLines==Yes)
     {
       NewLine("lnS_ActiveMid");
       NewLine("lnS_Support");
@@ -250,6 +257,12 @@ int OnInit()
       NewLine("lnS_Low");
       NewLine("lnS_PriorHigh");
       NewLine("lnS_PriorLow");
+    }
+    
+    if (inpShowOriginLines==Yes)
+    {
+      NewLine("lnS_Top");
+      NewLine("lnS_Bottom");
     }
     
     if (inpShowData>dpNone)

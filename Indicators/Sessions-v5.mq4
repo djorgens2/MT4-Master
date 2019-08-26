@@ -44,6 +44,7 @@ input int            inpEuropeClose  = 18;           // Europe Session Closing H
 input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
+input YesNoType      inpShowTOLines  = No;           // Display Trend Origin Lines
 input YesNoType      inpShowSRLines  = No;           // Display Support/Resistance Lines
 input YesNoType      inpShowMidLines = No;           // Display Mid-Price Lines
 
@@ -167,14 +168,14 @@ void RefreshScreen(int Bar=0)
     {
       UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+
                   " "+proper(ActionText(session[type].Bias()))+
-                  " "+BoolToStr(session[type].Bias()==Action(session[type][ActiveSession].BreakoutDir,InDirection),"Hold","Hedge"),
+                  " "+BoolToStr(session[type].Bias()==Action(session[type][ActiveSession].TermDir,InDirection),"Hold","Hedge"),
                   BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
 
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
-      UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,DirColor(session[type][ActiveSession].BreakoutDir));
+      UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].TermDir,DirColor(session[type][ActiveSession].TermDir));
       
       if (session[type].IsOpen())
-        if (TimeHour(Time[0])>session[type].SessionHour(SessionClose)-3)
+        if (session[type].ServerTime(Bar)>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
         else
         if (session[type].SessionHour()>3)
@@ -185,18 +186,24 @@ void RefreshScreen(int Bar=0)
         UpdateLabel("lbSessionTime"+EnumToString(type),"Session Is Closed",clrDarkGray);
 
       if (session[type].Event(NewBreakout) || session[type].Event(NewReversal))
-        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrWhite);
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].TermState),clrWhite);
       else
       if (session[type].Event(NewRally) || session[type].Event(NewPullback))
-        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrYellow);
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].TermState),clrYellow);
       else
-      if (session[type][ActiveSession].State==Trap)
+      if (session[type][ActiveSession].TermState==Trap)
         UpdateLabel("lbActiveState"+EnumToString(type),BoolToStr(session[type][ActiveSession].Direction==DirectionUp,"Bull","Bear")+
-                     " "+EnumToString(session[type][ActiveSession].State),clrYellow);
+                     " "+EnumToString(session[type][ActiveSession].TermState),clrYellow);
       else
-        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrDarkGray);
+        UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].TermState),clrDarkGray);
     }
 
+    if (inpShowTOLines==Yes)
+    {
+      UpdateLine("lnTop",session[Daily][ActiveSession].Top,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnBottom",session[Daily][ActiveSession].Bottom,STYLE_SOLID,clrForestGreen);
+    }
+    
     if (inpShowSRLines==Yes)
     {
       UpdateLine("lnSupport",session[Daily][ActiveSession].Support,STYLE_SOLID,clrFireBrick);
@@ -256,6 +263,8 @@ int OnInit()
     NewLine("lnSupport");
     NewLine("lnResistance");
     
+    NewLine("lnTop");
+    NewLine("lnBottom");
     
     session[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
@@ -304,6 +313,9 @@ void OnDeinit(const int reason)
 
     ObjectDelete("lbhSession");
     ObjectDelete("lbhState");
+    
+    ObjectDelete("lnTop");
+    ObjectDelete("lnBottom");
     
     for (SessionType type=Daily;type<SessionTypes;type++)
     {

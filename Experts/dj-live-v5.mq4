@@ -14,6 +14,8 @@
 #include <Class\Session.mqh>
 
 input string    EAHeader                = "";    //+---- Application Options -------+
+input bool      inpFIFO                 = true;  // US Rules: FIFO
+input bool      inpUniDir               = true;  // US Rules: Non-Hedging
 input YesNoType inpShowPolyArrows       = No;    // Show poly direction change arrows
 input YesNoType inpShowBreakouts        = No;    // Show session breakouts/reversals
 input double    inpDailyTarget          = 10;    // Daily % growth objective
