@@ -42,14 +42,14 @@ class CPipFractal : public CPipRegression
                      };
     
           //--- Operational variables
-          int        pfOriginDir;                       //--- Direction of Origin computed from last root reversal
-          double     pfOrigin;                          //--- Fractal origin at trend start
-          double     pfPrior;                           //--- Maximum inversion at trend start          
-          bool       pfPeg;                             //--- Pegs on trend/term divergence
-          double     pfPegMax;                          //--- Max price after peg
-          double     pfPegMin;                          //--- Min price after peg
-          double     pfPegExpansion;                    //--- Expansion price at peg      
-          int        pfState;                           //--- Current state of the fractal
+          int            pfOriginDir;                   //--- Direction of Origin computed from last root reversal
+          double         pfOrigin;                      //--- Fractal origin at trend start
+          double         pfPrior;                       //--- Maximum inversion at trend start          
+          bool           pfPeg;                         //--- Pegs on trend/term divergence
+          double         pfPegMax;                      //--- Max price after peg
+          double         pfPegMin;                      //--- Min price after peg
+          double         pfPegExpansion;                //--- Expansion price at peg      
+          ReservedWords  pfState;                       //--- Current state of the fractal
                      
           double     NewFractalRoot(RetraceType Type);  //--- Updates fractal price points
           void       UpdateFractal(RetraceType Type, int Direction);
@@ -74,7 +74,7 @@ class CPipFractal : public CPipRegression
 
        virtual   
           int        Count(int Counter);
-          int        State(void) { return (pfState); };
+          ReservedWords State(void) { return (pfState); };
           double     Price(int TimeRange, int Measure=Expansion);
           double     Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
           bool       IsPegged(void)                           {return (pfPeg); };
@@ -168,11 +168,11 @@ double CPipFractal::NewFractalRoot(RetraceType Type)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateState - updates state data for the supplied type           |
+//| CalcState - updates the pfractal state                           |
 //+------------------------------------------------------------------+
 void CPipFractal::CalcState(void)
   {
-    int usState          = pfState;
+    ReservedWords usState          = pfState;
     
     if (this.Direction(Term)!=this.Direction(Boundary))
       if (this.Direction(Range)!=this.Direction(Boundary))

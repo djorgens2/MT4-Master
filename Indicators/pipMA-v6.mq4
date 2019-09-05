@@ -65,11 +65,28 @@ const int    pmFiboPeriodId[3]  = {Term,Trend,Origin};
 const int    pmFiboTypeId[5]    = {Base,Root,Expansion,Retrace,Recovery};
 
 //+------------------------------------------------------------------+
+//| UpdateEvent - Reports event changes retaining the last event     |
+//+------------------------------------------------------------------+
+void UpdateEvent(string EventText, int EventColor)
+  {
+    static string ueLastEvent    = "No Event";
+    
+    if (EventText=="No Event")
+      UpdateLabel("lrEvent",ueLastEvent,clrGray,16);
+    else
+    if (IsChanged(ueLastEvent,EventText))
+      UpdateLabel("lrEvent",EventText,EventColor,16);
+    else
+      UpdateLabel("lrEvent",ueLastEvent,clrYellow,16);    
+  }
+
+//+------------------------------------------------------------------+
 //| RefreshScreen - updates screen data                              |
 //+------------------------------------------------------------------+
 void RefreshScreen()
   {
-    static int lastDir    = DirectionNone;
+    static int           lastDir    = DirectionNone;
+    static ReservedWords lastState  = NoState;
   
     ObjectSet("piprMean",OBJPROP_TIME1,Time[0]);
     ObjectSet("piprMean",OBJPROP_PRICE1,pfractal.Range(Mean));
@@ -156,33 +173,41 @@ void RefreshScreen()
         UpdateLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(pmFiboPeriodId[fperiod],pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
 
     if (pfractal.Event(MarketIdle))
-      UpdateLabel("lrEvent","Market is Idle",DirColor(pfractal.Direction(Aggregate)),16);
+      UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
     else
     if (pfractal.Event(NewDirection))
-      UpdateLabel("lrEvent","New Direction",DirColor(pfractal.Direction(Term)),16);
+      UpdateEvent("New Direction",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(NewMajor))
-      UpdateLabel("lrEvent","New Major",DirColor(pfractal.Direction(Term)),16);
+      UpdateEvent("New Major",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(NewMinor))
-      UpdateLabel("lrEvent","New Minor",DirColor(pfractal.Direction(Term)),16);
+      UpdateEvent("New Minor",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(TrendWane))
-      UpdateLabel("lrEvent","Trend Wane",DirColor(pfractal.Direction(Term)),16);
+      UpdateEvent("Trend Wane",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(TrendResume))
-      UpdateLabel("lrEvent","Trend Resume",DirColor(pfractal.Direction(Term)),16);
+      UpdateEvent("Trend Resume",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(NewBoundary))
     {
       if (pfractal.Event(NewHigh))
-        UpdateLabel("lrEvent","New High",clrLawnGreen,16);
+        UpdateEvent("New High",clrLawnGreen);
 
       if (pfractal.Event(NewLow))
-        UpdateLabel("lrEvent","New Low",clrRed,16);        
+        UpdateEvent("New Low",clrRed);        
     }
     else
-      UpdateLabel("lrEvent","No Event",clrGray,16);
+      UpdateEvent("No Event",clrGray);
+      
+    if (lastState!=pfractal.State())
+    {
+      lastState            = pfractal.State();
+      UpdateLabel("lrState",EnumToString(lastState),clrYellow,16);
+    }
+    else
+      UpdateLabel("lrState",EnumToString(lastState),clrGray,16);
 
     if (inpShowBounds)
     {
@@ -264,6 +289,7 @@ void InitScreenObjects()
     NewLabel("lrPricePolyDev","Price-Poly Deviation",5,5,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrPolyTrendDev","Poly-Trend Deviation",5,16,clrWhite,SCREEN_UR,IndWinId);
     NewLabel("lrEvent","",5,5,clrWhite,SCREEN_LR,IndWinId);
+    NewLabel("lrState","State",5,30,clrWhite,SCREEN_LR,IndWinId);
 
     NewLabel("lrFOC6","Dev",12,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC7","Max",51,65,clrWhite,SCREEN_UL,IndWinId);

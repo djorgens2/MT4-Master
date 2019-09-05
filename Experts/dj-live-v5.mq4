@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                   dj-live-v4.mq4 |
+//|                                                   dj-live-v5.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -16,8 +16,7 @@
 input string    EAHeader                = "";    //+---- Application Options -------+
 input bool      inpFIFO                 = true;  // US Rules: FIFO
 input bool      inpUniDir               = true;  // US Rules: Non-Hedging
-input YesNoType inpShowPolyArrows       = No;    // Show poly direction change arrows
-input YesNoType inpShowBreakouts        = No;    // Show session breakouts/reversals
+input double    inpMarginPct            = 50;    // Broker-specific Hedge Margin
 input double    inpDailyTarget          = 10;    // Daily % growth objective
   
 input string    fractalHeader           = "";    //+------ Fractal Options ---------+
@@ -138,8 +137,8 @@ void CallPause(string Message, ReservedWords EventLevel=Tick, int Action=OP_NO_A
       
           if (cpMBID==IDYES)
             OpenOrder(Action,Message);
-          if (cpMBID==IDNO)
 
+          if (cpMBID==IDNO)
             OpenOrder(Action(Action,InAction,InContrarian),Message);          
         }
         else
@@ -254,11 +253,11 @@ void ShowLines(void)
 void RefreshScreen(void)
   {
     string          rsComment        = "Daily:  ["+IntegerToString(session[Daily].SessionHour())+"] "+ActionText(sDailyAction)+" "+DirText(sDailyDir)
-                                                  +" "+EnumToString(session[Daily][ActiveSession].State)
+                                                  +" "+EnumToString(session[Daily][ActiveSession].TermState)
                                                   +"  ("+BoolToStr(sDailyHold,"Hold","Hedge")+")\n"+
                                        "Lead:   ["+IntegerToString(leadSession.SessionHour())+"] "+EnumToString(leadSession.Type())+" "
                                                   +ActionText(leadSession.Bias(),InAction)+" "
-                                                  +EnumToString(leadSession[ActiveSession].State)
+                                                  +EnumToString(leadSession[ActiveSession].TermState)
                                                   +"  ("+BoolToStr(sBiasHold,"Hold","Hedge")+")\n"+
                                        "Break-6: "+DirText(b6_Dir)+"\n"+
                                        "pipMA:   "+DirText(pfFOCDir)+" ["+EnumToString(pfFOCEvent)+"] "+BoolToStr(pfContrarian,"Contrarian","Conforming")+"\n";
@@ -542,14 +541,14 @@ void AnalyzeSession(void)
       if (IsChanged(sBiasHold,sDailyDir==Direction(leadSession.Bias(),InAction)))
         Rebalance(NewTradeBias,indSession,Minor);
     
-    if (IsChanged(sBiasState,leadSession[ActiveSession].State))
+    if (IsChanged(sBiasState,leadSession[ActiveSession].TermState))
       Rebalance(NewState,indSession,Minor);
         
     //--- Daily Session Events
     if (IsChanged(sDailyHold,sDailyDir==Direction(session[Daily].Bias(),InAction)))
       Rebalance(NewTradeBias,indSession,Major);
 
-    if (IsChanged(sDailyState,session[Daily][ActiveSession].State))
+    if (IsChanged(sDailyState,session[Daily][ActiveSession].TermState))
       Rebalance(NewState,indSession,Major);
   }
 
@@ -704,10 +703,7 @@ int OnInit()
     session[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
     
     for (SessionType type=Daily;type<SessionTypes;type++)
-      if (inpShowBreakouts==Yes)
-        session[type].ShowDirArrow(true);
-      else
-        session[type].ShowDirArrow(false);
+      session[type].ShowDirArrow(false);
 
     NewLabel("lbTriggerState","",350,5);
 
