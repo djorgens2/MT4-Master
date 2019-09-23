@@ -162,7 +162,7 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
 
     if (State==Reversal)
       if (ChangeState==Breakout)
-        ChangeState               = Recovery;
+        return(false);
       
     if (IsChanged(State,ChangeState))
     {
@@ -181,10 +181,6 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
                           break;
         case Trap:        sEvent.SetEvent(NewTrap);
                           break;
-        case Recovery:    sEvent.SetEvent(TrendResume);
-                          break;
-        case Correction:  sEvent.SetEvent(MarketCorrection);
-                          break;
       }
       
       return(true);
@@ -198,6 +194,10 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {
+    int    usArrow;
+    double usArrowHigh;
+    double usArrowLow;
+    
     ReservedWords usState              = NoState;
     ReservedWords usHighState          = NoState;
 
@@ -221,7 +221,7 @@ void CSession::UpdateSession(void)
 
         if (NewDirection(srec[PriorSession].TermDir,DirectionUp,NoUpdate))
         {
-          srec[ActiveSession].Bottom   = srec[ActiveSession].Support;
+          srec[ActiveSession].Bottom   = fmin(srec[ActiveSession].Support,srec[ActiveSession].Low);
           usState                      = Reversal;
         }
         else
@@ -249,7 +249,7 @@ void CSession::UpdateSession(void)
         
         if (NewDirection(srec[PriorSession].TermDir,DirectionDown,NoUpdate))
         {
-          srec[ActiveSession].Top      = srec[ActiveSession].Resistance;
+          srec[ActiveSession].Top      = fmax(srec[ActiveSession].Resistance,srec[ActiveSession].High);
           usState                      = Reversal;
         }
         else
@@ -272,14 +272,30 @@ void CSession::UpdateSession(void)
     
     if (NewState(srec[ActiveSession].TermState,usState,NewTerm))
       if (sShowDirArrow)
-        if (usState==Reversal || usState==Breakout)
+      {
+        switch (usState)
         {
-          if (sEvent[NewHigh])
-            NewArrow(SYMBOL_ARROWUP,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),fmax(usLastSession.High,usLastSession.Resistance),sBar);
-
-          if (sEvent[NewLow])
-            NewArrow(SYMBOL_ARROWDOWN,clrRed,EnumToString(sType)+"-"+EnumToString(usState),fmin(usLastSession.Low,usLastSession.Support),sBar);
+          case Breakout:   
+          case Reversal:   usArrow      = BoolToInt(usState==Reversal,SYMBOL_CHECKSIGN,
+                                            BoolToInt(sEvent[NewHigh],SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
+                           usArrowHigh  = fmax(usLastSession.Resistance,usLastSession.High);
+                           usArrowLow   = fmin(usLastSession.Support,usLastSession.Low);
+                           break;
+          case Trap:       usArrow      = SYMBOL_STOPSIGN;
+                           usArrowHigh  = fmax(srec[PriorSession].High,usLastSession.High);
+                           usArrowLow   = fmin(srec[PriorSession].Low,usLastSession.Low);
+                           break;
+          default:         usArrow  = SYMBOL_DASH;
+                           usArrowHigh  = usLastSession.High;
+                           usArrowLow   = usLastSession.Low;
         }
+        
+        if (sEvent[NewHigh])
+          NewArrow(usArrow,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usArrowHigh,sBar);
+
+        if (sEvent[NewLow])
+          NewArrow(usArrow,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usArrowLow,sBar);
+      }
   }
   
 //+------------------------------------------------------------------+
@@ -308,13 +324,16 @@ void CSession::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
   {        
+    double csResistance                   = fmax(srec[PriorSession].High,fmax(srec[ActiveSession].High,srec[OffSession].High));
+    double csSupport                      = fmin(srec[PriorSession].Low,fmin(srec[ActiveSession].Low,srec[OffSession].Low));
+
     //-- Update Prior Record and Indicator Buffer
     srec[PriorSession]                    = srec[ActiveSession];
     sPriorMidBuffer.SetValue(sBar,Pivot(PriorSession));
 
     //-- Reset Active Record
-    srec[ActiveSession].Resistance        = fmax(srec[ActiveSession].High,srec[OffSession].High);
-    srec[ActiveSession].Support           = fmin(srec[ActiveSession].Low,srec[OffSession].Low);
+    srec[ActiveSession].Resistance        = csResistance;
+    srec[ActiveSession].Support           = csSupport;
 
     srec[ActiveSession].High              = Close[fmin(Bars-1,sBar+1)];
     srec[ActiveSession].Low               = Close[fmin(Bars-1,sBar+1)];

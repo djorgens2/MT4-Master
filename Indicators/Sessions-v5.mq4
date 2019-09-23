@@ -200,8 +200,8 @@ void RefreshScreen(int Bar=0)
 
     if (inpShowTOLines==Yes)
     {
-      UpdateLine("lnTop",session[Daily][ActiveSession].Top,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnBottom",session[Daily][ActiveSession].Bottom,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnTop",session[Daily][ActiveSession].Top,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnBottom",session[Daily][ActiveSession].Bottom,STYLE_SOLID,clrFireBrick);
     }
     
     if (inpShowSRLines==Yes)

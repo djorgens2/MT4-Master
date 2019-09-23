@@ -65,7 +65,7 @@ CSession            *session            = new CSession(inpType,inpHourOpen,inpHo
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
-const int            sessionEOD         = 0;               // Session End-of-Day hour
+const int            sessionEOD         = 23;               // Session End-of-Day hour
 
 datetime             sessionOpenTime;
 double               sessionHigh;
@@ -176,14 +176,14 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Resistance",session[ActiveSession].Resistance,STYLE_SOLID,clrLawnGreen);
       UpdateLine("lnS_Low",session[ActiveSession].Low,STYLE_DOT,clrFireBrick);
       UpdateLine("lnS_High",session[ActiveSession].High,STYLE_DOT,clrForestGreen);
-      UpdateLine("lnS_PriorHigh",session[PriorSession].High,STYLE_SOLID,clrForestGreen);
-      UpdateLine("lnS_PriorLow",session[PriorSession].Low,STYLE_SOLID,clrFireBrick);
+      UpdateLine("lnS_PriorTop",session[PriorSession].Top,STYLE_DASH,clrForestGreen);
+      UpdateLine("lnS_PriorBottom",session[PriorSession].Bottom,STYLE_DASH,clrFireBrick);
     }
 
     if (inpShowOriginLines==Yes)
     {
-      UpdateLine("lnS_Top",session[ActiveSession].Top,STYLE_SOLID,clrRed);
-      UpdateLine("lnS_Bottom",session[ActiveSession].Bottom,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnS_Top",session[ActiveSession].Top,STYLE_DASH,clrLawnGreen);
+      UpdateLine("lnS_Bottom",session[ActiveSession].Bottom,STYLE_DASH,clrRed);
     }
     
     if (inpShowData>dpNone)
@@ -221,7 +221,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    if (inpShowBuffer)
+    if (inpShowBuffer==Yes)
       session.Update(indOffMidBuffer,indPriorMidBuffer);
     else
       session.Update();
@@ -302,8 +302,11 @@ void OnDeinit(const int reason)
     ObjectDelete("lnS_Resistance");
     ObjectDelete("lnS_High");
     ObjectDelete("lnS_Low");
-    ObjectDelete("lnS_PriorHigh");
-    ObjectDelete("lnS_PriorLow");
+    ObjectDelete("lnS_PriorTop");
+    ObjectDelete("lnS_PriorBottom");
+    ObjectDelete("lnS_Top");
+    ObjectDelete("lnS_Bottom");
+    
     
     ObjectDelete("lbActiveBrkDir"+sessionIndex);
     ObjectDelete("lbSessionType"+sessionIndex);
