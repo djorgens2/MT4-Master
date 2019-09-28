@@ -175,7 +175,7 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].TermDir,DirColor(session[type][ActiveSession].TermDir));
       
       if (session[type].IsOpen())
-        if (session[type].ServerTime(Bar)>session[type].SessionHour(SessionClose)-3)
+        if (TimeHour(session[type].ServerTime(Bar))>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
         else
         if (session[type].SessionHour()>3)

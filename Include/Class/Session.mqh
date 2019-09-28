@@ -43,14 +43,12 @@ public:
              {
                int            Direction;
                ReservedWords  TermState;
-               ReservedWords  TrendState;
                int            TermDir;
-               int            TrendDir;
                double         High;        //--- High/Low store daily/session high & low
                double         Low;
                double         Support;     //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
-               double         Top;         //--- Top/Bottom store trend base/root values
+               double         Top;         //--- Top/Bottom store trend revised support/resistance values
                double         Bottom;
              };
 
@@ -380,9 +378,7 @@ void CSession::LoadHistory(void)
     {
       srec[type].Direction           = lhStartDir;
       srec[type].TermState           = Breakout;
-      srec[type].TrendState          = Breakout;
       srec[type].TermDir             = lhStartDir;
-      srec[type].TrendDir            = lhStartDir;
       srec[type].High                = High[sBar];
       srec[type].Low                 = Low[sBar];
       srec[type].Resistance          = High[sBar];
@@ -551,13 +547,11 @@ string CSession::SessionText(PeriodType Type)
                                 + DoubleToStr(Pivot(ActiveSession),Digits)+"|"
                                 + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")                              
                                 + EnumToString(srec[Type].TermState)+"|"
-                                + EnumToString(srec[Type].TrendState)+"|"
                                 + DoubleToStr(srec[Type].High,Digits)+"|"
                                 + DoubleToStr(srec[Type].Low,Digits)+"|"
                                 + DoubleToStr(srec[Type].Resistance,Digits)+"|"
                                 + DoubleToStr(srec[Type].Support,Digits)+"|"
-                                + BoolToStr(srec[Type].TermDir==DirectionUp,"Long|","Short|")
-                                + BoolToStr(srec[Type].TrendDir==DirectionUp,"Long|","Short|");
+                                + BoolToStr(srec[Type].TermDir==DirectionUp,"Long|","Short|");
 
     return(siSessionInfo);
   }
