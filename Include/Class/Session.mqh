@@ -42,14 +42,12 @@ public:
              struct SessionRec
              {
                int            Direction;
-               ReservedWords  TermState;
-               int            TermDir;
+               int            BreakoutDir; //--- Direction of the last breakout or reversal
+               ReservedWords  State;
                double         High;        //--- High/Low store daily/session high & low
                double         Low;
                double         Support;     //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
-               double         Top;         //--- Top/Bottom store trend revised support/resistance values
-               double         Bottom;
              };
 
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
@@ -64,7 +62,6 @@ public:
              string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};
              
              datetime      ServerTime(int Bar=0);
-             void          ShowDirArrow(bool Show)          {sShowDirArrow=Show;};
              
              double        Pivot(const PeriodType Type);
              int           Bias(void);
@@ -91,9 +88,6 @@ private:
              int           sBars;
              int           sBarDay;
              int           sBarHour;
-             int           sMinorRange;
-             int           sMajorRange;
-             bool          sShowDirArrow;             
              
              //--- Private class collections
              SessionRec    srec[PeriodTypes];
@@ -114,8 +108,9 @@ private:
              void          LoadHistory(void);
              
              bool          NewDirection(int &Direction, int NewDirection, bool Update=true);
-             bool          NewState(ReservedWords &State, ReservedWords NewState, EventType EventLevel);
-  };
+             bool          NewState(ReservedWords &State, ReservedWords NewState);
+             void          AddFractal(void);
+};
 
 //+------------------------------------------------------------------+
 //| ServerTime - Returns the adjusted time based on server offset    |
@@ -138,7 +133,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection, bool Update=tru
     if (Direction==DirectionNone)
       Direction                   = ChangeDirection;
     else
-    if (IsChanged(Direction,ChangeDirection))
+    if (IsChanged(Direction,ChangeDirection,Update))
     {
       sEvent.SetEvent(NewDirection);
       return(true);
@@ -150,7 +145,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection, bool Update=tru
 //+------------------------------------------------------------------+
 //| NewState - Tests for new state events                            |
 //+------------------------------------------------------------------+
-bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventType EventLevel)
+bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
   {
     if (ChangeState==NoState)
       return(false);
@@ -159,13 +154,18 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
       State                       = ChangeState;
 
     if (State==Reversal)
+    {
       if (ChangeState==Breakout)
         return(false);
+        
+      if (ChangeState==Reversal)
+        if (sEvent[NewDirection])
+          State                    = Correction;
+    }
       
     if (IsChanged(State,ChangeState))
     {
       sEvent.SetEvent(NewState);
-      sEvent.SetEvent(EventLevel);
       
       switch (State)
       {
@@ -177,8 +177,6 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
                           break;
         case Pullback:    sEvent.SetEvent(NewPullback);
                           break;
-        case Trap:        sEvent.SetEvent(NewTrap);
-                          break;
       }
       
       return(true);
@@ -188,18 +186,26 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
   }
 
 //+------------------------------------------------------------------+
+//| AddFractal - Creates new fractal and validates existing states   |
+//+------------------------------------------------------------------+
+void CSession::AddFractal(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateSession - Sets active state, bounds and alerts on the tick |
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
-  {
-    int    usArrow;
-    double usArrowHigh;
-    double usArrowLow;
-    
+  {    
     ReservedWords usState              = NoState;
     ReservedWords usHighState          = NoState;
+    ReservedWords usLowState           = NoState;
 
     SessionRec    usLastSession        = srec[ActiveSession];
+
+    int           usArrow;
+    double        usArrowHigh          = fmax(srec[PriorSession].High,fmax(Open[sBar],usLastSession.High));
+    double        usArrowLow           = fmin(srec[PriorSession].Low,fmin(Open[sBar],usLastSession.Low));
 
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
@@ -207,26 +213,18 @@ void CSession::UpdateSession(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionUp))
+      {
         usState                        = Rally;
+        srec[ActiveSession].Resistance = usLastSession.High;
+      }
 
       if (IsHigher(srec[ActiveSession].High,srec[PriorSession].High,NoUpdate))
-        if (!sSessionIsOpen)
-          usState                      = Trap;
-              
-      if (IsHigher(srec[ActiveSession].High,srec[ActiveSession].Resistance,NoUpdate))
-      {
-        srec[ActiveSession].TermDir    = DirectionUp;
-
-        if (NewDirection(srec[PriorSession].TermDir,DirectionUp,NoUpdate))
-        {
-          srec[ActiveSession].Bottom   = fmin(srec[ActiveSession].Support,srec[ActiveSession].Low);
+        if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp))
           usState                      = Reversal;
-        }
         else
           usState                      = Breakout;
-      }
-                
-      usHighState                      = usState;   //-- Retain high on outside reversal
+          
+       usHighState                     = usState;  //--- Retain for multiple boundary correction
     }
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
@@ -235,65 +233,89 @@ void CSession::UpdateSession(void)
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionDown))
+      {
         usState                        = Pullback;
+        srec[ActiveSession].Support    = usLastSession.Low;
+      }
 
       if (IsLower(srec[ActiveSession].Low,srec[PriorSession].Low,NoUpdate))
-        if (!sSessionIsOpen)
-          usState                      = Trap;
-      
-      if (IsLower(srec[ActiveSession].Low,srec[ActiveSession].Support,NoUpdate))
-      {
-        srec[ActiveSession].TermDir    = DirectionDown;
-        
-        if (NewDirection(srec[PriorSession].TermDir,DirectionDown,NoUpdate))
-        {
-          srec[ActiveSession].Top      = fmax(srec[ActiveSession].Resistance,srec[ActiveSession].High);
+        if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown))
           usState                      = Reversal;
-        }
         else
           usState                      = Breakout;
-      }
+
+       usLowState                      = usState;  //--- Retain for multiple boundary correction
     }
-        
-    //-- Apply outside reversal correction possible only during historical analysis
+
+    //-- Apply corrections on multiple new boundary events: possible only during historical analysis
     if (sEvent[NewHigh] && sEvent[NewLow])
     {
-      if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))
-        if (srec[ActiveSession].Direction==DirectionUp)
+      if (usHighState==Reversal || usLowState==Reversal)
+      {
+        //--- axiom: at no time shall a breakout occur without first having a same direction reversal following a prior opposite reversal/breakout;
+        //--- axiom: given a high reversal, a low breakout is not possible;
+        //--- axiom: The simultaneous occurrence of both high and low reversals is possible; each of which must be processed in sequence;
+      
+        if (usHighState==Reversal && usLowState==Reversal) //--- double outside reversal?
         {
-          usState                      = usHighState;  //-- Outside reversal; use retained high
-          sEvent.ClearEvent(NewLow);
+          Print(TimeToStr(Time[sBar])+":Double Outside reversal; check results");
+        
+          //--- Process the 'original' reversal        
+        
         }
         else
-          sEvent.ClearEvent(NewHigh);
-    }
-    
-    if (NewState(srec[ActiveSession].TermState,usState,NewTerm))
-      if (sShowDirArrow)
-      {
-        switch (usState)
+        if (usHighState==Reversal)
         {
-          case Breakout:   
-          case Reversal:   usArrow      = BoolToInt(usState==Reversal,SYMBOL_CHECKSIGN,
-                                            BoolToInt(sEvent[NewHigh],SYMBOL_ARROWUP,SYMBOL_ARROWDOWN));
-                           usArrowHigh  = fmax(usLastSession.Resistance,usLastSession.High);
-                           usArrowLow   = fmin(usLastSession.Support,usLastSession.Low);
-                           break;
-          case Trap:       usArrow      = SYMBOL_STOPSIGN;
-                           usArrowHigh  = fmax(srec[PriorSession].High,usLastSession.High);
-                           usArrowLow   = fmin(srec[PriorSession].Low,usLastSession.Low);
-                           break;
-          default:         usArrow  = SYMBOL_DASH;
-                           usArrowHigh  = usLastSession.High;
-                           usArrowLow   = usLastSession.Low;
+          if (usState==Breakout)
+            Print("Axiom violation: High Reversal/Low Breakout not possible");
+
+          sEvent.ClearEvent(NewLow);
+          usState                       = usHighState;
+        }
+        else
+        {
+          sEvent.ClearEvent(NewHigh);
+          usState                       = usLowState;
         }
         
-        if (sEvent[NewHigh])
-          NewArrow(usArrow,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usArrowHigh,sBar);
-
-        if (sEvent[NewLow])
-          NewArrow(usArrow,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usArrowLow,sBar);
+        srec[ActiveSession].Direction = srec[ActiveSession].BreakoutDir;
       }
+      else
+      {
+        //--- Resolve pullback vs rally
+        if (IsChanged(srec[ActiveSession].Direction,Direction(Close[sBar]-Open[sBar])))   //--- does not work all the time; fuzzy guess; self-correcting
+        {
+          sEvent.ClearEvent(NewLow);
+          usState                       = usHighState;  //-- Outside bar reversal; use retained high
+        }
+        else
+        {
+          sEvent.ClearEvent(NewHigh);
+          usState                       = usLowState;  //-- Outside bar reversal; use retained high
+        }
+      }
+    }
+    
+    if (NewState(srec[ActiveSession].State,usState))
+    {
+      switch (usState)
+      {
+        case Breakout:   usArrow        = BoolToInt(sEvent[NewHigh],SYMBOL_ARROWUP,SYMBOL_ARROWDOWN);
+                         break;
+        case Reversal:   usArrow        = SYMBOL_CHECKSIGN;
+                         AddFractal();
+                         break;
+        default:         usArrow        = SYMBOL_DASH;
+                         usArrowHigh    = usLastSession.High;
+                         usArrowLow     = usLastSession.Low;
+      }
+       
+      if (sEvent[NewHigh])
+        NewArrow(usArrow,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usArrowHigh,sBar);
+
+      if (sEvent[NewLow])
+        NewArrow(usArrow,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usArrowLow,sBar);
+    }
   }
   
 //+------------------------------------------------------------------+
@@ -306,12 +328,19 @@ void CSession::OpenSession(void)
     sOffMidBuffer.SetValue(sBar,Pivot(ActiveSession));
 
     //-- Set support/resistance (ActiveSession is OffSession data)
-    srec[ActiveSession].Resistance        = fmax(srec[ActiveSession].High,srec[PriorSession].High);
-    srec[ActiveSession].Support           = fmin(srec[ActiveSession].Low,srec[PriorSession].Low);
+    srec[ActiveSession].Resistance        = Open[sBar];
+    srec[ActiveSession].Support           = Open[sBar];
+    srec[ActiveSession].High              = Open[sBar];
+    srec[ActiveSession].Low               = Open[sBar];
     
-    //<--- Find the nearest valid bar
-    srec[ActiveSession].High              = Close[fmin(Bars-1,sBar+1)];  
-    srec[ActiveSession].Low               = Close[fmin(Bars-1,sBar+1)];
+    //<--- Check for offsession reversals
+    if (IsHigher(srec[ActiveSession].High,srec[PriorSession].High,NoUpdate))    
+      if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp,NoUpdate))
+        srec[ActiveSession].High          = fdiv(srec[PriorSession].High+High[sBar],2,Digits);
+
+    if (IsLower(srec[ActiveSession].Low,srec[PriorSession].Low,NoUpdate))
+      if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown,NoUpdate))
+       srec[ActiveSession].Low            = fdiv(srec[PriorSession].Low+Low[sBar],2,Digits);
     
     //-- Set OpenSession flag
     sEvent.SetEvent(SessionOpen);
@@ -322,19 +351,16 @@ void CSession::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
   {        
-    double csResistance                   = fmax(srec[PriorSession].High,fmax(srec[ActiveSession].High,srec[OffSession].High));
-    double csSupport                      = fmin(srec[PriorSession].Low,fmin(srec[ActiveSession].Low,srec[OffSession].Low));
-
     //-- Update Prior Record and Indicator Buffer
     srec[PriorSession]                    = srec[ActiveSession];
     sPriorMidBuffer.SetValue(sBar,Pivot(PriorSession));
 
     //-- Reset Active Record
-    srec[ActiveSession].Resistance        = csResistance;
-    srec[ActiveSession].Support           = csSupport;
+    srec[ActiveSession].Resistance        = Open[sBar];
+    srec[ActiveSession].Support           = Open[sBar];
 
-    srec[ActiveSession].High              = Close[fmin(Bars-1,sBar+1)];
-    srec[ActiveSession].Low               = Close[fmin(Bars-1,sBar+1)];
+    srec[ActiveSession].High              = Open[sBar];
+    srec[ActiveSession].Low               = Open[sBar];
     
     sEvent.SetEvent(SessionClose);
   }
@@ -377,14 +403,12 @@ void CSession::LoadHistory(void)
     for (int type=0;type<ArraySize(srec);type++)
     {
       srec[type].Direction           = lhStartDir;
-      srec[type].TermState           = Breakout;
-      srec[type].TermDir             = lhStartDir;
+      srec[type].BreakoutDir         = DirectionNone;
+      srec[type].State               = Breakout;
       srec[type].High                = High[sBar];
       srec[type].Low                 = Low[sBar];
       srec[type].Resistance          = High[sBar];
       srec[type].Support             = Low[sBar];
-      srec[type].Top                 = High[sBar];
-      srec[type].Bottom              = Low[sBar];
     }
 
     //--- Initialize session records
@@ -411,7 +435,6 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sHourClose                       = HourClose;
     sHourOffset                      = HourOffset;
     sSessionIsOpen                   = false;
-    sShowDirArrow                    = true;
     
     sEvent                           = new CEvent();
 
@@ -478,6 +501,8 @@ void CSession::Update(void)
         CloseSession();
 
     UpdateSession();
+    
+//    if (Symbol()=="USDJPY") Print(SessionText(ActiveSession));
   }
   
 //+------------------------------------------------------------------+
@@ -488,7 +513,7 @@ void CSession::Update(double &OffMidBuffer[], double &PriorMidBuffer[])
     Update();
     
     sOffMidBuffer.Copy(OffMidBuffer);
-    sPriorMidBuffer.Copy(PriorMidBuffer);
+    sPriorMidBuffer.Copy(PriorMidBuffer);    
   }
   
 //+------------------------------------------------------------------+
@@ -544,14 +569,14 @@ string CSession::SessionText(PeriodType Type)
     string siSessionInfo        = EnumToString(this.Type())+"|"
                                 + TimeToStr(Time[sBar])+"|"
                                 + BoolToStr(this.IsOpen(),"Open|","Closed|")
-                                + DoubleToStr(Pivot(ActiveSession),Digits)+"|"
+                                + DoubleToStr(Pivot(Type),Digits)+"|"
                                 + BoolToStr(srec[Type].Direction==DirectionUp,"Long|","Short|")                              
-                                + EnumToString(srec[Type].TermState)+"|"
+                                + BoolToStr(srec[Type].BreakoutDir==DirectionUp,"Long|","Short|")                              
+                                + EnumToString(srec[Type].State)+"|"
                                 + DoubleToStr(srec[Type].High,Digits)+"|"
                                 + DoubleToStr(srec[Type].Low,Digits)+"|"
                                 + DoubleToStr(srec[Type].Resistance,Digits)+"|"
-                                + DoubleToStr(srec[Type].Support,Digits)+"|"
-                                + BoolToStr(srec[Type].TermDir==DirectionUp,"Long|","Short|");
+                                + DoubleToStr(srec[Type].Support,Digits)+"|";
 
     return(siSessionInfo);
   }
