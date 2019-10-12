@@ -208,6 +208,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Support,
                   Resistance,
                   Recovery,
+                  Resume,
                   Contrarian,
                   Continuation,
                   Correction,
@@ -338,6 +339,38 @@ int FiboLevel(double Fibonacci, FiboFormat Format=Extended)
       flFibo--;
     
     return(flFibo);
+  }
+
+//+------------------------------------------------------------------+
+//| FiboExpansion - returns the Fibo expansion for supplied points   |
+//+------------------------------------------------------------------+
+double FiboExpansion(double Base, double Root, double Expansion, int Format=InDecimal)
+  {
+    double feExpansion    = fdiv(fabs(Expansion-Root),fabs(Base-Root),3);
+
+    switch (Format)
+    {
+      case InDecimal:    return (NormalizeDouble(feExpansion,3));
+      case InPercent:    return (NormalizeDouble(feExpansion*100,3));
+    }
+            
+    return(0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| FiboRetrace - returns the linear Fibo retrace for supplied points|
+//+------------------------------------------------------------------+
+double FiboRetrace(double Root, double Expansion, double Retrace, int Format=InDecimal)
+  {
+    double frRetrace      = fdiv(fabs(Expansion-Retrace),fabs(Expansion-Root),3);
+
+    switch (Format)
+    {
+      case InDecimal:    return (NormalizeDouble(frRetrace,3));
+      case InPercent:    return (NormalizeDouble(frRetrace*100,3));
+    }
+            
+    return(0.00);
   }
 
 //+------------------------------------------------------------------+
@@ -518,12 +551,15 @@ bool IsChanged(ReservedWords &Check, ReservedWords Compare, bool Update=true)
 //+------------------------------------------------------------------+
 bool IsBetween(double Check, double Range1, double Range2, int Precision=0)
   {
-    double min = fmin(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
-    double max = fmax(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
+    double min;
+    double max;
 
     if (Precision == 0)
       Precision  = Digits;
-      
+
+    min = fmin(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
+    max = fmax(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
+          
     if (NormalizeDouble(Check,Precision) >= NormalizeDouble(min,Precision))
       if (NormalizeDouble(Check,Precision) <= NormalizeDouble(max,Precision))
         return (true);

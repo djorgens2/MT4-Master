@@ -12,8 +12,8 @@
 #property strict
 #property indicator_chart_window
 
-#property indicator_buffers   2
-#property indicator_plots     2
+#property indicator_buffers   3
+#property indicator_plots     3
 
 #include <stdutil.mqh>
 #include <std_utility.mqh>
@@ -32,8 +32,15 @@
 #property indicator_style2  STYLE_DOT;
 #property indicator_width2  1
 
+#property indicator_label3  "indFractal"
+#property indicator_type3   DRAW_LINE;
+#property indicator_color3  clrWhite;
+#property indicator_style3  STYLE_SOLID;
+#property indicator_width3  1
+
 double indPriorMidBuffer[];
 double indOffMidBuffer[];
+double indFractalBuffer[];
 
 enum DataPosition
   {
@@ -170,19 +177,21 @@ void RefreshScreen(int Bar=0)
 
     if (inpShowPriceLines==Yes)
     {
-      PeriodType show=ActiveSession;
-      UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnS_Support",session[show].Support,STYLE_SOLID,clrRed);
-      UpdateLine("lnS_Resistance",session[show].Resistance,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnS_Low",session[show].Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnS_High",session[show].High,STYLE_DOT,clrForestGreen);
+      FractalType show=ftOrigin;
+      UpdateLine("lnS_ActiveMid",session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnS_Support",session.Fractal(show).Support,STYLE_SOLID,clrRed);
+      UpdateLine("lnS_Resistance",session.Fractal(show).Resistance,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnS_Low",session.Fractal(show).Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High",session.Fractal(show).High,STYLE_DOT,clrForestGreen);
+//      UpdateLine("lnS_PriorLow",session.Fractal(ftPrior).Support,STYLE_DOT,clrFireBrick);
+//      UpdateLine("lnS_PriorHigh",session.Fractal(ftPrior).Resistance,STYLE_DOT,clrForestGreen);
     }
 
-//    if (inpShowOriginLines==Yes)
-//    {
-//      UpdateLine("lnS_Top",session[ActiveSession].Top,STYLE_DASH,clrLawnGreen);
-//      UpdateLine("lnS_Bottom",session[ActiveSession].Bottom,STYLE_DASH,clrRed);
-//    }
+    if (inpShowOriginLines==Yes)
+    {
+      UpdateLine("lnS_Top",session.Fractal(ftOrigin).Resistance,STYLE_DASH,clrLawnGreen);
+      UpdateLine("lnS_Bottom",session.Fractal(ftOrigin).Support,STYLE_DASH,clrRed);
+    }
     
     if (inpShowData>dpNone)
     {
@@ -220,7 +229,7 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {
     if (inpShowBuffer==Yes)
-      session.Update(indOffMidBuffer,indPriorMidBuffer);
+      session.Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     else
       session.Update();
     
@@ -242,6 +251,10 @@ int OnInit()
     SetIndexBuffer(1,indOffMidBuffer);
     SetIndexEmptyValue(1, 0.00);
     SetIndexStyle(1,DRAW_SECTION);
+    
+    SetIndexBuffer(2,indFractalBuffer);
+    SetIndexEmptyValue(2, 0.00);
+    SetIndexStyle(2,DRAW_SECTION);
     
     if (inpShowPriceLines==Yes)
     {

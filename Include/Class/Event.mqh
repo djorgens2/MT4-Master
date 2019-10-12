@@ -40,6 +40,7 @@ protected:
                   NewExpansion,
                   NewContraction,
                   NewRetrace,
+                  NewRecovery,
                   NewPoly,
                   NewHigh,
                   NewLow,

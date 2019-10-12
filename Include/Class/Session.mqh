@@ -19,6 +19,16 @@ class CSession
   {
 
 public:             
+             //-- Fractal Types
+             enum FractalType
+             {
+               ftOrigin,
+               ftTrend,
+               ftTerm,
+               ftPrior,
+               FractalTypes
+             };
+
              //-- Period Types
              enum PeriodType
              {
@@ -37,7 +47,7 @@ public:
                US,
                SessionTypes
              };
-
+             
              //-- Session Record Definition
              struct SessionRec
              {
@@ -49,7 +59,7 @@ public:
                double         Support;     //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
              };
-
+             
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
             ~CSession();
 
@@ -65,13 +75,17 @@ public:
              
              double        Pivot(const PeriodType Type);
              int           Bias(void);
+             double        Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
+             double        Expansion(FractalType Type, int Measure, int Format=InDecimal);     //--- returns fibonacci expansion
 
              void          Update(void);
-             void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[]);
+             void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
+             void          RefreshScreen(void);
 
              string        SessionText(PeriodType Type);
              
              SessionRec    operator[](const PeriodType Type) {return(srec[Type]);}
+             SessionRec    Fractal(const FractalType Type)   {return(sfractal[Type]);}
              
                                  
 private:
@@ -88,6 +102,9 @@ private:
              int           sBars;
              int           sBarDay;
              int           sBarHour;
+             
+             SessionRec    sfractal[FractalTypes];
+             int           sBarFE;          //--- Fractal Expansion Bar
              
              //--- Private class collections
              SessionRec    srec[PeriodTypes];
@@ -108,8 +125,11 @@ private:
              void          LoadHistory(void);
              
              bool          NewDirection(int &Direction, int NewDirection, bool Update=true);
-             bool          NewState(ReservedWords &State, ReservedWords NewState);
-             void          AddFractal(void);
+             bool          NewState(ReservedWords &State, ReservedWords NewState, EventType EventTrigger);
+
+             void          UpdateTerm(void);
+             void          UpdateTrend(void);
+             void          UpdateOrigin(void);
 };
 
 //+------------------------------------------------------------------+
@@ -145,7 +165,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection, bool Update=tru
 //+------------------------------------------------------------------+
 //| NewState - Tests for new state events                            |
 //+------------------------------------------------------------------+
-bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
+bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventType EventTrigger)
   {
     if (ChangeState==NoState)
       return(false);
@@ -153,14 +173,21 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
     if (State==NoState)
       State                       = ChangeState;
 
+    if (State==Resume)
+      if (ChangeState==Correction)
+        return(false);
+          
     if (State==Reversal)
     {
       if (ChangeState==Breakout)
         return(false);
         
       if (ChangeState==Reversal)
-        if (sEvent[NewDirection])
+        if (sEvent[EventTrigger])
+        {
           State                    = Correction;
+          Print(TimeToStr(Time[sBar])+": Corrected reversal");
+        }
     }
       
     if (IsChanged(State,ChangeState))
@@ -177,6 +204,14 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
                           break;
         case Pullback:    sEvent.SetEvent(NewPullback);
                           break;
+        case Retrace:     sEvent.SetEvent(NewRetrace);
+                          break;
+        case Recovery:    sEvent.SetEvent(NewRecovery);
+                          break;
+        case Resume:      sEvent.SetEvent(MarketResume);
+                          break;
+        case Correction:  sEvent.SetEvent(MarketCorrection);
+                          break;
       }
       
       return(true);
@@ -186,10 +221,258 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState)
   }
 
 //+------------------------------------------------------------------+
-//| AddFractal - Creates new fractal and validates existing states   |
+//| UpdateTerm - Updates term fractal bounds and buffers             |
 //+------------------------------------------------------------------+
-void CSession::AddFractal(void)
+void CSession::UpdateTerm(void)
   {
+    int           ufDoubleReversalBar   = NoValue;
+    double        ufExpansion           = 0.00;
+    ReservedWords ufState               = NoState;
+    SessionRec    ufPrior               = sfractal[ftTerm];
+    
+    //--- Check for term changes
+    if (sEvent[NewReversal])
+      if (NewDirection(sfractal[ftTerm].Direction,srec[ActiveSession].Direction))
+      {
+        sBarFE                          = sBar;
+        sfractal[ftPrior]               = ufPrior;
+        sEvent.SetEvent(NewTerm);        
+                
+        if (sfractal[ftTerm].Direction==DirectionUp)
+        {
+          sfractal[ftTerm].Resistance   = srec[PriorSession].High;
+          sfractal[ftTerm].Support      = sfractal[ftTerm].Low;
+          sfractal[ftTerm].High         = sfractal[ftTerm].Low;
+          sfractal[ftTerm].Low          = Close[sBar];
+        }
+
+        if (sfractal[ftTerm].Direction==DirectionDown)
+        {
+          sfractal[ftTerm].Support      = srec[PriorSession].Low;
+          sfractal[ftTerm].Resistance   = sfractal[ftTerm].High;
+          sfractal[ftTerm].Low          = sfractal[ftTerm].High;
+          sfractal[ftTerm].High         = Close[sBar];
+        }
+      }
+      else
+      {
+        //--- occurs on double reversals; requires analysis
+        ufDoubleReversalBar             = sBar;
+      }
+    
+    //--- Check for term boundary changes
+    if (sfractal[ftTerm].Direction==DirectionUp)
+      if (IsHigher(High[sBar],sfractal[ftTerm].High))
+      {
+        sEvent.SetEvent(NewFractal);
+        sFractalBuffer.Delete(sBarFE);
+        sFractalBuffer.Insert(sBar,High[sBar]);
+
+        sfractal[ftTerm].Low            = Close[sBar];
+        
+        ufExpansion                     = sfractal[ftTerm].High;
+        sBarFE                          = sBar;
+      }
+    else
+      if (sBar==0)
+        sfractal[ftTerm].Low            = fmin(Close[sBar],sfractal[ftTerm].Low);
+      else
+        sfractal[ftTerm].Low            = fmin(Low[sBar],sfractal[ftTerm].Low);
+            
+    if (sfractal[ftTerm].Direction==DirectionDown)
+      if (IsLower(Low[sBar],sfractal[ftTerm].Low))
+      {
+        sEvent.SetEvent(NewFractal);
+        sFractalBuffer.Delete(sBarFE);
+        sFractalBuffer.Insert(sBar,Low[sBar]);
+
+        sfractal[ftTerm].High           = Close[sBar];
+
+        ufExpansion                     = sfractal[ftTerm].Low;
+        sBarFE                          = sBar;
+      }
+    else
+      if (sBar==0)
+        sfractal[ftTerm].High           = fmax(Close[sBar],sfractal[ftTerm].High);
+      else
+        sfractal[ftTerm].High           = fmax(High[sBar],sfractal[ftTerm].High);
+      
+    if (sEvent[NewFractal])
+    {
+      if (IsBetween(ufExpansion,sfractal[ftPrior].Support,sfractal[ftPrior].Resistance))
+        if (sfractal[ftTerm].Direction==sfractal[ftTerm].BreakoutDir)
+          ufState                     = Recovery;
+        else
+          ufState                     = Retrace;
+      else
+        if (IsBetween(ufExpansion,sfractal[ftTerm].Support,sfractal[ftTerm].Resistance))
+          if (sfractal[ftTerm].Direction==DirectionUp)
+            ufState                     = Rally;
+          else
+            ufState                     = Pullback;
+        else
+        {
+          if (sfractal[ftTerm].Direction==DirectionUp)
+          {
+            if (IsLower(ufExpansion,sfractal[ftPrior].Support,NoUpdate))
+              ufState                   = Rally;
+              
+            if (IsHigher(ufExpansion,sfractal[ftPrior].Resistance,NoUpdate))
+              if (NewDirection(sfractal[ftTerm].BreakoutDir,sfractal[ftTerm].Direction))
+                ufState                     = Reversal;
+              else
+                ufState                     = Breakout;
+          }
+          else
+          {
+            if (IsHigher(ufExpansion,sfractal[ftPrior].Resistance,NoUpdate))
+              ufState                       = Pullback;
+              
+            if (IsLower(ufExpansion,sfractal[ftPrior].Support,NoUpdate))
+              if (NewDirection(sfractal[ftTerm].BreakoutDir,sfractal[ftTerm].Direction))
+                ufState                     = Reversal;
+              else
+                ufState                     = Breakout;
+          }
+      }
+      
+      if (NewState(sfractal[ftTerm].State,ufState,NewReversal));
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTrend - Updates trend fractal bounds and state             |
+//+------------------------------------------------------------------+
+void CSession::UpdateTrend(void)
+  {
+    ReservedWords utState              = sfractal[ftTrend].State;
+
+    //--- Check for trend changes      
+    if (sEvent[NewReversal])
+      if (sEvent[NewTerm])
+      {
+        if (sfractal[ftTerm].Direction==DirectionUp)
+          sfractal[ftTrend].Support    = sfractal[ftTerm].Support;
+        
+        if (sfractal[ftTerm].Direction==DirectionDown)
+          sfractal[ftTrend].Resistance = sfractal[ftTerm].Resistance;
+        
+        if (sfractal[ftTerm].Direction==sfractal[ftTrend].Direction)
+          utState                      = Recovery;
+        else
+          utState                      = Retrace;
+      }
+
+    //--- Check for trend boundary changes
+    if (sfractal[ftTrend].Direction==DirectionUp)
+      sfractal[ftTrend].High           = fmax(High[sBar],sfractal[ftTrend].High);
+
+    if (IsHigher(High[sBar],sfractal[ftTrend].Resistance,NoUpdate))
+      if (NewDirection(sfractal[ftTrend].Direction,DirectionUp))
+      {
+        sEvent.SetEvent(NewTrend);
+
+        sfractal[ftTrend].High         = Close[sBar];
+        utState                        = Reversal;
+      }
+      else
+        utState                        = Breakout;
+
+
+    if (sfractal[ftTrend].Direction==DirectionDown)
+      sfractal[ftTrend].Low            = fmin(Low[sBar],sfractal[ftTrend].Low);
+
+    if (IsLower(Low[sBar],sfractal[ftTrend].Support,NoUpdate))
+      if (NewDirection(sfractal[ftTrend].Direction,DirectionDown))
+      {
+        sEvent.SetEvent(NewTrend);
+              
+        sfractal[ftTrend].Low          = Close[sBar];
+        utState                        = Reversal;
+      }
+      else
+        utState                        = Breakout;
+    
+    if (NewState(sfractal[ftTrend].State,utState,NewTerm))
+      if (sfractal[ftTrend].State==Breakout)
+        if (NewDirection(sfractal[ftTrend].BreakoutDir,sfractal[ftTrend].Direction))
+          sEvent.SetEvent(NewBreakout);
+        else
+          sEvent.SetEvent(NewExpansion);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateOrigin - Updates origin fractal bounds and state           |
+//+------------------------------------------------------------------+
+void CSession::UpdateOrigin(void)
+  {
+    double        uoExpansion           = 0.00;
+
+    if (sEvent[NewTrend])
+    {
+      if (sfractal[ftTrend].Direction==DirectionDown)
+      {
+        sfractal[ftOrigin].Resistance   = sfractal[ftTrend].High;
+        sfractal[ftOrigin].High         = sfractal[ftTrend].Resistance;
+      }
+      else
+      {
+        sfractal[ftOrigin].Support      = sfractal[ftTrend].Low;
+        sfractal[ftOrigin].Low          = sfractal[ftTrend].Support;
+      }
+    }
+
+    if (sEvent[NewExpansion])
+    {
+      if (sfractal[ftTrend].Direction==DirectionDown)
+      {
+        sfractal[ftOrigin].Support      = sfractal[ftTrend].Support;
+        sfractal[ftOrigin].High         = sfractal[ftTrend].Resistance;
+        sfractal[ftOrigin].Low          = sfractal[ftTrend].Low;
+      }
+      else
+      {
+        sfractal[ftOrigin].Resistance   = sfractal[ftTrend].Resistance;
+        sfractal[ftOrigin].Low          = sfractal[ftTrend].Support;
+        sfractal[ftOrigin].High         = sfractal[ftTrend].High;
+      }
+    }
+    
+    if (IsHigher(High[sBar],sfractal[ftOrigin].High))
+    {
+      if (NewDirection(sfractal[ftOrigin].Direction,DirectionUp))
+        sEvent.SetEvent(NewRetrace);
+        
+      if (IsHigher(High[sBar],sfractal[ftOrigin].Resistance,NoUpdate))
+        if (NewDirection(sfractal[ftOrigin].BreakoutDir,DirectionUp))
+          sEvent.SetEvent(NewOrigin);
+    }
+
+    if (IsLower(Low[sBar],sfractal[ftOrigin].Low))
+    {
+      if (NewDirection(sfractal[ftOrigin].Direction,DirectionDown))
+        sEvent.SetEvent(NewRetrace);
+
+      if (IsLower(Low[sBar],sfractal[ftOrigin].Support,NoUpdate))
+        if (NewDirection(sfractal[ftOrigin].BreakoutDir,DirectionDown))
+          sEvent.SetEvent(NewOrigin);
+    }
+
+    if (sfractal[ftOrigin].Direction==sfractal[ftTerm].Direction)
+      if (sfractal[ftOrigin].Direction==DirectionUp)
+        uoExpansion                     = sfractal[ftTerm].High;
+      else
+        uoExpansion                     = sfractal[ftTerm].Low;
+    else
+      if (sfractal[ftOrigin].Direction==DirectionUp)
+        uoExpansion                     = sfractal[ftTerm].Low;
+      else
+        uoExpansion                     = sfractal[ftTerm].High;
+
+    sfractal[ftOrigin].State            = sfractal[ftTerm].State;
+    
+    if (IsBetween(uoExpansion,sfractal[ftOrigin].Resistance,sfractal[ftOrigin].Support))
+      sfractal[ftOrigin].State          = sfractal[ftTrend].State;
   }
 
 //+------------------------------------------------------------------+
@@ -296,14 +579,13 @@ void CSession::UpdateSession(void)
       }
     }
     
-    if (NewState(srec[ActiveSession].State,usState))
+    if (NewState(srec[ActiveSession].State,usState,NewDirection))
     {
       switch (usState)
       {
         case Breakout:   usArrow        = BoolToInt(sEvent[NewHigh],SYMBOL_ARROWUP,SYMBOL_ARROWDOWN);
                          break;
         case Reversal:   usArrow        = SYMBOL_CHECKSIGN;
-                         AddFractal();
                          break;
         default:         usArrow        = SYMBOL_DASH;
                          usArrowHigh    = usLastSession.High;
@@ -377,6 +659,8 @@ void CSession::UpdateBuffers(void)
       {
         sOffMidBuffer.Insert(0,0.00);
         sPriorMidBuffer.Insert(0,0.00);
+        sFractalBuffer.Insert(0,0.00);
+        sBarFE++;
       }
   }
 
@@ -386,21 +670,21 @@ void CSession::UpdateBuffers(void)
 void CSession::LoadHistory(void)
   {    
     int lhStartDir                   = DirectionNone;
-    
-    if (Close[sBar]<Open[sBar])
-      lhStartDir                     = DirectionDown;
-      
-    if (Close[sBar]>Open[sBar])
-      lhStartDir                     = DirectionUp;
-      
+          
     //--- Initialize period operationals
     sBar                             = Bars-1;
     sBars                            = Bars;
     sBarDay                          = NoValue;
     sBarHour                         = NoValue;
+
+    if (Close[sBar]<Open[sBar])
+      lhStartDir                     = DirectionDown;
+      
+    if (Close[sBar]>Open[sBar])
+      lhStartDir                     = DirectionUp;
     
     //--- Initialize session records
-    for (int type=0;type<ArraySize(srec);type++)
+    for (int type=0;type<PeriodTypes;type++)
     {
       srec[type].Direction           = lhStartDir;
       srec[type].BreakoutDir         = DirectionNone;
@@ -411,7 +695,10 @@ void CSession::LoadHistory(void)
       srec[type].Support             = Low[sBar];
     }
 
-    //--- Initialize session records
+    //--- Initialize Fibo record
+    for (int type=0;type<FractalTypes;type++)
+      sfractal[type]                 = srec[ActiveSession];
+
     //--- *** May need to modify this if the sbar Open==Close
     if (IsEqual(Open[sBar],Close[sBar]))
     {
@@ -501,19 +788,23 @@ void CSession::Update(void)
         CloseSession();
 
     UpdateSession();
+    UpdateTerm();
+    UpdateTrend();
+    UpdateOrigin();
     
-//    if (Symbol()=="USDJPY") Print(SessionText(ActiveSession));
+    RefreshScreen();    
   }
   
 //+------------------------------------------------------------------+
 //| Update - Updates and returns buffer values                       |
 //+------------------------------------------------------------------+
-void CSession::Update(double &OffMidBuffer[], double &PriorMidBuffer[])
+void CSession::Update(double &OffMidBuffer[], double &PriorMidBuffer[], double &FractalBuffer[])
   {
     Update();
     
     sOffMidBuffer.Copy(OffMidBuffer);
-    sPriorMidBuffer.Copy(PriorMidBuffer);    
+    sPriorMidBuffer.Copy(PriorMidBuffer);
+    sFractalBuffer.Copy(FractalBuffer);
   }
   
 //+------------------------------------------------------------------+
@@ -559,6 +850,70 @@ int CSession::Bias(void)
     }
       
     return (Action(srec[ActiveSession].Direction,InDirection));
+  }
+
+//+------------------------------------------------------------------+
+//| Retrace - Calcuates fibo retrace % for supplied Type             |
+//+------------------------------------------------------------------+
+double CSession::Retrace(FractalType Type, int Measure, int Format=InDecimal)
+  {
+    int    fDirection     = sfractal[Type].Direction;
+
+    if (fDirection==DirectionUp)
+      switch (Measure)
+      {
+        case Now: return(FiboRetrace(sfractal[Type].Support,sfractal[Type].High,Close[sBar],Format));
+        case Max: return(FiboRetrace(sfractal[Type].Support,sfractal[Type].High,sfractal[ftTerm].Low,Format));
+      }
+    else
+      switch (Measure)
+      {
+        case Now: return(FiboRetrace(sfractal[Type].Resistance,sfractal[Type].Low,Close[sBar],Format));
+        case Max: return(FiboRetrace(sfractal[Type].Resistance,sfractal[Type].Low,sfractal[ftTerm].High,Format));
+      }
+      
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Expansion - Calcuates fibo expansion % for supplied Type         |
+//+------------------------------------------------------------------+
+double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
+  {
+    int    fDirection     = sfractal[Type].Direction;
+
+//if (sBar==0) Print(DoubleToStr(FiboExpansion(sfractal[Type].Resistance
+    if (fDirection==DirectionUp)
+      switch (Measure)
+      {
+        case Now: return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,Close[sBar],Format));
+        case Max: return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,sfractal[Type].High,Format));
+      }
+    else
+      switch (Measure)
+      {
+        case Now: return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,Close[sBar],Format));
+        case Max: return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,sfractal[Type].Low,Format));
+      }
+      
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| RefreshScreen - Updates comment with fibonacci data              |
+//+------------------------------------------------------------------+
+void CSession::RefreshScreen(void)
+  {  
+    Comment("Prior State: "+EnumToString(sfractal[ftPrior].State)+" Direction: "+DirText(sfractal[ftPrior].Direction)+"/"+DirText(sfractal[ftPrior].BreakoutDir)+"\n"+
+        "Term State: "+EnumToString(sfractal[ftTerm].State)+" Direction: "+DirText(sfractal[ftTerm].Direction)+"/"+DirText(sfractal[ftTerm].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTerm,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftTerm,Max,InPercent),1)+"%\n"+
+        "Trend State: "+EnumToString(sfractal[ftTrend].State)+" Direction: "+DirText(sfractal[ftTrend].Direction)+"/"+DirText(sfractal[ftTrend].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(ftTrend,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTrend,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(ftTrend,Now,InPercent),1)+"%  "+BoolToStr(Expansion(ftTrend,Max)==1,"Interior",DoubleToStr(Expansion(ftTrend,Max,InPercent),1)+"%")+"\n"+
+        "Origin State: "+EnumToString(sfractal[ftOrigin].State)+" Direction: "+DirText(sfractal[ftOrigin].Direction)+"/"+DirText(sfractal[ftOrigin].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftOrigin,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(ftOrigin,Now,InPercent),1)+"%  "+BoolToStr(Expansion(ftOrigin,Max)==1,"Interior",DoubleToStr(Expansion(ftOrigin,Max,InPercent),1)+"%")+"\n");
   }
 
 //+------------------------------------------------------------------+

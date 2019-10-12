@@ -12,8 +12,8 @@
 #property strict
 #property indicator_chart_window
 
-#property indicator_buffers   2
-#property indicator_plots     2
+#property indicator_buffers   3
+#property indicator_plots     3
 
 #include <stdutil.mqh>
 #include <std_utility.mqh>
@@ -32,8 +32,15 @@
 #property indicator_style2  STYLE_DOT;
 #property indicator_width2  1
 
+#property indicator_label3  "indFractal"
+#property indicator_type3   DRAW_LINE;
+#property indicator_color3  clrWhite;
+#property indicator_style3  STYLE_SOLID;
+#property indicator_width3  1
+
 double indPriorMidBuffer[];
 double indOffMidBuffer[];
+double indFractalBuffer[];
 
 
 //--- Operational Inputs
@@ -221,7 +228,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    session[Daily].Update(indOffMidBuffer,indPriorMidBuffer);
+    session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     session[Asia].Update();
     session[Europe].Update();
     session[US].Update();
@@ -245,6 +252,10 @@ int OnInit()
     SetIndexEmptyValue(1, 0.00);
     SetIndexStyle(1,DRAW_SECTION);
     
+    SetIndexBuffer(2,indFractalBuffer);
+    SetIndexEmptyValue(2, 0.00);
+    SetIndexStyle(2,DRAW_SECTION);
+
     NewLine("lnActiveMid");
     NewLine("lnPriorMid");
     NewLine("lnOffMid");
