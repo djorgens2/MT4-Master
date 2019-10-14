@@ -336,7 +336,7 @@ void CSession::UpdateTerm(void)
           }
       }
       
-      if (NewState(sfractal[ftTerm].State,ufState,NewReversal));
+      if (NewState(sfractal[ftTerm].State,ufState,NewTerm));
     }
   }
 
@@ -792,7 +792,7 @@ void CSession::Update(void)
     UpdateTrend();
     UpdateOrigin();
     
-    RefreshScreen();    
+//    RefreshScreen();    
   }
   
 //+------------------------------------------------------------------+
