@@ -21,7 +21,6 @@ protected:
                   NoEvent,
                   NewDirection,
                   NewFractal,
-                  NewFibonacci,
                   NewPivot,
                   NewStdDev,
                   NewMajor,
@@ -30,7 +29,6 @@ protected:
                   TrendWane,
                   TrendResume,
                   TrendCorrection,
-                  NewStrategy,
                   NewState,
                   NewRange,
                   NewTerm,
@@ -42,6 +40,9 @@ protected:
                   NewRetrace,
                   NewRecovery,
                   NewPoly,
+                  NewPolyTrend,
+                  NewPolyBoundary,       
+                  NewPolyState,
                   NewHigh,
                   NewLow,
                   NewTradeBias,
@@ -51,6 +52,8 @@ protected:
                   NewRally,
                   NewPullback,
                   NewTrap,
+                  NewCrest,
+                  NewTrough,
                   MarketCorrection,
                   MarketIdle,
                   MarketResume,
@@ -74,7 +77,7 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
       bool           ActiveEvent(void)  {return(eActiveEvent);}
-      string         ActiveEventText(void);
+      string         ActiveEventText(bool WithHeader=true);
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
@@ -117,19 +120,20 @@ void CEvent::ClearEvents(void)
 //+------------------------------------------------------------------+
 //| ActiveEvents - Returns a string of crlf translated enums         |
 //+------------------------------------------------------------------+
-string CEvent::ActiveEventText(void)
+string CEvent::ActiveEventText(bool WithHeader=true)
   {
-    string aeActiveEvents   = "No Active Events";
+    string aeActiveEvents   = "\n------------------------------";
+    
+    if (WithHeader)
+      aeActiveEvents        = Symbol()+" Events"+aeActiveEvents;
     
     if (this.ActiveEvent())
     {
-      aeActiveEvents        = "Events Active\n------------------------------\n";
-      
       for (EventType event=NewDirection;event<EventTypes;event++)
         if (eEvents[event])
           Append(aeActiveEvents, EnumToString(event), "\n");
-          
     }
+    else Append(aeActiveEvents, "No Active Events", "\n");
     
     return (aeActiveEvents);
   }

@@ -12,14 +12,6 @@
 #include <Class\ArrayDouble.mqh>
 #include <stdutil.mqh>
 
-//--- Expanded directional defines (for amplitudes)
-#define  ShortCorrection     -4
-#define  ShortReversal       -3
-#define  MarketPullback      -2
-#define  MarketRally          2
-#define  LongReversal         3
-#define  LongCorrection       4
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -29,9 +21,8 @@ class CPolyRegression
 private:
 
     //--- private methods
-       void     prCalcPolyState(void);
-       void     prCalcPoly(void);
-       void     prCalcPolyAmplitude(void);
+       void     CalcPolyState(void);
+       void     CalcPoly(void);
        
     //--- Event Array
        CEvent   *prEvents;    //--- Event array
@@ -53,15 +44,17 @@ public:
        void     SetMAPeriods(int MAPeriods) { maPeriods = MAPeriods; }
        
     //--- Event methods
-       bool     Event(EventType Event) { return (prEvents[Event]); }        //-- returns the event signal for the specified event
-       bool     ActiveEvent(void)      { return (prEvents.ActiveEvent()); } //-- returns true on active event
+       bool     Event(EventType Event)      { return (prEvents[Event]); }         //-- returns the event signal for the specified event
+       bool     ActiveEvent(void)           { return (prEvents.ActiveEvent()); }  //-- returns true on active event
+       string   ActiveEventText(const bool WithHeader=true)
+                                            { return  (prEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events
+       
 
     //--- Poly properties
        double   MA(int Measure);
        double   Poly(int Measure);
-       double   Amp(int Measure);
 
-       ReservedWords State(void) { return(prPolyState); }
+       ReservedWords PolyState(void) { return(prPolyState); }
 
     virtual
        int     Direction(int Direction, bool Contrarian=false);
@@ -74,8 +67,12 @@ protected:
        void     UpdatePoly(void);
 
        //--- Event methods
-       void     SetEvent(EventType Event)   { prEvents.SetEvent(Event); }   //-- sets the event condition
+       void     SetEvent(EventType Event)   { prEvents.SetEvent(Event); }    //-- sets the event condition
        void     ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }  //-- clears the event condition
+       
+       bool     NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
+       bool     NewDirection(int &Direction, int ChangeDirection, bool Update=true);
+
 
        //--- input parameters
        int      prDegree;            // degree of regression
@@ -98,187 +95,117 @@ protected:
        double   prPricePolyDev;
 
        int      prPolyDirection;
-       int      prPolyAmpDirection;
-       int      prTopBar;
-       int      prBottomBar;
+       int      prPolyTrendDir;
+       
+       double   prPolyBoundary;
+       
+       bool     prPolyCrest;
+       bool     prPolyTrough;
 
        ReservedWords prPolyState;
-
-
-       //--- Amplitude Measures
-       double   prAmpNow;             //--- Current amplitude (Head-Mean)
-       double   prAmpMean;
-       double   prAmpPositive;
-       double   prAmpNegative;
-       double   prAmpMax;
-       double   prAmpMaxMean;
-
-       int      prAmpDirection;
 
        //--- Poly deviation
        double   prRSquared;    
   };
 
-
 //+------------------------------------------------------------------+
-//| prCalcAmplitude - Compute Amplitude measures                     |
+//| NewDirection - Returns true if a direction has a legit change    |
 //+------------------------------------------------------------------+
-void CPolyRegression::prCalcPolyAmplitude(void)
+bool CPolyRegression::NewDirection(int &Direction, int ChangeDirection, bool Update=true)
   {
-    double negAmp       = 0.00;
-    double posAmp       = 0.00;
-    
-    int    posCnt       = 0;
-    int    negCnt       = 0;
-    int    ampCnt       = 0;
-    
-    prAmpNow        = NormalizeDouble(prPolyHead,Digits)-NormalizeDouble(prPolyMean,Digits);
-    prAmpMean       = 0.00;
-    prAmpMax        = (prPolyTop-prPolyBottom)/2;
-    prAmpMaxMean    = 0.00;
-    
-    for (int idx=0; idx<prPeriods; idx++)
-    {
-      if (NormalizeDouble(fabs(prData[idx]-prPolyMean),Digits)>0.00)
-      {
-        prAmpMean  += NormalizeDouble(fabs(prData[idx]-prPolyMean),Digits);
-        ampCnt++;
-     
-        if (prData[idx]-prPolyMean>0.00)
-        {
-          posAmp       += NormalizeDouble(prData[idx]-prPolyMean,Digits);
-          posCnt++;
-        }
-
-        if (prData[idx]-prPolyMean<0.00)
-        {
-          negAmp       += NormalizeDouble(prData[idx]-prPolyMean,Digits);
-          negCnt++;
-        }
-      }
-    }
-
-    prAmpMean       = fdiv(prAmpMean,ampCnt);
-    prAmpPositive   = fdiv(posAmp,posCnt);
-    prAmpNegative   = fdiv(negAmp,negCnt);      
-    prAmpMaxMean    = fdiv(prAmpPositive+fabs(prAmpNegative),2);
-        
-    //--- Set Amplitude direction
-    if (prPolyHead>prPolyMean)
-      prAmpDirection = DirectionUp;
+    if (ChangeDirection==DirectionNone)
+      return (false);
       
-    if (prPolyHead<prPolyMean)
-      prAmpDirection = DirectionDown;
+    //--- In this class, an invalid direction is always set with no change
+    if (Direction==DirectionNone)
+    {
+      Direction                    = ChangeDirection;
+      return (false);
+    }
+    
+    return (IsChanged(Direction,ChangeDirection,Update));
   }
-
-
+  
 //+------------------------------------------------------------------+
-//| prCalcPolyState - computes prPoly state                          |
+//| NewState - Returns true if state has a legit change              |
 //+------------------------------------------------------------------+
-void CPolyRegression::prCalcPolyState(void)
+bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true)
   {
-    //--- Handle Extremes
-    if (prTopBar == 0 || prBottomBar == 0)
+    if (ChangeState==NoState)
+      return (false);
+
+    if (ChangeState==Breakout)
+      if (State==Reversal)
+        return (false);
+
+    if (State==NoState)
+      State            = ChangeState;
+
+    if (IsChanged(State,ChangeState))
     {
-      prPolyState   = Max;
-      
-      if (prPolyDirection!=prPolyAmpDirection)
+      switch (State)
       {
-        if (prTopBar == 0)
-          if (prPolyDirection == DirectionDown)
-            prPolyState = Reversal;
-
-        if (prBottomBar == 0)
-          if (prPolyDirection == DirectionUp)
-            prPolyState = Reversal;
-      }  
+        case Reversal:    SetEvent(NewReversal);
+                          break;
+        case Breakout:    SetEvent(NewBreakout);
+                          break;
+        case Rally:       SetEvent(NewRally);
+                          break;
+        case Pullback:    SetEvent(NewPullback);
+                          break;
+        case Retrace:     SetEvent(NewRetrace);
+                          break;
+        case Crest:       SetEvent(NewCrest);
+                          break;
+        case Trough:      SetEvent(NewTrough);
+                          break;
+      }
+      
+      return (true);
     }
-    else
       
-    //--- Handle Uptrends
-    if (prTopBar<prBottomBar)
-    {
-      if (prPolyDirection == DirectionUp)
-      {
-        if (prPolyHead>prPolyMean)
-          if (Low[0]>prPolyMean)
-            prPolyState = Min;
-          else
-            prPolyState = Minor;
-
-        if (prPolyHead<prPolyMean)
-          if (High[0]>prPolyMean)
-            prPolyState = Minor;
-          else
-            prPolyState = Major;
-      }
-      
-      if (prPolyDirection == DirectionDown)
-      {
-        if (prPolyHead>prPolyMean)
-          if (Low[0]>prPolyMean)
-            if (High[0]>prPolyTop)
-              prPolyState = Min;
-            else
-              prPolyState = Minor;
-
-        if (prPolyHead<prPolyMean)
-          if (High[0]<prPolyMean)
-            prPolyState = Major;
-          else
-            prPolyState = Minor;
-            
-        if (Low[0]<prPolyBottom)
-          prPolyState = Major;
-      }
-    }
-    else
-    
-    //--- Handle Downtrends
-    if (prTopBar>prBottomBar)
-    {
-      if (prPolyDirection == DirectionDown)
-      {
-        if (prPolyHead<prPolyMean)
-          if (High[0]<prPolyMean)
-            prPolyState = Min;   
-          else
-            prPolyState = Minor;
-
-        if (prPolyHead>prPolyMean)
-          if (Low[0]<prPolyMean)
-            prPolyState = Minor;
-          else
-            prPolyState = Major;
-      }
-      
-      if (prPolyDirection == DirectionUp)
-      {
-        if (prPolyHead<prPolyMean)
-          if (High[0]<prPolyMean)
-            prPolyState = Min;
-          else
-            prPolyState = Minor;
-
-        if (prPolyHead>prPolyMean)
-          if (Low[0]>prPolyMean)
-            prPolyState = Major;
-          else
-            prPolyState = Minor;
-            
-        if (High[0]>prPolyTop)
-          prPolyState = Major;
-      }
-    }
+    return (false);
   }
 
 //+------------------------------------------------------------------+
-//| prCalcPoly - computes prPoly regression to x degree              |
+//| CalcPolyState - computes the current Poly state                  |
 //+------------------------------------------------------------------+
-void CPolyRegression::prCalcPoly(void)
+void CPolyRegression::CalcPolyState(void)
   {
-    int    cpPolyDirection = prPolyDirection;
+    ReservedWords cpState          = NoState;
     
+    if (Event(NewPoly))
+    {
+      if (IsChanged(prPolyCrest,false))
+        cpState                    = Pullback;
+
+      if (IsChanged(prPolyTrough,false))
+        cpState                    = Rally;
+    }
+    
+    if (Event(NewHigh))
+      if (Event(NewPolyBoundary))
+        if (IsChanged(prPolyCrest,true))
+          cpState                  = Crest;
+
+    if (Event(NewLow))
+      if (Event(NewPolyBoundary))
+        if (IsChanged(prPolyTrough,true))
+          cpState                  = Trough;
+
+    if (NewState(prPolyState,cpState))
+      SetEvent(NewPolyState);
+  }
+
+//+------------------------------------------------------------------+
+//| CalcPoly - computes polynomial regression to x degree            |
+//+------------------------------------------------------------------+
+void CPolyRegression::CalcPoly(void)
+  {
+    int    cpTopBar           = 0;
+    int    cpBottomBar        = 0;
+    int    cpTrendDir         = DirectionNone;
+
     double ai[10,10],b[10],x[10],sx[20];
     double sum; 
     double qq,mm,tt;
@@ -295,147 +222,156 @@ void CPolyRegression::prCalcPoly(void)
     sx[1]  = prPeriods+1;
     nn     = prDegree+1;
    
-     //----------------------sx-------------
-     for(mi=1;mi<=nn*2-2;mi++)
-     {
-       sum=0;
-       for(n=0;n<=prPeriods; n++)
-       {
-          sum+=MathPow(n ,mi);
-       }
-       sx[mi+1]=sum;
-     }  
+    //----------------------sx-------------
+    for(mi=1;mi<=nn*2-2;mi++)
+    {
+      sum=0;
+      for(n=0;n<=prPeriods; n++)
+      {
+         sum+=MathPow(n ,mi);
+      }
+      sx[mi+1]=sum;
+    }  
      
-     //----------------------syx-----------
-     ArrayInitialize(b,0.00);
-     for(mi=1;mi<=nn;mi++)
-     {
-       sum=0.00000;
-       for(n=0;n<=prPeriods;n++)
-       {
-          if(mi==1) 
-            sum += maData[n];
-          else 
-            sum += maData[n]*MathPow(n, mi-1);
-       }
-       b[mi]=sum;
-     } 
+    //----------------------syx-----------
+    ArrayInitialize(b,0.00);
+    for(mi=1;mi<=nn;mi++)
+    {
+      sum=0.00000;
+      for(n=0;n<=prPeriods;n++)
+      {
+         if(mi==1) 
+           sum += maData[n];
+         else 
+           sum += maData[n]*MathPow(n, mi-1);
+      }
+      b[mi]=sum;
+    } 
      
-     //===============Matrix================
-     ArrayInitialize(ai,0.00);
-     for(jj=1;jj<=nn;jj++)
-     {
-       for(ii=1; ii<=nn; ii++)
-       {
-          kk=ii+jj-1;
-          ai[ii,jj]=sx[kk];
-       }
-     }
+    //===============Matrix================
+    ArrayInitialize(ai,0.00);
+    for(jj=1;jj<=nn;jj++)
+    {
+      for(ii=1; ii<=nn; ii++)
+      {
+         kk=ii+jj-1;
+         ai[ii,jj]=sx[kk];
+      }
+    }
 
-     //===============Gauss=================
-     for(kk=1; kk<=nn-1; kk++)
-     {
-       ll=0;
-       mm=0;
-       for(ii=kk; ii<=nn; ii++)
-       {
-          if(MathAbs(ai[ii,kk])>mm)
-          {
-             mm=MathAbs(ai[ii,kk]);
-             ll=ii;
-          }
-       }
-       if (ll!=kk)
-       {
-          for(jj=1; jj<=nn; jj++)
-          {
-             tt=ai[kk,jj];
-             ai[kk,jj]=ai[ll,jj];
-             ai[ll,jj]=tt;
-          }
-          tt=b[kk];
-          b[kk]=b[ll];
-          b[ll]=tt;
-       }  
-       for(ii=kk+1;ii<=nn;ii++)
-       {
-          qq=ai[ii,kk]/ai[kk,kk];
-//          Print(DoubleToStr(ai[ii,kk])+" "+DoubleToStr(ai[kk,kk])+" "+DoubleToStr(qq)+" "+DoubleToStr(fdiv(ai[ii,kk],ai[kk,kk],32)));
-          for(jj=1;jj<=nn;jj++)
-          {
-             if(jj==kk) ai[ii,jj]=0;
-             else ai[ii,jj]=ai[ii,jj]-qq*ai[kk,jj];
-          }
-          b[ii]=b[ii]-qq*b[kk];
-       }
-     }  
-     x[nn]=b[nn]/ai[nn,nn];
-     for(ii=nn-1;ii>=1;ii--)
-     {
-       tt=0;
-       for(jj=1;jj<=nn-ii;jj++)
-       {
-          tt=tt+ai[ii,ii+jj]*x[ii+jj];
-          x[ii]=(1/ai[ii,ii])*(b[ii]-tt);
-       }
-     } 
-     //=====================================
+    //===============Gauss=================
+    for(kk=1; kk<=nn-1; kk++)
+    {
+      ll=0;
+      mm=0;
+      for(ii=kk; ii<=nn; ii++)
+      {
+         if(MathAbs(ai[ii,kk])>mm)
+         {
+            mm=MathAbs(ai[ii,kk]);
+            ll=ii;
+         }
+      }
+      if (ll!=kk)
+      {
+         for(jj=1; jj<=nn; jj++)
+         {
+            tt=ai[kk,jj];
+            ai[kk,jj]=ai[ll,jj];
+            ai[ll,jj]=tt;
+         }
+         tt=b[kk];
+         b[kk]=b[ll];
+         b[ll]=tt;
+      }  
+      for(ii=kk+1;ii<=nn;ii++)
+      {
+         qq=ai[ii,kk]/ai[kk,kk];
+         for(jj=1;jj<=nn;jj++)
+         {
+            if(jj==kk) ai[ii,jj]=0;
+            else ai[ii,jj]=ai[ii,jj]-qq*ai[kk,jj];
+         }
+         b[ii]=b[ii]-qq*b[kk];
+      }
+    }  
+    x[nn]=b[nn]/ai[nn,nn];
+    for(ii=nn-1;ii>=1;ii--)
+    {
+      tt=0;
+      for(jj=1;jj<=nn-ii;jj++)
+      {
+         tt=tt+ai[ii,ii+jj]*x[ii+jj];
+         x[ii]=(1/ai[ii,ii])*(b[ii]-tt);
+      }
+    } 
+    //=====================================
      
-     for(n=0;n<=prPeriods-1;n++)
-     {
-       sum=0;
-       for(kk=1;kk<=prDegree;kk++)
-       {
-          sum+=x[kk+1]*MathPow(n,kk);
-       }
-       mean_y += x[1]+sum;
+    for(n=0;n<=prPeriods-1;n++)
+    {
+      sum=0;
+      for(kk=1;kk<=prDegree;kk++)
+      {
+         sum+=x[kk+1]*MathPow(n,kk);
+      }
+      mean_y += x[1]+sum;
 
-       prData[n]=x[1]+sum;
-     }
+      prData[n]=x[1]+sum;
+    }
 
-     //--- Compute poly range data
-     mean_y = mean_y/prPeriods;
+    //--- Compute poly range data
+    mean_y = mean_y/prPeriods;
 
-     prPolyTop         = prData[0];
-     prPolyBottom      = prData[0];
+    prPolyTop         = prData[0];
+    prPolyBottom      = prData[0];
+
+    for (n=0;n<prPeriods;n++)
+    {
+      se_l           += pow(maData[n]-prData[n],2);
+      se_y           += pow(prData[n]-mean_y,2);
+      
+      if (IsChanged(prPolyTop,fmax(prPolyTop,prData[n])))
+        cpTopBar      = n;
+        
+      if (IsChanged(prPolyBottom,fmin(prPolyBottom,prData[n])))
+        cpBottomBar   = n;
+    }
+
+    prRSquared        = ((1-(se_l/se_y))*100);  //--- R^2 factor
+    prPolyMean        = fdiv(prPolyTop-prPolyBottom,2)+prPolyBottom;
+    prPolyHead        = prData[0];
+    prPolyTail        = prData[prPeriods-1];
+    prPricePolyDev    = maData[0]-prPolyHead;
      
-     prTopBar          = 0;
-     prBottomBar       = 0;
+    //-- Initialize trend direction (occurs once);
+    if (prPolyTrendDir==DirectionNone)
+      prPolyTrendDir    = Direction(cpBottomBar-cpTopBar);
 
-     for (n=0;n<prPeriods;n++)
-     {
-       se_l           += pow(maData[n]-prData[n],2);
-       se_y           += pow(prData[n]-mean_y,2);
-       
-       if (IsChanged(prPolyTop,fmax(prPolyTop,prData[n])))
-         prTopBar      = n;
-         
-       if (IsChanged(prPolyBottom,fmin(prPolyBottom,prData[n])))
-         prBottomBar   = n;
-     }
+    //-- Calculate changes in poly direction and boundary
+    if (IsEqual(prPolyHead,prPolyTop))
+    {
+      cpTrendDir        = DirectionUp;
+      
+      if (IsHigher(prPolyTop,prPolyBoundary))
+        SetEvent(NewPolyBoundary);
+    }
 
-     prRSquared        = ((1-(se_l/se_y))*100);  //--- R^2 factor
-     prPolyMean        = fdiv(prPolyTop-prPolyBottom,2)+prPolyBottom;
-     prPolyHead        = prData[0];
-     prPolyTail        = prData[prPeriods-1];
-     prPricePolyDev    = maData[0]-prPolyHead;
-     
-     if (prData[0]-prData[2]>0.00)
-       cpPolyDirection = DirectionUp;
-     else  
-     if (prData[0]-prData[2]<0.00)
-       cpPolyDirection = DirectionDown;
-     else
-       cpPolyDirection = DirectionNone;
-       
-     if (IsChanged(prPolyDirection,cpPolyDirection))
-     {
-       if (prTopBar<prBottomBar)
-         prPolyAmpDirection = DirectionUp;
+    if (IsEqual(prPolyHead,prPolyBottom))
+    {
+      cpTrendDir        = DirectionDown;
 
-       if (prTopBar>prBottomBar)
-         prPolyAmpDirection = DirectionDown;
-     }
+      if (IsLower(prPolyBottom,prPolyBoundary))
+        SetEvent(NewPolyBoundary);
+    }
+    
+    if (NewDirection(prPolyTrendDir,cpTrendDir))
+    {
+      prPolyBoundary    = BoolToDouble(cpTrendDir==DirectionUp,prPolyTop,prPolyBottom);
+      SetEvent(NewPolyTrend);
+    }
+    
+    if (NewDirection(prPolyDirection,Direction(prData[0]-prData[2])))
+      SetEvent(NewPoly);
   }
 
 
@@ -446,6 +382,12 @@ void CPolyRegression::CalcMA(void)
   {
     double agg  = 0.00;
     
+    if (IsHigher(Close[0],maTop))
+      SetEvent(NewHigh);
+      
+    if (IsLower(Close[0],maBottom))
+      SetEvent(NewLow);
+      
     maTop       = 0.00;
     maBottom    = 999.99;
     maMean      = 0.00;
@@ -489,8 +431,16 @@ void CPolyRegression::SetPeriods(int Periods)
 //+------------------------------------------------------------------+
 CPolyRegression::CPolyRegression(int Degree, int Periods, int MAPeriods)
   {
-    prEvents    = new CEvent();
+    prEvents             = new CEvent();
     
+    prPolyState          = NoState;
+    
+    prPolyDirection      = DirectionNone;
+    prPolyTrendDir       = DirectionNone;
+    
+    prPolyCrest          = false;
+    prPolyTrough         = false;
+
     SetDegree(Degree);
     SetPeriods(Periods);
     SetMAPeriods(MAPeriods); 
@@ -517,9 +467,8 @@ int CPolyRegression::Direction(int Type, bool Contrarian=false)
 
     switch (Type)
     {
-      case PolyAmplitude: return (prPolyAmpDirection*dContrary);
+      case PolyTrend:     return (prPolyTrendDir*dContrary);
       case Polyline:      return (prPolyDirection*dContrary);
-      case Amplitude:     return (prAmpDirection*dContrary);
     }
     
     return (DirectionNone);
@@ -564,35 +513,18 @@ double CPolyRegression::Poly(int Measure)
   }
   
 //+------------------------------------------------------------------+
-//| Amp - Returns the requested Amplitude measure                    |
-//+------------------------------------------------------------------+
-double CPolyRegression::Amp(int Measure)
-  {
-    switch (Measure)
-    {    
-       case Now:        return (NormalizeDouble(prAmpNow,Digits));
-       case Mean:       return (NormalizeDouble(prAmpMean,Digits));
-       case Positive:   return (NormalizeDouble(prAmpPositive,Digits));
-       case Negative:   return (NormalizeDouble(prAmpNegative,Digits));
-       case Max:        return (NormalizeDouble(prAmpMax,Digits));
-       case MaxMean:    return (NormalizeDouble(prAmpMaxMean,Digits));
-    }
-    
-    return (NoValue);
-  }
-  
-//+------------------------------------------------------------------+
 //| Update - Public interface to populate metrics                    |
 //+------------------------------------------------------------------+
 void CPolyRegression::UpdatePoly(void)
   {    
     if (Bars > prPeriods)
     {
+      prEvents.ClearEvents();
+      
       CalcMA();
 
-      prCalcPoly();
-      prCalcPolyState();
-      prCalcPolyAmplitude();
+      CalcPoly();
+      CalcPolyState();
     }
   }
   

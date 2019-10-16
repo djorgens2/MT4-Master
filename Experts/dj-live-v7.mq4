@@ -60,6 +60,7 @@ input int       inpGMTOffset            = 0;     // GMT Offset
   //--- Display operationals
   string              rsShow              = "APP";
   bool                PauseOn             = true;
+  bool                LoggingOn           = true;
   bool                Alerts[EventTypes];
   
   //--- Session operationals
@@ -73,9 +74,12 @@ input int       inpGMTOffset            = 0;     // GMT Offset
 //+------------------------------------------------------------------+
 void CallPause(string Message)
   {
+    static string cpMessage   = "";
     if (PauseOn)
-      Pause(Message,AccountCompany()+" "+Symbol()+" Event Trapper");
-    else
+      if (IsChanged(cpMessage,Message))
+        Pause(Message,AccountCompany()+" Event Trapper");
+
+    if (LoggingOn)
       Print(Message);
   }
   
@@ -120,11 +124,13 @@ void RefreshScreen(void)
     if (rsShow=="FRACTAL")
       fractal.RefreshScreen();
 
+    if (rsShow=="PIPMA")
+      pfractal.RefreshScreen();
+
     if (rsShow=="DAILY")
       session[Daily].RefreshScreen();
       
     sEvent.ClearEvents();
-
 
     for (SessionType show=Daily;show<SessionTypes;show++)
       if (sRec[show].Alerts)
@@ -133,8 +139,14 @@ void RefreshScreen(void)
             sEvent.SetEvent(type);
        
     if (sEvent.ActiveEvent())
-      CallPause(sEvent.ActiveEventText());
+    {
+      rsComment             = "Processed "+sEvent.ActiveEventText(true)+"\n";
+    
+      for (SessionType show=Daily;show<SessionTypes;show++)
+        Append(rsComment,EnumToString(show)+" "+session[show].ActiveEventText(false)+"\n","\n");
       
+      CallPause(rsComment);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -176,7 +188,8 @@ void SetOrderAction(SessionType Type)
     if (NewDirection(sRec[Type].FractalDir,session[Type].Fractal(ftTerm).Direction))
       sRec[Type].Reversal    = true;
       
-    OrderTrigger                 = true;
+    OrderTrigger             = true;
+//    PauseOn                  = true;
   }
 
 //+------------------------------------------------------------------+
@@ -276,11 +289,15 @@ void CheckFractalEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| CheckPipMAEvents - Check events when activated by order event    |
+//| CheckOrderEvents - Check events when activated by order event    |
 //+------------------------------------------------------------------+
-void CheckPipMAEvents(void)
+void CheckOrderEvents(void)
   {
-    UpdateLabel("lbTrigger","Trigger open",clrYellow);
+    if (IsChanged(OrderTrigger,true))
+      UpdateLabel("lbTrigger","Trigger open",clrYellow);
+      
+    if (pfractal.ActiveEvent())
+      CallPause("PipMA "+pfractal.ActiveEventText());
   }
 
 //+------------------------------------------------------------------+
@@ -295,7 +312,7 @@ void Execute(void)
     CheckFractalEvents();
 
     if (OrderTrigger)
-      CheckPipMAEvents();
+      CheckOrderEvents();
 
   }
 
@@ -330,6 +347,14 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="PLAY")
       PauseOn                     = false;
     
+    if (Command[0]=="LOG")
+    {
+      if (Command[1]=="ON")
+        LoggingOn                 = true;
+
+      if (Command[1]=="OFF")
+        LoggingOn                 = false;
+    }
     if (Command[0]=="SHOW")
       rsShow                      = Command[1];
 

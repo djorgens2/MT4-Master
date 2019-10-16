@@ -69,7 +69,8 @@ public:
              
              bool          Event(EventType Type)            {return (sEvent[Type]);}
              bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
-             string        ActiveEventText(void)            {return (sEvent.ActiveEventText());};
+             string        ActiveEventText(const bool WithHeader=true)
+                                                            {return (sEvent.ActiveEventText(WithHeader));};
              
              datetime      ServerTime(int Bar=0);
              

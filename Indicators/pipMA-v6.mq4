@@ -132,12 +132,12 @@ void RefreshScreen()
     UpdateLabel("lrPricePolyDev",NegLPad(pfractal.Poly(Deviation),1),DirColor(pfractal.Direction(Polyline)));
     UpdateLabel("lrPolyTrendDev",NegLPad(pfractal.Trendline(Deviation),1),DirColor(pfractal.Direction(Polyline)));
     
-    UpdateLabel("lrFOCAmpDirection",pfractal.Text(InDirection),DirColor(pfractal.FOCDirection()));
-    UpdateLabel("lrFOCState",pfractal.Text(InState),DirColor(pfractal.FOCDirection()));
+    UpdateLabel("lrPolyState",EnumToString(pfractal.PolyState()),BoolToInt(pfractal.PolyState()==Crest||pfractal.PolyState()==Trough,clrYellow,DirColor(pfractal.Direction(Polyline))));
+    UpdateLabel("lrFOCState",EnumToString(pfractal.TrendState()),DirColor(pfractal.FOCDirection()));
     
-    UpdateLabel("lrAmpData","Amp: "+DoubleToStr(pfractal.FOCAmp(Now),1)
-               +" x:"+DoubleToStr(pfractal.FOCAmp(Max),1)
-               +" p:"+DoubleToStr(pfractal.FOCAmp(Peak),1),DirColor(pfractal.Direction(FOCAmplitude)),10);
+//    UpdateLabel("lrAmpData","Amp: "+DoubleToStr(pfractal.FOCAmp(Now),1)
+//               +" x:"+DoubleToStr(pfractal.FOCAmp(Max),1)
+//               +" p:"+DoubleToStr(pfractal.FOCAmp(Peak),1),DirColor(pfractal.Direction(FOCAmplitude)),10);
                
     UpdateDirection("lrStdDevDir",pfractal.Direction(StdDev),DirColor(pfractal.Direction(StdDev)),10);
 
@@ -301,7 +301,7 @@ void InitScreenObjects()
     NewLabel("lrFOC13","Low",270,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC14","High",300,65,clrWhite,SCREEN_UL,IndWinId);
 
-    NewLabel("lrFOCAmpDirection","",15,78,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrPolyState","",15,78,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCState","",85,78,clrNONE,SCREEN_UL,IndWinId);
     
     //--- Fibo labels

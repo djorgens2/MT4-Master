@@ -12,15 +12,6 @@
 
 
 //--- pipma state defs
-#define  SevereContraction   -4
-#define  ActiveContraction   -3
-#define  Contracting         -2
-#define  IdleContraction     -1
-#define  Idle                 0
-#define  IdleExpansion        1
-#define  Expanding            2
-#define  ActiveExpansion      3
-#define  SevereExpansion      4
 
 
 //+------------------------------------------------------------------+
@@ -29,13 +20,19 @@
 class CPipRegression : public CTrendRegression
   {
 
-private:
-
-       bool     CalcDirection(double Last, double Current, int &Direction);
-       int      CalcState(double Last, double Current);
-        
-
 public:
+       enum     RangeStateType
+                {
+                   SevereContraction   = -4,
+                   ActiveContraction   = -3,
+                   Contracting         = -2,
+                   IdleContraction     = -1,
+                   Idle                =  0,
+                   IdleExpansion       =  1,
+                   Expanding           =  2,
+                   ActiveExpansion     =  3,
+                   SevereExpansion     =  4
+                };
 
                 CPipRegression(int Degree, int Periods, double Tolerance, int IdleTime);
                ~CPipRegression();                     
@@ -48,9 +45,11 @@ public:
        
     void        SetMarketIdleTime(int IdleTime) {ptrMarketIdleTime = IdleTime;};
 
+    
+    RangeStateType TrendState(void) {return (ptrRangeState);};
+    
     virtual
        int      Direction(int Direction, bool Contrarian=false);
-       string   Text(int Type);
        int      Age(int Measure);
        double   Range(int Measure);
        bool     HistoryLoaded(void) {return (pipHistory.Count == prPeriods+prDegree); }
@@ -77,11 +76,16 @@ protected:
        double   ptrPriceLow;
        double   ptrPriceMid;
               
-       int      ptrRangeState;
+       RangeStateType  ptrRangeState;
+
        int      ptrRangeDir;
        int      ptrRangeDirHigh;
        int      ptrRangeDirLow;
         
+private:
+
+       bool             CalcDirection(double Last, double Current, int &Direction);
+       RangeStateType   CalcState(double Last, double Current);        
   };
 
 
@@ -107,7 +111,7 @@ bool CPipRegression::CalcDirection(double Last, double Current, int &Direction)
 //+------------------------------------------------------------------+
 //| CalcState - Analyzes range data and computes state               |
 //+------------------------------------------------------------------+
-int CPipRegression::CalcState(double Last, double Current)
+RangeStateType CPipRegression::CalcState(double Last, double Current)
   {
     const int Severe           = 4;
     int       State            = 0;
@@ -319,9 +323,8 @@ int CPipRegression::Direction(int Type, bool Contrarian=false)
 
     switch (Type)
     {
-      case PolyAmplitude: return (prPolyAmpDirection*dContrary);
+      case PolyTrend:     return (prPolyTrendDir*dContrary);
       case Polyline:      return (prPolyDirection*dContrary);
-      case Amplitude:     return (prAmpDirection*dContrary);
       case Trendline:     return (trTrendlineDir*dContrary);
       case Pivot:         return (trPivotDir*dContrary);
       case StdDev:        return (trStdDevDir*dContrary);
@@ -383,41 +386,3 @@ void CPipRegression::Update(void)
       CalcMA();
 
   }
-  
-//+------------------------------------------------------------------+
-//| Text - translates supplied type code to text                     |
-//+------------------------------------------------------------------+
-string CPipRegression::Text(int Type)
-{
-  if (Type == InState)
-    switch (ptrRangeState)
-    {
-      case SevereContraction:   return("Severe Contraction");
-      case ActiveContraction:   return("Active Contraction");
-      case Contracting:         return("Contracting");
-      case IdleContraction:     return("Idle Contraction");
-      case Idle:                return("Idle");
-      case IdleExpansion:       return("Idle Expansion");
-      case Expanding:           return("Expanding");
-      case ActiveExpansion:     return("Active Expansion");
-      case SevereExpansion:     return("Severe Expansion");
-      default:                  return("Bad State Code");
-    }
-  
-  if (Type == InDirection)
-    switch (trFOCAmpDir)
-    {
-      case ShortCorrection:     return("Correction(S)");
-      case ShortReversal:       return("Reversal(S)");
-      case MarketPullback:      return("Pullback");
-      case DirectionDown:       return("Short");
-      case DirectionNone:       return("None");
-      case DirectionUp:         return("Long");
-      case MarketRally:         return("Rally");
-      case LongReversal:        return("Reversal(L)");
-      case LongCorrection:      return("Correction(L)");
-      default:                  return("Bad Direction Code");
-    }
-    
-  return ("Bad text type");
-}

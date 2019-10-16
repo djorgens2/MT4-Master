@@ -559,9 +559,8 @@ int CPipFractal::Direction(int Type=Term, bool Contrarian=false)
       case Origin:        return (pfOriginDir*dContrary);
       case Trend:       
       case Term:          return (pf[Type].Direction*dContrary);
-      case PolyAmplitude: return (prPolyAmpDirection*dContrary);      
+      case PolyTrend:     return (prPolyTrendDir*dContrary);
       case Polyline:      return (prPolyDirection*dContrary);
-      case Amplitude:     return (prAmpDirection*dContrary);
       case Trendline:     return (trTrendlineDir*dContrary);
       case Pivot:         return (trPivotDir*dContrary);
       case StdDev:        return (trStdDevDir*dContrary);
@@ -632,6 +631,7 @@ void CPipFractal::RefreshScreen(void)
            +"  FOC: "+DirText(FOCDirection(trTrendlineTolerance))+" "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)
            +"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"/"+DoubleToStr(Pip(Pivot(Max)),1)
            +"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
+           +"  Poly: "+EnumToString(prPolyState)+"  ("+DirText(Direction(Polyline))+"/"+DirText(Direction(PolyTrend))+")\n"
            +"  Std Dev: "+DoubleToStr(Pip(StdDev(Now)),1)
                +" x:"+DoubleToStr(fmax(Pip(StdDev(Positive)),fabs(Pip(StdDev(Negative)))),1)
                +" p:"+DoubleToStr(Pip(StdDev()),1)
@@ -648,6 +648,7 @@ void CPipFractal::RefreshScreen(void)
            +"  Origin: "+DirText(Direction(Origin))+"\n"
            +"     Base: "+DoubleToStr(this.Price(Origin,Base),Digits)+" Root: "+DoubleToStr(this.Price(Origin,Root),Digits)+" Expansion: "+DoubleToStr(this.Price(Origin,Expansion),Digits)+"\n"       
            +"     Retrace: "+DoubleToStr(Fibonacci(Origin,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
-           +"   Expansion: "+DoubleToStr(Fibonacci(Origin,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Expansion,Max,InPercent),1)+"%\n");
+           +"   Expansion: "+DoubleToStr(Fibonacci(Origin,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Origin,Expansion,Max,InPercent),1)+"%\n"
+           +"\nPipMA Active "+ActiveEventText());
   }
 

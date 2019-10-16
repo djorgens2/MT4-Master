@@ -101,17 +101,28 @@ void RefreshScreen(void)
 
     switch (pregrlt.State())
     {
-      case Max:      rsLTStyle = STYLE_SOLID;
+      case Rally:  
+      case Pullback: rsLTStyle = STYLE_DOT;
                      break;
-      case Min:      rsLTStyle = STYLE_DOT;
-                     break;
-      case Minor:    rsLTStyle = STYLE_DASHDOTDOT;
-                     break;
-      case Major:    rsLTStyle = STYLE_SOLID;
+      case Breakout: rsLTStyle = STYLE_SOLID;
                      break;
       case Reversal: rsLTWidth = 2;
                      rsLTColor = clrYellow;
     }
+    
+    if (pregrlt.Event(NewRally))
+      NewArrow(SYMBOL_DASH,clrYellow,TimeToStr(Time[0])+":Rally",Close[0]);
+
+    if (pregrlt.Event(NewPullback))
+      NewArrow(SYMBOL_DASH,clrRed,TimeToStr(Time[0])+":Pullback",Close[0]);
+
+    if (pregrlt.Event(NewBreakout))
+      NewArrow(BoolToInt(pregrlt.Direction(PolyTrend)==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+        BoolToInt(pregrlt.Direction(PolyTrend)==DirectionUp,clrYellow,clrRed),TimeToStr(Time[0])+":Breakout",Close[0]);
+
+    if (pregrlt.Event(NewReversal))
+      NewArrow(BoolToInt(pregrlt.Direction(PolyTrend)==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),
+        clrGoldenrod,TimeToStr(Time[0])+":Breakout",Close[0]);
 
     SetIndexStyle(0,DRAW_SECTION,STYLE_DOT,1,clrGray);
     SetIndexStyle(1,DRAW_SECTION,STYLE_SOLID,1,rsMTColor);
@@ -125,11 +136,11 @@ void RefreshScreen(void)
     UpdateLine("prPolyMeanMT",pregrmt.Poly(Mean),STYLE_SOLID,rsMTColor);
     UpdateLine("prPolyMeanLT",pregrlt.Poly(Mean),rsLTStyle,rsLTColor);
 
-    UpdateDirection("prAmpDirection",pregrlt.Direction(PolyAmplitude),DirColor(pregrlt.Direction(PolyAmplitude)),24);
+    UpdateDirection("prPolyTrend",pregrlt.Direction(PolyTrend),DirColor(pregrlt.Direction(PolyTrend)),24);
     UpdateLabel("prDeviation",NegLPad(pregrlt.Poly(Deviation),1),DirColor(dir(pregrlt.Poly(Deviation))),16);
 
     UpdateLabel("prMARange",DoubleToStr(Pip(rsPolyTop-rsPolyBottom),1),DirColor(dir(pregrlt.Poly(Deviation))),16);
-    UpdateLabel("prPolyState",proper(DirText(pregrlt.Direction(PolyAmplitude)))+" ("+EnumToString(pregrlt.State())+")",rsLTColor,12);
+    UpdateLabel("prPolyState",proper(DirText(pregrlt.Direction(PolyTrend)))+" ("+EnumToString(pregrlt.State())+")",rsLTColor,12);
     UpdateLabel("prTrendState",BoolToStr(rsState!=Tick,EnumToString(rsState)),rsLTColor,12);
 
     UpdateLabel("prSTStrength",DoubleToStr(pregrst.Poly(Strength)*100,1),StrengthColor(pregrst.Poly(Strength)),16);
@@ -197,7 +208,7 @@ int OnInit()
     NewLabel("pr21","Short",180,54,clrWhite,SCREEN_UL,indWinId);
     NewLabel("pr22","Mid",235,54,clrWhite,SCREEN_UL,indWinId);
     NewLabel("pr23","Long",290,54,clrWhite,SCREEN_UL,indWinId);
-    NewLabel("prAmpDirection","",70,31,clrGray,SCREEN_UL,indWinId);
+    NewLabel("prPolyTrend","",70,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prDeviation","",10,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prMARange","",110,31,clrGray,SCREEN_UL,indWinId);
     NewLabel("prPolyState","",5,5,clrGray,SCREEN_UR,indWinId);
