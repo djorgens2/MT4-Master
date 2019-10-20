@@ -54,6 +54,8 @@ protected:
                   NewTrap,
                   NewCrest,
                   NewTrough,
+                  NewStrategy,
+                  NewOutOfBounds,
                   MarketCorrection,
                   MarketIdle,
                   MarketResume,

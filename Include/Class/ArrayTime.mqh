@@ -17,8 +17,7 @@ class CArrayDouble : public CArray
   {
 private:
 
-   double            dblArray[];
-   int               arrPrecision;    
+   datetime          dtArray[];
 
    //--- properties
    double            adAverage;
@@ -26,17 +25,9 @@ private:
    double            adMax;
    double            adMid;
    double            adRange;
-   double            adSum;
-   double            adSumNeg;
-   double            adSumPos;
-   double            adCountNeg;
-   double            adCountPos;
-   double            adCountZero;
-   double            adMeanNonZero;
-   double            adMeanNeg;
-   double            adMeanPos;
-   double            adMeanAbs;
-   double            adMeanAbsMid;
+   double            adTotal;
+   double            adBegin;
+   double            adEnd;
 
 public:
                      CArrayDouble(const int elements);

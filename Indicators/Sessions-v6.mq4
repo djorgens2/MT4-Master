@@ -66,12 +66,12 @@ const color          AsiaColor          = C'0,32,0';       // Asia session box c
 const color          EuropeColor        = C'48,0,0';       // Europe session box color
 const color          USColor            = C'0,0,56';       // US session box color
 const color          DailyColor         = C'64,64,0';      // Daily session box color;
+const color          ForecastColor      = clrIndigo;       // Daily session box color;
 
 CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset);
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
-const int            sessionEOD         = 23;               // Session End-of-Day hour
 
 datetime             sessionOpenTime;
 double               sessionHigh;
@@ -100,16 +100,24 @@ color SessionColor(void)
 //+------------------------------------------------------------------+
 void CreateRange(int Bar=0)
  {
-   string crRangeId;
+   static string crLastRange   = TimeToStr(session.ServerTime(Bars-1),TIME_DATE);
+   string        crRangeId;
    
-   if (sessionOpen)
-     return;
-   else
+   if (IsChanged(crLastRange,TimeToStr(session.ServerTime(Bar),TIME_DATE)))
+     sessionOpen               = false;
+     
+   if (IsChanged(sessionOpen,true))
    {
      crRangeId          = EnumToString(inpType)+IntegerToString(++sessionRange);
+
+     if (session.Type()==Daily)
+     {
+       ObjectSet("boxForecast",OBJPROP_PRICE1,sessionHigh);
+       ObjectSet("boxForecast",OBJPROP_PRICE2,sessionLow);
+       ObjectSet("boxForecast",OBJPROP_TIME1,Time[Bar]);
+       ObjectSet("boxForecast",OBJPROP_TIME2,Time[Bar]+(PERIOD_D1*60));
+     }
      
-     sessionOpen        = true;
-   
      sessionOpenTime    = Time[Bar];
      sessionHigh        = High[Bar];
      sessionLow         = Low[Bar];
@@ -118,7 +126,7 @@ void CreateRange(int Bar=0)
    
      ObjectSet(crRangeId, OBJPROP_STYLE, STYLE_SOLID);
      ObjectSet(crRangeId, OBJPROP_COLOR, SessionColor());
-     ObjectSet(crRangeId, OBJPROP_BACK, true);
+     ObjectSet(crRangeId, OBJPROP_BACK, true);     
    }
  }
 
@@ -129,9 +137,6 @@ void UpdateRange(int Bar=0)
  {
    string urRangeId       = EnumToString(inpType)+IntegerToString(sessionRange);
 
-   if (TimeHour(session.ServerTime(Bar))==sessionEOD)
-     sessionOpen          = false;
-     
    if (TimeHour(session.ServerTime(Bar))==inpHourClose)
    {
      if (sessionOpen)
@@ -185,6 +190,13 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_High",session.Fractal(show).High,STYLE_DOT,clrForestGreen);
 //      UpdateLine("lnS_PriorLow",session.Fractal(ftPrior).Support,STYLE_DOT,clrFireBrick);
 //      UpdateLine("lnS_PriorHigh",session.Fractal(ftPrior).Resistance,STYLE_DOT,clrForestGreen);
+
+      //PeriodType show=ActiveSession;
+      //UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
+      //UpdateLine("lnS_Support",session[show].Support,STYLE_SOLID,clrRed);
+      //UpdateLine("lnS_Resistance",session[show].Resistance,STYLE_SOLID,clrLawnGreen);
+      //UpdateLine("lnS_Low",session[show].Low,STYLE_DOT,clrFireBrick);
+      //UpdateLine("lnS_High",session[show].High,STYLE_DOT,clrForestGreen);
     }
 
     if (inpShowOriginLines==Yes)
@@ -287,7 +299,25 @@ int OnInit()
 
     DeleteRanges();
 
-    for (int bar=Bars-24;bar>0;bar--)
+//    if (session.Type()==Daily)
+    {
+      int    startBar          = 0;
+      string startTime         = TimeToStr(session.ServerTime(),TIME_DATE);
+    
+      while (TimeToStr(Time[startBar+1],TIME_DATE)==startTime) startBar++;
+    
+      ObjectCreate("boxForecast",OBJ_RECTANGLE,0,
+        Time[startBar],
+        High[iHighest(Symbol(),Period(),MODE_HIGH,23,1)],
+        Time[startBar]+(PERIOD_D1*60),
+        Low[iLowest(Symbol(),Period(),MODE_LOW,23,1)]);
+   
+      ObjectSet("boxForecast", OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSet("boxForecast", OBJPROP_COLOR, ForecastColor);
+      ObjectSet("boxForecast", OBJPROP_BACK, true);
+    }
+
+    for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);
       
     if (Period()<PERIOD_D1)
@@ -314,6 +344,7 @@ void OnDeinit(const int reason)
     ObjectDelete("lnS_PriorBottom");
     ObjectDelete("lnS_Top");
     ObjectDelete("lnS_Bottom");
+    ObjectDelete("boxForecast");
     
     
     ObjectDelete("lbActiveBrkDir"+sessionIndex);

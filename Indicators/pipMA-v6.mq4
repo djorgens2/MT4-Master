@@ -134,11 +134,7 @@ void RefreshScreen()
     
     UpdateLabel("lrPolyState",EnumToString(pfractal.PolyState()),BoolToInt(pfractal.PolyState()==Crest||pfractal.PolyState()==Trough,clrYellow,DirColor(pfractal.Direction(Polyline))));
     UpdateLabel("lrFOCState",EnumToString(pfractal.TrendState()),DirColor(pfractal.FOCDirection()));
-    
-//    UpdateLabel("lrAmpData","Amp: "+DoubleToStr(pfractal.FOCAmp(Now),1)
-//               +" x:"+DoubleToStr(pfractal.FOCAmp(Max),1)
-//               +" p:"+DoubleToStr(pfractal.FOCAmp(Peak),1),DirColor(pfractal.Direction(FOCAmplitude)),10);
-               
+                   
     UpdateDirection("lrStdDevDir",pfractal.Direction(StdDev),DirColor(pfractal.Direction(StdDev)),10);
 
     UpdateLabel("lrStdDevData","Std Dev: "+DoubleToStr(Pip(pfractal.StdDev(Now)),1)
@@ -359,7 +355,6 @@ void InitScreenObjects()
         NewLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p","0.00000",90+(fperiod*80),230+(ftype*12),clrDarkGray,SCREEN_UL,IndWinId);
         
     //--- Amplitude/Standard Deviation labels
-    NewLabel("lrAmpData","",5,18,clrLightGray,SCREEN_LL,IndWinId);
     NewLabel("lrStdDevData","",15,5,clrLightGray,SCREEN_LL,IndWinId);
     NewLabel("lrStdDevDir","",5,5,clrLightGray,SCREEN_LL,IndWinId);
 

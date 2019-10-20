@@ -279,7 +279,7 @@ CPipRegression::CPipRegression(int Degree, int Periods, double Tolerance, int Id
     pipHistory = new CArrayDouble(Degree+Periods);    
     pipHistory.Truncate  = true;
 
-    pipHistory.SetAutoCompute(true,0,Periods);
+    pipHistory.SetAutoCompute(true);
     pipHistory.SetPrecision(Digits);
     
     ptrTick              = 0;

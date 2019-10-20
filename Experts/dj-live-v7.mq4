@@ -14,60 +14,84 @@
 #include <Class\PipFractal.mqh>
 
   
-input string    fractalHeader           = "";    //+------ Fractal Options ---------+
-input int       inpRangeMin             = 60;    // Minimum fractal pip range
-input int       inpRangeMax             = 120;   // Maximum fractal pip range
-input int       inpPeriodsLT            = 240;   // Long term regression periods
+input string    fractalHeader        = "";    //+------ Fractal Options ---------+
+input int       inpRangeMin          = 60;    // Minimum fractal pip range
+input int       inpRangeMax          = 120;   // Maximum fractal pip range
+input int       inpPeriodsLT         = 240;   // Long term regression periods
 
-input string    RegressionHeader        = "";    //+------ Regression Options ------+
-input int       inpDegree               = 6;     // Degree of poly regression
-input int       inpSmoothFactor         = 3;     // MA Smoothing factor
-input double    inpTolerance            = 0.5;   // Directional sensitivity
-input int       inpPipPeriods           = 200;   // Trade analysis periods (PipMA)
-input int       inpRegrPeriods          = 24;    // Trend analysis periods (RegrMA)
+input string    RegressionHeader     = "";    //+------ Regression Options ------+
+input int       inpDegree            = 6;     // Degree of poly regression
+input int       inpSmoothFactor      = 3;     // MA Smoothing factor
+input double    inpTolerance         = 0.5;   // Directional sensitivity
+input int       inpPipPeriods        = 200;   // Trade analysis periods (PipMA)
+input int       inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
 
-input string    SessionHeader           = "";    //+---- Session Hours -------+
-input int       inpAsiaOpen             = 1;     // Asian market open hour
-input int       inpAsiaClose            = 10;    // Asian market close hour
-input int       inpEuropeOpen           = 8;     // Europe market open hour
-input int       inpEuropeClose          = 18;    // Europe market close hour
-input int       inpUSOpen               = 14;    // US market open hour
-input int       inpUSClose              = 23;    // US market close hour
-input int       inpGMTOffset            = 0;     // GMT Offset
+input string    SessionHeader        = "";    //+---- Session Hours -------+
+input int       inpAsiaOpen          = 1;     // Asian market open hour
+input int       inpAsiaClose         = 10;    // Asian market close hour
+input int       inpEuropeOpen        = 8;     // Europe market open hour
+input int       inpEuropeClose       = 18;    // Europe market close hour
+input int       inpUSOpen            = 14;    // US market open hour
+input int       inpUSClose           = 23;    // US market close hour
+input int       inpGMTOffset         = 0;     // GMT Offset
 
   //--- Class Objects
   CSession           *session[SessionTypes];
   CSession           *lead;
-  CFractal           *fractal             = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal            = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
-  CEvent             *sEvent              = new CEvent();
-  CEvent             *fEvent              = new CEvent();
+  CFractal           *fractal        = new CFractal(inpRangeMax,inpRangeMin);
+  CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
+  CEvent             *sEvent         = new CEvent();
+  CEvent             *fEvent         = new CEvent();
+  CEvent             *toEvent        = new CEvent();
   
+  //--- App enums
+  enum                StrategyType
+                      {
+                        NoStrategy,
+                        Build,
+                        Hold,
+                        Release,
+                        Scalp,
+                        Halt
+                      };
+                      
   //--- Collection Objects
   struct              SessionDetail 
-                          {
-                            int  OpenDir;
-                            int  ActiveDir;
-                            int  OpenBias;
-                            int  ActiveBias;
-                            int  FractalDir;
-                            bool IsValid;
-                            bool Reversal;
-                            bool Alerts;
-                          };
+                      {
+                        int            OpenDir;
+                        int            ActiveDir;
+                        int            OpenBias;
+                        int            ActiveBias;
+                        int            FractalDir;
+                        StrategyType   Strategy[2];
+                        double         Entry[2];
+                        double         Profit[2];
+                        double         Risk[2];
+                        int            NewFractalCnt;
+                        bool           NewFractal;
+                        bool           IsValid;
+                        bool           Reversal;
+                        bool           Alerts;
+                      };
 
 
   //--- Display operationals
   string              rsShow              = "APP";
   bool                PauseOn             = true;
-  bool                LoggingOn           = true;
+  bool                LoggingOn           = false;
   bool                Alerts[EventTypes];
   
   //--- Session operationals
-  SessionDetail       sRec[SessionTypes];
+  SessionDetail       detail[SessionTypes];
+  SessionDetail       history[SessionTypes];
   
   //--- Trade operationals
   bool                OrderTrigger         = false;
+  
+  double              toBoundaryPrice      = 0.00;
+  int                 toBoundaryDir        = DirectionNone;
+  
+  
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -112,10 +136,10 @@ void RefreshScreen(void)
       for (SessionType type=Daily;type<SessionTypes;type++)
         rsComment       += BoolToStr(lead.Type()==type,"-->")+EnumToString(type)
                            +BoolToStr(session[type].IsOpen()," ("+IntegerToString(session[type].SessionHour())+")"," Closed")
-                           +"\n  Direction (Open/Active): "+DirText(sRec[type].OpenDir)+"/"+DirText(sRec[type].ActiveDir)
-                           +"\n  Bias (Open/Active): "+ActionText(sRec[type].OpenBias)+"/"+ActionText(sRec[type].ActiveBias)
-                           +"\n  State: "+BoolToStr(sRec[type].IsValid,"OK","Invalid")
-                           +"  "+BoolToStr(sRec[type].Reversal,"Reversal",BoolToStr(sRec[type].FractalDir==DirectionNone,"",DirText(sRec[type].FractalDir)))
+                           +"\n  Direction (Open/Active): "+DirText(detail[type].OpenDir)+"/"+DirText(detail[type].ActiveDir)
+                           +"\n  Bias (Open/Active): "+ActionText(detail[type].OpenBias)+"/"+ActionText(detail[type].ActiveBias)
+                           +"\n  State: "+BoolToStr(detail[type].IsValid,"OK","Invalid")
+                           +"  "+BoolToStr(detail[type].Reversal,"Reversal",BoolToStr(detail[type].FractalDir==DirectionNone,"",DirText(detail[type].FractalDir)))
                            +"\n\n";
 
       Comment(rsComment);
@@ -125,7 +149,16 @@ void RefreshScreen(void)
       fractal.RefreshScreen();
 
     if (rsShow=="PIPMA")
-      pfractal.RefreshScreen();
+      if (pfractal.HistoryLoaded())
+        pfractal.RefreshScreen();
+        
+    for (EventType type=0;type<EventTypes;type++)
+      if (Alerts[type]&&pfractal.Event(type))
+      {
+        CallPause("PipMA "+pfractal.ActiveEventText());
+        break;
+      }
+
 
     if (rsShow=="DAILY")
       session[Daily].RefreshScreen();
@@ -133,11 +166,19 @@ void RefreshScreen(void)
     sEvent.ClearEvents();
 
     for (SessionType show=Daily;show<SessionTypes;show++)
-      if (sRec[show].Alerts)
+      if (detail[show].Alerts)
         for (EventType type=0;type<EventTypes;type++)
           if (Alerts[type]&&session[show].Event(type))
-            sEvent.SetEvent(type);
-       
+          {
+            if (session[show].Event(NewFractal))
+            {
+              if (!detail[show].NewFractal)
+                sEvent.SetEvent(type);
+            }
+            else
+              sEvent.SetEvent(type);
+          }
+
     if (sEvent.ActiveEvent())
     {
       rsComment             = "Processed "+sEvent.ActiveEventText(true)+"\n";
@@ -185,10 +226,7 @@ bool NewBias(int &Now, int New)
 //+------------------------------------------------------------------+
 void SetOrderAction(SessionType Type)
   {
-    if (NewDirection(sRec[Type].FractalDir,session[Type].Fractal(ftTerm).Direction))
-      sRec[Type].Reversal    = true;
-      
-    OrderTrigger             = true;
+    OrderTrigger                   = true;
 //    PauseOn                  = true;
   }
 
@@ -197,8 +235,71 @@ void SetOrderAction(SessionType Type)
 //+------------------------------------------------------------------+
 void ClearOrderAction(SessionType Type)
   {
-    OrderTrigger                 = false;
+    OrderTrigger                   = false;
     UpdateLabel("lbTrigger","Waiting",clrLightGray);    
+  }
+
+//+------------------------------------------------------------------+
+//| SetDailyAction - Prepare the daily strategy                      |
+//+------------------------------------------------------------------+
+void SetAsiaAction(void)
+  {
+    StrategyType saaStrategy      = NoStrategy;
+
+    if (session[Asia].Event(SessionOpen))
+    {}
+    else
+    if (session[Asia].IsOpen())
+    {}
+    else
+    {}
+  }
+
+//+------------------------------------------------------------------+
+//| SetDailyAction - Prepare the daily strategy                      |
+//+------------------------------------------------------------------+
+void SetDailyAction(void)
+  {
+    ArrayCopy(history,detail);
+    
+    //--- Update Session Detail
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      detail[type].FractalDir      = DirectionNone;
+      detail[type].NewFractalCnt   = 0;
+      detail[type].NewFractal      = false;
+      detail[type].Reversal        = false;      
+    }
+    
+//    if (IsHigher(session[Daily][OffSession].High,session[Daily][PriorSession].High,NoUpdate)
+//         || IsLower(session[Daily][OffSession].Low,session[Daily][PriorSession].Low,NoUpdate))
+//    {
+//      toEvent.SetEvent(OutOfBounds);
+//      
+//      if (NewDirection(toBoundaryDir,session[Daily].Fractal(ftTerm).Direction))
+//        toEvent.SetEvent(NewFractal);
+//
+//      toBoundaryPrice              = BoolToDouble(toBoundaryDir==DirectionUp,session[Daily].Fractal(ftTerm).High,session[Daily].Fractal(ftTerm).Low);
+//    }
+//    else
+//    {
+//      if (NewDirection(toBoundaryDir,session[Daily][PriorSession].Direction))
+//        toEvent.SetEvent(NewDirection);
+//
+//      toBoundaryPrice              = BoolToDouble(toBoundaryDir==DirectionUp,session[Daily][PriorSession].High,session[Daily][PriorSession].Low);
+//    };
+
+  }
+
+//+------------------------------------------------------------------+
+//| SetHourlyAction - sets session hold/hedge detail by type hourly  |
+//+------------------------------------------------------------------+
+void SetHourlyAction(void)
+  {
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      detail[type].NewFractal      = false;
+    }  
   }
 
 //+------------------------------------------------------------------+
@@ -206,51 +307,31 @@ void ClearOrderAction(SessionType Type)
 //+------------------------------------------------------------------+
 void SetOpenAction(SessionType Type)
   {
-    if (NewDirection(sRec[Type].OpenDir,Direction(session[Type].Pivot(OffSession)-session[Type].Pivot(PriorSession))))
+    if (NewDirection(detail[Type].OpenDir,Direction(session[Type].Pivot(OffSession)-session[Type].Pivot(PriorSession))))
       sEvent.SetEvent(NewDirection);
       
-    if (NewBias(sRec[Type].OpenBias,session[Type].Bias()))
+    if (NewBias(detail[Type].OpenBias,session[Type].Bias()))
       sEvent.SetEvent(NewTradeBias);
-  }
 
-//+------------------------------------------------------------------+
-//| SetActiveAction - sets the active hold/hedge parameters          |
-//+------------------------------------------------------------------+
-void SetActiveAction(SessionType Type)
-  {  
-    bool saaIsValid          = sRec[Type].IsValid;
-
-    sEvent.ClearEvents();
-    
-    if (NewDirection(sRec[Type].ActiveDir,Direction(session[Type].Pivot(ActiveSession)-session[Type].Pivot(PriorSession))))
-      sEvent.SetEvent(NewDirection);
-
-    if (NewBias(sRec[Type].ActiveBias,session[Type].Bias()))
-      sEvent.SetEvent(NewTradeBias);
-      
-    if (sRec[Type].ActiveDir==sRec[Type].OpenDir)
-      if (sRec[Type].ActiveBias==sRec[Type].OpenBias)
-        if (sRec[Type].ActiveDir==Direction(sRec[Type].ActiveBias,InAction))
-          saaIsValid         = true;
-
-    if (IsChanged(sRec[Type].IsValid,saaIsValid))
+    switch (Type)
     {
-      if (Alerts[MarketCorrection])
-        CallPause(EnumToString(session[Type].Type())+":Market Correction to "+BoolToStr(saaIsValid,"OK","Invalid"));
-        
-      sEvent.SetEvent(MarketCorrection);
+      case Daily:   SetDailyAction();
+                    break;
+      case Asia:    SetAsiaAction();
+                    break;
     }
   }
 
 //+------------------------------------------------------------------+
-//| DailySetup - Prepare the daily strategy                          |
+//| SetOpenAction - sets session hold/hedge detail by type on open   |
 //+------------------------------------------------------------------+
-void DailySetup(void)
+void SetHourlyAction(SessionType Type)
   {
+    sEvent.SetEvent(NewHour);
+    
+    //-- Reset hourly action flags
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
-      sRec[type].FractalDir      = DirectionNone;
-      sRec[type].Reversal        = false;
     }    
   }
 
@@ -259,20 +340,49 @@ void DailySetup(void)
 //+------------------------------------------------------------------+
 void CheckSessionEvents(void)
   {          
+    bool cseIsValid                = false;
+
     sEvent.ClearEvents();
+    
+    if (session[Daily].Event(NewHour))
+      SetHourlyAction();
     
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       if (session[type].Event(SessionOpen))
         SetOpenAction(type);
+
+      if (NewDirection(detail[type].ActiveDir,Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession))))
+        sEvent.SetEvent(NewDirection);
+
+      if (NewBias(detail[type].ActiveBias,session[type].Bias()))
+        sEvent.SetEvent(NewTradeBias);
         
-      if (session[type].Event(NewFractal)||session[type].Event(NewReversal)||session[type].Event(NewBreakout))
-        SetOrderAction(type);
-      else
-      if (session[type].Event(NewRally)||session[type].Event(NewPullback))
-        ClearOrderAction(type);
+      if (NewDirection(detail[type].FractalDir,session[type].Fractal(ftTerm).Direction))
+      {
+        detail[type].Reversal      = true;
         
-      SetActiveAction(type);
+        sEvent.SetEvent(NewReversal);
+        
+        if (type==Daily)
+          sEvent.SetEvent(NewMajor);
+        else
+          sEvent.SetEvent(NewMinor);
+      }
+      
+      if (session[type].Event(NewFractal))
+        if (IsChanged(detail[type].NewFractal,true))
+          detail[type].NewFractalCnt++;
+        
+      cseIsValid                   = detail[type].IsValid;
+
+      if (detail[type].ActiveDir==detail[type].OpenDir)
+        if (detail[type].ActiveBias==detail[type].OpenBias)
+          if (detail[type].ActiveDir==Direction(detail[type].ActiveBias,InAction))
+            cseIsValid             = true;
+
+      if (IsChanged(detail[type].IsValid,cseIsValid))
+        sEvent.SetEvent(MarketCorrection);
     }
   }
   
@@ -295,22 +405,31 @@ void CheckOrderEvents(void)
   {
     if (IsChanged(OrderTrigger,true))
       UpdateLabel("lbTrigger","Trigger open",clrYellow);
-      
-    if (pfractal.ActiveEvent())
-      CallPause("PipMA "+pfractal.ActiveEventText());
   }
+  
+//+------------------------------------------------------------------+
+//| CheckOrderEvents - Check events when activated by order event    |
+//+------------------------------------------------------------------+
+void CalcStrategy(void)
+  {
+//    if (session[type].Event(NewFractal)||session[type].Event(NewReversal)||session[type].Event(NewBreakout))
+//      SetOrderAction(type);
+//    else
+//    if (session[type].Event(NewRally)||session[type].Event(NewPullback))
+//      ClearOrderAction(type);      
+  }
+  
 
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    if (session[Daily].Event(SessionOpen))
-      DailySetup();
-      
     CheckSessionEvents();
     CheckFractalEvents();
 
+    CalcStrategy();
+    
     if (OrderTrigger)
       CheckOrderEvents();
 
@@ -379,6 +498,31 @@ void ExecAppCommands(string &Command[])
         Print("Alerts for "+EnumToString(EventType(AlertKey(Command[1])))+" enabled.");
       }
     }
+
+    if (Command[0]=="ALERT")
+    {
+      if (Command[1]=="ON")
+      {
+        if (Command[2]=="ASIA")   detail[Asia].Alerts  = true;
+        if (Command[2]=="EUROPE") detail[Asia].Alerts  = true;
+        if (Command[2]=="US")     detail[Asia].Alerts  = true;
+        if (Command[2]=="DAILY")  detail[Asia].Alerts  = true;
+        if (Command[2]=="ALL")
+          for (int alert=Daily;alert<SessionTypes;alert++)
+           detail[alert].Alerts   = true;
+      }        
+
+      if (Command[1]=="OFF")
+      {
+        if (Command[2]=="ASIA")   detail[Asia].Alerts  = false;
+        if (Command[2]=="EUROPE") detail[Asia].Alerts  = false;
+        if (Command[2]=="US")     detail[Asia].Alerts  = false;
+        if (Command[2]=="DAILY")  detail[Asia].Alerts  = false;
+        if (Command[2]=="ALL")
+          for (int alert=Daily;alert<SessionTypes;alert++)
+           detail[alert].Alerts   = false;
+      }        
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -424,14 +568,15 @@ int OnInit()
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
-      sRec[type].OpenDir      = DirectionNone;
-      sRec[type].ActiveDir    = DirectionNone;
-      sRec[type].OpenBias     = OP_NO_ACTION;
-      sRec[type].ActiveBias   = OP_NO_ACTION;
-      sRec[type].IsValid      = false;
-      sRec[type].FractalDir   = DirectionNone;
-      sRec[type].Reversal     = false;
-      sRec[type].Alerts       = true;
+      detail[type].OpenDir      = DirectionNone;
+      detail[type].ActiveDir    = DirectionNone;
+      detail[type].OpenBias     = OP_NO_ACTION;
+      detail[type].ActiveBias   = OP_NO_ACTION;
+//      detail[type].Strategy     = NoStrategy;
+      detail[type].IsValid      = false;
+      detail[type].FractalDir   = DirectionNone;
+      detail[type].Reversal     = false;
+      detail[type].Alerts       = true;
     }
 
     return(INIT_SUCCEEDED);
@@ -449,4 +594,5 @@ void OnDeinit(const int reason)
     delete pfractal;
     delete sEvent;
     delete fEvent;
+    delete toEvent;
   }

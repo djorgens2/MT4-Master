@@ -113,6 +113,7 @@ private:
              CArrayDouble *sOffMidBuffer;
              CArrayDouble *sPriorMidBuffer;
              CArrayDouble *sFractalBuffer;
+             CArrayDouble *sSessionRange;
              
              CEvent       *sEvent;
              
@@ -337,7 +338,7 @@ void CSession::UpdateTerm(void)
           }
       }
       
-      if (NewState(sfractal[ftTerm].State,ufState,NewTerm));
+      NewState(sfractal[ftTerm].State,ufState,NewTerm);
     }
   }
 
@@ -634,7 +635,9 @@ void CSession::OpenSession(void)
 //+------------------------------------------------------------------+
 void CSession::CloseSession(void)
   {        
-    //-- Update Prior Record and Indicator Buffer
+    //-- Update Prior Record, range history, and Indicator Buffer
+    sSessionRange.Insert(0,srec[ActiveSession].High-srec[ActiveSession].Low);
+    
     srec[PriorSession]                    = srec[ActiveSession];
     sPriorMidBuffer.SetValue(sBar,Pivot(PriorSession));
 
@@ -726,6 +729,13 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     
     sEvent                           = new CEvent();
 
+    sSessionRange                    = new CArrayDouble(0);
+    sSessionRange.Truncate           = false;
+    sSessionRange.AutoExpand         = true;    
+    sSessionRange.SetPrecision(Digits);
+    sSessionRange.Initialize(0.00);
+    sSessionRange.SetAutoCompute(true);
+
     sOffMidBuffer                    = new CArrayDouble(Bars);
     sOffMidBuffer.Truncate           = false;
     sOffMidBuffer.AutoExpand         = true;    
@@ -757,6 +767,7 @@ CSession::~CSession()
     delete sOffMidBuffer;
     delete sPriorMidBuffer;
     delete sFractalBuffer;
+    delete sSessionRange;
   }
 
 //+------------------------------------------------------------------+
@@ -883,18 +894,25 @@ double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
   {
     int    fDirection     = sfractal[Type].Direction;
 
-//if (sBar==0) Print(DoubleToStr(FiboExpansion(sfractal[Type].Resistance
     if (fDirection==DirectionUp)
       switch (Measure)
       {
         case Now: return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,Close[sBar],Format));
-        case Max: return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,sfractal[Type].High,Format));
+        case Max: if (Type==ftTrend)
+                    if (sfractal[ftTrend].Direction==sfractal[ftTerm].Direction)
+                      return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,sfractal[ftTerm].High,Format));
+                      
+                  return(FiboExpansion(sfractal[Type].Resistance,sfractal[Type].Support,sfractal[Type].High,Format));
       }
     else
       switch (Measure)
       {
         case Now: return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,Close[sBar],Format));
-        case Max: return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,sfractal[Type].Low,Format));
+        case Max: if (Type==ftTrend)
+                    if (sfractal[ftTrend].Direction==sfractal[ftTerm].Direction)
+                      return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,sfractal[ftTerm].Low,Format));
+
+                  return(FiboExpansion(sfractal[Type].Support,sfractal[Type].Resistance,sfractal[Type].Low,Format));
       }
       
     return (0.00);

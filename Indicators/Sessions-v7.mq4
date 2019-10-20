@@ -72,7 +72,9 @@ const int            sessionEOD      = 0;            // Session End-of-Day hour
 const int            sessionOffset   = 40;           // Display offset
 
 CSession            *session[SessionTypes];
+
 SessionData          data[SessionTypes];
+string               dataDate[SessionTypes];
 
 //+------------------------------------------------------------------+
 //| SessionColor - Returns the color for session ranges              |
@@ -95,15 +97,15 @@ color SessionColor(SessionType Type)
 //+------------------------------------------------------------------+
 void CreateRange(SessionType Type, int Bar=0)
  {
-   string crRangeId;
+   string        crRangeId;
    
-   if (data[Type].IsOpen)
-     return;
-   else
+   if (IsChanged(dataDate[Type],TimeToStr(session[Type].ServerTime(Bar),TIME_DATE)))
+     data[Type].IsOpen        = false;
+
+   if (IsChanged(data[Type].IsOpen,true))
    {
      crRangeId                = EnumToString(Type)+IntegerToString(++data[Type].Range);
      
-     data[Type].IsOpen        = true;
      data[Type].OpenTime      = Time[Bar];
      data[Type].PriceHigh     = High[Bar];
      data[Type].PriceLow      = Low[Bar];
@@ -277,6 +279,7 @@ int OnInit()
     {
       data[type].IsOpen   = false;
       data[type].Range    = 0;
+      dataDate[type]      = TimeToStr(session[type].ServerTime(Bars-1),TIME_DATE);
       
       NewLabel("lbSessionType"+EnumToString(type),"",100,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveDir"+EnumToString(type),"",30,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
@@ -284,8 +287,8 @@ int OnInit()
       NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
     }
-    
-    for (int bar=Bars-24;bar>0;bar--)
+          
+    for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);
       
     if (Period()<PERIOD_D1)
