@@ -151,19 +151,32 @@ void RefreshScreen(void)
     if (rsShow=="PIPMA")
       if (pfractal.HistoryLoaded())
         pfractal.RefreshScreen();
-        
-    for (EventType type=0;type<EventTypes;type++)
-      if (Alerts[type]&&pfractal.Event(type))
-      {
-        CallPause("PipMA "+pfractal.ActiveEventText());
-        break;
-      }
-
 
     if (rsShow=="DAILY")
       session[Daily].RefreshScreen();
       
+    if (rsShow=="LEAD")
+      lead.RefreshScreen();
+
+    if (rsShow=="ASIA")
+      session[Asia].RefreshScreen();
+
+    if (rsShow=="EUROPE")
+      session[Europe].RefreshScreen();
+
+    if (rsShow=="US")
+      session[US].RefreshScreen();
+
     sEvent.ClearEvents();
+    rsComment    = "";
+    
+    for (EventType type=0;type<EventTypes;type++)
+      if (Alerts[type]&&pfractal.Event(type))
+      {
+        rsComment   = "PipMA "+pfractal.ActiveEventText()+"\n";
+//        CallPause("PipMA "+pfractal.ActiveEventText());
+        break;
+      }
 
     for (SessionType show=Daily;show<SessionTypes;show++)
       if (detail[show].Alerts)
@@ -181,13 +194,16 @@ void RefreshScreen(void)
 
     if (sEvent.ActiveEvent())
     {
-      rsComment             = "Processed "+sEvent.ActiveEventText(true)+"\n";
+      Append(rsComment,"Processed "+sEvent.ActiveEventText(true)+"\n","\n");
     
       for (SessionType show=Daily;show<SessionTypes;show++)
-        Append(rsComment,EnumToString(show)+" "+session[show].ActiveEventText(false)+"\n","\n");
-      
-      CallPause(rsComment);
+        Append(rsComment,EnumToString(show)+" ("+BoolToStr(session[show].IsOpen(),
+           "Open:"+IntegerToString(session[show].SessionHour()),
+           "Closed")+")"+session[show].ActiveEventText(false)+"\n","\n");
     }
+
+    if (StringLen(rsComment)>0)
+      CallPause(rsComment);
   }
 
 //+------------------------------------------------------------------+
@@ -268,7 +284,7 @@ void SetDailyAction(void)
       detail[type].FractalDir      = DirectionNone;
       detail[type].NewFractalCnt   = 0;
       detail[type].NewFractal      = false;
-      detail[type].Reversal        = false;      
+      detail[type].Reversal        = false;
     }
     
 //    if (IsHigher(session[Daily][OffSession].High,session[Daily][PriorSession].High,NoUpdate)

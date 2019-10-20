@@ -923,11 +923,11 @@ double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
 //+------------------------------------------------------------------+
 void CSession::RefreshScreen(void)
   {  
-    Comment("Prior State: "+EnumToString(sfractal[ftPrior].State)+" Direction: "+DirText(sfractal[ftPrior].Direction)+"/"+DirText(sfractal[ftPrior].BreakoutDir)+"\n"+
-        "Term State: "+EnumToString(sfractal[ftTerm].State)+" Direction: "+DirText(sfractal[ftTerm].Direction)+"/"+DirText(sfractal[ftTerm].BreakoutDir)+
+    Comment("Prior State:    "+EnumToString(sfractal[ftPrior].State)+" Direction: "+DirText(sfractal[ftPrior].Direction)+"/"+DirText(sfractal[ftPrior].BreakoutDir)+"\n"+
+        "Term State:   "+EnumToString(sfractal[ftTerm].State)+" Direction: "+DirText(sfractal[ftTerm].Direction)+"/"+DirText(sfractal[ftTerm].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTerm,Max,InPercent),1)+"%"+
                        " (e) "+DoubleToStr(Expansion(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftTerm,Max,InPercent),1)+"%\n"+
-        "Trend State: "+EnumToString(sfractal[ftTrend].State)+" Direction: "+DirText(sfractal[ftTrend].Direction)+"/"+DirText(sfractal[ftTrend].BreakoutDir)+
+        "Trend State:  "+EnumToString(sfractal[ftTrend].State)+" Direction: "+DirText(sfractal[ftTrend].Direction)+"/"+DirText(sfractal[ftTrend].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(ftTrend,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTrend,Max,InPercent),1)+"%"+
                        " (e) "+DoubleToStr(Expansion(ftTrend,Now,InPercent),1)+"%  "+BoolToStr(Expansion(ftTrend,Max)==1,"Interior",DoubleToStr(Expansion(ftTrend,Max,InPercent),1)+"%")+"\n"+
         "Origin State: "+EnumToString(sfractal[ftOrigin].State)+" Direction: "+DirText(sfractal[ftOrigin].Direction)+"/"+DirText(sfractal[ftOrigin].BreakoutDir)+

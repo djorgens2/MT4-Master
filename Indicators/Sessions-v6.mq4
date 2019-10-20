@@ -59,7 +59,6 @@ input int            inpHourOffset      = 0;               // Time offset EOD NY
 input YesNoType      inpShowRange       = No;              // Display session ranges?
 input YesNoType      inpShowBuffer      = No;              // Display trend lines?
 input YesNoType      inpShowPriceLines  = No;              // Show price Lines?
-input YesNoType      inpShowOriginLines = No;              // Show Origin Lines?
 input DataPosition   inpShowData        = dpNone;          // Indicator data position
 
 const color          AsiaColor          = C'0,32,0';       // Asia session box color
@@ -182,14 +181,12 @@ void RefreshScreen(int Bar=0)
 
     if (inpShowPriceLines==Yes)
     {
-      FractalType show=ftOrigin;
-      UpdateLine("lnS_ActiveMid",session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnS_Support",session.Fractal(show).Support,STYLE_SOLID,clrRed);
-      UpdateLine("lnS_Resistance",session.Fractal(show).Resistance,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnS_Low",session.Fractal(show).Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnS_High",session.Fractal(show).High,STYLE_DOT,clrForestGreen);
-//      UpdateLine("lnS_PriorLow",session.Fractal(ftPrior).Support,STYLE_DOT,clrFireBrick);
-//      UpdateLine("lnS_PriorHigh",session.Fractal(ftPrior).Resistance,STYLE_DOT,clrForestGreen);
+      FractalType show=ftTerm;
+      UpdateLine("lnS_ActiveMid:"+sessionIndex,session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnS_Support:"+sessionIndex,session.Fractal(show).Support,STYLE_SOLID,clrRed);
+      UpdateLine("lnS_Resistance:"+sessionIndex,session.Fractal(show).Resistance,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnS_Low:"+sessionIndex,session.Fractal(show).Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High:"+sessionIndex,session.Fractal(show).High,STYLE_DOT,clrForestGreen);
 
       //PeriodType show=ActiveSession;
       //UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
@@ -197,12 +194,6 @@ void RefreshScreen(int Bar=0)
       //UpdateLine("lnS_Resistance",session[show].Resistance,STYLE_SOLID,clrLawnGreen);
       //UpdateLine("lnS_Low",session[show].Low,STYLE_DOT,clrFireBrick);
       //UpdateLine("lnS_High",session[show].High,STYLE_DOT,clrForestGreen);
-    }
-
-    if (inpShowOriginLines==Yes)
-    {
-      UpdateLine("lnS_Top",session.Fractal(ftOrigin).Resistance,STYLE_DASH,clrLawnGreen);
-      UpdateLine("lnS_Bottom",session.Fractal(ftOrigin).Support,STYLE_DASH,clrRed);
     }
     
     if (inpShowData>dpNone)
@@ -270,19 +261,11 @@ int OnInit()
     
     if (inpShowPriceLines==Yes)
     {
-      NewLine("lnS_ActiveMid");
-      NewLine("lnS_Support");
-      NewLine("lnS_Resistance");
-      NewLine("lnS_High");
-      NewLine("lnS_Low");
-      NewLine("lnS_PriorHigh");
-      NewLine("lnS_PriorLow");
-    }
-    
-    if (inpShowOriginLines==Yes)
-    {
-      NewLine("lnS_Top");
-      NewLine("lnS_Bottom");
+      NewLine("lnS_ActiveMid:"+sessionIndex);
+      NewLine("lnS_Support:"+sessionIndex);
+      NewLine("lnS_Resistance:"+sessionIndex);
+      NewLine("lnS_High:"+sessionIndex);
+      NewLine("lnS_Low:"+sessionIndex);
     }
     
     if (inpShowData>dpNone)
@@ -335,15 +318,11 @@ void OnDeinit(const int reason)
     
     delete session;    
 
-    ObjectDelete("lnS_ActiveMid");
-    ObjectDelete("lnS_Support");
-    ObjectDelete("lnS_Resistance");
-    ObjectDelete("lnS_High");
-    ObjectDelete("lnS_Low");
-    ObjectDelete("lnS_PriorTop");
-    ObjectDelete("lnS_PriorBottom");
-    ObjectDelete("lnS_Top");
-    ObjectDelete("lnS_Bottom");
+    ObjectDelete("lnS_ActiveMid:"+sessionIndex);
+    ObjectDelete("lnS_Support:"+sessionIndex);
+    ObjectDelete("lnS_Resistance:"+sessionIndex);
+    ObjectDelete("lnS_High:"+sessionIndex);
+    ObjectDelete("lnS_Low:"+sessionIndex);
     ObjectDelete("boxForecast");
     
     
