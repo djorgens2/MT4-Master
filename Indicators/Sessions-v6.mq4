@@ -58,7 +58,8 @@ input int            inpHourClose       = NoValue;         // Session Closing Ho
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input YesNoType      inpShowRange       = No;              // Display session ranges?
 input YesNoType      inpShowBuffer      = No;              // Display trend lines?
-input YesNoType      inpShowPriceLines  = No;              // Show price Lines?
+input FractalType    inpFractalLines    = FractalTypes;    // Fractal line to show?
+input YesNoType      inpShowComment     = No;              // Show session data in comment?
 input DataPosition   inpShowData        = dpNone;          // Indicator data position
 
 const color          AsiaColor          = C'0,32,0';       // Asia session box color
@@ -179,14 +180,13 @@ void RefreshScreen(int Bar=0)
       UpdateRange(Bar);
     }
 
-    if (inpShowPriceLines==Yes)
+    if (inpFractalLines!=FractalTypes)
     {
-      FractalType show=ftTerm;
       UpdateLine("lnS_ActiveMid:"+sessionIndex,session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnS_Support:"+sessionIndex,session.Fractal(show).Support,STYLE_SOLID,clrRed);
-      UpdateLine("lnS_Resistance:"+sessionIndex,session.Fractal(show).Resistance,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnS_Low:"+sessionIndex,session.Fractal(show).Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnS_High:"+sessionIndex,session.Fractal(show).High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnS_Support:"+sessionIndex,session.Fractal(inpFractalLines).Support,STYLE_SOLID,clrRed);
+      UpdateLine("lnS_Resistance:"+sessionIndex,session.Fractal(inpFractalLines).Resistance,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnS_Low:"+sessionIndex,session.Fractal(inpFractalLines).Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High:"+sessionIndex,session.Fractal(inpFractalLines).High,STYLE_DOT,clrForestGreen);
 
       //PeriodType show=ActiveSession;
       //UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
@@ -215,6 +215,9 @@ void RefreshScreen(int Bar=0)
 
       UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,DirColor(session[ActiveSession].BreakoutDir));
     }
+    
+    if (inpShowComment==Yes)
+      session.RefreshScreen();
   }
  
 //+------------------------------------------------------------------+
@@ -259,14 +262,11 @@ int OnInit()
     SetIndexEmptyValue(2, 0.00);
     SetIndexStyle(2,DRAW_SECTION);
     
-    if (inpShowPriceLines==Yes)
-    {
-      NewLine("lnS_ActiveMid:"+sessionIndex);
-      NewLine("lnS_Support:"+sessionIndex);
-      NewLine("lnS_Resistance:"+sessionIndex);
-      NewLine("lnS_High:"+sessionIndex);
-      NewLine("lnS_Low:"+sessionIndex);
-    }
+    NewLine("lnS_ActiveMid:"+sessionIndex);
+    NewLine("lnS_Support:"+sessionIndex);
+    NewLine("lnS_Resistance:"+sessionIndex);
+    NewLine("lnS_High:"+sessionIndex);
+    NewLine("lnS_Low:"+sessionIndex);
     
     if (inpShowData>dpNone)
     {

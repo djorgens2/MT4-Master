@@ -42,19 +42,9 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
   CEvent             *sEvent         = new CEvent();
   CEvent             *fEvent         = new CEvent();
+  CEvent             *pfEvent        = new CEvent();
   CEvent             *toEvent        = new CEvent();
-  
-  //--- App enums
-  enum                StrategyType
-                      {
-                        NoStrategy,
-                        Build,
-                        Hold,
-                        Release,
-                        Scalp,
-                        Halt
-                      };
-                      
+                        
   //--- Collection Objects
   struct              SessionDetail 
                       {
@@ -63,14 +53,12 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         int            OpenBias;
                         int            ActiveBias;
                         int            FractalDir;
-                        StrategyType   Strategy[2];
+                        bool           NewFractal;
+                        bool           Reversal;
                         double         Entry[2];
                         double         Profit[2];
                         double         Risk[2];
-                        int            NewFractalCnt;
-                        bool           NewFractal;
                         bool           IsValid;
-                        bool           Reversal;
                         bool           Alerts;
                       };
 
@@ -87,6 +75,8 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   
   //--- Trade operationals
   bool                OrderTrigger         = false;
+  int                 OrderAction          = OP_NO_ACTION;
+  EventType           OrderEvent           = NoEvent;
   
   double              toBoundaryPrice      = 0.00;
   int                 toBoundaryDir        = DirectionNone;
@@ -240,10 +230,15 @@ bool NewBias(int &Now, int New)
 //+------------------------------------------------------------------+
 //| SetOrderAction - updates session detail on a new order event     |
 //+------------------------------------------------------------------+
-void SetOrderAction(SessionType Type)
+void SetOrderAction(int Action, EventType Event)
   {
+    OrderAction                    = Action;
+    OrderEvent                     = Event;      
     OrderTrigger                   = true;
-//    PauseOn                  = true;
+
+//    PauseOn                        = true;
+
+    UpdateLabel("lbTrigger","Fired "+ActionText(OrderAction)+" on Event "+EnumToString(Event),clrYellow);
   }
 
 //+------------------------------------------------------------------+
@@ -260,8 +255,6 @@ void ClearOrderAction(SessionType Type)
 //+------------------------------------------------------------------+
 void SetAsiaAction(void)
   {
-    StrategyType saaStrategy      = NoStrategy;
-
     if (session[Asia].Event(SessionOpen))
     {}
     else
@@ -278,14 +271,8 @@ void SetDailyAction(void)
   {
     ArrayCopy(history,detail);
     
-    //--- Update Session Detail
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-      detail[type].FractalDir      = DirectionNone;
-      detail[type].NewFractalCnt   = 0;
-      detail[type].NewFractal      = false;
-      detail[type].Reversal        = false;
-    }
+    //-- Build forecast
+    
     
 //    if (IsHigher(session[Daily][OffSession].High,session[Daily][PriorSession].High,NoUpdate)
 //         || IsLower(session[Daily][OffSession].Low,session[Daily][PriorSession].Low,NoUpdate))
@@ -305,6 +292,13 @@ void SetDailyAction(void)
 //      toBoundaryPrice              = BoolToDouble(toBoundaryDir==DirectionUp,session[Daily][PriorSession].High,session[Daily][PriorSession].Low);
 //    };
 
+    //--- Reset Session Detail for this trading day
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      detail[type].FractalDir      = DirectionNone;
+      detail[type].NewFractal      = false;
+      detail[type].Reversal        = false;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -388,8 +382,17 @@ void CheckSessionEvents(void)
       
       if (session[type].Event(NewFractal))
         if (IsChanged(detail[type].NewFractal,true))
-          detail[type].NewFractalCnt++;
+          sEvent.SetEvent(NewFractal);
+          
+      if (session[type].Event(NewTerm))
+          sEvent.SetEvent(NewTerm);
         
+      if (session[type].Event(NewTrend))
+          sEvent.SetEvent(NewTrend);
+
+      if (session[type].Event(NewOrigin))
+          sEvent.SetEvent(NewOrigin);
+
       cseIsValid                   = detail[type].IsValid;
 
       if (detail[type].ActiveDir==detail[type].OpenDir)
@@ -403,7 +406,7 @@ void CheckSessionEvents(void)
   }
   
 //+------------------------------------------------------------------+
-//| CheckFractalEvents - updates trading strategy on fractal events  |
+//| CheckFractalEvents - Sets alerts for relevant Fractal events     |
 //+------------------------------------------------------------------+
 void CheckFractalEvents(void)
   {    
@@ -415,12 +418,44 @@ void CheckFractalEvents(void)
   }
 
 //+------------------------------------------------------------------+
+//| CheckPipMAEvents - Sets alerts for relevant PipMA events         |
+//+------------------------------------------------------------------+
+void CheckPipMAEvents(void)
+  {    
+    pfEvent.ClearEvents();
+
+    for (EventType pf=0;pf<EventTypes;pf++)
+    switch (pf)
+    {
+      case NewCrest:        
+      case NewTrough:
+      case NewMinor:
+      case NewMajor:
+      case NewHigh:
+      case NewLow:
+      case NewPoly:
+      case NewPolyBoundary:
+      case NewPolyTrend:
+      case NewPolyState:    if (pfractal.Event(pf)) pfEvent.SetEvent(pf);
+                            break;
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| CheckOrderEvents - Check events when activated by order event    |
 //+------------------------------------------------------------------+
-void CheckOrderEvents(void)
+void ManageOrderEvents(void)
   {
-    if (IsChanged(OrderTrigger,true))
-      UpdateLabel("lbTrigger","Trigger open",clrYellow);
+    if (pfEvent[NewCrest])
+      SetOrderAction(OP_SELL,NewCrest);
+
+    if (pfEvent[NewTrough])
+      SetOrderAction(OP_BUY,NewTrough);
+    
+    if (OrderTrigger)
+      if (pfEvent[NewPoly])
+        if (OpenOrder(OrderAction,EnumToString(OrderEvent)))
+          OrderTrigger       = false;
   }
   
 //+------------------------------------------------------------------+
@@ -443,11 +478,11 @@ void Execute(void)
   {
     CheckSessionEvents();
     CheckFractalEvents();
+    CheckPipMAEvents();
 
     CalcStrategy();
     
-    if (OrderTrigger)
-      CheckOrderEvents();
+    ManageOrderEvents();
 
   }
 
@@ -610,5 +645,6 @@ void OnDeinit(const int reason)
     delete pfractal;
     delete sEvent;
     delete fEvent;
+    delete pfEvent;
     delete toEvent;
   }

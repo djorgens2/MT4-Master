@@ -544,6 +544,10 @@ void GetManualRequest(string Command="")
                       break;
               case 4: OpenDCAPlan(ActionCode(params[1]),StringToDouble(params[2]),CloseOption(params[3]));
                       break;
+              case 5: OpenDCAPlan(ActionCode(params[1]),StringToDouble(params[2]),CloseOption(params[3]),params[4]=="KEEP");
+                      break;
+              case 6: OpenDCAPlan(ActionCode(params[1]),StringToDouble(params[2]),CloseOption(params[3]),params[4]=="KEEP",StringToDouble(params[5]));
+                      break;
             }
           }
           else          

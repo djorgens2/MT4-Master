@@ -179,19 +179,21 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
       if (ChangeState==Correction)
         return(false);
           
-    if (State==Reversal)
+
+    if (sEvent[EventTrigger])
     {
-      if (ChangeState==Breakout)
-        return(false);
-        
       if (ChangeState==Reversal)
-        if (sEvent[EventTrigger])
+        if (State==Reversal)
         {
           State                    = Correction;
           Print(TimeToStr(Time[sBar])+": Corrected reversal");
         }
-    }
-      
+     }
+     else
+       if (ChangeState==Breakout)
+         if (State==Reversal)
+           return(false);
+        
     if (IsChanged(State,ChangeState))
     {
       sEvent.SetEvent(NewState);
@@ -395,12 +397,15 @@ void CSession::UpdateTrend(void)
       else
         utState                        = Breakout;
     
-    if (NewState(sfractal[ftTrend].State,utState,NewTerm))
+    if (NewState(sfractal[ftTrend].State,utState,NewTrend))
       if (sfractal[ftTrend].State==Breakout)
+      {
+        Print("We have breakout!");
         if (NewDirection(sfractal[ftTrend].BreakoutDir,sfractal[ftTrend].Direction))
           sEvent.SetEvent(NewBreakout);
         else
           sEvent.SetEvent(NewExpansion);
+      }
   }
 
 //+------------------------------------------------------------------+
