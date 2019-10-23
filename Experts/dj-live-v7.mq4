@@ -8,6 +8,7 @@
 #property version   "7.00"
 #property strict
 
+#define   Allow       true
 
 #include <manual.mqh>
 #include <Class\Session.mqh>
@@ -34,6 +35,7 @@ input int       inpEuropeClose       = 18;    // Europe market close hour
 input int       inpUSOpen            = 14;    // US market open hour
 input int       inpUSClose           = 23;    // US market close hour
 input int       inpGMTOffset         = 0;     // GMT Offset
+
 
   //--- Class Objects
   CSession           *session[SessionTypes];
@@ -86,11 +88,11 @@ input int       inpGMTOffset         = 0;     // GMT Offset
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
 //+------------------------------------------------------------------+
-void CallPause(string Message)
+void CallPause(string Message, bool Always=false)
   {
     static string cpMessage   = "";
-    if (PauseOn)
-      if (IsChanged(cpMessage,Message))
+    if (PauseOn||Always)
+      if (IsChanged(cpMessage,Message)||Always)
         Pause(Message,AccountCompany()+" Event Trapper");
 
     if (LoggingOn)
@@ -225,29 +227,6 @@ bool NewBias(int &Now, int New)
       return (true);
       
     return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| SetOrderAction - updates session detail on a new order event     |
-//+------------------------------------------------------------------+
-void SetOrderAction(int Action, EventType Event)
-  {
-    OrderAction                    = Action;
-    OrderEvent                     = Event;      
-    OrderTrigger                   = true;
-
-//    PauseOn                        = true;
-
-    UpdateLabel("lbTrigger","Fired "+ActionText(OrderAction)+" on Event "+EnumToString(Event),clrYellow);
-  }
-
-//+------------------------------------------------------------------+
-//| ClearOrderAction - validates OrderTrigger and clears if needed   |
-//+------------------------------------------------------------------+
-void ClearOrderAction(SessionType Type)
-  {
-    OrderTrigger                   = false;
-    UpdateLabel("lbTrigger","Waiting",clrLightGray);    
   }
 
 //+------------------------------------------------------------------+
@@ -442,7 +421,35 @@ void CheckPipMAEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| CheckOrderEvents - Check events when activated by order event    |
+//| SetOrderAction - updates session detail on a new order event     |
+//+------------------------------------------------------------------+
+void SetOrderAction(int Action, EventType Event)
+  {
+    OrderAction                    = Action;
+    OrderEvent                     = Event;      
+    OrderTrigger                   = true;
+
+//    PauseOn                        = true;
+
+    UpdateLabel("lbTrigger","Fired "+ActionText(OrderAction)+" on Event "+EnumToString(Event),clrYellow);
+  }
+
+//+------------------------------------------------------------------+
+//| ClearOrderAction - validates OrderTrigger and clears if needed   |
+//+------------------------------------------------------------------+
+void ClearOrderAction(void)
+  {
+    OrderTrigger                   = false;
+    OrderAction                    = OP_NO_ACTION;
+    OrderEvent                     = NoEvent;
+
+    UpdateLabel("lbTrigger","Waiting",clrLightGray);
+
+    CallPause("Order opened!",Allow);    
+  }
+
+//+------------------------------------------------------------------+
+//| ManageOrderEvents - Check events when activated by order event   |
 //+------------------------------------------------------------------+
 void ManageOrderEvents(void)
   {
@@ -455,19 +462,17 @@ void ManageOrderEvents(void)
     if (OrderTrigger)
       if (pfEvent[NewPoly])
         if (OpenOrder(OrderAction,EnumToString(OrderEvent)))
-          OrderTrigger       = false;
+          ClearOrderAction();
   }
   
 //+------------------------------------------------------------------+
-//| CheckOrderEvents - Check events when activated by order event    |
+//| ManageRiskEvents - Check events when activated by risk scenarios |
 //+------------------------------------------------------------------+
-void CalcStrategy(void)
+void ManageRiskEvents(void)
   {
-//    if (session[type].Event(NewFractal)||session[type].Event(NewReversal)||session[type].Event(NewBreakout))
-//      SetOrderAction(type);
-//    else
-//    if (session[type].Event(NewRally)||session[type].Event(NewPullback))
-//      ClearOrderAction(type);      
+    //-- 1. Calculate risk level (0%-MinEQ=Healthy; to MinEQ*2=Working; to MinEQ*4=At Risk; >Adverse
+    //-- 2. Calculate risk sliders Net EQ, Net Action Neg, Net Position Neg
+
   }
   
 
@@ -479,10 +484,9 @@ void Execute(void)
     CheckSessionEvents();
     CheckFractalEvents();
     CheckPipMAEvents();
-
-    CalcStrategy();
     
     ManageOrderEvents();
+    ManageRiskEvents();
 
   }
 

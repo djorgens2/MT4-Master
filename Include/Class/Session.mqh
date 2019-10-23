@@ -400,7 +400,9 @@ void CSession::UpdateTrend(void)
     if (NewState(sfractal[ftTrend].State,utState,NewTrend))
       if (sfractal[ftTrend].State==Breakout)
       {
-        Print("We have breakout!");
+        if (sBar==0)
+          Pause("We Have Breakout on "+EnumToString(this.Type()),"BreakoutCheck");
+
         if (NewDirection(sfractal[ftTrend].BreakoutDir,sfractal[ftTrend].Direction))
           sEvent.SetEvent(NewBreakout);
         else
