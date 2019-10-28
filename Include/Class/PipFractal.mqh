@@ -102,8 +102,8 @@ void CPipFractal::CalcFiboChange(void)
     static int  cfcMarketIdle    = false;
     static bool cfcNewMajor      = false;
     
-    ClearEvent(MarketIdle);
-    ClearEvent(MarketResume);
+    ClearEvent(NewIdle);
+    ClearEvent(NewResume);
     ClearEvent(NewMajor);
     ClearEvent(NewMinor);
 
@@ -113,7 +113,7 @@ void CPipFractal::CalcFiboChange(void)
     if (fmin(ptrRangeAgeLow,ptrRangeAgeHigh)==1)
       if (cfcMarketIdle)
       {
-        SetEvent(MarketResume);
+        SetEvent(NewResume);
         cfcMarketIdle    = false;
       } 
 
@@ -133,7 +133,7 @@ void CPipFractal::CalcFiboChange(void)
         if (cfcBoundaryAge>=ptrMarketIdleTime)
         {
           if (!cfcMarketIdle)
-            SetEvent(MarketIdle);
+            SetEvent(NewIdle);
 
           cfcMarketIdle    = true;
         }    

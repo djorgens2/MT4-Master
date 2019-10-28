@@ -131,6 +131,8 @@ bool CPolyRegression::NewDirection(int &Direction, int ChangeDirection, bool Upd
 //+------------------------------------------------------------------+
 bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true)
   {
+    ReservedWords nsLastState      = State;
+    
     if (ChangeState==NoState)
       return (false);
 
@@ -138,26 +140,25 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
       if (State==Reversal)
         return (false);
 
-    if (State==NoState)
-      State            = ChangeState;
+// --- skip ignore first
+//    if (State==NoState)
+//      State                        = ChangeState;
 
     if (IsChanged(State,ChangeState))
     {
       switch (State)
       {
-        case Reversal:    SetEvent(NewReversal);
-                          break;
-        case Breakout:    SetEvent(NewBreakout);
-                          break;
         case Rally:       SetEvent(NewRally);
                           break;
         case Pullback:    SetEvent(NewPullback);
                           break;
-        case Retrace:     SetEvent(NewRetrace);
-                          break;
         case Crest:       SetEvent(NewCrest);
+                          if (nsLastState==Pullback)
+                            SetEvent(NewBreakout);
                           break;
         case Trough:      SetEvent(NewTrough);
+                          if (nsLastState==Rally)
+                            SetEvent(NewBreakout);
                           break;
       }
       
@@ -345,7 +346,10 @@ void CPolyRegression::CalcPoly(void)
      
     //-- Initialize trend direction (occurs once);
     if (prPolyTrendDir==DirectionNone)
+    {
       prPolyTrendDir    = Direction(cpBottomBar-cpTopBar);
+      prPolyBoundary    = prPolyMean;
+    }
 
     //-- Calculate changes in poly direction and boundary
     if (IsEqual(prPolyHead,prPolyTop))

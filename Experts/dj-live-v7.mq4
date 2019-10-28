@@ -69,6 +69,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   string              rsShow              = "APP";
   bool                PauseOn             = true;
   bool                LoggingOn           = false;
+  bool                TradingOn           = true;
   bool                Alerts[EventTypes];
   
   //--- Session operationals
@@ -79,7 +80,9 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   bool                OrderTrigger         = false;
   int                 OrderAction          = OP_NO_ACTION;
   EventType           OrderEvent           = NoEvent;
-  
+  ReservedWords       OrderState           = NoState;
+  int                 OrderStateDir        = DirectionNone;
+    
   double              toBoundaryPrice      = 0.00;
   int                 toBoundaryDir        = DirectionNone;
   
@@ -166,7 +169,6 @@ void RefreshScreen(void)
       if (Alerts[type]&&pfractal.Event(type))
       {
         rsComment   = "PipMA "+pfractal.ActiveEventText()+"\n";
-//        CallPause("PipMA "+pfractal.ActiveEventText());
         break;
       }
 
@@ -359,6 +361,16 @@ void CheckSessionEvents(void)
           sEvent.SetEvent(NewMinor);
       }
       
+      if (session[type].Event(NewState))
+      {
+        if (session[type].Event(MidSessionReversal))
+          OrderStateDir     = Direction(session[type][ActiveSession].Direction,InDirection,Contrarian);
+        else
+          OrderStateDir     = session[type][ActiveSession].Direction;
+
+        sEvent.SetEvent(NewState);
+      }
+
       if (session[type].Event(NewFractal))
         if (IsChanged(detail[type].NewFractal,true))
           sEvent.SetEvent(NewFractal);
@@ -397,6 +409,18 @@ void CheckFractalEvents(void)
   }
 
 //+------------------------------------------------------------------+
+//| SetLine - Sets the crest/trough lines based on rally/pullback    |
+//+------------------------------------------------------------------+
+void SetLine(void)
+  {    
+    if (pfractal.Event(NewCrest))
+      UpdatePriceLabel("lbCrest",Close[0],BoolToInt(pfractal.Event(NewBreakout),clrYellow,clrGoldenrod));
+       
+    if (pfractal.Event(NewTrough))
+      UpdatePriceLabel("lbTrough",Close[0],BoolToInt(pfractal.Event(NewBreakout),clrRed,clrFireBrick));
+  }
+
+//+------------------------------------------------------------------+
 //| CheckPipMAEvents - Sets alerts for relevant PipMA events         |
 //+------------------------------------------------------------------+
 void CheckPipMAEvents(void)
@@ -406,8 +430,8 @@ void CheckPipMAEvents(void)
     for (EventType pf=0;pf<EventTypes;pf++)
     switch (pf)
     {
-      case NewCrest:        
-      case NewTrough:
+      case NewCrest:       
+      case NewTrough:       SetLine();
       case NewMinor:
       case NewMajor:
       case NewHigh:
@@ -419,6 +443,20 @@ void CheckPipMAEvents(void)
                             break;
     }
   }
+
+//+------------------------------------------------------------------+
+//| CheckHealth - Verify health and safety of open positions         |
+//+------------------------------------------------------------------+
+void CheckHealth(void)
+  {
+   UpdateLabel("lbEQ",OrdersTotal(),clrLawnGreen,10);
+    if (sEvent[NewState])
+    {
+      UpdateDirection("lbState",OrderStateDir,DirColor(OrderStateDir));
+//      CallPause("New State Event", false);
+    }
+  }
+  
 
 //+------------------------------------------------------------------+
 //| SetOrderAction - updates session detail on a new order event     |
@@ -445,8 +483,22 @@ void ClearOrderAction(void)
 
     UpdateLabel("lbTrigger","Waiting",clrLightGray);
 
-    CallPause("Order opened!",Allow);    
+    CallPause("Order opened!");    
   }
+
+//+------------------------------------------------------------------+
+//| OrderApproved - Performs health and sanity checks for approval   |
+//+------------------------------------------------------------------+
+bool OrderApproved(int Action)
+  {
+    if (TradingOn)
+      return (true);
+
+    ClearOrderAction();
+
+    return (false);
+  }
+
 
 //+------------------------------------------------------------------+
 //| ManageOrderEvents - Check events when activated by order event   |
@@ -454,15 +506,29 @@ void ClearOrderAction(void)
 void ManageOrderEvents(void)
   {
     if (pfEvent[NewCrest])
+    {
+      SetEquityHold(OP_BUY);
       SetOrderAction(OP_SELL,NewCrest);
-
+    }
+    
     if (pfEvent[NewTrough])
+    {
+      SetEquityHold(OP_SELL);
       SetOrderAction(OP_BUY,NewTrough);
+    }
     
     if (OrderTrigger)
       if (pfEvent[NewPoly])
-        if (OpenOrder(OrderAction,EnumToString(OrderEvent)))
-          ClearOrderAction();
+        if (OrderApproved(OrderAction))
+        {
+          if (OpenOrder(OrderAction,EnumToString(OrderEvent)))
+            ClearOrderAction();
+            
+          SetEquityHold();
+        }
+            
+     if (OrderClosed()||OrderFulfilled())
+       Pause ("Order Closed/Opened","Order Event");
   }
   
 //+------------------------------------------------------------------+
@@ -484,6 +550,7 @@ void Execute(void)
     CheckSessionEvents();
     CheckFractalEvents();
     CheckPipMAEvents();
+    CheckHealth();
     
     ManageOrderEvents();
     ManageRiskEvents();
@@ -516,40 +583,46 @@ EventType AlertKey(string Event)
 void ExecAppCommands(string &Command[])
   {
     if (Command[0]=="PAUSE")
-      PauseOn                     = true;
+      PauseOn                          = true;
       
     if (Command[0]=="PLAY")
-      PauseOn                     = false;
+      PauseOn                          = false;
     
     if (Command[0]=="LOG")
     {
       if (Command[1]=="ON")
-        LoggingOn                 = true;
+        LoggingOn                      = true;
 
       if (Command[1]=="OFF")
-        LoggingOn                 = false;
+        LoggingOn                      = false;
     }
     if (Command[0]=="SHOW")
-      rsShow                      = Command[1];
+      rsShow                           = Command[1];
 
     if (Command[0]=="DISABLE")
     {
+      if (Command[1]=="TRADE"||Command[1]=="TRADING")
+        TradingOn                      = false;
+      else
       if (Command[1]=="ALL")
         ArrayInitialize(Alerts,false);
       else
       {
-        Alerts[AlertKey(Command[1])]  = false;
+        Alerts[AlertKey(Command[1])]   = false;
         Print("Alerts for "+EnumToString(EventType(AlertKey(Command[1])))+" disabled.");
       }
     }
 
     if (Command[0]=="ENABLE")
     {
+      if (Command[1]=="TRADE"||Command[1]=="TRADING")
+        TradingOn                      = true;
+      else
       if (Command[1]=="ALL")
         ArrayInitialize(Alerts,true);
       else
       {
-        Alerts[AlertKey(Command[1])]  = true;
+        Alerts[AlertKey(Command[1])]   = true;
         Print("Alerts for "+EnumToString(EventType(AlertKey(Command[1])))+" enabled.");
       }
     }
@@ -564,7 +637,7 @@ void ExecAppCommands(string &Command[])
         if (Command[2]=="DAILY")  detail[Asia].Alerts  = true;
         if (Command[2]=="ALL")
           for (int alert=Daily;alert<SessionTypes;alert++)
-           detail[alert].Alerts   = true;
+           detail[alert].Alerts        = true;
       }        
 
       if (Command[1]=="OFF")
@@ -575,7 +648,7 @@ void ExecAppCommands(string &Command[])
         if (Command[2]=="DAILY")  detail[Asia].Alerts  = false;
         if (Command[2]=="ALL")
           for (int alert=Daily;alert<SessionTypes;alert++)
-           detail[alert].Alerts   = false;
+           detail[alert].Alerts        = false;
       }        
     }
   }
@@ -617,8 +690,9 @@ int OnInit()
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     session[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
     
-    NewLabel("lbTrigger","Waiting",5,5,clrLightGray,SCREEN_LL);
-
+    NewLabel("lbTrigger","Waiting",15,5,clrLightGray,SCREEN_LL);
+    NewLabel("lbState","",5,5,clrNONE,SCREEN_LL);
+    
     ArrayInitialize(Alerts,true);
 
     for (SessionType type=Daily;type<SessionTypes;type++)

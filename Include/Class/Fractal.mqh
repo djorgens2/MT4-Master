@@ -380,11 +380,11 @@ void CFractal::CalcRetrace(void)
         
         if (this.Fibonacci(type,Retrace,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,true))
-            fEvents.SetEvent(MarketCorrection);
+            fEvents.SetEvent(NewCorrection);
 
         if (this.Fibonacci(type,Expansion,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,false))
-            fEvents.SetEvent(MarketResume);
+            fEvents.SetEvent(NewResume);
 
         if (f[type].Correction)
         {

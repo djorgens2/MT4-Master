@@ -215,16 +215,15 @@ int OnInit()
       NewPriceTag("ptOrigin","(o)",clrRed,12);
     }
    
-   if (inpShowFibo)
-   {
-     ObjectCreate("fFiboRetrace",OBJ_FIBO,0,0,0);
-     ObjectSet("fFiboRetrace",OBJPROP_LEVELCOLOR,clrMaroon);
+    if (inpShowFibo)
+    {
+      ObjectCreate("fFiboRetrace",OBJ_FIBO,0,0,0);
+      ObjectSet("fFiboRetrace",OBJPROP_LEVELCOLOR,clrMaroon);
      
-     ObjectCreate("fFiboExpansion",OBJ_FIBO,0,0,0);   
-     ObjectSet("fFiboExpansion",OBJPROP_LEVELCOLOR,clrForestGreen);
-   }
-    
-    
+      ObjectCreate("fFiboExpansion",OBJ_FIBO,0,0,0);
+      ObjectSet("fFiboExpansion",OBJPROP_LEVELCOLOR,clrForestGreen);
+    }
+
     return(INIT_SUCCEEDED);
   }
 
@@ -252,6 +251,9 @@ void OnDeinit(const int reason)
     ObjectDelete("ptTerm");
     ObjectDelete("ptTrend");
     ObjectDelete("ptOrigin");
+
+    ObjectDelete("fFiboRetrace");
+    ObjectDelete("fFiboExpansion");
 
     Comment("");
   }

@@ -168,7 +168,7 @@ void RefreshScreen()
       for (int fperiod=0;fperiod<3;fperiod++)
         UpdateLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(pmFiboPeriodId[fperiod],pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
 
-    if (pfractal.Event(MarketIdle))
+    if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
     else
     if (pfractal.Event(NewDirection))
