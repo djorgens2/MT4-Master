@@ -112,8 +112,8 @@ void CreateRange(int Bar=0)
 
      if (session.Type()==Daily)
      {
-       ObjectSet("boxForecast",OBJPROP_PRICE1,sessionHigh);
-       ObjectSet("boxForecast",OBJPROP_PRICE2,sessionLow);
+//       ObjectSet("boxForecast",OBJPROP_PRICE1,sessionHigh);
+//       ObjectSet("boxForecast",OBJPROP_PRICE2,sessionLow);
        ObjectSet("boxForecast",OBJPROP_TIME1,Time[Bar]);
        ObjectSet("boxForecast",OBJPROP_TIME2,Time[Bar]+(PERIOD_D1*60));
      }
@@ -200,7 +200,11 @@ void RefreshScreen(int Bar=0)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session.Bias())),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
       UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,DirColor(session[ActiveSession].Direction),20);
-      UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].Direction),8);
+      
+      if (session[ActiveSession].State==Trap)
+        UpdateLabel("lbActiveState"+sessionIndex,BoolToStr(session[ActiveSession].Direction==DirectionUp,"Bull Trap","Bear Trap"),clrYellow ,8);
+      else
+        UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].Direction),8);
             
       if (session.IsOpen())
         if (TimeHour(session.ServerTime(Bar))>inpHourClose-3)
@@ -249,7 +253,9 @@ int OnCalculate(const int rates_total,
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
 int OnInit()
-  {      
+  {
+    IndicatorShortName("PipMA-v6:"+EnumToString(session.Type()));
+    
     SetIndexBuffer(0,indPriorMidBuffer);
     SetIndexEmptyValue(0, 0.00);
     SetIndexStyle(0,DRAW_SECTION);
@@ -261,6 +267,9 @@ int OnInit()
     SetIndexBuffer(2,indFractalBuffer);
     SetIndexEmptyValue(2, 0.00);
     SetIndexStyle(2,DRAW_SECTION);
+    
+    if (inpType!=Daily)
+      SetIndexStyle(2,DRAW_SECTION,STYLE_SOLID,1,clrDodgerBlue);    
     
     NewLine("lnS_ActiveMid:"+sessionIndex);
     NewLine("lnS_Support:"+sessionIndex);

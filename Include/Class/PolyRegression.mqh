@@ -45,6 +45,8 @@ public:
        
     //--- Event methods
        bool     Event(EventType Event)      { return (prEvents[Event]); }         //-- returns the event signal for the specified event
+       bool     EventAlert(EventType Event, AlertLevelType AlertLevel)            //-- returns the event signal for the specified event & alert level
+                                            { return (prEvents.EventAlert(Event,AlertLevel)); }
        bool     ActiveEvent(void)           { return (prEvents.ActiveEvent()); }  //-- returns true on active event
        string   ActiveEventText(const bool WithHeader=true)
                                             { return  (prEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events
@@ -67,7 +69,8 @@ protected:
        void     UpdatePoly(void);
 
        //--- Event methods
-       void     SetEvent(EventType Event)   { prEvents.SetEvent(Event); }    //-- sets the event condition
+       void     SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
+                                 { prEvents.SetEvent(Event,AlertLevel); }    //-- sets the event condition
        void     ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }  //-- clears the event condition
        
        bool     NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
@@ -148,17 +151,17 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
     {
       switch (State)
       {
-        case Rally:       SetEvent(NewRally);
+        case Rally:       SetEvent(NewRally,Nominal);
                           break;
-        case Pullback:    SetEvent(NewPullback);
+        case Pullback:    SetEvent(NewPullback,Nominal);
                           break;
-        case Crest:       SetEvent(NewCrest);
+        case Crest:       SetEvent(NewCrest,Minor);
                           if (nsLastState==Pullback)
-                            SetEvent(NewBreakout);
+                            SetEvent(NewBreakout,Major);
                           break;
-        case Trough:      SetEvent(NewTrough);
+        case Trough:      SetEvent(NewTrough,Minor);
                           if (nsLastState==Rally)
-                            SetEvent(NewBreakout);
+                            SetEvent(NewBreakout,Major);
                           break;
       }
       
@@ -195,7 +198,7 @@ void CPolyRegression::CalcPolyState(void)
           cpState                  = Trough;
 
     if (NewState(prPolyState,cpState))
-      SetEvent(NewPolyState);
+      SetEvent(NewPolyState,Minor);
   }
 
 //+------------------------------------------------------------------+
@@ -357,7 +360,7 @@ void CPolyRegression::CalcPoly(void)
       cpTrendDir        = DirectionUp;
       
       if (IsHigher(prPolyTop,prPolyBoundary))
-        SetEvent(NewPolyBoundary);
+        SetEvent(NewPolyBoundary,Minor);
     }
 
     if (IsEqual(prPolyHead,prPolyBottom))
@@ -365,17 +368,17 @@ void CPolyRegression::CalcPoly(void)
       cpTrendDir        = DirectionDown;
 
       if (IsLower(prPolyBottom,prPolyBoundary))
-        SetEvent(NewPolyBoundary);
+        SetEvent(NewPolyBoundary,Minor);
     }
     
     if (NewDirection(prPolyTrendDir,cpTrendDir))
     {
       prPolyBoundary    = BoolToDouble(cpTrendDir==DirectionUp,prPolyTop,prPolyBottom);
-      SetEvent(NewPolyTrend);
+      SetEvent(NewPolyTrend,Minor);
     }
     
     if (NewDirection(prPolyDirection,Direction(prData[0]-prData[2])))
-      SetEvent(NewPoly);
+      SetEvent(NewPoly,Nominal);
   }
 
 
@@ -387,10 +390,10 @@ void CPolyRegression::CalcMA(void)
     double agg  = 0.00;
     
     if (IsHigher(Close[0],maTop))
-      SetEvent(NewHigh);
+      SetEvent(NewHigh,Nominal);
       
     if (IsLower(Close[0],maBottom))
-      SetEvent(NewLow);
+      SetEvent(NewLow,Nominal);
       
     maTop       = 0.00;
     maBottom    = 999.99;

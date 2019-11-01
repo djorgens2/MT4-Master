@@ -58,80 +58,85 @@ public:
                double         Low;
                double         Support;     //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
+               double         NetChange;   //--- Net change in pips from open to open
+               int            Step;        //--- Directional count from open to open
              };
              
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
             ~CSession();
 
-             SessionType   Type(void)                       {return (sType);}
-             int           SessionHour(int Measure=Now);
-             bool          IsOpen(void);
+             SessionType      Type(void)                       {return (sType);}
+             int              SessionHour(int Measure=Now);
+             bool             IsOpen(void);
              
-             bool          Event(EventType Type)            {return (sEvent[Type]);}
-             bool          ActiveEvent(void)                {return (sEvent.ActiveEvent());}
-             string        ActiveEventText(const bool WithHeader=true)
+             bool             Event(EventType Type,AlertLevelType AlertLevel)
+                                                            {return (sEvent.EventAlert(Type,AlertLevel));}
+             bool             Event(EventType Type)            {return (sEvent[Type]);}
+             AlertLevelType   AlertLevel(EventType Type)      {return (sEvent.AlertLevel(Type));}
+             bool             ActiveEvent(void)                {return (sEvent.ActiveEvent());}
+             string           ActiveEventText(const bool WithHeader=true)
                                                             {return (sEvent.ActiveEventText(WithHeader));};
              
-             datetime      ServerTime(int Bar=0);
+             datetime         ServerTime(int Bar=0);
              
-             double        Pivot(const PeriodType Type);
-             int           Bias(void);
-             double        Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
-             double        Expansion(FractalType Type, int Measure, int Format=InDecimal);     //--- returns fibonacci expansion
+             double           Pivot(const PeriodType Type);
+             int              Bias(void);
+             double           Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
+             double           Expansion(FractalType Type, int Measure, int Format=InDecimal);     //--- returns fibonacci expansion
 
-             void          Update(void);
-             void          Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
-             void          RefreshScreen(void);
+             void             Update(void);
+             void             Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
+             void             RefreshScreen(void);
 
-             string        SessionText(PeriodType Type);
+             string           SessionText(PeriodType Type);
              
-             SessionRec    operator[](const PeriodType Type) {return(srec[Type]);}
-             SessionRec    Fractal(const FractalType Type)   {return(sfractal[Type]);}
+             SessionRec       operator[](const PeriodType Type) {return(srec[Type]);}
+             SessionRec       Fractal(const FractalType Type)   {return(sfractal[Type]);}
              
                                  
 private:
 
              //--- Private Class properties
-             SessionType   sType;
+             SessionType      sType;
              
-             bool          sSessionIsOpen;
+             bool             sSessionIsOpen;
 
-             int           sHourOpen;
-             int           sHourClose;
-             int           sHourOffset;
-             int           sBar;
-             int           sBars;
-             int           sBarDay;
-             int           sBarHour;
+             int              sHourOpen;
+             int              sHourClose;
+             int              sHourOffset;
+             int              sBar;
+             int              sBars;
+             int              sBarDay;
+             int              sBarHour;
              
-             SessionRec    sfractal[FractalTypes];
-             int           sBarFE;          //--- Fractal Expansion Bar
+             SessionRec       sfractal[FractalTypes];
+             int              sBarFE;          //--- Fractal Expansion Bar
              
              //--- Private class collections
-             SessionRec    srec[PeriodTypes];
+             SessionRec       srec[PeriodTypes];
              
-             CArrayDouble *sOffMidBuffer;
-             CArrayDouble *sPriorMidBuffer;
-             CArrayDouble *sFractalBuffer;
-             CArrayDouble *sSessionRange;
+             CArrayDouble    *sOffMidBuffer;
+             CArrayDouble    *sPriorMidBuffer;
+             CArrayDouble    *sFractalBuffer;
+             CArrayDouble    *sSessionRange;
              
-             CEvent       *sEvent;
+             CEvent          *sEvent;
              
              //--- Private Methods
-             void          OpenSession(void);
-             void          CloseSession(void);
-             void          UpdateSession(void);
+             void             OpenSession(void);
+             void             CloseSession(void);
+             void             UpdateSession(void);
                           
-             void          UpdateBuffers(void);
+             void             UpdateBuffers(void);
 
-             void          LoadHistory(void);
+             void             LoadHistory(void);
              
-             bool          NewDirection(int &Direction, int NewDirection, bool Update=true);
-             bool          NewState(ReservedWords &State, ReservedWords NewState, EventType EventTrigger);
+             bool             NewDirection(int &Direction, int NewDirection, bool Update=true);
+             bool             NewState(ReservedWords &State, ReservedWords NewState, EventType EventTrigger);
 
-             void          UpdateTerm(void);
-             void          UpdateTrend(void);
-             void          UpdateOrigin(void);
+             void             UpdateTerm(void);
+             void             UpdateTrend(void);
+             void             UpdateOrigin(void);
 };
 
 //+------------------------------------------------------------------+
@@ -157,7 +162,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection, bool Update=tru
     else
     if (IsChanged(Direction,ChangeDirection,Update))
     {
-      sEvent.SetEvent(NewDirection);
+      sEvent.SetEvent(NewDirection,Nominal);
       return(true);
     }
     
@@ -205,23 +210,23 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
     { 
       switch (State)
       {
-        case Reversal:    sEvent.SetEvent(NewReversal);
+        case Reversal:    sEvent.SetEvent(NewReversal,Major);
                           break;
-        case Breakout:    sEvent.SetEvent(NewBreakout);
+        case Breakout:    sEvent.SetEvent(NewBreakout,Major);
                           break;
-        case Rally:       sEvent.SetEvent(NewRally);
+        case Rally:       sEvent.SetEvent(NewRally,Nominal);
                           break;
-        case Pullback:    sEvent.SetEvent(NewPullback);
+        case Pullback:    sEvent.SetEvent(NewPullback,Nominal);
                           break;
-        case Trap:        sEvent.SetEvent(NewTrap);
+        case Trap:        sEvent.SetEvent(NewTrap,Nominal);
                           break;
-        case Retrace:     sEvent.SetEvent(NewRetrace);
+        case Retrace:     sEvent.SetEvent(NewRetrace,Minor);
                           break;
-        case Recovery:    sEvent.SetEvent(NewRecovery);
+        case Recovery:    sEvent.SetEvent(NewRecovery,Minor);
                           break;
-        case Resume:      sEvent.SetEvent(NewResume);
+        case Resume:      sEvent.SetEvent(NewResume,Minor);
                           break;
-        case Correction:  sEvent.SetEvent(NewCorrection);
+        case Correction:  sEvent.SetEvent(NewCorrection,Major);
                           break;
       }
       
@@ -247,7 +252,7 @@ void CSession::UpdateTerm(void)
       {
         sBarFE                         = sBar;
         sfractal[ftPrior]              = ufPrior;
-        sEvent.SetEvent(NewTerm);        
+        sEvent.SetEvent(NewTerm,Minor);        
                 
         if (sfractal[ftTerm].Direction==DirectionUp)
         {
@@ -348,7 +353,7 @@ void CSession::UpdateTerm(void)
       }
       
       if (NewState(sfractal[ftTerm].State,ufState,NewTerm))
-        sEvent.SetEvent(NewTermState);
+        sEvent.SetEvent(NewTermState,Notify);
     }
   }
 
@@ -375,14 +380,14 @@ void CSession::UpdateTrend(void)
           utState                      = Retrace;
       }
 
-    //--- Check for trend boundary changes
+    //--- Check for upper trend boundary changes
     if (sfractal[ftTrend].Direction==DirectionUp)
       sfractal[ftTrend].High           = fmax(High[sBar],sfractal[ftTrend].High);
 
     if (IsHigher(High[sBar],sfractal[ftTrend].Resistance,NoUpdate))
       if (NewDirection(sfractal[ftTrend].Direction,DirectionUp))
       {
-        sEvent.SetEvent(NewTrend);
+        sEvent.SetEvent(NewTrend,Major);
 
         sfractal[ftTrend].High         = Close[sBar];
         utState                        = Reversal;
@@ -393,16 +398,17 @@ void CSession::UpdateTrend(void)
         
         if (IsHigher(High[sBar],sfractal[ftOrigin].Resistance,NoUpdate))
           if (NewDirection(sfractal[ftTrend].BreakoutDir,DirectionUp))
-            sEvent.SetEvent(NewTrend);
+            sEvent.SetEvent(NewTrend,Major);
       }
 
+    //--- Check for lower trend boundary changes
     if (sfractal[ftTrend].Direction==DirectionDown)
       sfractal[ftTrend].Low            = fmin(Low[sBar],sfractal[ftTrend].Low);
 
     if (IsLower(Low[sBar],sfractal[ftTrend].Support,NoUpdate))
       if (NewDirection(sfractal[ftTrend].Direction,DirectionDown))
       {
-        sEvent.SetEvent(NewTrend);
+        sEvent.SetEvent(NewTrend,Major);
               
         sfractal[ftTrend].Low          = Close[sBar];
         utState                        = Reversal;
@@ -413,18 +419,20 @@ void CSession::UpdateTrend(void)
         
         if (IsLower(Low[sBar],sfractal[ftOrigin].Support,NoUpdate))
           if (NewDirection(sfractal[ftTrend].BreakoutDir,DirectionDown))
-            sEvent.SetEvent(NewTrend);
+            sEvent.SetEvent(NewTrend,Major);
       }
 
+    //--- Check for critical fibo price points
+    if (FiboLevel(Expansion(ftTrend,Now))==FiboRoot)
+      utState                          = Correction;
+            
     if (NewState(sfractal[ftTrend].State,utState,NewTrend))
     {
       if (sfractal[ftTrend].State==Breakout)
-        if (NewDirection(sfractal[ftTrend].BreakoutDir,sfractal[ftTrend].Direction))
-          sEvent.SetEvent(NewBreakout);
-        else
-          sEvent.SetEvent(NewExpansion);   //--- Continuation breakout; strong trend
+        if (!NewDirection(sfractal[ftTrend].BreakoutDir,sfractal[ftTrend].Direction))
+          sEvent.SetEvent(NewExpansion,Major);   //--- Continuation breakout; strong trend
 
-      sEvent.SetEvent(NewTrendState);
+      sEvent.SetEvent(NewTrendState,Notify);
      }
   }
 
@@ -474,7 +482,7 @@ void CSession::UpdateOrigin(void)
       if (IsHigher(High[sBar],sfractal[ftOrigin].Resistance,NoUpdate))
         if (NewDirection(sfractal[ftOrigin].BreakoutDir,DirectionUp))
         {
-          sEvent.SetEvent(NewOrigin);
+          sEvent.SetEvent(NewOrigin,Critical);
           uoState                       = Reversal;
         }
         else
@@ -492,7 +500,7 @@ void CSession::UpdateOrigin(void)
       if (IsLower(Low[sBar],sfractal[ftOrigin].Support,NoUpdate))
         if (NewDirection(sfractal[ftOrigin].BreakoutDir,DirectionDown))
         {
-          sEvent.SetEvent(NewOrigin);
+          sEvent.SetEvent(NewOrigin,Critical);
           uoState                       = Reversal;
         }
         else
@@ -527,7 +535,7 @@ void CSession::UpdateOrigin(void)
     
     if (NewState(sfractal[ftOrigin].State,uoState,NewOrigin))
     {
-      sEvent.SetEvent(NewOriginState);
+      sEvent.SetEvent(NewOriginState,Notify);
       
 //      if (sBar==0) 
 //        if (Pause("Origin State Changed to "+EnumToString(uoState),"Origin Check",MB_ICONASTERISK|MB_OKCANCEL)==IDCANCEL)
@@ -555,7 +563,7 @@ void CSession::UpdateSession(void)
 
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
-      sEvent.SetEvent(NewHigh);
+      sEvent.SetEvent(NewHigh,Nominal);
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionUp))
@@ -578,7 +586,7 @@ void CSession::UpdateSession(void)
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
     {
-      sEvent.SetEvent(NewLow);
+      sEvent.SetEvent(NewLow,Nominal);
       sEvent.SetEvent(NewBoundary);
 
       if (NewDirection(srec[ActiveSession].Direction,DirectionDown))
@@ -650,7 +658,7 @@ void CSession::UpdateSession(void)
     
     if (NewState(srec[ActiveSession].State,usState,NewDirection))
     {
-      sEvent.SetEvent(NewState);
+      sEvent.SetEvent(NewState,Nominal);
 
       switch (usState)
       {
@@ -668,10 +676,20 @@ void CSession::UpdateSession(void)
       }
        
       if (sEvent[NewHigh])
+      {
+        if (!IsBetween(usArrowHigh,High[sBar],Low[sBar]))
+          usArrowHigh                   = Open[sBar];
+
         NewArrow(usArrow,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usArrowHigh,sBar);
+      }
 
       if (sEvent[NewLow])
+      {
+        if (!IsBetween(usArrowLow,High[sBar],Low[sBar]))
+          usArrowLow                    = Open[sBar];
+
         NewArrow(usArrow,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usArrowLow,sBar);
+      }
     }
   }
   
@@ -681,6 +699,13 @@ void CSession::UpdateSession(void)
 void CSession::OpenSession(void)
   {
     //-- Update OffSession Record and Indicator Buffer
+    srec[ActiveSession].NetChange         = Pivot(ActiveSession)-Pivot(OffSession);
+    
+    if (Direction(srec[ActiveSession].NetChange)==Direction(srec[OffSession].NetChange))
+      srec[ActiveSession].Step            = srec[OffSession].Step+1;
+    else
+      srec[ActiveSession].Step            = 1;
+      
     srec[OffSession]                      = srec[ActiveSession];
     sOffMidBuffer.SetValue(sBar,Pivot(ActiveSession));
 
@@ -689,18 +714,20 @@ void CSession::OpenSession(void)
     srec[ActiveSession].Support           = Open[sBar];
     srec[ActiveSession].High              = Open[sBar];
     srec[ActiveSession].Low               = Open[sBar];
+    srec[ActiveSession].NetChange         = 0.00;
+    srec[ActiveSession].Step              = 0;
     
     //<--- Check for offsession reversals
-    if (IsHigher(srec[ActiveSession].High,srec[PriorSession].High,NoUpdate))    
+    if (IsHigher(srec[ActiveSession].High,srec[PriorSession].High,NoUpdate))
       if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp,NoUpdate))
         srec[ActiveSession].High          = fdiv(srec[PriorSession].High+High[sBar],2,Digits);
 
     if (IsLower(srec[ActiveSession].Low,srec[PriorSession].Low,NoUpdate))
       if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown,NoUpdate))
        srec[ActiveSession].Low            = fdiv(srec[PriorSession].Low+Low[sBar],2,Digits);
-    
+
     //-- Set OpenSession flag
-    sEvent.SetEvent(SessionOpen);
+    sEvent.SetEvent(SessionOpen,Notify);
   }
 
 //+------------------------------------------------------------------+
@@ -711,17 +738,25 @@ void CSession::CloseSession(void)
     //-- Update Prior Record, range history, and Indicator Buffer
     sSessionRange.Insert(0,srec[ActiveSession].High-srec[ActiveSession].Low);
     
+    srec[ActiveSession].NetChange         = Pivot(ActiveSession)-Pivot(PriorSession);
+    
+    if (Direction(srec[ActiveSession].NetChange)==Direction(srec[PriorSession].NetChange))
+      srec[ActiveSession].Step            = srec[PriorSession].Step++;
+    else
+      srec[ActiveSession].Step            = 1;
+
     srec[PriorSession]                    = srec[ActiveSession];
     sPriorMidBuffer.SetValue(sBar,Pivot(PriorSession));
 
     //-- Reset Active Record
     srec[ActiveSession].Resistance        = Open[sBar];
     srec[ActiveSession].Support           = Open[sBar];
-
     srec[ActiveSession].High              = Open[sBar];
     srec[ActiveSession].Low               = Open[sBar];
+    srec[ActiveSession].NetChange         = 0.00;
+    srec[ActiveSession].Step              = 0;    
     
-    sEvent.SetEvent(SessionClose);
+    sEvent.SetEvent(SessionClose,Notify);
   }
 
 //+------------------------------------------------------------------+
@@ -770,6 +805,8 @@ void CSession::LoadHistory(void)
       srec[type].Low                 = Low[sBar];
       srec[type].Resistance          = High[sBar];
       srec[type].Support             = Low[sBar];
+      srec[type].NetChange           = 0.00;
+      srec[type].Step                = 0;
     }
 
     //--- Initialize Fibo record
@@ -856,14 +893,14 @@ void CSession::Update(void)
     //--- Test for New Day; Force close
     if (IsChanged(sBarDay,TimeDay(ServerTime(sBar))))
     {
-      sEvent.SetEvent(NewDay);
+      sEvent.SetEvent(NewDay,Notify);
       
       if (IsChanged(sSessionIsOpen,false))
         CloseSession();
     }
     
     if (IsChanged(sBarHour,TimeHour(ServerTime(sBar))))
-      sEvent.SetEvent(NewHour);
+      sEvent.SetEvent(NewHour,Notify);
 
     //--- Calc events session open/close
     if (IsChanged(sSessionIsOpen,this.IsOpen()))
@@ -876,8 +913,6 @@ void CSession::Update(void)
     UpdateTerm();
     UpdateTrend();
     UpdateOrigin();
-    
-//    RefreshScreen();    
   }
   
 //+------------------------------------------------------------------+
@@ -1008,7 +1043,8 @@ double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
 //+------------------------------------------------------------------+
 void CSession::RefreshScreen(void)
   {  
-    Comment("Prior State: "+EnumToString(sfractal[ftPrior].State)+" Direction: "+DirText(sfractal[ftPrior].Direction)+"/"+DirText(sfractal[ftPrior].BreakoutDir)+"\n"+
+    Comment("*---------- "+EnumToString(this.Type())+ "Session Fractal ----------*\n"+
+        "Prior State: "+EnumToString(sfractal[ftPrior].State)+" Direction: "+DirText(sfractal[ftPrior].Direction)+"/"+DirText(sfractal[ftPrior].BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[ftTerm].State)+" Direction: "+DirText(sfractal[ftTerm].Direction)+"/"+DirText(sfractal[ftTerm].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTerm,Max,InPercent),1)+"%"+
                        " (e) "+DoubleToStr(Expansion(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftTerm,Max,InPercent),1)+"%\n"+

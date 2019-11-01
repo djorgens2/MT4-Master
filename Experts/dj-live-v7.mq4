@@ -8,7 +8,7 @@
 #property version   "7.00"
 #property strict
 
-#define   Allow       true
+#define   Always     true
 
 #include <manual.mqh>
 #include <Class\Session.mqh>
@@ -54,9 +54,14 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         int            ActiveDir;
                         int            OpenBias;
                         int            ActiveBias;
+                        bool           Reversal;
                         int            FractalDir;
                         bool           NewFractal;
-                        bool           Reversal;
+                        int            FractalHour;
+                        int            HighHour;
+                        int            LowHour;
+                        double         ForecastHigh;
+                        double         ForecastLow;
                         double         Entry[2];
                         double         Profit[2];
                         double         Risk[2];
@@ -68,6 +73,8 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   //--- Display operationals
   string              rsShow              = "APP";
   bool                PauseOn             = true;
+  int                 PauseOnHour         = NoValue;
+  bool                ScalperOn           = false;
   bool                LoggingOn           = false;
   bool                TradingOn           = true;
   bool                Alerts[EventTypes];
@@ -82,8 +89,10 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   EventType           OrderEvent           = NoEvent;
   ReservedWords       OrderState           = NoState;
   int                 OrderStateDir        = DirectionNone;
+  
+  int                 SessionHour;
     
-  double              toBoundaryPrice      = 0.00;
+  double              toBoundarycrest      = 0.00;
   int                 toBoundaryDir        = DirectionNone;
   
   
@@ -91,11 +100,12 @@ input int       inpGMTOffset         = 0;     // GMT Offset
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
 //+------------------------------------------------------------------+
-void CallPause(string Message, bool Always=false)
+void CallPause(string Message, bool Force=false)
   {
     static string cpMessage   = "";
-    if (PauseOn||Always)
-      if (IsChanged(cpMessage,Message)||Always)
+    
+    if (PauseOn||Force)
+      if (IsChanged(cpMessage,Message)||Force)
         Pause(Message,AccountCompany()+" Event Trapper");
 
     if (LoggingOn)
@@ -120,11 +130,25 @@ void GetData(void)
   }
 
 //+------------------------------------------------------------------+
+//| ServerHour - returns the server hour adjused for gmt             |
+//+------------------------------------------------------------------+
+int ServerHour(void)
+  { 
+    return (TimeHour(session[Daily].ServerTime()));
+  }
+
+//+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   { 
     string rsComment   = "";
+
+    UpdateLabel("lbEQ",OrdersTotal(),clrLawnGreen,10);
+    if (sEvent.EventAlert(NewReversal,Caution))
+      UpdateDirection("lbState",OrderBias(),clrYellow);
+    else
+      UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()));
 
     if (rsShow=="APP")
     {
@@ -165,22 +189,31 @@ void RefreshScreen(void)
     sEvent.ClearEvents();
     rsComment    = "";
     
-    for (EventType type=0;type<EventTypes;type++)
+    for (EventType type=1;type<EventTypes;type++)
       if (Alerts[type]&&pfractal.Event(type))
       {
         rsComment   = "PipMA "+pfractal.ActiveEventText()+"\n";
         break;
       }
 
+    for (EventType type=1;type<EventTypes;type++)
+      if (Alerts[type]&&fractal.Event(type))
+      {
+        rsComment   = "Fractal "+fractal.ActiveEventText()+"\n";
+        break;
+      }
+
     for (SessionType show=Daily;show<SessionTypes;show++)
       if (detail[show].Alerts)
-        for (EventType type=0;type<EventTypes;type++)
+        for (EventType type=1;type<EventTypes;type++)
           if (Alerts[type]&&session[show].Event(type))
           {
-            if (session[show].Event(NewFractal))
+            if (type==NewFractal)
             {
               if (!detail[show].NewFractal)
                 sEvent.SetEvent(type);
+                
+              detail[show].FractalHour = ServerHour();
             }
             else
               sEvent.SetEvent(type);
@@ -232,158 +265,73 @@ bool NewBias(int &Now, int New)
   }
 
 //+------------------------------------------------------------------+
-//| SetDailyAction - Prepare the daily strategy                      |
-//+------------------------------------------------------------------+
-void SetAsiaAction(void)
-  {
-    if (session[Asia].Event(SessionOpen))
-    {}
-    else
-    if (session[Asia].IsOpen())
-    {}
-    else
-    {}
-  }
-
-//+------------------------------------------------------------------+
-//| SetDailyAction - Prepare the daily strategy                      |
-//+------------------------------------------------------------------+
-void SetDailyAction(void)
-  {
-    ArrayCopy(history,detail);
-    
-    //-- Build forecast
-    
-    
-//    if (IsHigher(session[Daily][OffSession].High,session[Daily][PriorSession].High,NoUpdate)
-//         || IsLower(session[Daily][OffSession].Low,session[Daily][PriorSession].Low,NoUpdate))
-//    {
-//      toEvent.SetEvent(OutOfBounds);
-//      
-//      if (NewDirection(toBoundaryDir,session[Daily].Fractal(ftTerm).Direction))
-//        toEvent.SetEvent(NewFractal);
-//
-//      toBoundaryPrice              = BoolToDouble(toBoundaryDir==DirectionUp,session[Daily].Fractal(ftTerm).High,session[Daily].Fractal(ftTerm).Low);
-//    }
-//    else
-//    {
-//      if (NewDirection(toBoundaryDir,session[Daily][PriorSession].Direction))
-//        toEvent.SetEvent(NewDirection);
-//
-//      toBoundaryPrice              = BoolToDouble(toBoundaryDir==DirectionUp,session[Daily][PriorSession].High,session[Daily][PriorSession].Low);
-//    };
-
-    //--- Reset Session Detail for this trading day
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-      detail[type].FractalDir      = DirectionNone;
-      detail[type].NewFractal      = false;
-      detail[type].Reversal        = false;
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| SetHourlyAction - sets session hold/hedge detail by type hourly  |
-//+------------------------------------------------------------------+
-void SetHourlyAction(void)
-  {
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-      detail[type].NewFractal      = false;
-    }  
-  }
-
-//+------------------------------------------------------------------+
-//| SetOpenAction - sets session hold/hedge detail by type on open   |
-//+------------------------------------------------------------------+
-void SetOpenAction(SessionType Type)
-  {
-    if (NewDirection(detail[Type].OpenDir,Direction(session[Type].Pivot(OffSession)-session[Type].Pivot(PriorSession))))
-      sEvent.SetEvent(NewDirection);
-      
-    if (NewBias(detail[Type].OpenBias,session[Type].Bias()))
-      sEvent.SetEvent(NewTradeBias);
-
-    switch (Type)
-    {
-      case Daily:   SetDailyAction();
-                    break;
-      case Asia:    SetAsiaAction();
-                    break;
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| SetOpenAction - sets session hold/hedge detail by type on open   |
-//+------------------------------------------------------------------+
-void SetHourlyAction(SessionType Type)
-  {
-    sEvent.SetEvent(NewHour);
-    
-    //-- Reset hourly action flags
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-    }    
-  }
-
-//+------------------------------------------------------------------+
 //| CheckSessionEvents - updates trading strategy on session events  |
 //+------------------------------------------------------------------+
 void CheckSessionEvents(void)
   {          
-    bool cseIsValid                = false;
-
+    bool cseIsValid;
+    
     sEvent.ClearEvents();
     
+    //-- Set General Notification Events
+    if (session[Daily].Event(NewDay))
+      sEvent.SetEvent(NewDay);
+      
     if (session[Daily].Event(NewHour))
-      SetHourlyAction();
-    
+      sEvent.SetEvent(NewHour);
+      
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
+      //-- Set Session Notification Events
       if (session[type].Event(SessionOpen))
-        SetOpenAction(type);
-
-      if (NewDirection(detail[type].ActiveDir,Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession))))
-        sEvent.SetEvent(NewDirection);
-
-      if (NewBias(detail[type].ActiveBias,session[type].Bias()))
-        sEvent.SetEvent(NewTradeBias);
+        sEvent.SetEvent(SessionOpen);
         
-      if (NewDirection(detail[type].FractalDir,session[type].Fractal(ftTerm).Direction))
-      {
-        detail[type].Reversal      = true;
-        
-        sEvent.SetEvent(NewReversal);
-        
-        if (type==Daily)
-          sEvent.SetEvent(NewMajor);
-        else
-          sEvent.SetEvent(NewMinor);
-      }
-      
-      if (session[type].Event(NewState))
-      {
-        if (session[type].Event(MidSessionReversal))
-          OrderStateDir     = Direction(session[type][ActiveSession].Direction,InDirection,Contrarian);
-        else
-          OrderStateDir     = session[type][ActiveSession].Direction;
-
-        sEvent.SetEvent(NewState);
-      }
+      //-- Evaluate and Set Session Fractal Events
+      if (session[type].Event(NewOriginState))
+        sEvent.SetEvent(NewOriginState,session[type].AlertLevel(NewOriginState));
 
       if (session[type].Event(NewFractal))
-        if (IsChanged(detail[type].NewFractal,true))
-          sEvent.SetEvent(NewFractal);
+      {
+        detail[type].NewFractal       = true;
+
+        if (type==Daily)
+        {
+          sEvent.SetEvent(NewFractal,Major);
+          
+//          if (
+        }
+        else
+          sEvent.SetEvent(NewFractal,Minor);
+      }
           
       if (session[type].Event(NewTerm))
-          sEvent.SetEvent(NewTerm);
+        sEvent.SetEvent(NewTerm,session[type].AlertLevel(NewTerm));
         
       if (session[type].Event(NewTrend))
-          sEvent.SetEvent(NewTrend);
+        sEvent.SetEvent(NewTrend,session[type].AlertLevel(NewTrend));
 
       if (session[type].Event(NewOrigin))
-          sEvent.SetEvent(NewOrigin);
+        sEvent.SetEvent(NewOrigin,session[type].AlertLevel(NewOrigin));
+        
+      if (session[type].Event(NewState))
+        sEvent.SetEvent(NewState,Nominal);       
 
+      //--- Session detail operational checks
+      if (session[type].Event(NewHigh))
+        detail[type].HighHour       = ServerHour();
+
+      if (session[type].Event(NewLow))
+        detail[type].LowHour        = ServerHour();
+
+      if (NewDirection(detail[type].ActiveDir,Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession))))
+        sEvent.SetEvent(NewPivot,Major);
+
+      if (NewBias(detail[type].ActiveBias,session[type].Bias()))
+        sEvent.SetEvent(NewBias,Minor);
+        
+      if (NewDirection(detail[type].FractalDir,session[type].Fractal(ftTerm).Direction))
+        detail[type].Reversal      = true;
+      
       cseIsValid                   = detail[type].IsValid;
 
       if (detail[type].ActiveDir==detail[type].OpenDir)
@@ -392,8 +340,8 @@ void CheckSessionEvents(void)
             cseIsValid             = true;
 
       if (IsChanged(detail[type].IsValid,cseIsValid))
-        sEvent.SetEvent(MarketCorrection);
-    }
+        sEvent.SetEvent(NewAction,Major);
+    }    
   }
   
 //+------------------------------------------------------------------+
@@ -404,20 +352,110 @@ void CheckFractalEvents(void)
     fEvent.ClearEvents();
 
     if (fractal.ActiveEvent())
-      if (fractal.Event(NewMajor))
-        CallPause("Fractal Major");
+    {
+      if (fractal.EventAlert(NewOrigin,Major))
+        fEvent.SetEvent(NewOrigin,Major);
+
+      if (fractal.EventAlert(NewRetrace,Major))
+        fEvent.SetEvent(NewRetrace,Major);
+
+      if (fractal.EventAlert(NewCorrection,Major))
+        fEvent.SetEvent(NewCorrection,Major);
+
+      if (fractal.EventAlert(NewResume,Major))
+        fEvent.SetEvent(NewResume,Major);
+
+      if (fractal.EventAlert(NewReversal,Major))
+        fEvent.SetEvent(NewReversal,Major);
+
+      if (fractal.EventAlert(NewBreakout,Major))
+        fEvent.SetEvent(NewBreakout,Major);
+
+      if (fractal.EventAlert(NewFibonacci,Major))
+        fEvent.SetEvent(NewFibonacci,Major);
+
+      if (fractal.EventAlert(NewFibonacci,Minor))
+        fEvent.SetEvent(NewFibonacci,Minor);
+    }
   }
 
 //+------------------------------------------------------------------+
-//| SetLine - Sets the crest/trough lines based on rally/pullback    |
+//| Draw - Paint Crest/Trough lines                                  |
 //+------------------------------------------------------------------+
-void SetLine(void)
-  {    
-    if (pfractal.Event(NewCrest))
-      UpdatePriceLabel("lbCrest",Close[0],BoolToInt(pfractal.Event(NewBreakout),clrYellow,clrGoldenrod));
-       
-    if (pfractal.Event(NewTrough))
-      UpdatePriceLabel("lbTrough",Close[0],BoolToInt(pfractal.Event(NewBreakout),clrRed,clrFireBrick));
+void Draw(EventType Event, bool NewEvent=true)
+  {
+    static    int crestidx          = 0;
+    static    int troughidx         = 0;
+    
+    static double crest[4];
+    static double trough[4];
+
+    if (NewEvent)
+      switch (Event)
+      {
+        case NewCrest:  toEvent.SetEvent(NewCrest);
+                        crestidx++;
+                       
+                        ObjectCreate("lnCrestHL"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+                        ObjectCreate("lnCrestOC"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+                     
+                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_COLOR,clrYellow);
+                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_RAY,false);
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_RAY,false);
+                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_WIDTH,2);
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_WIDTH,8);
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_BACK,true);
+
+                        ArrayInitialize(crest,Close[0]);
+
+                        break;
+                        
+        case NewTrough: toEvent.SetEvent(NewTrough);
+                        troughidx++;
+
+                        ObjectCreate("lnTroughHL"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+                        ObjectCreate("lnTroughOC"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+
+                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_COLOR,clrRed);
+                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_RAY,false);
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_RAY,false);
+                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_WIDTH,2);
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_WIDTH,8);
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_BACK,true);
+                       
+                        ArrayInitialize(trough,Close[0]);
+      }
+      
+    switch (Event)
+    {
+      case NewCrest:  if (IsHigher(Close[0],crest[1]))
+                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_PRICE1,Close[0]);
+                      else
+                      if (IsLower(Close[0],crest[2]))
+                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_PRICE2,Close[0]);
+
+                      ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_PRICE2,Close[0]);
+
+                      if (IsLower(Close[0],crest[0],NoUpdate))
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_COLOR,clrMaroon);
+                      else
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_COLOR,clrForestGreen);
+                   
+                      break;
+
+      case NewTrough: if (IsHigher(Close[0],trough[1]))
+                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_PRICE1,Close[0]);
+                      else
+                      if (IsLower(Close[0],trough[2]))
+                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_PRICE2,Close[0]);
+
+                      ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_PRICE2,Close[0]);
+
+                      if (IsLower(Close[0],trough[0],NoUpdate))
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_COLOR,clrMaroon);
+                      else
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_COLOR,clrForestGreen);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -427,13 +465,19 @@ void CheckPipMAEvents(void)
   {    
     pfEvent.ClearEvents();
 
-    for (EventType pf=0;pf<EventTypes;pf++)
+    for (EventType pf=1;pf<EventTypes;pf++)
     switch (pf)
     {
       case NewCrest:       
-      case NewTrough:       SetLine();
-      case NewMinor:
-      case NewMajor:
+      case NewTrough:      if (pfractal.Event(pf))
+                             Draw(pf);
+                           else
+                           if (toEvent[pf])
+                             if (pfractal.PolyState()==Crest||pfractal.PolyState()==Trough)
+                               Draw(pf,sEvent[NewHour]);
+                             else
+                               toEvent.ClearEvent(pf);
+      case NewFibonacci:
       case NewHigh:
       case NewLow:
       case NewPoly:
@@ -443,20 +487,6 @@ void CheckPipMAEvents(void)
                             break;
     }
   }
-
-//+------------------------------------------------------------------+
-//| CheckHealth - Verify health and safety of open positions         |
-//+------------------------------------------------------------------+
-void CheckHealth(void)
-  {
-   UpdateLabel("lbEQ",OrdersTotal(),clrLawnGreen,10);
-    if (sEvent[NewState])
-    {
-      UpdateDirection("lbState",OrderStateDir,DirColor(OrderStateDir));
-//      CallPause("New State Event", false);
-    }
-  }
-  
 
 //+------------------------------------------------------------------+
 //| SetOrderAction - updates session detail on a new order event     |
@@ -482,8 +512,6 @@ void ClearOrderAction(void)
     OrderEvent                     = NoEvent;
 
     UpdateLabel("lbTrigger","Waiting",clrLightGray);
-
-    CallPause("Order opened!");    
   }
 
 //+------------------------------------------------------------------+
@@ -499,6 +527,27 @@ bool OrderApproved(int Action)
     return (false);
   }
 
+//+------------------------------------------------------------------+
+//| OrderBias - Trade direction/action all factors considered        |
+//+------------------------------------------------------------------+
+int OrderBias(int Measure=InDirection)
+  {
+    static int odDirection      = DirectionNone;
+    
+    if (ServerHour()>3)
+      odDirection               = Direction(detail[Daily].HighHour-detail[Daily].LowHour);
+      
+    return (odDirection);
+   
+   if (lead.SessionHour()>4)
+     if ((lead[ActiveSession].Direction!=Direction(Close[0]-lead.Pivot(ActiveSession))))
+       sEvent.SetEvent(NewReversal,Caution);    
+  
+    if (sEvent.EventAlert(NewReversal,Caution))
+      return(Direction(lead[ActiveSession].Direction,InDirection,Contrarian));
+
+    return (lead[ActiveSession].Direction);
+  }
 
 //+------------------------------------------------------------------+
 //| ManageOrderEvents - Check events when activated by order event   |
@@ -527,8 +576,8 @@ void ManageOrderEvents(void)
           SetEquityHold();
         }
             
-     if (OrderClosed()||OrderFulfilled())
-       Pause ("Order Closed/Opened","Order Event");
+//     if (OrderClosed()||OrderFulfilled())
+//       Pause ("Order Closed/Opened","Order Event");
   }
   
 //+------------------------------------------------------------------+
@@ -540,7 +589,139 @@ void ManageRiskEvents(void)
     //-- 2. Calculate risk sliders Net EQ, Net Action Neg, Net Position Neg
 
   }
-  
+
+//+------------------------------------------------------------------+
+//| SetNewDayPlan - Prepare the daily strategy                       |
+//+------------------------------------------------------------------+
+void SetNewDayPlan(void)
+  {
+    ArrayCopy(history,detail);
+    
+    //--- Reset Session Detail for this trading day
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      detail[type].FractalDir      = DirectionNone;
+      detail[type].NewFractal      = false;
+      detail[type].Reversal        = false;
+      detail[type].HighHour        = ServerHour();
+      detail[type].LowHour         = ServerHour();
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| SetHourlyPlan - sets session hold/hedge detail by type hourly    |
+//+------------------------------------------------------------------+
+void SetHourlyPlan(void)
+  {
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      detail[type].NewFractal      = false;
+    }  
+  }
+
+//+------------------------------------------------------------------+
+//| SetOpenPlan - sets session hold/hedge detail by type on open     |
+//+------------------------------------------------------------------+
+void SetOpenPlan(SessionType Type)
+  {
+    if (NewDirection(detail[Type].OpenDir,Direction(session[Type].Pivot(OffSession)-session[Type].Pivot(PriorSession))))
+      sEvent.SetEvent(NewPivot,Major);
+      
+    if (NewBias(detail[Type].OpenBias,session[Type].Bias()))
+      sEvent.SetEvent(NewBias);
+      
+    //--- Basic forecast model
+    if (Type==Daily)
+    {
+      if (lead[OffSession].Step==1)  //--- Reversal day
+        if (Direction(lead[OffSession].NetChange)==DirectionUp)
+        {
+//          Print("Reversal forecast (Higher): "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
+
+          detail[Daily].ForecastHigh    = lead[PriorSession].High+(lead[OffSession].High-lead[OffSession].Low);
+          detail[Daily].ForecastLow     = lead[PriorSession].Low+lead[PriorSession].NetChange;
+        }
+        else
+        {
+//          Print("Reversal forecast (Lower): "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
+          
+          detail[Daily].ForecastHigh    = lead[PriorSession].High+lead[PriorSession].NetChange;
+          detail[Daily].ForecastLow     = lead[PriorSession].Low-(lead[OffSession].High-lead[OffSession].Low);
+        }
+      else
+      {
+//        Print("Resume forecast: "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
+
+        detail[Daily].ForecastHigh      = lead[PriorSession].High+lead[PriorSession].NetChange;
+        detail[Daily].ForecastLow       = lead[PriorSession].Low+lead[PriorSession].NetChange;
+      }
+
+//      ObjectSet("boxForecast",OBJPROP_crest1,detail[Daily].ForecastHigh);
+//      ObjectSet("boxForecast",OBJPROP_crest2,detail[Daily].ForecastLow);      
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| AnalyzeData - Verify health and safety of open positions         |
+//+------------------------------------------------------------------+
+void AnalyzeData(void)
+  {
+    if (sEvent[NewDay])
+      SetNewDayPlan();
+      
+    if (sEvent[NewHour])
+      SetHourlyPlan();
+      
+    if (sEvent[SessionOpen])
+      SetOpenPlan(lead.Type());
+      
+
+  }
+
+//+------------------------------------------------------------------+
+//| Scalper                                                          |
+//+------------------------------------------------------------------+
+void Scalper(void)
+  {
+    static int sActionHigh   = OP_NO_ACTION;
+    static int sActionLow    = OP_NO_ACTION;
+
+    if (sEvent[NewDay])
+    {
+      sActionHigh            = OP_NO_ACTION;
+      sActionLow             = OP_NO_ACTION;
+    }
+    
+    if (IsBetween(detail[Daily].HighHour,9,11))
+      sActionHigh            = OP_SELL;
+
+    if (IsBetween(detail[Daily].LowHour,9,11))
+      sActionLow             = OP_BUY;
+
+    if (ScalperOn)
+    {        
+      if (sActionHigh==OP_SELL)
+        if (pfractal.Event(NewCrest))
+          if (OpenOrder(sActionHigh,"Scalper"))
+            sActionHigh        = OP_NO_ACTION;
+    
+      if (sActionLow==OP_BUY)
+        if (pfractal.Event(NewTrough))
+          if (OpenOrder(sActionHigh,"Scalper"))
+            sActionLow         = OP_NO_ACTION; 
+          
+      if (ServerHour()>11)
+        if (EquityPercent(Now)<0.00)
+          CloseOrders(CloseAll);   
+
+      if (ServerHour()>15)
+      {
+        CloseOrders(CloseAll);
+        sActionHigh             = OP_NO_ACTION;
+        sActionLow              = OP_NO_ACTION;
+      }
+    }
+  }
 
 //+------------------------------------------------------------------+
 //| Execute                                                          |
@@ -550,7 +731,16 @@ void Execute(void)
     CheckSessionEvents();
     CheckFractalEvents();
     CheckPipMAEvents();
-    CheckHealth();
+
+    if (PauseOnHour>NoValue)
+      if (sEvent[NewHour])
+        if (ServerHour()==PauseOnHour)
+          CallPause("Pause requested on Server Hour "+IntegerToString(PauseOnHour),Always);
+      
+
+    Scalper();
+
+    AnalyzeData();
     
     ManageOrderEvents();
     ManageRiskEvents();
@@ -564,7 +754,7 @@ EventType AlertKey(string Event)
   {
     string akType;
     
-    for (EventType type=0;type<EventTypes;type++)
+    for (EventType type=1;type<EventTypes;type++)
     {
       akType           = EnumToString(type);
 
@@ -583,73 +773,89 @@ EventType AlertKey(string Event)
 void ExecAppCommands(string &Command[])
   {
     if (Command[0]=="PAUSE")
+    {
       PauseOn                          = true;
+
+      if (Command[1]=="")
+        PauseOnHour                    = NoValue;
+      else
+        PauseOnHour                    = (int)StringToInteger(Command[1]);
+    }
       
     if (Command[0]=="PLAY")
       PauseOn                          = false;
     
-    if (Command[0]=="LOG")
-    {
-      if (Command[1]=="ON")
-        LoggingOn                      = true;
-
-      if (Command[1]=="OFF")
-        LoggingOn                      = false;
-    }
     if (Command[0]=="SHOW")
       rsShow                           = Command[1];
 
     if (Command[0]=="DISABLE")
     {
-      if (Command[1]=="TRADE"||Command[1]=="TRADING")
+      if (Command[1]=="ASIA")   detail[Asia].Alerts    = false;
+      else      
+      if (Command[1]=="EUROPE") detail[Europe].Alerts  = false;
+      else      
+      if (Command[1]=="US")     detail[US].Alerts      = false;
+      else      
+      if (Command[1]=="DAILY")  detail[Daily].Alerts   = false;
+      else      
+      if (StringSubstr(Command[1],0,5)=="SCALP")
+         ScalperOn                     = false;
+      else
+      if (StringSubstr(Command[1],0,3)=="LOG")
+        LoggingOn                      = false;
+      else      
+      if (StringSubstr(Command[1],0,4)=="TRAD")
         TradingOn                      = false;
       else
-      if (Command[1]=="ALL")
+      if (Command[1]=="ALL")  
+      {
         ArrayInitialize(Alerts,false);
+
+        for (int alert=Daily;alert<SessionTypes;alert++)
+         detail[alert].Alerts          = false;
+      }   
       else
       {
         Alerts[AlertKey(Command[1])]   = false;
-        Print("Alerts for "+EnumToString(EventType(AlertKey(Command[1])))+" disabled.");
+        Command[1]                     = EnumToString(EventType(AlertKey(Command[1])));
       }
+      
+      Print("Alerts for "+Command[1]+" disabled.");
     }
 
     if (Command[0]=="ENABLE")
     {
-      if (Command[1]=="TRADE"||Command[1]=="TRADING")
+      if (Command[1]=="ASIA")   detail[Asia].Alerts    = true;
+      else
+      if (Command[1]=="EUROPE") detail[Europe].Alerts  = true;
+      else
+      if (Command[1]=="US")     detail[US].Alerts      = true;
+      else
+      if (Command[1]=="DAILY")  detail[Daily].Alerts   = true;
+      else
+      if (StringSubstr(Command[1],0,5)=="SCALP")
+         ScalperOn                     = true;
+      else
+      if (StringSubstr(Command[1],0,3)=="LOG")
+        LoggingOn                      = true;
+      else      
+      if (StringSubstr(Command[1],0,4)=="TRAD")
         TradingOn                      = true;
       else
       if (Command[1]=="ALL")
+      {
         ArrayInitialize(Alerts,true);
+
+        for (int alert=Daily;alert<SessionTypes;alert++)
+         detail[alert].Alerts        = true;
+      }
       else
       {
         Alerts[AlertKey(Command[1])]   = true;
-        Print("Alerts for "+EnumToString(EventType(AlertKey(Command[1])))+" enabled.");
+        Command[1]                     = EnumToString(EventType(AlertKey(Command[1])));
       }
-    }
-
-    if (Command[0]=="ALERT")
-    {
-      if (Command[1]=="ON")
-      {
-        if (Command[2]=="ASIA")   detail[Asia].Alerts  = true;
-        if (Command[2]=="EUROPE") detail[Asia].Alerts  = true;
-        if (Command[2]=="US")     detail[Asia].Alerts  = true;
-        if (Command[2]=="DAILY")  detail[Asia].Alerts  = true;
-        if (Command[2]=="ALL")
-          for (int alert=Daily;alert<SessionTypes;alert++)
-           detail[alert].Alerts        = true;
-      }        
-
-      if (Command[1]=="OFF")
-      {
-        if (Command[2]=="ASIA")   detail[Asia].Alerts  = false;
-        if (Command[2]=="EUROPE") detail[Asia].Alerts  = false;
-        if (Command[2]=="US")     detail[Asia].Alerts  = false;
-        if (Command[2]=="DAILY")  detail[Asia].Alerts  = false;
-        if (Command[2]=="ALL")
-          for (int alert=Daily;alert<SessionTypes;alert++)
-           detail[alert].Alerts        = false;
-      }        
+      
+      Print("Alerts for "+Command[1]+" enabled.");
     }
   }
 
@@ -701,7 +907,6 @@ int OnInit()
       detail[type].ActiveDir    = DirectionNone;
       detail[type].OpenBias     = OP_NO_ACTION;
       detail[type].ActiveBias   = OP_NO_ACTION;
-//      detail[type].Strategy     = NoStrategy;
       detail[type].IsValid      = false;
       detail[type].FractalDir   = DirectionNone;
       detail[type].Reversal     = false;

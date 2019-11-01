@@ -239,10 +239,10 @@ void CPipRegression::CalcMA(void)
       ClearEvent(NewBoundary);
         
       if (NormalizeDouble(Close[0],Digits)>=NormalizeDouble(ptrPriceHigh,Digits))
-        SetEvent(NewHigh);
+        SetEvent(NewHigh,Nominal);
         
       if (NormalizeDouble(Close[0],Digits)<=NormalizeDouble(ptrPriceLow,Digits))
-        SetEvent(NewLow);
+        SetEvent(NewLow,Nominal);
         
       if (Event(NewHigh)||Event(NewLow))
       {

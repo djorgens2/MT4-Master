@@ -16,20 +16,29 @@
 class CEvent
   {
 protected:
+       enum     AlertLevelType
+                {
+                  NoAlert,
+                  Notify,
+                  Caution,
+                  Nominal,
+                  Minor,
+                  Major,
+                  Critical
+                };
+
        enum     EventType
                 {
                   NoEvent,
                   NewDirection,
                   NewFractal,
+                  NewFibonacci,
                   NewPivot,
                   NewStdDev,
-                  NewMajor,
-                  NewMinor,
                   NewFOC,
-                  TrendWane,
-                  TrendResume,
-                  TrendCorrection,
                   NewState,
+                  NewAction,
+                  NewBias,
                   NewRange,
                   NewTerm,
                   NewTrend,
@@ -41,14 +50,13 @@ protected:
                   NewRecovery,
                   NewPoly,
                   NewPolyTrend,
-                  NewPolyBoundary,       
+                  NewPolyBoundary,
                   NewPolyState,
                   NewOriginState,
                   NewTrendState,
                   NewTermState,
                   NewHigh,
                   NewLow,
-                  NewTradeBias,
                   NewBoundary,
                   NewBreakout,
                   NewReversal,
@@ -59,8 +67,8 @@ protected:
                   NewTrough,
                   NewCorrection,
                   NewIdle,
+                  NewWane,
                   NewResume,
-                  MidSessionReversal,
                   SessionOpen,
                   SessionClose,
                   NewDay,
@@ -70,17 +78,25 @@ protected:
                 
 private:
 
-      bool eEvents[EventTypes];
-      bool eActiveEvent;
+      bool           eEvents[EventTypes];
+      
+      AlertLevelType eAlerts[EventTypes];
+      AlertLevelType eMaxAlert;
 
 public:
-                     CEvent(){};
+                     CEvent(){ClearEvents();};
                     ~CEvent(){};
 
-      void           SetEvent(EventType Event);
+      void           SetEvent(EventType Event, AlertLevelType AlertLevel=Notify);
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
-      bool           ActiveEvent(void)  {return(eActiveEvent);}
+
+      bool           EventAlert(EventType Event, AlertLevelType AlertLevel)
+                                                 {return (eAlerts[Event]==AlertLevel);}
+      AlertLevelType AlertLevel(EventType Event) {return (eAlerts[Event]);}
+      AlertLevelType HighAlert(void)             {return (eMaxAlert);}
+
+      bool           ActiveEvent(void)           {return(!eEvents[NoEvent]);}
       string         ActiveEventText(bool WithHeader=true);
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
@@ -90,10 +106,15 @@ public:
 //+------------------------------------------------------------------+
 //| SetEvent - Sets the triggering event to true                     |
 //+------------------------------------------------------------------+
-void CEvent::SetEvent(EventType Event)
+void CEvent::SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
   {
-    eEvents[Event] = true;
-    eActiveEvent   = true;
+    if (Event==NoEvent)
+      return;
+
+    eEvents[NoEvent]         = false;
+    eEvents[Event]           = true;
+    eAlerts[Event]           = fmax(AlertLevel,eAlerts[Event]);
+    eMaxAlert                = fmax(AlertLevel,eMaxAlert);
   }
   
 //+------------------------------------------------------------------+
@@ -101,14 +122,19 @@ void CEvent::SetEvent(EventType Event)
 //+------------------------------------------------------------------+
 void CEvent::ClearEvent(EventType Event)
   {
-    eActiveEvent   = false;
-    eEvents[Event] = false;
+    if (Event==NoEvent)
+      return;
+
+    eEvents[NoEvent]         = true;
+    eEvents[Event]           = false;
+    eAlerts[Event]           = NoAlert;
+    eMaxAlert                = NoAlert;
     
     for (EventType event=NewDirection;event<EventTypes;event++)
       if (eEvents[event])
       {
-        eActiveEvent   = true;
-        break;
+        eEvents[NoEvent]     = false;
+        eMaxAlert            = fmax(eAlerts[event],eMaxAlert);
       }
   }
   
@@ -117,8 +143,11 @@ void CEvent::ClearEvent(EventType Event)
 //+------------------------------------------------------------------+
 void CEvent::ClearEvents(void)
   {
-    ArrayInitialize(eEvents,false);
-    eActiveEvent   = false;
+    ArrayInitialize(eEvents,false);    
+    ArrayInitialize(eAlerts,NoAlert);
+    
+    eEvents[NoEvent]         = true;
+    eMaxAlert                = NoAlert;
   }
   
 //+------------------------------------------------------------------+
@@ -135,7 +164,7 @@ string CEvent::ActiveEventText(bool WithHeader=true)
     {
       for (EventType event=NewDirection;event<EventTypes;event++)
         if (eEvents[event])
-          Append(aeActiveEvents, EnumToString(event), "\n");
+          Append(aeActiveEvents, EnumToString(eAlerts[event])+":"+EnumToString(event), "\n");
     }
     else Append(aeActiveEvents, "No Active Events", "\n");
     

@@ -128,7 +128,11 @@ public:
        bool          IsBreakout(RetraceType Type)    { if (this[Type].Breakout) return (true); return (false); }
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
+       bool          EventAlert(EventType Event, AlertLevelType AlertLevel)
+                                                     { return (fEvents.EventAlert(Event,AlertLevel));}       
        bool          ActiveEvent(void)               { return (fEvents.ActiveEvent()); }
+       string        ActiveEventText(const bool WithHeader=true)
+                                                     { return  (fEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events
        
        FractalRec operator[](const RetraceType Type) const { return(f[Type]); }
   };
@@ -200,20 +204,20 @@ void CFractal::CalcOrigin(void)
     if (fStateMajor==Expansion)
       if (Event(NewFractal))
         if (f[Expansion].Price>fmax(dOrigin.Top,dOrigin.Price) || f[Expansion].Price<fmin(dOrigin.Bottom,dOrigin.Price))
-          fEvents.SetEvent(NewOrigin);
+          fEvents.SetEvent(NewOrigin,Major);
         else
         if (f[Expansion].Direction==DirectionUp)
-          fEvents.SetEvent(NewRally);
+          fEvents.SetEvent(NewRally,Minor);
         else
-          fEvents.SetEvent(NewPullback);
+          fEvents.SetEvent(NewPullback,Minor);
       else
       if (f[Expansion].Direction!=dOrigin.Direction)
       {
         if (f[Expansion].Direction==DirectionUp && f[Expansion].Price>dOrigin.Price)
-          fEvents.SetEvent(NewOrigin);
+          fEvents.SetEvent(NewOrigin,Major);
     
         if (f[Expansion].Direction==DirectionDown && f[Expansion].Price<dOrigin.Price)
-          fEvents.SetEvent(NewOrigin);
+          fEvents.SetEvent(NewOrigin,Major);
       }
 
     if (Event(NewRally)||Event(NewPullback))
@@ -222,7 +226,7 @@ void CFractal::CalcOrigin(void)
         dOrigin.State            = Trap;
       else
         if (f[Expansion].Direction == dOrigin.Direction)
-          dOrigin.State          = Continuation;
+          dOrigin.State          = Resume;
         else
           dOrigin.State          = Reversal;
     }
@@ -266,7 +270,7 @@ void CFractal::CalcOrigin(void)
       }
     else
         
-    if (Event(NewMajor))
+    if (fEvents.EventAlert(NewFibonacci,Major))
     {
       if (fStateMajor==Divergent)
       {
@@ -285,7 +289,7 @@ void CFractal::CalcOrigin(void)
       if (fStateMajor==Convergent)
       {
         if (f[Expansion].Direction == dOrigin.Direction)
-          dOrigin.State          = Continuation;
+          dOrigin.State          = Resume;
         else
           dOrigin.State          = Retrace;      
       }
@@ -298,7 +302,7 @@ void CFractal::CalcOrigin(void)
     }
     
     if (IsChanged(coState,dOrigin.State))
-      fEvents.SetEvent(NewState);
+      fEvents.SetEvent(NewOriginState,Major);
   }
         
 //+------------------------------------------------------------------+
@@ -380,23 +384,23 @@ void CFractal::CalcRetrace(void)
         
         if (this.Fibonacci(type,Retrace,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,true))
-            fEvents.SetEvent(NewCorrection);
+            fEvents.SetEvent(NewCorrection,Major);
 
         if (this.Fibonacci(type,Expansion,Now)>=1-FiboPercent(Fibo23))
           if (IsChanged(f[type].Correction,false))
-            fEvents.SetEvent(NewResume);
+            fEvents.SetEvent(NewResume,Major);
 
         if (f[type].Correction)
         {
           if (this.Fibonacci(type,Expansion,Now)>=FiboPercent(Fibo50))
             if (IsChanged(f[type].Retrace,false))
-              fEvents.SetEvent(NewRetrace);
+              fEvents.SetEvent(NewRetrace,Major);
         }
         else
         {
           if (this.Fibonacci(type,Retrace,Now)>=FiboPercent(Fibo50))
             if (IsChanged(f[type].Retrace,true))
-              fEvents.SetEvent(NewRetrace);
+              fEvents.SetEvent(NewRetrace,Major);
         }
       }
       
@@ -423,10 +427,10 @@ void CFractal::CalcRetrace(void)
 
     //--- Calc fractal change events
     if (IsChanged(fStateMinor,crStateMinor))
-      fEvents.SetEvent(NewMinor);
+      fEvents.SetEvent(NewFibonacci,Minor);
       
     if (IsChanged(fStateMajor,crStateMajor))
-      fEvents.SetEvent(NewMajor);
+      fEvents.SetEvent(NewFibonacci,Major);
   }
 
   
@@ -463,7 +467,7 @@ void CFractal::UpdateFractal(int Direction)
     {
       f[Expansion].Reversal    = true;
 
-      fEvents.SetEvent(NewReversal);
+      fEvents.SetEvent(NewReversal,Major);
     }
     else
     {
@@ -472,10 +476,10 @@ void CFractal::UpdateFractal(int Direction)
       f[Expansion].Breakout    = true;
       f[Root].Peg              = true;
 
-      fEvents.SetEvent(NewBreakout);
+      fEvents.SetEvent(NewBreakout,Major);
     }
 
-    fEvents.SetEvent(NewFractal);  //--- set new fractal alert
+    fEvents.SetEvent(NewFractal,Nominal);  //--- set new fractal alert
   }
 
 //+------------------------------------------------------------------+
@@ -698,8 +702,8 @@ RetraceType CFractal::State(ReservedWords Level=Now)
     switch(Level)
     {
       case Now:     return(fStateNow);
-      case Major:   return(fStateMajor);
-      case Minor:   return(fStateMinor);
+      case Max:     return(fStateMajor);
+      case Min:     return(fStateMinor);
     }
     
     return (NoValue);
@@ -881,7 +885,7 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
                        }                         
                        break;
 
-        case Major:    //-- Maximum range based on Major Fractal
+        case Maxest:   //-- Maximum range based on Major Fractal
                        if (dOrigin.Direction==f[fStateMajor].Direction)
                          range = fabs(this.Price(Origin)-this.Price(fStateMajor,Now));
                        else
@@ -917,7 +921,7 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
                        }                         
                        break;
 
-        case Major:    //-- Actual range now from origin base to retrace (geometric retrace)
+        case Maxest:   //-- Actual range now from origin base to retrace (geometric retrace)
                        switch (dOrigin.Direction)
                        {
                          case DirectionUp:   range = this.Price(Origin,Top)-this.Price(Origin,Retrace);
@@ -1019,7 +1023,7 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
                           case Now: fibonacci = fdiv(this.Range(Retrace,Now),this.Range(Origin,Max));
                                     break;
                           
-                          case Max: fibonacci = fdiv(this.Range(Retrace,Major),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Retrace,Maxest),this.Range(Origin,Max));
                                     break;
                         }
                         break;
@@ -1029,7 +1033,7 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
                           case Now: fibonacci = fdiv(this.Range(Origin,Now),this.Range(Origin,Max));
                                     break;
                             
-                          case Max: fibonacci = fdiv(this.Range(Origin,Major),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Origin,Maxest),this.Range(Origin,Max));
                                     break;
                         }
                         break;
@@ -1269,17 +1273,17 @@ void CFractal::RefreshScreen(void)
       rsReport  +="             Retrace: "+DoubleToString(this.Fibonacci(Origin,Retrace,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Retrace,Major,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Retrace,Maxest,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Retrace,Max,InPips),1)+"\n";
 
       rsReport  +="             Expansion: " +DoubleToString(this.Fibonacci(Origin,Expansion,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Expansion,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Origin,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Origin,Major,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Origin,Maxest,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Origin,Max,InPips),1)+"\n";
     }
       
-    for (RetraceType type=Trend;type<=this.State();type++)
+    for (RetraceType type=Trend;type<=this.State(Now);type++)
     {
       if (this[type].Bar>NoValue)
       {
@@ -1289,7 +1293,7 @@ void CFractal::RefreshScreen(void)
         if (type == this.Dominant(Term))
           rsReport  += "\n  Term:\n";
         else
-        if (type == this.State())
+        if (type == this.State(Now))
           if (type < Actual)
             rsReport+= "\n  Actual:\n";
 
