@@ -52,14 +52,16 @@ public:
              struct SessionRec
              {
                int            Direction;
-               int            BreakoutDir; //--- Direction of the last breakout or reversal
+               int            BreakoutDir;     //--- Direction of the last breakout or reversal
                ReservedWords  State;
-               double         High;        //--- High/Low store daily/session high & low
+               double         High;            //--- High/Low store daily/session high & low
                double         Low;
-               double         Support;     //--- Support/Resistance determines reversal, breakout & continuation
+               double         Support;         //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
-               double         NetChange;   //--- Net change in pips from open to open
-               int            Step;        //--- Directional count from open to open
+               double         CorrectionHigh;  //--- Locks in the correction high base 
+               double         CorrectionLow;   //--- Locks in the correction low base 
+               double         NetChange;       //--- Net change in pips from open to open
+               int            Step;            //--- Directional count from open to open
              };
              
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
@@ -369,10 +371,20 @@ void CSession::UpdateTrend(void)
       if (sEvent[NewTerm])
       {
         if (sfractal[ftTerm].Direction==DirectionUp)
+        {
           sfractal[ftTrend].Support    = sfractal[ftTerm].Support;
+
+          if (sfractal[ftTrend].Direction==DirectionDown)
+            sfractal[ftTrend].CorrectionLow = sfractal[ftTrend].Low;
+        }
         
         if (sfractal[ftTerm].Direction==DirectionDown)
+        {
           sfractal[ftTrend].Resistance = sfractal[ftTerm].Resistance;
+
+          if (sfractal[ftTrend].Direction==DirectionUp)
+            sfractal[ftTrend].CorrectionHigh = sfractal[ftTrend].High;
+        }
         
         if (sfractal[ftTerm].Direction==sfractal[ftTrend].Direction)
           utState                      = Recovery;
@@ -388,15 +400,15 @@ void CSession::UpdateTrend(void)
       if (NewDirection(sfractal[ftTrend].Direction,DirectionUp))
       {
         sEvent.SetEvent(NewTrend,Major);
-
         sfractal[ftTrend].High         = Close[sBar];
         utState                        = Reversal;
       }
       else
       {
         utState                        = Breakout;
+        sfractal[ftTrend].CorrectionLow  = sfractal[ftTrend].Support;
         
-        if (IsHigher(High[sBar],sfractal[ftOrigin].Resistance,NoUpdate))
+        if (IsHigher(High[sBar],sfractal[ftTrend].CorrectionHigh,NoUpdate))
           if (NewDirection(sfractal[ftTrend].BreakoutDir,DirectionUp))
             sEvent.SetEvent(NewTrend,Major);
       }
@@ -409,15 +421,15 @@ void CSession::UpdateTrend(void)
       if (NewDirection(sfractal[ftTrend].Direction,DirectionDown))
       {
         sEvent.SetEvent(NewTrend,Major);
-              
         sfractal[ftTrend].Low          = Close[sBar];
         utState                        = Reversal;
       }
       else
       {
         utState                        = Breakout;
+        sfractal[ftTrend].CorrectionHigh = sfractal[ftTrend].Resistance;
         
-        if (IsLower(Low[sBar],sfractal[ftOrigin].Support,NoUpdate))
+        if (IsLower(Low[sBar],sfractal[ftTrend].CorrectionLow,NoUpdate))
           if (NewDirection(sfractal[ftTrend].BreakoutDir,DirectionDown))
             sEvent.SetEvent(NewTrend,Major);
       }

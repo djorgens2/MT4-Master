@@ -382,7 +382,7 @@ void CheckFractalEvents(void)
 //+------------------------------------------------------------------+
 //| Draw - Paint Crest/Trough lines                                  |
 //+------------------------------------------------------------------+
-void Draw(EventType Event, bool NewEvent=true)
+void Draw(EventType Event, bool NewEvent=true, int BarIndex=0)
   {
     static    int crestidx          = 0;
     static    int troughidx         = 0;
@@ -391,71 +391,88 @@ void Draw(EventType Event, bool NewEvent=true)
     static double trough[4];
 
     if (NewEvent)
+    {
+      if (BarIndex==0)
+      {
+        ArrayInitialize(crest,Close[0]);
+        ArrayInitialize(trough,Close[0]);
+      }
+        
       switch (Event)
       {
         case NewCrest:  toEvent.SetEvent(NewCrest);
                         crestidx++;
                        
-                        ObjectCreate("lnCrestHL"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
-                        ObjectCreate("lnCrestOC"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+                        ObjectCreate("lnCrestHL"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],crest[1],Time[0],crest[2]);
+                        ObjectCreate("lnCrestOC"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],fmin(High[0],crest[0]),Time[0],Close[0]);
                      
                         ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_COLOR,clrYellow);
                         ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_RAY,false);
                         ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_RAY,false);
                         ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_WIDTH,2);
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_WIDTH,8);
+                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_WIDTH,12);
                         ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_BACK,true);
-
-                        ArrayInitialize(crest,Close[0]);
+                        
+                        if (IsLower(High[0],crest[0],NoUpdate))
+                        {
+                          NewPriceLabel("lnCrestAnom"+IntegerToString(crestidx),Close[0]);
+                          UpdatePriceLabel("lnCrestAnom"+IntegerToString(crestidx),Close[0],clrYellow);
+                        }
 
                         break;
                         
         case NewTrough: toEvent.SetEvent(NewTrough);
                         troughidx++;
 
-                        ObjectCreate("lnTroughHL"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
-                        ObjectCreate("lnTroughOC"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],Close[0],Time[0],Close[0]);
+                        ObjectCreate("lnTroughHL"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],trough[1],Time[0],trough[2]);
+                        ObjectCreate("lnTroughOC"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],fmax(Low[0],trough[0]),Time[0],Close[0]);
 
                         ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_COLOR,clrRed);
                         ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_RAY,false);
                         ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_RAY,false);
                         ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_WIDTH,2);
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_WIDTH,8);
+                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_WIDTH,12);
                         ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_BACK,true);
-                       
-                        ArrayInitialize(trough,Close[0]);
+
+                        if (IsHigher(Low[0],trough[0],NoUpdate))
+                          NewPriceLabel("lnTroughAnom"+IntegerToString(troughidx),Close[0]);
       }
-      
-    switch (Event)
+    }  
+
+    for (int carry=BarIndex;carry>NoValue;carry--)
     {
-      case NewCrest:  if (IsHigher(Close[0],crest[1]))
-                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_PRICE1,Close[0]);
-                      else
-                      if (IsLower(Close[0],crest[2]))
-                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_PRICE2,Close[0]);
+      if (IsBetween(Close[0],High[carry],Low[carry]))
+        switch (Event)
+        {
+          case NewCrest:  IsHigher(Close[0],crest[1]);
+                          IsLower(Close[0],crest[2]);
 
-                      ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_PRICE2,Close[0]);
+                          ObjectSet("lnCrestHL"+IntegerToString(crestidx-carry),OBJPROP_PRICE1,fmin(High[carry],crest[1]));
+                          ObjectSet("lnCrestHL"+IntegerToString(crestidx-carry),OBJPROP_PRICE2,fmax(Low[carry],crest[2]));
+                          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_PRICE2,Close[0]);
 
-                      if (IsLower(Close[0],crest[0],NoUpdate))
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_COLOR,clrMaroon);
-                      else
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_COLOR,clrForestGreen);
-                   
-                      break;
+                          break;
 
-      case NewTrough: if (IsHigher(Close[0],trough[1]))
-                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_PRICE1,Close[0]);
-                      else
-                      if (IsLower(Close[0],trough[2]))
-                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_PRICE2,Close[0]);
+          case NewTrough: IsHigher(Close[0],trough[1]);
+                          IsLower(Close[0],trough[2]);
 
-                      ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_PRICE2,Close[0]);
+                          ObjectSet("lnTroughHL"+IntegerToString(troughidx-carry),OBJPROP_PRICE1,fmin(High[carry],trough[1]));
+                          ObjectSet("lnTroughHL"+IntegerToString(troughidx-carry),OBJPROP_PRICE2,fmax(Low[carry],trough[2]));
+                          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_PRICE2,Close[0]);
+        }
+        
+      if (Event==NewCrest)
+        if (IsHigher(Close[0],crest[0],NoUpdate))
+          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_COLOR,clrForestGreen);
+        else
+          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_COLOR,clrMaroon);
 
-                      if (IsLower(Close[0],trough[0],NoUpdate))
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_COLOR,clrMaroon);
-                      else
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_COLOR,clrForestGreen);
-    }
+      if (Event==NewTrough)
+        if (IsHigher(Close[0],trough[0],NoUpdate))
+          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_COLOR,clrForestGreen);
+        else
+          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_COLOR,clrMaroon);
+    }    
   }
 
 //+------------------------------------------------------------------+
@@ -463,6 +480,8 @@ void Draw(EventType Event, bool NewEvent=true)
 //+------------------------------------------------------------------+
 void CheckPipMAEvents(void)
   {    
+    static int cpBarIndex   = 0;
+
     pfEvent.ClearEvents();
 
     for (EventType pf=1;pf<EventTypes;pf++)
@@ -474,9 +493,15 @@ void CheckPipMAEvents(void)
                            else
                            if (toEvent[pf])
                              if (pfractal.PolyState()==Crest||pfractal.PolyState()==Trough)
-                               Draw(pf,sEvent[NewHour]);
+                             {
+                               if (sEvent[NewHour]) cpBarIndex++;
+                               Draw(pf,sEvent[NewHour],cpBarIndex);
+                             }
                              else
+                             {
                                toEvent.ClearEvent(pf);
+                               cpBarIndex   = 0;
+                             }
       case NewFibonacci:
       case NewHigh:
       case NewLow:

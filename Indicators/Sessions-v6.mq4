@@ -187,6 +187,12 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Resistance:"+sessionIndex,session.Fractal(inpFractalLines).Resistance,STYLE_SOLID,clrLawnGreen);
       UpdateLine("lnS_Low:"+sessionIndex,session.Fractal(inpFractalLines).Low,STYLE_DOT,clrFireBrick);
       UpdateLine("lnS_High:"+sessionIndex,session.Fractal(inpFractalLines).High,STYLE_DOT,clrForestGreen);
+      
+      if (inpFractalLines==ftTrend)
+        if (session.Fractal(ftTerm).Direction==DirectionUp)
+          UpdateLine("lnS_Correction:"+sessionIndex,session.Fractal(ftTrend).CorrectionHigh,STYLE_DASH,clrWhite);
+        else
+          UpdateLine("lnS_Correction:"+sessionIndex,session.Fractal(ftTrend).CorrectionLow,STYLE_DASH,clrWhite);
 
       //PeriodType show=ActiveSession;
       //UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
@@ -274,8 +280,10 @@ int OnInit()
     NewLine("lnS_ActiveMid:"+sessionIndex);
     NewLine("lnS_Support:"+sessionIndex);
     NewLine("lnS_Resistance:"+sessionIndex);
+    NewLine("lnS_Correction:"+sessionIndex);
     NewLine("lnS_High:"+sessionIndex);
     NewLine("lnS_Low:"+sessionIndex);
+    
     
     if (inpShowData>dpNone)
     {

@@ -17,17 +17,42 @@
 //+------------------------------------------------------------------+
 class CPolyRegression
   {
-
-private:
-
-    //--- private methods
-       void     CalcPolyState(void);
-       void     CalcPoly(void);
-       
-    //--- Event Array
-       CEvent   *prEvents;    //--- Event array
     
 public:
+    enum        WaveType
+                {
+                  Ebb,
+                  Eddy,
+                  Ordinary,
+                  Riptide,
+                  Tidal,
+                  Rogue
+                };
+
+    //--- Wave Analytics Record
+     struct     WaveRec
+                {
+                  int             Direction;
+                  double          Open;
+                  double          High;
+                  double          Low;
+                  double          Close;
+                  int             Step;
+                };
+
+    //--- Crest/Trough analytics
+     struct     AnalyticsRec
+                {
+                  ReservedWords   Type;
+                  ReservedWords   State;
+                  ReservedWords   PriorType;
+                  WaveRec         Wave;
+                  WaveRec         OffWave;
+                  WaveRec         Crest;
+                  WaveRec         Trough;
+                  bool            Breakout;
+                  bool            Reversal;
+                };
 
                 CPolyRegression(int Degree, int PolyPeriods, int MAPeriods);
                ~CPolyRegression();
@@ -56,6 +81,7 @@ public:
        double   MA(int Measure);
        double   Poly(int Measure);
 
+       AnalyticsRec  Wave(void) { return(prWave); }
        ReservedWords PolyState(void) { return(prPolyState); }
 
     virtual
@@ -67,6 +93,7 @@ protected:
     virtual
        void     CalcMA(void);
        void     UpdatePoly(void);
+       void     UpdatePolyAnalytics(void);
 
        //--- Event methods
        void     SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
@@ -109,6 +136,20 @@ protected:
 
        //--- Poly deviation
        double   prRSquared;    
+
+private:
+
+       //--- private methods
+       void     CalcPolyState(void);
+       void     CalcPoly(void);
+       void     InitWaveSegment(WaveRec &Wave);
+       void     InitWave(void);
+       
+       
+       //--- Event Array
+       CEvent   *prEvents;    //--- Event array
+
+    AnalyticsRec prWave;
   };
 
 //+------------------------------------------------------------------+
@@ -133,19 +174,13 @@ bool CPolyRegression::NewDirection(int &Direction, int ChangeDirection, bool Upd
 //| NewState - Returns true if state has a legit change              |
 //+------------------------------------------------------------------+
 bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true)
-  {
-    ReservedWords nsLastState      = State;
-    
+  {    
     if (ChangeState==NoState)
       return (false);
 
     if (ChangeState==Breakout)
       if (State==Reversal)
         return (false);
-
-// --- skip ignore first
-//    if (State==NoState)
-//      State                        = ChangeState;
 
     if (IsChanged(State,ChangeState))
     {
@@ -156,12 +191,8 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
         case Pullback:    SetEvent(NewPullback,Nominal);
                           break;
         case Crest:       SetEvent(NewCrest,Minor);
-                          if (nsLastState==Pullback)
-                            SetEvent(NewBreakout,Major);
                           break;
         case Trough:      SetEvent(NewTrough,Minor);
-                          if (nsLastState==Rally)
-                            SetEvent(NewBreakout,Major);
                           break;
       }
       
@@ -169,6 +200,68 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
     }
       
     return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| InitWave - Initializes wave records on analytics start           |
+//+------------------------------------------------------------------+
+void CPolyRegression::InitWaveSegment(WaveRec &Wave)
+  {
+    Wave.Direction           = DirectionNone;
+    Wave.Open                = Close[0];
+    Wave.High                = Close[0];
+    Wave.Low                 = Close[0];
+    Wave.Close               = 0.00;
+    Wave.Step                = 0;
+  }
+
+//+------------------------------------------------------------------+
+//| InitAnalytics - InitAnalytics wave records and analytics core    |
+//+------------------------------------------------------------------+
+void CPolyRegression::InitWave(void)
+  {
+    prWave.Type              = Default;
+    prWave.State             = NoState;    
+    prWave.PriorType         = Default;
+  
+    InitWaveSegment(prWave.Wave);
+    InitWaveSegment(prWave.OffWave);    
+    InitWaveSegment(prWave.Crest);
+    InitWaveSegment(prWave.Trough);
+    
+    prWave.Breakout          = false;
+    prWave.Reversal          = false;
+  }
+ 
+//+------------------------------------------------------------------+
+//| UpdatePolyAnalytics - Crest/Trough analytics                     |
+//+------------------------------------------------------------------+
+void CPolyRegression::UpdatePolyAnalytics(void)
+  {
+    ReservedWords upaState  = Breakout;
+    
+    if (Event(NewPolyTrend))
+      upaState              = Reversal;
+
+    switch (prPolyState)
+    {
+      case Pullback:
+                       break;
+      case Rally:
+                       break;
+
+      case Crest:      if (Event(NewCrest))
+                       break;
+
+      case Trough:
+                       break;
+
+      case NoState:    if (IsHigher(Close[0],prWave.OffWave.High))
+                         NewDirection(prWave.OffWave.Direction,DirectionUp);        
+                       if (IsLower(Close[0],prWave.OffWave.Low))
+                         NewDirection(prWave.OffWave.Direction,DirectionDown);
+                       break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -450,7 +543,9 @@ CPolyRegression::CPolyRegression(int Degree, int Periods, int MAPeriods)
 
     SetDegree(Degree);
     SetPeriods(Periods);
-    SetMAPeriods(MAPeriods); 
+    SetMAPeriods(MAPeriods);
+    
+    InitWave();
   }
 
 
@@ -533,6 +628,8 @@ void CPolyRegression::UpdatePoly(void)
       CalcPoly();
       CalcPolyState();
     }
+
+    UpdatePolyAnalytics();
   }
   
 
