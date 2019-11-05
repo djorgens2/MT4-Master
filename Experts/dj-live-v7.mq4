@@ -654,36 +654,6 @@ void SetOpenPlan(SessionType Type)
       
     if (NewBias(detail[Type].OpenBias,session[Type].Bias()))
       sEvent.SetEvent(NewBias);
-      
-    //--- Basic forecast model
-    if (Type==Daily)
-    {
-      if (lead[OffSession].Step==1)  //--- Reversal day
-        if (Direction(lead[OffSession].NetChange)==DirectionUp)
-        {
-//          Print("Reversal forecast (Higher): "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
-
-          detail[Daily].ForecastHigh    = lead[PriorSession].High+(lead[OffSession].High-lead[OffSession].Low);
-          detail[Daily].ForecastLow     = lead[PriorSession].Low+lead[PriorSession].NetChange;
-        }
-        else
-        {
-//          Print("Reversal forecast (Lower): "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
-          
-          detail[Daily].ForecastHigh    = lead[PriorSession].High+lead[PriorSession].NetChange;
-          detail[Daily].ForecastLow     = lead[PriorSession].Low-(lead[OffSession].High-lead[OffSession].Low);
-        }
-      else
-      {
-//        Print("Resume forecast: "+DoubleToStr(lead[PriorSession].NetChange,Digits)+":"+DoubleToStr(lead[OffSession].NetChange,Digits));
-
-        detail[Daily].ForecastHigh      = lead[PriorSession].High+lead[PriorSession].NetChange;
-        detail[Daily].ForecastLow       = lead[PriorSession].Low+lead[PriorSession].NetChange;
-      }
-
-//      ObjectSet("boxForecast",OBJPROP_crest1,detail[Daily].ForecastHigh);
-//      ObjectSet("boxForecast",OBJPROP_crest2,detail[Daily].ForecastLow);      
-    }
   }
 
 //+------------------------------------------------------------------+
