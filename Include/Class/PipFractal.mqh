@@ -403,8 +403,11 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
     if (HistoryLoaded())
       UpdateBuffer(PolyBuffer,TrendBuffer);
     else
+    {
       CalcMA();
-      
+      CalcWave();      
+    }
+
     CalcPipFractal();          
     CalcFiboChange();
     CalcState();
@@ -423,7 +426,10 @@ void CPipFractal::Update(void)
       UpdateTrendline();
     }
     else
+    {
       CalcMA();
+      CalcWave();      
+    }
       
     CalcPipFractal();          
     CalcFiboChange();

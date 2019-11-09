@@ -150,6 +150,23 @@ void RefreshScreen(void)
     else
       UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()));
 
+//    if (pfractal.Wave().Reversal)
+//      UpdateLabel("lbWaveState",EnumToString(pfractal.Wave().Wave.Type)+" "+EnumToString(pfractal.Wave().State),clrRed);
+//    else
+//    if (pfractal.Wave().Breakout)
+//      UpdateLabel("lbWaveState",EnumToString(pfractal.Wave().Wave.Type)+" "+EnumToString(pfractal.Wave().State),clrYellow);
+//    else
+      UpdateLabel("lbWaveState",EnumToString(pfractal.ActiveWave().Type)+" "+EnumToString(pfractal.Wave().State),DirColor(pfractal.ActiveWave().Direction));
+    
+    UpdateLine("lnWaveHigh",pfractal.ActiveWave().High,STYLE_DASH,clrLawnGreen);
+    UpdateLine("lnWaveLow",pfractal.ActiveWave().Low,STYLE_DASH,clrOrangeRed);
+    UpdateLine("lnCrestOpen",pfractal.ActiveWave().Open,STYLE_DASH,clrYellow);
+    UpdateLine("lnCrestClose",pfractal.ActiveWave().Close,STYLE_DASH,clrSteelBlue);
+    //UpdateLine("lnCrestOpen",pfractal.ActiveWaveSegment().Open,STYLE_DOT,clrYellow);
+    //UpdateLine("lnCrestClose",pfractal.ActiveWaveSegment().Close,STYLE_DOT,clrSteelBlue);
+    //UpdateLine("lnTroughOpen",pfractal.ActiveWaveSegment().High,STYLE_DOT,clrLawnGreen);
+    //UpdateLine("lnTroughClose",pfractal.ActiveWaveSegment().Low,STYLE_DOT,clrOrangeRed);
+
     if (rsShow=="APP")
     {
       for (SessionType type=Daily;type<SessionTypes;type++)
@@ -893,6 +910,14 @@ int OnInit()
     
     NewLabel("lbTrigger","Waiting",15,5,clrLightGray,SCREEN_LL);
     NewLabel("lbState","",5,5,clrNONE,SCREEN_LL);
+    
+    NewLabel("lbWaveState","No State",600,5,clrDarkGray);
+    NewLine("lnWaveHigh");
+    NewLine("lnWaveLow");
+    NewLine("lnCrestOpen");
+    NewLine("lnCrestClose");
+    NewLine("lnTroughOpen");
+    NewLine("lnTroughClose");
     
     ArrayInitialize(Alerts,true);
 
