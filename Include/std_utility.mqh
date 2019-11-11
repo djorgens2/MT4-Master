@@ -607,3 +607,16 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
 
     ObjectSet(PriceLabelName,OBJPROP_TIME1,Time[0]);
   }
+  
+//+------------------------------------------------------------------+
+//| Flag - creates a right price label object                        |
+//+------------------------------------------------------------------+
+void Flag(string Name, int Color)
+  {
+    static int fIdx  = 0;
+
+    fIdx++;
+            
+    ObjectCreate("Name-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
+    ObjectSet("Name-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+  }

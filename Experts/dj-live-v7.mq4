@@ -145,28 +145,46 @@ void RefreshScreen(void)
     string rsComment   = "";
 
     UpdateLabel("lbEQ",OrdersTotal(),clrLawnGreen,10);
-    if (sEvent.EventAlert(NewReversal,Caution))
+    if (sEvent.EventAlert(NewReversal,Warning))
       UpdateDirection("lbState",OrderBias(),clrYellow);
     else
       UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()));
 
-//    if (pfractal.Wave().Reversal)
-//      UpdateLabel("lbWaveState",EnumToString(pfractal.Wave().Wave.Type)+" "+EnumToString(pfractal.Wave().State),clrRed);
-//    else
-//    if (pfractal.Wave().Breakout)
-//      UpdateLabel("lbWaveState",EnumToString(pfractal.Wave().Wave.Type)+" "+EnumToString(pfractal.Wave().State),clrYellow);
-//    else
-      UpdateLabel("lbWaveState",EnumToString(pfractal.ActiveWave().Type)+" "+EnumToString(pfractal.Wave().State),DirColor(pfractal.ActiveWave().Direction));
+    UpdateLabel("lbWaveState",EnumToString(pfractal.ActiveWave().Type)+" "+EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
+    UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY))+" "+EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
+    UpdateLabel("lbShortState",EnumToString(pfractal.ActionState(OP_SELL))+" "+EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
     
-    UpdateLine("lnWaveHigh",pfractal.ActiveWave().High,STYLE_DASH,clrLawnGreen);
-    UpdateLine("lnWaveLow",pfractal.ActiveWave().Low,STYLE_DASH,clrOrangeRed);
-    UpdateLine("lnCrestOpen",pfractal.ActiveWave().Open,STYLE_DASH,clrYellow);
-    UpdateLine("lnCrestClose",pfractal.ActiveWave().Close,STYLE_DASH,clrSteelBlue);
+    //UpdateLine("lnWaveHigh",pfractal.ActiveWave().High,STYLE_DASH,clrLawnGreen);
+    //UpdateLine("lnWaveLow",pfractal.ActiveWave().Low,STYLE_DASH,clrOrangeRed);
+    //UpdateLine("lnCrestOpen",pfractal.ActiveWave().Open,STYLE_DASH,clrYellow);
+    //UpdateLine("lnCrestClose",pfractal.ActiveWave().Close,STYLE_DASH,clrSteelBlue);
     //UpdateLine("lnCrestOpen",pfractal.ActiveWaveSegment().Open,STYLE_DOT,clrYellow);
     //UpdateLine("lnCrestClose",pfractal.ActiveWaveSegment().Close,STYLE_DOT,clrSteelBlue);
     //UpdateLine("lnTroughOpen",pfractal.ActiveWaveSegment().High,STYLE_DOT,clrLawnGreen);
     //UpdateLine("lnTroughClose",pfractal.ActiveWaveSegment().Low,STYLE_DOT,clrOrangeRed);
 
+    UpdateLine("lnBuyOpen",pfractal.WaveSegment(OP_BUY).Open,STYLE_SOLID,clrYellow);
+    UpdateLine("lnBuyHigh",pfractal.WaveSegment(OP_BUY).High,STYLE_DOT,clrLawnGreen);
+    UpdateLine("lnBuyLow",pfractal.WaveSegment(OP_BUY).Low,STYLE_DOT,clrLawnGreen);
+    UpdateLine("lnBuyClose",pfractal.WaveSegment(OP_BUY).Close,STYLE_SOLID,clrSteelBlue);
+    
+    UpdateLine("lnSellOpen",pfractal.WaveSegment(OP_SELL).Open,STYLE_SOLID,clrYellow);
+    UpdateLine("lnSellHigh",pfractal.WaveSegment(OP_SELL).High,STYLE_DOT,clrOrangeRed);
+    UpdateLine("lnSellLow",pfractal.WaveSegment(OP_SELL).Low,STYLE_DOT,clrOrangeRed);
+    UpdateLine("lnSellClose",pfractal.WaveSegment(OP_SELL).Close,STYLE_SOLID,clrSteelBlue);
+
+//    UpdateLine("lnCrestOpen",pfractal.WaveSegment(Crest).Open,STYLE_SOLID,clrLawnGreen);
+//    UpdateLine("lnCrestHigh",pfractal.WaveSegment(Crest).High,STYLE_DOT,clrLawnGreen);
+//    UpdateLine("lnCrestLow",pfractal.WaveSegment(Crest).Low,STYLE_DOT,clrLawnGreen);
+//    UpdateLine("lnCrestClose",pfractal.WaveSegment(Crest).Close,STYLE_SOLID,clrLawnGreen);
+//
+//    UpdateLine("lnTroughOpen",pfractal.WaveSegment(Trough).Open,STYLE_SOLID,clrOrangeRed);
+//    UpdateLine("lnTroughHigh",pfractal.WaveSegment(Trough).High,STYLE_DOT,clrOrangeRed);
+//    UpdateLine("lnTroughLow",pfractal.WaveSegment(Trough).Low,STYLE_DOT,clrOrangeRed);
+//    UpdateLine("lnTroughClose",pfractal.WaveSegment(Trough).Close,STYLE_SOLID,clrOrangeRed);
+//        
+pfractal.ActionState(OP_SELL);
+pfractal.ActionState(OP_BUY);
     if (rsShow=="APP")
     {
       for (SessionType type=Daily;type<SessionTypes;type++)
@@ -247,7 +265,7 @@ void RefreshScreen(void)
     }
 
     if (StringLen(rsComment)>0)
-      CallPause(rsComment);
+      CallPause(rsComment,Always);
   }
 
 //+------------------------------------------------------------------+
@@ -429,12 +447,6 @@ void Draw(EventType Event, bool NewEvent=true, int BarIndex=0)
                         ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_WIDTH,2);
                         ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_WIDTH,12);
                         ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_BACK,true);
-                        
-                        if (IsLower(High[0],crest[0],NoUpdate))
-                        {
-                          NewPriceLabel("lnCrestAnom"+IntegerToString(crestidx),Close[0]);
-                          UpdatePriceLabel("lnCrestAnom"+IntegerToString(crestidx),Close[0],clrYellow);
-                        }
 
                         break;
                         
@@ -450,9 +462,6 @@ void Draw(EventType Event, bool NewEvent=true, int BarIndex=0)
                         ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_WIDTH,2);
                         ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_WIDTH,12);
                         ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_BACK,true);
-
-                        if (IsHigher(Low[0],trough[0],NoUpdate))
-                          NewPriceLabel("lnTroughAnom"+IntegerToString(troughidx),Close[0]);
       }
     }  
 
@@ -497,7 +506,7 @@ void Draw(EventType Event, bool NewEvent=true, int BarIndex=0)
 //+------------------------------------------------------------------+
 void CheckPipMAEvents(void)
   {    
-    static int cpBarIndex   = 0;
+    static int    cpBarIndex   = 0;
 
     pfEvent.ClearEvents();
 
@@ -519,6 +528,14 @@ void CheckPipMAEvents(void)
                                toEvent.ClearEvent(pf);
                                cpBarIndex   = 0;
                              }
+                             
+      case NewAction:      if (pfractal.Event(NewAction))
+                           {
+//                             if (pfractal.ActionState(OP_BUY)==Opportunity)
+//                               Flag("Long-Oppty:",clrYellow);
+//                             if (pfractal.ActionState(OP_SELL)==Opportunity)
+//                               Flag("Short-Oppty:",clrRed);
+                           }
       case NewFibonacci:
       case NewHigh:
       case NewLow:
@@ -583,9 +600,9 @@ int OrderBias(int Measure=InDirection)
    
    if (lead.SessionHour()>4)
      if ((lead[ActiveSession].Direction!=Direction(Close[0]-lead.Pivot(ActiveSession))))
-       sEvent.SetEvent(NewReversal,Caution);    
+       sEvent.SetEvent(NewReversal,Warning);    
   
-    if (sEvent.EventAlert(NewReversal,Caution))
+    if (sEvent.EventAlert(NewReversal,Warning))
       return(Direction(lead[ActiveSession].Direction,InDirection,Contrarian));
 
     return (lead[ActiveSession].Direction);
@@ -687,7 +704,6 @@ void AnalyzeData(void)
     if (sEvent[SessionOpen])
       SetOpenPlan(lead.Type());
       
-
   }
 
 //+------------------------------------------------------------------+
@@ -912,11 +928,27 @@ int OnInit()
     NewLabel("lbState","",5,5,clrNONE,SCREEN_LL);
     
     NewLabel("lbWaveState","No State",600,5,clrDarkGray);
-    NewLine("lnWaveHigh");
-    NewLine("lnWaveLow");
+    NewLabel("lbLongState","No State",600,16,clrDarkGray);
+    NewLabel("lbShortState","No State",600,27,clrDarkGray);
+
+    NewLine("lnBuyOpen");
+    NewLine("lnBuyHigh");
+    NewLine("lnBuyLow");
+    NewLine("lnBuyClose");
+
+    NewLine("lnSellOpen");
+    NewLine("lnSellHigh");
+    NewLine("lnSellLow");
+    NewLine("lnSellClose");
+
     NewLine("lnCrestOpen");
+    NewLine("lnCrestHigh");
+    NewLine("lnCrestLow");
     NewLine("lnCrestClose");
+
     NewLine("lnTroughOpen");
+    NewLine("lnTroughHigh");
+    NewLine("lnTroughLow");
     NewLine("lnTroughClose");
     
     ArrayInitialize(Alerts,true);
