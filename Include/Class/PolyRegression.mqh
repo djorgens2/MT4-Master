@@ -19,24 +19,16 @@ class CPolyRegression
   {
     
 public:
-    enum        WaveType
-                {
-                  Ebb,
-                  Eddy,
-                  Ordinary,
-                  Riptide,
-                  Tidal,
-                  Rogue
-                };
-                
+
      //--- Action States
      enum       ActionState
                 {
-                  InProfit,
+                  Goal,
+                  Yield,
+                  Take,
                   Build,
                   Hold,
-                  Caution,
-                  AtRisk,
+                  Risk,
                   Halt,
                   Opportunity,
                   Grab
@@ -51,7 +43,8 @@ public:
                   double          Risk;
                   double          Build;
                   double          Doom;
-                  double          Resume;                  
+                  double          Kill;
+                  double          Mercy;
                   double          Recovery;
                   double          Opportunity;
                 };
@@ -65,6 +58,8 @@ public:
                   double          High;
                   double          Low;
                   double          Close;
+                  double          Retrace;
+                  int             Count;
                   bool            IsOpen;
                 };
 
@@ -77,6 +72,9 @@ public:
                   WaveSegment     Active[2];
                   WaveSegment     Crest;
                   WaveSegment     Trough;
+                  WaveSegment     Decay;           //-- Manage Non-Oscillatory Decay
+                  int             CrestTotal;
+                  int             TroughTotal;
                   bool            Breakout;
                   bool            Reversal;
                   bool            Retrace;
@@ -100,85 +98,88 @@ public:
        
 
        //--- Poly methods
-       double        MA(int Measure);
-       double        Poly(int Measure);
+       double           MA(int Measure);
+       double           Poly(int Measure);
        
-       ReservedWords PolyState(void) { return(prPolyState); }
-       ActionState   ActionState(const int Action) {return (prWave.ActionState[Action]); }
+       ReservedWords    PolyState(void) { return(prPolyState); }
+       ActionState      ActionState(const int Action) {return (prWave.ActionState[Action]); }
+       PriceLineRec     ActionLine(const int Action) {return (prLine[Action]); }
        
        //--- Wave methods
-       WaveRec       Wave(void) { return(prWave); }
-       WaveSegment   WaveSegment(const int Type);
-       WaveSegment   ActiveWave(void) {return (prWave.Active[prWave.Action]); }
-       WaveSegment   ActiveWaveSegment(void) {if (ActiveWave().Type==Crest) return (prWave.Crest); return (prWave.Trough); }
-       ReservedWords WaveState(void) {return (prWave.State); } 
+       bool             SegmentIsOpen(void) {return (prWave.Crest.IsOpen||prWave.Trough.IsOpen); }
+       WaveRec          Wave(void) { return(prWave); }
+       WaveSegment      WaveSegment(const int Segment);
+       WaveSegment      ActiveWave(void) {return (prWave.Active[prWave.Action]); }
+       WaveSegment      ActiveSegment(void);
+       ReservedWords    WaveState(void) {return (prWave.State); } 
 
     virtual
-       int     Direction(int Direction, bool Contrarian=false);
+       int              Direction(int Direction, bool Contrarian=false);
      
 protected:
 
        //--- Protected methods
     virtual
-       void          CalcMA(void);
-       void          CalcWave(void);
-       ReservedWords CalcWaveState(void);
-       void          UpdatePoly(void);
+       void             CalcMA(void);
+       void             CalcWave(void);
+       ReservedWords    CalcWaveState(void);
+       void             UpdatePoly(void);
        
        //--- configuration methods
     virtual
-       void     SetPeriods(int Periods);
-       void     SetDegree(int Degree)       { prDegree  = Degree; }
-       void     SetMAPeriods(int MAPeriods) { maPeriods = MAPeriods; }       
+       void             SetPeriods(int Periods);
+       void             SetDegree(int Degree)       { prDegree  = Degree; }
+       void             SetMAPeriods(int MAPeriods) { maPeriods = MAPeriods; }       
        
        
        //--- Event methods
-       void     SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
-                                 { prEvents.SetEvent(Event,AlertLevel); }    //-- sets the event condition
-       void     ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }  //-- clears the event condition
+       void             SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
+                                                    { prEvents.SetEvent(Event,AlertLevel); }   //-- sets the event condition
+       void             ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }            //-- clears the event condition
        
-       bool     NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
-       bool     NewDirection(int &Direction, int ChangeDirection, bool Update=true);
+       bool             NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
+       bool             NewDirection(int &Direction, int ChangeDirection, bool Update=true);
 
 
        //--- input parameters
-       int      prDegree;            // degree of regression
-       int      prPeriods;           // number of periods
-       int      maPeriods;           // periods to compute the slow ma on
+       int              prDegree;            // degree of regression
+       int              prPeriods;           // number of periods
+       int              maPeriods;           // periods to compute the slow ma on
 
-       double   prData[];            // computed poly regression values
-       double   maData[];            // base moving average data
-       double   maTop;               // highest value in the madata array
-       double   maBottom;            // lowest value in the madata array
-       double   maMean;              // mean value of the madata array
+       double           prData[];            // computed poly regression values
+       double           maData[];            // base moving average data
+       double           maTop;               // highest value in the madata array
+       double           maBottom;            // lowest value in the madata array
+       double           maMean;              // mean value of the madata array
 
 
        //--- PolyMeasures
-       double   prPolyTop;
-       double   prPolyBottom;
-       double   prPolyMean;
-       double   prPolyHead;
-       double   prPolyTail;
-       double   prPricePolyDev;
+       double           prPolyTop;
+       double           prPolyBottom;
+       double           prPolyMean;
+       double           prPolyHead;
+       double           prPolyTail;
+       double           prPricePolyDev;
 
-       int      prPolyDirection;
-       int      prPolyTrendDir;
+       int              prPolyDirection;
+       int              prPolyTrendDir;
        
-       double   prPolyBoundary;
+       double           prPolyBoundary;
        
-       bool     prPolyCrest;
-       bool     prPolyTrough;
+       bool             prPolyCrest;
+       bool             prPolyTrough;
 
        ReservedWords prPolyState;
 
        //--- Poly deviation
-       double   prRSquared;    
+       double           prRSquared;    
 
 private:
 
        //--- private methods
        void             CalcPolyState(void);
        void             CalcPoly(void);
+       void             CalcLines(const int Action, const bool Contrarian=false);
        void             CalcActionState(const int Action);
        
        //--- Wave methods
@@ -187,6 +188,7 @@ private:
        void             UpdateWave(WaveSegment &Segment);
 
        void             InitWaveSegment(WaveSegment &Segment);
+       void             OpenDecaySegment(WaveSegment &Segment);
        void             InitWave(void);
        
        
@@ -194,6 +196,7 @@ private:
        CEvent          *prEvents;    //--- Event array
 
        WaveRec          prWave;
+       WaveSegment      prLastSegment;
        PriceLineRec     prLine[2];
   };
 
@@ -254,89 +257,110 @@ ReservedWords CPolyRegression::CalcWaveState(void)
   {
     if (prWave.Action==OP_BUY)
     {
-      if (ActiveWave().Type==Trough)
+      switch (ActiveWave().Type)
       {
-        if (IsLower(Close[0],ActiveWave().Open,NoUpdate))
-          return (Reversal);
-          
-        if (IsLower(Close[0],ActiveWaveSegment().Open,NoUpdate))
-          return (Retrace);
-          
-        return (Rally);
+        case Decay:    return (prWave.State);
+        
+        case Trough:   if (IsLower(Close[0],ActiveWave().Open,NoUpdate))
+                         return (Reversal);
+
+                       if (IsLower(Close[0],ActiveSegment().Open,NoUpdate))
+                         return (Retrace);
+
+                       return (Rally);
+
+        case Crest:    //--- Handle straight line reversal into breakout on the tick
+                       if (prWave.Reversal)
+                         if (IsHigher(Close[0],prWave.Active[OP_SELL].Open,NoUpdate))
+                         {
+                           prWave.Breakout      = true;
+                           prWave.Reversal      = false;
+                           prWave.Retrace       = false;
+                         }
+
+                       if (IsLower(Close[0],ActiveWave().Open,NoUpdate))
+                         return (Reversal);
+
+                       if (IsHigher(Close[0],ActiveWave().High,NoUpdate))
+                         if (prWave.Reversal)
+                           return (Reversal);
+                         else
+                           return (Breakout);
+
+                       if (prWave.Retrace)
+                       {
+                         if (IsLower(Close[0],ActiveWave().Low,NoUpdate))
+                           return (Reversal);
+
+                         if (IsLower(Close[0],ActiveSegment().Open,NoUpdate))
+                           return (Pullback);
+
+                         return (Recovery);
+                       }
+
+                       if (IsLower(Close[0],ActiveSegment().Open,NoUpdate))
+                         return (Pullback);
+
+                       if (prWave.Reversal)
+                         return (Reversal);
+
+                       return (Breakout);      
       }
-      
-      if (IsLower(Close[0],ActiveWave().Open,NoUpdate))
-        return (Reversal);
-          
-      if (IsHigher(Close[0],ActiveWave().High,NoUpdate))
-        if (prWave.Reversal)
-          return (Reversal);
-        else
-          return (Breakout);
-
-      if (prWave.Retrace)
-      {
-        if (IsLower(Close[0],ActiveWave().Low,NoUpdate))
-          return (Reversal);
-
-        if (IsLower(Close[0],ActiveWaveSegment().Open,NoUpdate))
-          return (Pullback);
-          
-        return (Recovery);
-      }
-      
-      if (IsLower(Close[0],ActiveWaveSegment().Open,NoUpdate))
-        return (Pullback);
-          
-      if (prWave.Reversal)
-        return (Reversal);
-
-      return (Breakout);
     }
-    
+
     if (prWave.Action==OP_SELL)
     {
-      if (ActiveWave().Type==Crest)
+      switch (ActiveWave().Type)
       {
-        if (IsHigher(Close[0],ActiveWave().Open,NoUpdate))
-          return (Reversal);
-          
-        if (IsHigher(Close[0],ActiveWaveSegment().Open,NoUpdate))
-          return (Retrace);
-          
-        return (Pullback);
-      }
+        case Decay:    return (prWave.State);
       
-      if (IsHigher(Close[0],ActiveWave().Open,NoUpdate))
-        return (Reversal);
-          
-      if (IsLower(Close[0],ActiveWave().Low,NoUpdate))
-        if (prWave.Reversal)
-          return (Reversal);
-        else
-          return (Breakout);
+        case Crest:    if (IsHigher(Close[0],ActiveWave().Open,NoUpdate))
+                         return (Reversal);
 
-      if (prWave.Retrace)
-      {
-        if (IsHigher(Close[0],ActiveWave().High,NoUpdate))
-          return (Reversal);
+                       if (IsHigher(Close[0],ActiveSegment().Open,NoUpdate))
+                         return (Retrace);
 
-        if (IsHigher(Close[0],ActiveWaveSegment().Open,NoUpdate))
-          return (Rally);
-          
-        return (Recovery);
+                       return (Pullback);
+
+        case Trough:   //--- Handle straight line reversal into breakout on the tick
+                      if (prWave.Reversal)
+                        if (IsLower(Close[0],prWave.Active[OP_BUY].Open,NoUpdate))
+                        {
+                          prWave.Breakout      = true;
+                          prWave.Reversal      = false;
+                          prWave.Retrace       = false;
+                        }
+
+                      if (IsHigher(Close[0],ActiveWave().Open,NoUpdate))
+                        return (Reversal);
+
+                      if (IsLower(Close[0],ActiveWave().Low,NoUpdate))
+                        if (prWave.Reversal)
+                          return (Reversal);
+                        else
+                          return (Breakout);
+
+                      if (prWave.Retrace)
+                      {
+                        if (IsHigher(Close[0],ActiveWave().High,NoUpdate))
+                          return (Reversal);
+
+                        if (IsHigher(Close[0],ActiveSegment().Open,NoUpdate))
+                          return (Rally);
+
+                        return (Recovery);
+                      }
+
+                      if (IsHigher(Close[0],ActiveSegment().Open,NoUpdate))
+                        return (Rally);
+
+                      if (prWave.Reversal)
+                        return (Reversal);
+
+                      return (Breakout);
       }
-      
-      if (IsHigher(Close[0],ActiveWaveSegment().Open,NoUpdate))
-        return (Rally);
-        
-          
-      if (prWave.Reversal)
-        return (Reversal);
-
-      return (Breakout);
     }
-    
+
     return (NoState);
   }
   
@@ -350,6 +374,8 @@ void CPolyRegression::InitWaveSegment(WaveSegment &Segment)
     Segment.High             = Close[0];
     Segment.Low              = Close[0];
     Segment.Close            = Close[0];
+    Segment.Retrace          = Close[0];
+    Segment.Count            = 0;
     Segment.IsOpen           = false;
   }
 
@@ -364,12 +390,40 @@ void CPolyRegression::InitWave(void)
     InitWaveSegment(prWave.Active[OP_SELL]);
     InitWaveSegment(prWave.Crest);
     InitWaveSegment(prWave.Trough);
-    
+    InitWaveSegment(prLastSegment);    
+
+    prWave.CrestTotal                 = 0;
+    prWave.TroughTotal                = 0;
+
     prWave.Crest.Type                 = Crest;
     prWave.Trough.Type                = Trough;
+    prLastSegment.Type                = Default;
     
     prWave.Active[OP_BUY].Direction   = DirectionUp;
     prWave.Active[OP_SELL].Direction  = DirectionDown;
+  }
+
+//+------------------------------------------------------------------+
+//| OpenDecaySegment - Initializes non-oscillation wave segment      |
+//+------------------------------------------------------------------+
+void CPolyRegression::OpenDecaySegment(WaveSegment &Segment)
+  {
+    if (!SegmentIsOpen())
+    {
+      prLastSegment                    = Segment;
+      prWave.Decay.Count++;
+
+      prWave.Decay                     = Segment;
+      prWave.Decay.Type                = Decay;
+      prWave.Decay.Retrace             = Close[0];
+      prWave.Decay.IsOpen              = true;
+      
+      if (prWave.Decay.Direction==DirectionUp)
+        prWave.Decay.Open              = prWave.Decay.Low;
+      
+      if (prWave.Decay.Direction==DirectionDown)
+        prWave.Decay.Open              = prWave.Decay.High;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -377,25 +431,13 @@ void CPolyRegression::InitWave(void)
 //+------------------------------------------------------------------+
 void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
   {
-    if (Segment.IsOpen)
-      Segment.IsOpen                = false;
-    else
-      if (Action==NoValue)
-      {
-        //--- Axiom: It is highly improbable for a poly line to move crest to trough on a single tick
-        //---        or vice-versa without first having passed through a pullback/rally state; This
-        //---        condition may occur in an excessively volatile market; requires analysis -- Kill Switch?
-        Print ("Axiom violation: Close executed on a previously closed wave segment");
-        return;
-      }
-
     if (Segment.Type==Crest)
       if (Segment.Direction==DirectionUp)
-        Action                    = OP_BUY;
+        Action                         = OP_BUY;
       
     if (Segment.Type==Trough)
       if (Segment.Direction==DirectionDown)
-        Action                    = OP_SELL;
+        Action                         = OP_SELL;
 
     if (Action==NoValue)
     {
@@ -438,7 +480,17 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
     if (IsChanged(prWave.Action,Action))
     {
       //-- New Action Manager Assignment
-      SetEvent(NewAction);
+      SetEvent(NewWaveReversal);
+      
+      prWave.Active[OP_BUY].Count     = 0;
+      prWave.Active[OP_SELL].Count    = 0;
+
+      prWave.CrestTotal               = 0;
+      prWave.TroughTotal              = 0;
+      
+      prWave.Decay.Count              = 0;
+      prWave.Crest.Count              = 0;
+      prWave.Trough.Count             = 0;
       
       if (prWave.Action==OP_BUY)
       {
@@ -448,6 +500,10 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
         prWave.Active[OP_BUY].High     = Segment.High;
         prWave.Active[OP_BUY].Low      = prWave.Active[OP_SELL].Low;
         prWave.Active[OP_BUY].Close    = Segment.Low;
+        
+        prWave.Active[OP_BUY].Count++;
+        prWave.CrestTotal++;
+        prWave.Crest.Count++;
       }
 
       if (prWave.Action==OP_SELL)
@@ -458,6 +514,10 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
         prWave.Active[OP_SELL].High    = prWave.Active[OP_BUY].High;
         prWave.Active[OP_SELL].Low     = Segment.Low;
         prWave.Active[OP_SELL].Close   = Segment.High;
+
+        prWave.Active[OP_SELL].Count++;
+        prWave.TroughTotal++;
+        prWave.Trough.Count++;
       }
 
       prWave.Active[Action].Type       = Segment.Type;
@@ -480,7 +540,23 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
       }
 
       prWave.Retrace                   = false;
-    }
+    }    
+
+    if (IsChanged(Segment.IsOpen,false))
+      //-- Prime the decay record
+      OpenDecaySegment(Segment);
+  
+    else
+      if (Action==NoValue)
+      {
+        //--- Axiom: It is highly improbable for a poly line to move crest to trough on a single tick
+        //---        or vice-versa without first having passed through a pullback/rally state; This
+        //---        condition may occur in an excessively volatile market; requires analysis -- Kill Switch?
+        Print ("Axiom violation: Close executed on a previously closed wave segment");
+        return;
+      }
+
+    SetEvent(NewWaveClose);
   }
 
 //+------------------------------------------------------------------+
@@ -488,11 +564,42 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
 //+------------------------------------------------------------------+
 void CPolyRegression::OpenWave(WaveSegment &Segment)
   {
-    SetEvent(NewWaveSegment);
-    InitWaveSegment(Segment);
+    if (IsChanged(prWave.Decay.IsOpen,false))
+    {
+      //=== Feathering opportunity?
     
-    prWave.Active[prWave.Action].Type  = Segment.Type;
-    Segment.IsOpen                     = true;
+    }
+  
+    InitWaveSegment(Segment);
+
+    if (IsChanged(prLastSegment.Type,Segment.Type,NoUpdate))
+    {
+      prWave.Crest.Count                 = 0;
+      prWave.Trough.Count                = 0;
+    }
+    else
+      Segment.Count                      = prLastSegment.Count;
+
+    if (Event(NewWaveReversal))
+    {
+      prWave.CrestTotal                  = 0;
+      prWave.TroughTotal                 = 0;
+      prWave.Active[prWave.Action].Count = 0;
+    }
+
+    if (Segment.Type==Crest)
+      prWave.CrestTotal++;
+      
+    if (Segment.Type==Trough)
+      prWave.TroughTotal++;
+
+    prWave.Active[prWave.Action].Count++;
+    prWave.Active[prWave.Action].Type    = Segment.Type;
+    
+    Segment.IsOpen                       = true;
+    Segment.Count++;    
+
+    SetEvent(NewWaveOpen);    
   }
 
 //+------------------------------------------------------------------+
@@ -500,34 +607,161 @@ void CPolyRegression::OpenWave(WaveSegment &Segment)
 //+------------------------------------------------------------------+
 void CPolyRegression::UpdateWave(WaveSegment &Segment)
   {
-    IsHigher(Close[0],Segment.High);
-    IsLower(Close[0],Segment.Low);
+    //-- Update Crest Bounds and Retrace
+    if (Segment.Type==Crest)
+      if (IsHigher(Close[0],Segment.High))
+        Segment.Retrace            = Close[0];
+      else
+      {
+        Segment.Retrace            = fmin(Close[0],Segment.Retrace);
+        Segment.Low                = fmin(Close[0],Segment.Low);
+      }
+
+    //-- Update Trough Bounds and Retrace              
+    if (Segment.Type==Trough)
+      if (IsLower(Close[0],Segment.Low))
+        Segment.Retrace            = Close[0];
+      else
+      {
+        Segment.Retrace            = fmax(Close[0],Segment.Retrace);
+        Segment.High               = fmax(Close[0],Segment.High);
+      }
+
+    //-- Update Crest Decay Bounds, State and Retrace
+    if (prLastSegment.Type==Crest)
+      if (IsHigher(Close[0],prWave.Decay.High))
+        prWave.Decay.Retrace       = Close[0];
+      else
+      {
+        prWave.Decay.Retrace       = fmin(Close[0],prWave.Decay.Retrace);
+        prWave.Decay.Low           = fmin(Close[0],prWave.Decay.Low);
+      }      
     
-    Segment.Close                  = Close[0];
+    //-- Update Trough Decay Bounds, State and Retrace
+    if (prLastSegment.Type==Trough)
+      if (IsLower(Close[0],prWave.Decay.Low))
+          prWave.Decay.Retrace     = Close[0];
+      else
+      {
+        prWave.Decay.Retrace       = fmax(Close[0],prWave.Decay.Retrace);
+        prWave.Decay.High          = fmax(Close[0],prWave.Decay.High);        
+      }
     
     if (IsLower(Close[0],Segment.Open,NoUpdate))
       Segment.Direction            = DirectionDown;
       
     if (IsHigher(Close[0],Segment.Open,NoUpdate))
       Segment.Direction            = DirectionUp;
-  
+
+    Segment.Close                  = Close[0];
+  }
+
+//+------------------------------------------------------------------+
+//| CalcLines - Calculates price boundaries for the supplied action  |
+//+------------------------------------------------------------------+
+void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
+  {
+    if (Contrarian)
+    {
+      switch (Action)
+      {
+        case OP_BUY:      prLine[Action].Recovery     = prWave.Active[OP_BUY].Low;
+                          prLine[Action].Go           = prWave.Active[OP_SELL].Open;
+                          prLine[Action].Opportunity  = prWave.Active[OP_SELL].Close;
+                          prLine[Action].Kill         = prWave.Trough.Low;
+
+                          prLine[OP_SELL].Risk        = fmin(prWave.Active[OP_SELL].High,prLine[OP_SELL].Risk);
+                          break;
+
+        case OP_SELL:     prLine[Action].Recovery     = prWave.Active[OP_SELL].High;
+                          prLine[Action].Go           = prWave.Active[OP_BUY].Open;
+                          prLine[Action].Opportunity  = prWave.Active[OP_BUY].Close;
+                          prLine[Action].Kill         = prWave.Crest.High;
+                          
+                          prLine[OP_BUY].Risk         = fmax(prLine[OP_BUY].Risk,prWave.Active[OP_BUY].Low);
+                          break;
+      }
+      
+      prLine[Action].Build                            = prLine[Action].Opportunity;
+      prLine[Action].Mercy                            = fdiv(prWave.Active[OP_BUY].Open+prWave.Active[OP_SELL].Open,2,Digits);
+    }
+    else
+      switch (Action)
+      {
+        case OP_BUY:      prLine[Action].Profit       = prWave.Active[OP_BUY].High;
+                          prLine[Action].Doom         = prWave.Active[OP_BUY].Open;
+                          prLine[Action].Close        = prWave.Active[OP_BUY].Close;
+                          prLine[Action].Build        = fmax(prLine[Action].Build,fdiv(prWave.Active[OP_SELL].Close+prWave.Active[OP_BUY].Low,2));
+
+                          if (Event(NewWaveReversal))
+                            prLine[OP_BUY].Risk       = prWave.Active[OP_SELL].Low;
+                          break;
+
+        case OP_SELL:     prLine[Action].Profit       = prWave.Active[OP_SELL].Low;
+                          prLine[Action].Doom         = prWave.Active[OP_SELL].Open;
+                          prLine[Action].Close        = prWave.Active[OP_SELL].Close;
+                          prLine[Action].Build        = fmin(prLine[Action].Build,fdiv(prWave.Active[OP_BUY].Close+prWave.Active[OP_SELL].High,2));
+
+                          if (Event(NewWaveReversal))
+                            prLine[OP_SELL].Risk       = prWave.Active[OP_BUY].High;
+                          break;
+      }      
   }
 
 //+------------------------------------------------------------------+
 //| CalcActionState - Calculates the state for a specific action     |
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcActionState(const int Action)
-  {
-    bool        asInBounds    = IsBetween(Close[0],prWave.Active[OP_BUY].Close,prWave.Active[OP_SELL].Close);
-    ActionState asActionState = Hold;
-    
+  {                  
+    ActionState asActionState    = Hold;
+    bool        asOscillatory    = ActiveSegment().IsOpen;
+
     if (Action==prWave.Action)
     {
       //-- return trend states
+      if (Event(NewWaveClose))
+        CalcLines(Action);
+        
+      if (Action==OP_BUY)
+      {
+        //--- Open crest wave segment states
+        if (prWave.Crest.IsOpen)
+        {
+          if (IsHigher(Close[0],prLine[OP_BUY].Go,NoUpdate))
+            if (prWave.Retrace)
+            {
+              if (PolyState()==Pullback)
+                asActionState           = Take;
+                
+              if (PolyState()==Rally)
+                if (IsHigher(Close[0],prLine[OP_BUY].Risk,NoUpdate))
+                  asActionState         = Build;
+            }
+            else
+              asActionState             = Goal;
+         }
+         //--- Closed crest wave segment states (Non-oscillatory states)
+         else
+         {
+//           if (IsLower(Close[0],prLine[OP_BUY].Close,NoUpdate))
+//             asActionState
+         }
+      }
+      else
+      {
+        if (IsLower(Close[0],prLine[OP_SELL].Go,NoUpdate))
+          if (prWave.Retrace)
+          {}
+          else
+            asActionState             = Goal;      
+      }
     }
     else
     {
       //-- return contrarian states
+      if (Event(NewWaveClose))
+        CalcLines(Action,InContrarian);
+
       if (Action==OP_BUY)
       {
         if (IsHigher(Close[0],prWave.Active[OP_SELL].Close,NoUpdate))
@@ -537,7 +771,7 @@ void CPolyRegression::CalcActionState(const int Action)
       {
         if (IsLower(Close[0],prWave.Active[OP_BUY].Close,NoUpdate))
           asActionState                = Opportunity;
-      };
+      }
     }
     
     if (IsChanged(prWave.ActionState[Action],asActionState))
@@ -549,18 +783,24 @@ void CPolyRegression::CalcActionState(const int Action)
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcWave(void)
   {
-    ClearEvent(NewWave);
-    ClearEvent(NewAction);
+    ClearEvent(NewWaveOpen);
+    ClearEvent(NewWaveClose);
+    ClearEvent(NewWaveState);
+    ClearEvent(NewWaveReversal);
     ClearEvent(NewActionState);
 
     switch (prPolyState)
     {
       case Pullback:   if (Event(NewPolyState))
                          CloseWave(prWave.Crest);
+
+                       UpdateWave(prWave.Decay);
                        break;
                        
       case Rally:      if (Event(NewPolyState))
                          CloseWave(prWave.Trough);
+
+                       UpdateWave(prWave.Decay);
                        break;
 
       case Crest:      if (prWave.Crest.IsOpen)
@@ -575,16 +815,7 @@ void CPolyRegression::CalcWave(void)
                          OpenWave(prWave.Trough);
                        break;
 
-      case NoState:    if (maData[ArraySize(maData)-1]>0.00)
-                       {
-                         if (prWave.Crest.IsOpen)
-                           CloseWave(prWave.Crest);
-
-                         if (prWave.Trough.IsOpen)
-                           CloseWave(prWave.Crest);
-                       }
-                       else
-                       if (Event(NewHigh)&&prWave.Action!=OP_BUY)
+      case NoState:    if (Event(NewHigh)&&prWave.Action!=OP_BUY)
                        {
                          CloseWave(prWave.Trough,OP_BUY);
                          OpenWave(prWave.Crest);
@@ -620,6 +851,33 @@ void CPolyRegression::CalcPolyState(void)
   {
     ReservedWords cpState          = NoState;
     
+    if (prPolyState==NoState)
+    {
+      if (SegmentIsOpen())
+      {
+        if (ActiveSegment().Type==Crest)
+        {
+          cpState                  = Crest;
+          prPolyCrest              = true;
+          
+          if (Direction(Polyline)==DirectionDown)
+            SetEvent(NewPoly);
+        }        
+
+        if (ActiveSegment().Type==Trough)
+        {
+          cpState                  = Trough;
+          prPolyTrough             = true;
+          
+          if (Direction(Polyline)==DirectionUp)
+            SetEvent(NewPoly);
+        }
+      }
+      else
+        //-- Axiom: Under no circumstances should the PolyState be initialized on a closed segment
+        Print("Axiom violation: PolyState initialization occurred on a closed segment.");
+    }
+
     if (Event(NewPoly))
     {
       if (IsChanged(prPolyCrest,false))
@@ -789,7 +1047,7 @@ void CPolyRegression::CalcPoly(void)
     prPolyTail        = prData[prPeriods-1];
     prPricePolyDev    = maData[0]-prPolyHead;
      
-    //-- Initialize trend direction (occurs once);
+    //-- Complete init on first CalcPoly (occurs once);
     if (prPolyTrendDir==DirectionNone)
     {
       prPolyTrendDir    = Direction(cpBottomBar-cpTopBar);
@@ -1003,19 +1261,35 @@ void CPolyRegression::Update(void)
   }
 
 //+------------------------------------------------------------------+
-//| WaveSegment - Returns the wave segement by type                  |
+//| ActiveSegment - Returns the active wave segment                  |
 //+------------------------------------------------------------------+
-WaveSegment CPolyRegression::WaveSegment(const int Type)
+WaveSegment CPolyRegression::ActiveSegment(void)
   {
-    switch (Type)
+     if (prWave.Crest.IsOpen)
+       return (prWave.Crest);
+       
+     if (prWave.Trough.IsOpen)
+       return (prWave.Trough);
+       
+     return (prWave.Decay);
+  }
+
+//+------------------------------------------------------------------+
+//| WaveSegment - Returns the requested wave segment                 |
+//+------------------------------------------------------------------+
+WaveSegment CPolyRegression::WaveSegment(const int Segment)
+  {
+    switch (Segment)
     {
-      case OP_BUY:   
-      case OP_SELL:   return (prWave.Active[Type]);
-      case Crest:     return (prWave.Crest);
-      case Trough:    return (prWave.Trough);
-    }
+      case OP_BUY:
+      case OP_SELL:     return (prWave.Active[Segment]);
+      case Crest:       return (prWave.Crest);
+      case Trough:      return (prWave.Trough);
+      case Decay:       return (prWave.Decay);
+      case Last:        return (prLastSegment);
+    }       
     
-    return (ActiveWaveSegment());
+    return (ActiveSegment());
   }
 
 //+------------------------------------------------------------------+

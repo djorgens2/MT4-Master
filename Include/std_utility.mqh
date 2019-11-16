@@ -41,6 +41,7 @@
 //---- Format Constants
 #define IN_DIRECTION           8
 #define IN_ACTION              9
+#define IN_PROXIMITY          10
 
 
 //---- Screen Locations
@@ -324,6 +325,30 @@ int DirColor(int Value, int DirUp=clrLawnGreen, int DirDown=clrRed, int DirNone=
     case DIR_NONE:  return(DirNone);
     default:        return(-1);
   }
+}
+
+//+------------------------------------------------------------------+
+//| Color - returns the color based on the supplied Value            |
+//+------------------------------------------------------------------+
+color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
+{
+  if (Contrarian)
+    Value       *= -1.0;  
+  
+  switch (Style)
+  {
+    case IN_DIRECTION:   if (Value<0.00) return (clrRed);
+                         if (Value>0.00) return (clrLawnGreen);
+                         return (clrDarkGray);
+    case IN_PROXIMITY:   if (Close[0]>Value+point(3))  return(clrLawnGreen);
+                         if (Close[0]>Value+point(1))  return(clrMediumSeaGreen);
+                         if (Close[0]>Value+point(0.2)) return(clrYellowGreen);
+                         if (Close[0]>Value-point(0.2)) return(clrYellow);
+                         if (Close[0]>Value-point(1))   return(clrGoldenrod);
+                         if (Close[0]>Value-point(3))   return(clrOrangeRed);
+                         return (clrRed);
+  }
+  return (clrDarkGray);
 }
 
 //+------------------------------------------------------------------+
@@ -617,6 +642,6 @@ void Flag(string Name, int Color)
 
     fIdx++;
             
-    ObjectCreate("Name-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
-    ObjectSet("Name-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+    ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
+    ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
   }

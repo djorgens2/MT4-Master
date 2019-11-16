@@ -173,6 +173,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   StdDev,
                   OverBought,
                   OverSold,
+                  Decay,
                   Crest,
                   Trough,
                   PolyTrend,
@@ -205,17 +206,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   WordCount      //--- must be last
               };
               
-       enum     SignalType
-                {
-                  Inactive,
-                  Triggered,
-                  Waiting,
-                  Confirmed,
-                  Rejected,
-                  Broken,
-                  SignalTypes
-                };
-
        enum     RetraceType
                 {
                   Trend,              //--- Pertaining to trend

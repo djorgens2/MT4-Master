@@ -109,14 +109,6 @@ void CreateRange(int Bar=0)
    if (IsChanged(sessionOpen,true))
    {
      crRangeId          = EnumToString(inpType)+IntegerToString(++sessionRange);
-
-     if (session.Type()==Daily)
-     {
-//       ObjectSet("boxForecast",OBJPROP_PRICE1,sessionHigh);
-//       ObjectSet("boxForecast",OBJPROP_PRICE2,sessionLow);
-       ObjectSet("boxForecast",OBJPROP_TIME1,Time[Bar]);
-       ObjectSet("boxForecast",OBJPROP_TIME2,Time[Bar]+(PERIOD_D1*60));
-     }
      
      sessionOpenTime    = Time[Bar];
      sessionHigh        = High[Bar];
@@ -297,24 +289,6 @@ int OnInit()
     }
 
     DeleteRanges();
-
-//    if (session.Type()==Daily)
-    {
-      int    startBar          = 0;
-      string startTime         = TimeToStr(session.ServerTime(),TIME_DATE);
-    
-      while (TimeToStr(Time[startBar+1],TIME_DATE)==startTime) startBar++;
-    
-      ObjectCreate("boxForecast",OBJ_RECTANGLE,0,
-        Time[startBar],
-        High[iHighest(Symbol(),Period(),MODE_HIGH,23,1)],
-        Time[startBar]+(PERIOD_D1*60),
-        Low[iLowest(Symbol(),Period(),MODE_LOW,23,1)]);
-   
-      ObjectSet("boxForecast", OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSet("boxForecast", OBJPROP_COLOR, ForecastColor);
-      ObjectSet("boxForecast", OBJPROP_BACK, true);
-    }
 
     for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);
