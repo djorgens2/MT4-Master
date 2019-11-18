@@ -61,7 +61,7 @@ public:
    void              Initialize(const double value);
 
    void              Copy(double &Data[]) {ArrayCopy(Data,dblArray,0,0,MaxSize());}
-   void              CopyNonZero(double &Data[], const int elements);
+   void              CopyFiltered(double &Data[], bool KeepZero, bool KeepDups, int SortMode);
    void              Compute(void);
 
    void              SetPrecision(int Precision) {arrPrecision=Precision;};
@@ -141,20 +141,37 @@ void CArrayDouble::Resize(const int elements)
   }
  
 //+------------------------------------------------------------------+
-//| CopyNonZero - Returns non-zero values only from the class array  |
+//| Copy - Returns value array with filter and sort options          |
 //+------------------------------------------------------------------+
-void CArrayDouble::CopyNonZero(double &Data[], const int elements)
+void CArrayDouble::CopyFiltered(double &Data[], bool KeepZero=true, bool KeepDups=true, int Sort=MODE_ASCEND)
   {
     double buffer[];
+    double work[];
+    
     int    count = 0;
     
-    ArrayResize(buffer,elements);
-    ArrayInitialize(buffer,0.00);
+    ArrayCopy(work,dblArray);
+    ArraySort(work,WHOLE_ARRAY,0,Sort);
     
-    for (int idx=0;idx<arrMaximum&&count<elements;idx++)
-      if (NormalizeDouble(dblArray[idx],arrPrecision)>0.00)
-        buffer[count++] = NormalizeDouble(dblArray[idx],arrPrecision);
-
+    for (int idx=0;idx<ArraySize(work);idx++)
+    {
+      if (count==0)
+      {
+        if (NormalizeDouble(work[idx],arrPrecision)>0.00||KeepZero)
+        {
+          ArrayResize(buffer,count+1);
+          buffer[count++]      = work[idx];
+        }
+      } 
+      else
+        if (NormalizeDouble(work[idx],arrPrecision)>0.00||KeepZero)
+          if (NormalizeDouble(work[idx],arrPrecision)!=NormalizeDouble(buffer[count-1],arrPrecision)||KeepDups)
+          {
+            ArrayResize(buffer,count+1);
+            buffer[count++]    = work[idx];
+          }
+    }
+    
     if (count>0)
     {
       ArrayResize(Data,count);
@@ -330,7 +347,7 @@ void CArrayDouble::Compute()
   }
 
 //+------------------------------------------------------------------+
-//| Sort                                                 |
+//| Sort                                                             |
 //+------------------------------------------------------------------+
 void CArrayDouble::Sort(int beg,int end)
   {

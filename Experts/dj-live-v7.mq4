@@ -9,6 +9,7 @@
 #property strict
 
 #define   Always     true
+#define   clrBoxOff C'60,60,60'
 
 #include <manual.mqh>
 #include <Class\Session.mqh>
@@ -43,8 +44,6 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CFractal           *fractal        = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
   CEvent             *sEvent         = new CEvent();
-  CEvent             *toEvent        = new CEvent();
-
 
   //--- Recommendation Alerts
   enum                AnalystAlert
@@ -73,9 +72,11 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         Waiting,
                         Pending,
                         Requested,
+                        Canceled,
                         Approved,
                         Rejected,
                         Fulfilled,
+                        Expired,
                         OrderStates
                       };
                       
@@ -116,6 +117,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         StrategyType    Strategy;
                         ActionState     Plan;
                         OrderState      OrderStatus;
+                        double          OrderVolume;
                         EventType       OrderEvent;
                         int             OrderCount;
                         double          LotCount;
@@ -126,9 +128,12 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         double          ClosedLoss;
                       };
 
+  const int SegmentType[5]   = {OP_BUY,OP_SELL,Crest,Trough,Decay};
+
   //--- Display operationals
   string              rsShow              = "APP";
-  int                 rsAction            = OP_BUY;  
+  int                 rsAction            = OP_BUY;
+  int                 rsSegment           = NoValue;
   bool                PauseOn             = true;
   int                 PauseOnHour         = NoValue;
   bool                LoggingOn           = false;
@@ -143,6 +148,9 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   int                 SessionHour;
   
   OrderManagerRec     om[2];
+  double              omPrice[5][5];
+  double              omInterlace[];
+  CArrayDouble       *omWork;
    
   
 
@@ -166,6 +174,8 @@ void CallPause(string Message, bool Force=false)
 //+------------------------------------------------------------------+
 void GetData(void)
   {
+    double gdPrice[5];
+    
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       session[type].Update();
@@ -176,6 +186,28 @@ void GetData(void)
     
     fractal.Update();
     pfractal.Update();
+    
+    omWork.Clear();
+    
+    //-- Extract the equalization matrix
+    for (int seg=0;seg<5;seg++)
+    {
+      gdPrice[0]              = pfractal.WaveSegment(SegmentType[seg]).Open;
+      gdPrice[1]              = pfractal.WaveSegment(SegmentType[seg]).High;
+      gdPrice[2]              = pfractal.WaveSegment(SegmentType[seg]).Low;
+      gdPrice[3]              = pfractal.WaveSegment(SegmentType[seg]).Close;
+      gdPrice[4]              = pfractal.WaveSegment(SegmentType[seg]).Retrace;
+      
+      ArraySort(gdPrice,WHOLE_ARRAY,0,MODE_DESCEND);
+      
+      for (int copy=0;copy<5;copy++)
+      {
+        omPrice[seg][copy]    = gdPrice[copy];
+        omWork.Add(gdPrice[copy]);
+      }
+    }
+    
+    omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
   }
 
 //+------------------------------------------------------------------+
@@ -195,14 +227,51 @@ void RefreshControlPanel(void)
       UpdateDirection("lbState",OrderBias(),clrYellow,24);
     else
       UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()),24);
-      
-    UpdateLabel("lbh-1D","Long",BoolToInt(pfractal.ActiveWave().Type==Crest,clrLawnGreen,clrWhite));
-    UpdateLabel("lbh-1E","Short",BoolToInt(pfractal.ActiveWave().Type==Trough,clrRed,clrWhite));
-    UpdateLabel("lbh-1F","Crest",BoolToInt(pfractal.ActiveSegment().Type==Crest,clrLawnGreen,BoolToInt(pfractal.WaveSegment(Crest).IsOpen,clrYellow,clrWhite)));
-    UpdateLabel("lbh-1G","Trough",BoolToInt(pfractal.ActiveSegment().Type==Trough,clrRed,BoolToInt(pfractal.WaveSegment(Trough).IsOpen,clrYellow,clrWhite)));
-    UpdateLabel("lbh-1H","Decay",BoolToInt(pfractal.WaveSegment(Decay).IsOpen,BoolToInt(pfractal.WaveSegment(Last).Type==Crest,clrLawnGreen,clrRed),clrWhite));
 
-    UpdateLabel("lbLastSegment",EnumToString(pfractal.WaveSegment(Last).Type),clrDarkGray);
+    if (pfractal.Event(NewWaveReversal))
+    {
+      UpdateLabel("lbh-1L","Long",clrDarkGray);
+      UpdateLabel("lbh-1S","Short",clrDarkGray);
+      
+      UpdateBox("hdLong",clrBoxOff);
+      UpdateBox("hdShort",clrBoxOff);
+      
+      if (pfractal.WaveSegment(OP_BUY).IsOpen)
+      {
+        UpdateLabel("lbh-1L","Long",clrWhite); 
+        UpdateBox("hdLong",clrDarkGreen);
+      }
+
+      if (pfractal.WaveSegment(OP_SELL).IsOpen)
+      {
+        UpdateLabel("lbh-1S","Short",clrWhite); 
+        UpdateBox("hdShort",clrMaroon);
+      }
+    }
+    
+    if (pfractal.Event(NewWaveOpen))
+    {
+      UpdateLabel("lbh-1C","Crest",clrDarkGray);
+      UpdateLabel("lbh-1T","Trough",clrDarkGray);
+      UpdateLabel("lbh-1D","Decay "+EnumToString(pfractal.WaveSegment(Last).Type),clrDarkGray);
+
+      UpdateBox("hdCrest",clrBoxOff);
+      UpdateBox("hdTrough",clrBoxOff);
+      UpdateBox("hdDecay",clrBoxOff);
+
+      switch (pfractal.ActiveSegment().Type)
+      {
+        case Crest:     UpdateLabel("lbh-1C","Crest",clrWhite);
+                        UpdateBox("hdCrest",clrDarkGreen);
+                        break;
+        case Trough:    UpdateLabel("lbh-1T","Trough",clrWhite);
+                        UpdateBox("hdTrough",clrMaroon);
+                        break;
+        case Decay:     UpdateLabel("lbh-1D","Decay "+EnumToString(pfractal.WaveSegment(Last).Type),clrWhite);
+                        UpdateBox("hdDecay",BoolToInt(pfractal.WaveSegment(Last).Type==Crest,clrDarkGreen,clrMaroon));
+      }
+    }
+    
     UpdateLabel("lbWaveState",EnumToString(pfractal.ActiveWave().Type)+" "
                       +BoolToStr(pfractal.ActiveSegment().Type==Decay,"Decay ")
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
@@ -228,28 +297,23 @@ void RefreshControlPanel(void)
     UpdateLabel("lbShortCount",(string)pfractal.WaveSegment(OP_SELL).Count,clrDarkGray);
     UpdateLabel("lbCrestCount",(string)pfractal.WaveSegment(Crest).Count+":"+(string)pfractal.Wave().CrestTotal,clrDarkGray);
     UpdateLabel("lbTroughCount",(string)pfractal.WaveSegment(Trough).Count+":"+(string)pfractal.Wave().TroughTotal,clrDarkGray);
-    UpdateLabel("lbDecayCount",(string)pfractal.WaveSegment(Decay).Count,clrDarkGray);    
+    UpdateLabel("lbDecayCount",(string)pfractal.WaveSegment(Decay).Count,clrDarkGray);
 
-    UpdateLabel("lbCrestOpen",DoubleToStr(pfractal.WaveSegment(Crest).Open,Digits),Color(pfractal.WaveSegment(Crest).Open,IN_PROXIMITY));
-    UpdateLabel("lbTroughOpen",DoubleToStr(pfractal.WaveSegment(Trough).Open,Digits),Color(pfractal.WaveSegment(Trough).Open,IN_PROXIMITY));
-    UpdateLabel("lbDecayOpen",DoubleToStr(pfractal.WaveSegment(Decay).Open,Digits),Color(pfractal.WaveSegment(Decay).Open,IN_PROXIMITY));
+    string colHead[5]  = {"L","S","C","T","D"};
 
-    UpdateLabel("lbCrestHigh",DoubleToStr(pfractal.WaveSegment(Crest).High,Digits),Color(pfractal.WaveSegment(Crest).High,IN_PROXIMITY));
-    UpdateLabel("lbTroughHigh",DoubleToStr(pfractal.WaveSegment(Trough).High,Digits),Color(pfractal.WaveSegment(Trough).High,IN_PROXIMITY));
-    UpdateLabel("lbDecayHigh",DoubleToStr(pfractal.WaveSegment(Decay).High,Digits),Color(pfractal.WaveSegment(Decay).High,IN_PROXIMITY));
+    for (int row=0;row<5;row++)
+      for (int col=0;col<5;col++)
+        UpdateLabel("lb"+colHead[col]+(string)row,DoubleToStr(omPrice[col][row],Digits),Color(omPrice[col][row],IN_PROXIMITY));
 
-    UpdateLabel("lbCrestLow",DoubleToStr(pfractal.WaveSegment(Crest).Low,Digits),Color(pfractal.WaveSegment(Crest).Low,IN_PROXIMITY));
-    UpdateLabel("lbTroughLow",DoubleToStr(pfractal.WaveSegment(Trough).Low,Digits),Color(pfractal.WaveSegment(Trough).Low,IN_PROXIMITY));
-    UpdateLabel("lbDecayLow",DoubleToStr(pfractal.WaveSegment(Decay).Low,Digits),Color(pfractal.WaveSegment(Decay).Low,IN_PROXIMITY));
+    for (int row=0;row<25;row++)
+      if (row<ArraySize(omInterlace))
+        UpdateLabel("lbInterlace"+(string)row,DoubleToStr(omInterlace[row],Digits),Color(omInterlace[row],IN_PROXIMITY));
+      else
+        UpdateLabel("lbInterlace"+(string)row,"");
 
-    UpdateLabel("lbCrestClose",DoubleToStr(pfractal.WaveSegment(Crest).Close,Digits),Color(fdiv(pfractal.WaveSegment(Crest).Low+pfractal.WaveSegment(Crest).Retrace,2),IN_PROXIMITY));
-    UpdateLabel("lbTroughClose",DoubleToStr(pfractal.WaveSegment(Trough).Close,Digits),Color(fdiv(pfractal.WaveSegment(Trough).Low+pfractal.WaveSegment(Trough).Retrace,2),IN_PROXIMITY));
-    UpdateLabel("lbDecayClose",DoubleToStr(pfractal.WaveSegment(Decay).Close,Digits),Color(fdiv(pfractal.WaveSegment(Decay).Low+pfractal.WaveSegment(Decay).Retrace,2),IN_PROXIMITY));
-
-    UpdateLabel("lbCrestRetrace",DoubleToStr(pfractal.WaveSegment(Crest).Retrace,Digits),Color(fdiv(pfractal.WaveSegment(Crest).Low+pfractal.WaveSegment(Crest).Retrace,2),IN_PROXIMITY));
-    UpdateLabel("lbTroughRetrace",DoubleToStr(pfractal.WaveSegment(Trough).Retrace,Digits),Color(fdiv(pfractal.WaveSegment(Crest).Low+pfractal.WaveSegment(Crest).Retrace,2),IN_PROXIMITY));
-    UpdateLabel("lbDecayRetrace",DoubleToStr(pfractal.WaveSegment(Decay).Retrace,Digits),Color(fdiv(pfractal.WaveSegment(Crest).Low+pfractal.WaveSegment(Crest).Retrace,2),IN_PROXIMITY));
-
+    UpdateBox("hdInterlace",BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2)<Close[0],clrDarkGreen,clrMaroon));
+    UpdateLabel("lbLongNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_BUY).Retrace-pfractal.WaveSegment(OP_BUY).High),1),clrRed);    
+    UpdateLabel("lbShortNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_SELL).Low-pfractal.WaveSegment(OP_SELL).Retrace),1),clrLawnGreen);    
     UpdateLabel("lbCrestNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Crest).Retrace-pfractal.WaveSegment(Crest).High),1),clrRed);
     UpdateLabel("lbTroughNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Trough).Low-pfractal.WaveSegment(Trough).Retrace),1),clrLawnGreen);    
 
@@ -258,6 +322,73 @@ void RefreshControlPanel(void)
 
     if (pfractal.WaveSegment(Last).Type==Trough)
       UpdateLabel("lbDecayNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Decay).Low-pfractal.WaveSegment(Decay).Retrace),1),clrLawnGreen);
+  }
+
+//+------------------------------------------------------------------+
+//| ZeroLines - Set displayed lines to zero                          |
+//+------------------------------------------------------------------+
+void ZeroLines(void)
+  {
+    static int zlAction       = OP_NO_ACTION;
+    static int zlActionWave   = OP_NO_ACTION;
+    
+    if (IsChanged(zlAction,rsAction)||IsChanged(zlActionWave,pfractal.Wave().Action))
+    {
+      UpdateLine("lnOpen",0.00);
+      UpdateLine("lnHigh",0.00);
+      UpdateLine("lnLow",0.00);
+      UpdateLine("lnClose",0.00);
+      UpdateLine("lnRetrace",0.00);
+      UpdateLine("lnProfit",0.00);
+      UpdateLine("lnRisk",0.00);
+      UpdateLine("lnBuild",0.00);
+      UpdateLine("lnGo",0.00);
+      UpdateLine("lnDoom",0.00);
+      UpdateLine("lnRecovery",0.00);
+      UpdateLine("lnMercy",0.00);
+      UpdateLine("lnOpportunity",0.00);
+      UpdateLine("lnKill",0.00);
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| ShowLines - Show lines for the supplied segment                  |
+//+------------------------------------------------------------------+
+void ShowLines(void)
+  { 
+    ZeroLines();
+    
+    if (rsAction==OP_NO_ACTION)
+      return;
+
+    if (rsSegment>NoValue)
+    {
+      UpdateLine("lnOpen",pfractal.WaveSegment(SegmentType[rsSegment]).Open,STYLE_SOLID,clrYellow);
+      UpdateLine("lnHigh",pfractal.WaveSegment(SegmentType[rsSegment]).High,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnLow",pfractal.WaveSegment(SegmentType[rsSegment]).Low,STYLE_SOLID,clrRed);
+      UpdateLine("lnClose",pfractal.WaveSegment(SegmentType[rsSegment]).Close,STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnRetrace",pfractal.WaveSegment(SegmentType[rsSegment]).Retrace,STYLE_DOT,clrSteelBlue);
+    }
+    else
+    if (pfractal.Wave().Action==rsAction)
+    {
+      UpdateLine("lnProfit",pfractal.ActionLine(rsAction).Profit,STYLE_DOT,clrLawnGreen);
+      UpdateLine("lnClose",pfractal.ActionLine(rsAction).Close,STYLE_DASH,clrSteelBlue);
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnBuild",pfractal.ActionLine(rsAction).Build,STYLE_DASH,clrLawnGreen);
+      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
+      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
+    }
+    else
+    {
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
+      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
+      UpdateLine("lnRecovery",pfractal.ActionLine(rsAction).Recovery,STYLE_DOT,clrLawnGreen);
+      UpdateLine("lnMercy",pfractal.ActionLine(rsAction).Mercy,STYLE_DOT,clrSteelBlue);      
+      UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction).Opportunity,STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnKill",pfractal.ActionLine(rsAction).Kill,STYLE_DASH,clrOrangeRed);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -277,37 +408,7 @@ void RefreshScreen(void)
                            +"  "+BoolToStr(detail[type].Reversal,"Reversal",BoolToStr(detail[type].FractalDir==DirectionNone,"",DirText(detail[type].FractalDir)))
                            +"\n\n";
 
-    if (pfractal.Wave().Action==rsAction)
-    {
-      UpdateLine("lnRecovery",0.00,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnMercy",0.00,STYLE_DOT,clrSteelBlue);
-      UpdateLine("lnOpportunity",0.00,STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnKill",0.00,STYLE_DOT,clrOrangeRed);
-
-      UpdateLine("lnProfit",pfractal.ActionLine(rsAction).Profit,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnClose",pfractal.ActionLine(rsAction).Close,STYLE_DASH,clrSteelBlue);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnBuild",pfractal.ActionLine(rsAction).Build,STYLE_DASH,clrLawnGreen);
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
-      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
-    }
-    else
-    {
-      UpdateLine("lnProfit",0.00,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnClose",0.00,STYLE_DASH,clrSteelBlue);
-      UpdateLine("lnBuild",0.00,STYLE_DASH,clrLawnGreen);
-
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
-      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
-      UpdateLine("lnRecovery",pfractal.ActionLine(rsAction).Recovery,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnMercy",pfractal.ActionLine(rsAction).Mercy,STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction).Opportunity,STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnKill",pfractal.ActionLine(rsAction).Kill,STYLE_DASH,clrOrangeRed);
-    }
-
-    pfractal.ActionState(OP_SELL);
-    pfractal.ActionState(OP_BUY);
+    ShowLines();
 
     sEvent.ClearEvents();
     
@@ -419,6 +520,21 @@ bool NewBias(int &Now, int New)
   }
 
 //+------------------------------------------------------------------+
+//| PriceRating - Returns the proximity to close price rating        |
+//+------------------------------------------------------------------+
+int PriceRating(double Price, double Max=6.0, double Min=3.0, double Mean=0.2)
+  {
+    if (Close[0]>Price+point(Max))   return(3);
+    if (Close[0]>Price+point(Min))   return(2);
+    if (Close[0]>Price+point(Mean))  return(1);
+    if (Close[0]>Price-point(Mean))  return(0);
+    if (Close[0]>Price-point(Min))   return(-1);
+    if (Close[0]>Price-point(Max))   return(-2);
+
+    return (-3);
+  }
+
+//+------------------------------------------------------------------+
 //| CheckSessionEvents - updates trading strategy on session events  |
 //+------------------------------------------------------------------+
 void CheckSessionEvents(void)
@@ -495,137 +611,6 @@ void CheckSessionEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| Draw - Paint Crest/Trough lines                                  |
-//+------------------------------------------------------------------+
-void Draw(EventType Event, bool NewEvent=true, int BarIndex=0)
-  {
-    static    int crestidx          = 0;
-    static    int troughidx         = 0;
-    
-    static double crest[4];
-    static double trough[4];
-
-    if (NewEvent)
-    {
-      if (BarIndex==0)
-      {
-        ArrayInitialize(crest,Close[0]);
-        ArrayInitialize(trough,Close[0]);
-      }
-        
-      switch (Event)
-      {
-        case NewCrest:  toEvent.SetEvent(NewCrest);
-                        crestidx++;
-                       
-                        ObjectCreate("lnCrestHL"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],crest[1],Time[0],crest[2]);
-                        ObjectCreate("lnCrestOC"+IntegerToString(crestidx),OBJ_TREND,0,Time[0],fmin(High[0],crest[0]),Time[0],Close[0]);
-                     
-                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_COLOR,clrYellow);
-                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_RAY,false);
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_RAY,false);
-                        ObjectSet("lnCrestHL"+IntegerToString(crestidx),OBJPROP_WIDTH,2);
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_WIDTH,12);
-                        ObjectSet("lnCrestOC"+IntegerToString(crestidx),OBJPROP_BACK,true);
-
-                        break;
-                        
-        case NewTrough: toEvent.SetEvent(NewTrough);
-                        troughidx++;
-
-                        ObjectCreate("lnTroughHL"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],trough[1],Time[0],trough[2]);
-                        ObjectCreate("lnTroughOC"+IntegerToString(troughidx),OBJ_TREND,0,Time[0],fmax(Low[0],trough[0]),Time[0],Close[0]);
-
-                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_COLOR,clrRed);
-                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_RAY,false);
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_RAY,false);
-                        ObjectSet("lnTroughHL"+IntegerToString(troughidx),OBJPROP_WIDTH,2);
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_WIDTH,12);
-                        ObjectSet("lnTroughOC"+IntegerToString(troughidx),OBJPROP_BACK,true);
-      }
-    }  
-
-    for (int carry=BarIndex;carry>NoValue;carry--)
-    {
-      if (IsBetween(Close[0],High[carry],Low[carry]))
-        switch (Event)
-        {
-          case NewCrest:  IsHigher(Close[0],crest[1]);
-                          IsLower(Close[0],crest[2]);
-
-                          ObjectSet("lnCrestHL"+IntegerToString(crestidx-carry),OBJPROP_PRICE1,fmin(High[carry],crest[1]));
-                          ObjectSet("lnCrestHL"+IntegerToString(crestidx-carry),OBJPROP_PRICE2,fmax(Low[carry],crest[2]));
-                          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_PRICE2,Close[0]);
-
-                          break;
-
-          case NewTrough: IsHigher(Close[0],trough[1]);
-                          IsLower(Close[0],trough[2]);
-
-                          ObjectSet("lnTroughHL"+IntegerToString(troughidx-carry),OBJPROP_PRICE1,fmin(High[carry],trough[1]));
-                          ObjectSet("lnTroughHL"+IntegerToString(troughidx-carry),OBJPROP_PRICE2,fmax(Low[carry],trough[2]));
-                          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_PRICE2,Close[0]);
-        }
-        
-      if (Event==NewCrest)
-        if (IsLower(Close[0],crest[0],NoUpdate))
-          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_COLOR,clrMaroon);
-        else
-          ObjectSet("lnCrestOC"+IntegerToString(crestidx-carry),OBJPROP_COLOR,clrForestGreen);
-
-      if (Event==NewTrough)
-        if (IsHigher(Close[0],trough[0],NoUpdate))
-          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_COLOR,clrForestGreen);
-        else
-          ObjectSet("lnTroughOC"+IntegerToString(troughidx-carry),OBJPROP_COLOR,clrMaroon);
-    }    
-  }
-
-//+------------------------------------------------------------------+
-//| CheckPipMAEvents - Sets alerts for relevant PipMA events         |
-//+------------------------------------------------------------------+
-void CheckPipMAEvents(void)
-  {    
-    static int    cpBarIndex   = 0;
-
-    for (EventType pf=1;pf<EventTypes;pf++)
-    switch (pf)
-    {
-      case NewCrest:       
-      case NewTrough:      if (pfractal.Event(pf))
-                             Draw(pf);
-                           else
-                           if (toEvent[pf])
-                             if (pfractal.PolyState()==Crest||pfractal.PolyState()==Trough)
-                             {
-                               if (sEvent[NewHour]) cpBarIndex++;
-                               Draw(pf,sEvent[NewHour],cpBarIndex);
-                             }
-                             else
-                             {
-                               toEvent.ClearEvent(pf);
-                               cpBarIndex   = 0;
-                             }
-                             
-      case NewAction:      if (pfractal.Event(NewAction))
-                           {
-//                             if (pfractal.ActionState(OP_BUY)==Opportunity)
-//                               Flag("Long-Oppty:",clrYellow);
-//                             if (pfractal.ActionState(OP_SELL)==Opportunity)
-//                               Flag("Short-Oppty:",clrRed);
-                           }
-      case NewFibonacci:
-      case NewHigh:
-      case NewLow:
-      case NewPoly:
-      case NewPolyBoundary:
-      case NewPolyTrend:
-      case NewPolyState:    if (pfractal.Event(pf)) sEvent.SetEvent(pf);
-                            break;
-    }
-  }
-
-//+------------------------------------------------------------------+
 //| OrderBias - Trade direction/action all factors considered        |
 //+------------------------------------------------------------------+
 int OrderBias(int Measure=InDirection)
@@ -689,10 +674,22 @@ void SetOpenPlan(SessionType Type)
   }
 
 //+------------------------------------------------------------------+
+//| ProcessPipMA - Process PipMA data and prepare recommendations    |
+//+------------------------------------------------------------------+
+void ProcessPipMA(void)
+  {
+    pfractal.DrawStateLines();
+
+  }
+
+//+------------------------------------------------------------------+
 //| AnalyzeData - Verify health and safety of open positions         |
 //+------------------------------------------------------------------+
 void AnalyzeData(void)
   {
+    //--- Analyze an prepare session data
+    CheckSessionEvents();
+
     if (sEvent[NewDay])
       SetNewDayPlan();
       
@@ -701,7 +698,9 @@ void AnalyzeData(void)
       
     if (sEvent[SessionOpen])
       SetOpenPlan(lead.Type());
-      
+
+    //--- Analyze an prepare session data
+    ProcessPipMA();
   }
 
 //+------------------------------------------------------------------+
@@ -831,9 +830,6 @@ void OrderManagement(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    CheckSessionEvents();
-    CheckPipMAEvents();
-
     if (PauseOnHour>NoValue)
       if (sEvent[NewHour])
         if (ServerHour()==PauseOnHour)
@@ -887,11 +883,32 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="SHOW")
       if (Command[1]=="LINES")
       {
+        if (Command[2]=="CREST")
+          rsSegment                    = 2;
+        else
+        if (Command[2]=="TROUGH")
+          rsSegment                    = 3;
+        else
+        if (Command[2]=="DECAY")
+          rsSegment                    = 4;
+        else
         if (Command[2]=="BUY"||Command[2]=="LONG")
+        {
           rsAction                     = OP_BUY;
+          rsSegment                    = NoValue;
+          
+          if (Command[3]=="SEG")
+            rsSegment                  = OP_BUY;
+        }
         else
         if (Command[2]=="SELL"||Command[2]=="SHORT")
+        {
           rsAction                     = OP_SELL;
+          rsSegment                    = NoValue;
+
+          if (Command[3]=="SEG")
+            rsSegment                  = OP_SELL;
+        }
        }
      else
        rsShow                          = Command[1];
@@ -999,14 +1016,24 @@ int OnInit()
   {
     ManualInit();
     
+    omWork                = new CArrayDouble(0);
+    omWork.Truncate       = false;
+    omWork.AutoExpand     = true;    
+    omWork.SetPrecision(Digits);
+    omWork.Initialize(0.00);
+    
     session[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     session[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
  
+    NewLine("lnOpen");
+    NewLine("lnHigh");
+    NewLine("lnLow");
+    NewLine("lnClose");
+    NewLine("lnRetrace");
     NewLine("lnProfit");
     NewLine("lnDoom");
-    NewLine("lnClose");
     NewLine("lnRisk");
     NewLine("lnBuild");
     NewLine("lnGo");
@@ -1044,7 +1071,7 @@ int OnInit()
       om[action].ClosedLoss     = 0.00;
     }
 
-    return(INIT_SUCCEEDED);
+    return(INIT_SUCCEEDED);    
   }
 
 //+------------------------------------------------------------------+
@@ -1058,5 +1085,5 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete sEvent;
-    delete toEvent;
+    delete omWork;
   }

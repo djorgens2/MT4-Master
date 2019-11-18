@@ -11,6 +11,7 @@
 #include <Class\Event.mqh>
 #include <Class\ArrayDouble.mqh>
 #include <stdutil.mqh>
+#include <std_utility.mqh>
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -101,6 +102,7 @@ public:
        double           MA(int Measure);
        double           Poly(int Measure);
        
+       void             DrawStateLines(void);
        ReservedWords    PolyState(void) { return(prPolyState); }
        ActionState      ActionState(const int Action) {return (prWave.ActionState[Action]); }
        PriceLineRec     ActionLine(const int Action) {return (prLine[Action]); }
@@ -423,6 +425,8 @@ void CPolyRegression::OpenDecaySegment(WaveSegment &Segment)
       
       if (prWave.Decay.Direction==DirectionDown)
         prWave.Decay.Open              = prWave.Decay.High;
+        
+      SetEvent(NewWaveOpen);
     }
   }
 
@@ -451,7 +455,7 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
           prWave.Reversal              = false;
           prWave.Breakout              = false;
         }
-        
+
         if (Segment.Type==Trough)
         {
           prWave.Active[OP_BUY].Low    = Segment.Low;
@@ -468,7 +472,7 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
           prWave.Reversal              = false;
           prWave.Breakout              = false;
         }
-        
+
         if (Segment.Type==Crest)
         {
           prWave.Active[OP_SELL].High  = Segment.High;
@@ -479,9 +483,13 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
     else
     if (IsChanged(prWave.Action,Action))
     {
+      prWave.Active[OP_BUY].IsOpen    = false;
+      prWave.Active[OP_SELL].IsOpen   = false;
+      prWave.Active[Action].IsOpen    = true;
+    
       //-- New Action Manager Assignment
       SetEvent(NewWaveReversal);
-      
+
       prWave.Active[OP_BUY].Count     = 0;
       prWave.Active[OP_SELL].Count    = 0;
 
@@ -502,6 +510,7 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
         prWave.Active[OP_BUY].Close    = Segment.Low;
         
         prWave.Active[OP_BUY].Count++;
+        
         prWave.CrestTotal++;
         prWave.Crest.Count++;
       }
@@ -516,6 +525,7 @@ void CPolyRegression::CloseWave(WaveSegment &Segment, int Action=NoValue)
         prWave.Active[OP_SELL].Close   = Segment.High;
 
         prWave.Active[OP_SELL].Count++;
+        
         prWave.TroughTotal++;
         prWave.Trough.Count++;
       }
@@ -599,7 +609,7 @@ void CPolyRegression::OpenWave(WaveSegment &Segment)
     Segment.IsOpen                       = true;
     Segment.Count++;    
 
-    SetEvent(NewWaveOpen);    
+    SetEvent(NewWaveOpen);
   }
 
 //+------------------------------------------------------------------+
@@ -652,6 +662,18 @@ void CPolyRegression::UpdateWave(WaveSegment &Segment)
       
     if (IsHigher(Close[0],Segment.Open,NoUpdate))
       Segment.Direction            = DirectionUp;
+
+   if (IsHigher(Close[0],prWave.Active[OP_BUY].High,NoUpdate))
+     if (Event(NewHigh))
+       prWave.Active[OP_BUY].Retrace  = Close[0];
+
+   if (IsLower(Close[0],prWave.Active[OP_SELL].Low,NoUpdate))
+     if (Event(NewLow))
+       prWave.Active[OP_SELL].Retrace  = Close[0];
+
+    prWave.Active[OP_BUY].Retrace  = fmin(prWave.Active[OP_BUY].Retrace,Close[0]);
+    prWave.Active[OP_SELL].Retrace = fmax(prWave.Active[OP_SELL].Retrace,Close[0]);;
+
 
     Segment.Close                  = Close[0];
   }
@@ -839,6 +861,8 @@ void CPolyRegression::CalcWave(void)
     
     if (IsChanged(prWave.State,CalcWaveState()))
       SetEvent(NewWaveState);
+      
+//    DrawStateLines();  
       
     CalcActionState(OP_BUY);
     CalcActionState(OP_SELL);
@@ -1290,6 +1314,65 @@ WaveSegment CPolyRegression::WaveSegment(const int Segment)
     }       
     
     return (ActiveSegment());
+  }
+
+//+------------------------------------------------------------------+
+//| DrawStateLines - Paint Crest/Trough lines                        |
+//+------------------------------------------------------------------+
+void CPolyRegression::DrawStateLines(void)
+  {
+    static int           dsBarIndex  = 0;
+    static int           dsEventIdx  = 0;
+    static int           dsHourIdx   = 0;
+    static ReservedWords dsState     = Default;
+    bool                 dsNewLine   = false;
+        
+    if (Event(NewCrest)||Event(NewTrough))
+    {
+      dsHourIdx                      = TimeHour(Time[0]);
+      dsBarIndex                     = 0;
+      dsState                        = (ReservedWords)BoolToInt(Event(NewCrest),Crest,Trough);
+      dsNewLine                      = true;
+      dsEventIdx++;
+    }
+    
+    if (IsChanged(dsHourIdx,TimeHour(Time[0])))
+    {
+      dsNewLine                      = true;
+      dsBarIndex++;
+    }
+
+    if (IsChanged(dsState,prPolyState))
+      return;
+    else
+    if (dsState==Crest||dsState==Trough)
+    {
+      if (dsNewLine)
+      {
+        NewRay("tlHL"+EnumToString(dsState)+(string)dsEventIdx,false);
+        NewRay("tlOC"+EnumToString(dsState)+(string)dsEventIdx,false);
+
+        UpdateRay("tlHL"+EnumToString(dsState)+(string)dsEventIdx,Close[0],0,Close[0],0,STYLE_SOLID,BoolToInt(dsState==Crest,clrYellow,clrRed));
+        UpdateRay("tlOC"+EnumToString(dsState)+(string)dsEventIdx,Close[0],0,Close[0],0,STYLE_SOLID,clrNONE);
+      
+        ObjectSet("tlHL"+EnumToString(dsState)+(string)dsEventIdx,OBJPROP_WIDTH,2);
+        ObjectSet("tlOC"+EnumToString(dsState)+(string)dsEventIdx,OBJPROP_WIDTH,12);
+        ObjectSet("tlOC"+EnumToString(dsState)+(string)dsEventIdx,OBJPROP_BACK,true);
+      }
+
+      for (int carry=dsBarIndex;carry>NoValue;carry--)
+      {
+        if (IsBetween(ActiveSegment().Open,High[carry],Low[0]))
+          ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,ActiveSegment().Open);
+
+        if (IsBetween(Close[0],High[carry],Low[carry]))
+          ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE2,Close[0]);
+
+        ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_COLOR,DirColor(ActiveSegment().Direction,clrForestGreen,clrMaroon));
+        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,fmin(High[carry],ActiveSegment().High));
+        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE2,fmax(Low[carry],ActiveSegment().Low));
+      }
+    }
   }
 
 //+------------------------------------------------------------------+

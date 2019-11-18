@@ -340,12 +340,12 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
     case IN_DIRECTION:   if (Value<0.00) return (clrRed);
                          if (Value>0.00) return (clrLawnGreen);
                          return (clrDarkGray);
-    case IN_PROXIMITY:   if (Close[0]>Value+point(3))  return(clrLawnGreen);
-                         if (Close[0]>Value+point(1))  return(clrMediumSeaGreen);
-                         if (Close[0]>Value+point(0.2)) return(clrYellowGreen);
+    case IN_PROXIMITY:   if (Close[0]>Value+point(6))  return(clrLawnGreen);
+                         if (Close[0]>Value+point(3))  return(clrYellowGreen);
+                         if (Close[0]>Value+point(0.2)) return(clrMediumSeaGreen);
                          if (Close[0]>Value-point(0.2)) return(clrYellow);
-                         if (Close[0]>Value-point(1))   return(clrGoldenrod);
-                         if (Close[0]>Value-point(3))   return(clrOrangeRed);
+                         if (Close[0]>Value-point(3))   return(clrGoldenrod);
+                         if (Close[0]>Value-point(6))   return(clrChocolate);
                          return (clrRed);
   }
   return (clrDarkGray);
@@ -644,4 +644,29 @@ void Flag(string Name, int Color)
             
     ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
     ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+  }
+
+//+------------------------------------------------------------------+
+//| DrawBox - Draws a box used to frame text                         |
+//+------------------------------------------------------------------+
+void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, int Border, int WinId=0)
+  {
+    ObjectCreate(Name,OBJ_RECTANGLE_LABEL,WinId,0,0,0,0);
+    ObjectSet(Name,OBJPROP_XDISTANCE,PosX);
+    ObjectSet(Name,OBJPROP_YDISTANCE,PosY);
+    ObjectSet(Name,OBJPROP_XSIZE,Width);
+    ObjectSet(Name,OBJPROP_YSIZE,Height);
+    ObjectSet(Name,OBJPROP_CORNER,SCREEN_UL);
+    ObjectSet(Name,OBJPROP_STYLE, STYLE_SOLID);
+    ObjectSet(Name,OBJPROP_BORDER_TYPE, Border);
+    ObjectSet(Name,OBJPROP_BGCOLOR, Color);
+    ObjectSet(Name,OBJPROP_BACK, true);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateBox - Updates some box properties (wip)                    |
+//+------------------------------------------------------------------+
+void UpdateBox(string Name, color Color)
+  {
+      ObjectSet(Name,OBJPROP_BGCOLOR, Color);
   }
