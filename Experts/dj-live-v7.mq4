@@ -66,27 +66,15 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         TidalWave        //-- Non-volatile steady wave growth lasting several hours or days;
                       };
                       
-  //--- Order Statuses
-  enum                OrderState
-                      {
-                        Waiting,
-                        Pending,
-                        Requested,
-                        Canceled,
-                        Approved,
-                        Rejected,
-                        Fulfilled,
-                        Expired,
-                        OrderStates
-                      };
-                      
   //--- Strategies
   enum                StrategyType
                       {
-                        Stop,
-                        Scalp,
+//                        Kill,
+//                        Stop,
                         Spot,
                         FFE,
+//                        Capture,
+//                        Bank,
                         StrategyTypes
                       };
                        
@@ -103,29 +91,27 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         int            FractalHour;
                         int            HighHour;
                         int            LowHour;
-                        double         ForecastHigh;
-                        double         ForecastLow;
-                        double         Entry[2];
-                        double         Profit[2];
-                        double         Risk[2];
                         bool           IsValid;
                         bool           Alerts;
                       };
 
+  struct              ActionRequest
+                      {
+                        double          Price;
+                        double          Lots;                      
+                      };
+                      
   struct              OrderManagerRec
                       {
-                        StrategyType    Strategy;
                         ActionState     Plan;
-                        OrderState      OrderStatus;
-                        double          OrderVolume;
-                        EventType       OrderEvent;
-                        int             OrderCount;
-                        double          LotCount;
+                        ActionRequest   ShortAction[StrategyTypes];
+                        ActionRequest   LongAction[StrategyTypes];
+                        int             OrderTotal;
+                        double          LotsTotal;
                         double          NetMargin;
                         double          EQProfit;
                         double          EQLoss;
-                        double          ClosedProfit;
-                        double          ClosedLoss;
+                        double          EQNet;
                       };
 
   const int SegmentType[5]   = {OP_BUY,OP_SELL,Crest,Trough,Decay};
@@ -136,19 +122,19 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   int                 rsSegment           = NoValue;
   bool                PauseOn             = true;
   int                 PauseOnHour         = NoValue;
+  double              PauseOnPrice        = 0.00;
   bool                LoggingOn           = false;
   bool                TradingOn           = true;
   bool                Alerts[EventTypes];
   
   //--- Session operationals
   SessionDetail       detail[SessionTypes];
-  SessionDetail       history[SessionTypes];
   
   //--- Trade operationals
   int                 SessionHour;
   
   OrderManagerRec     om[2];
-  double              omPrice[5][5];
+  double              omMatrix[5][5];
   double              omInterlace[];
   CArrayDouble       *omWork;
    
@@ -174,8 +160,6 @@ void CallPause(string Message, bool Force=false)
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    double gdPrice[5];
-    
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       session[type].Update();
@@ -185,29 +169,7 @@ void GetData(void)
     }
     
     fractal.Update();
-    pfractal.Update();
-    
-    omWork.Clear();
-    
-    //-- Extract the equalization matrix
-    for (int seg=0;seg<5;seg++)
-    {
-      gdPrice[0]              = pfractal.WaveSegment(SegmentType[seg]).Open;
-      gdPrice[1]              = pfractal.WaveSegment(SegmentType[seg]).High;
-      gdPrice[2]              = pfractal.WaveSegment(SegmentType[seg]).Low;
-      gdPrice[3]              = pfractal.WaveSegment(SegmentType[seg]).Close;
-      gdPrice[4]              = pfractal.WaveSegment(SegmentType[seg]).Retrace;
-      
-      ArraySort(gdPrice,WHOLE_ARRAY,0,MODE_DESCEND);
-      
-      for (int copy=0;copy<5;copy++)
-      {
-        omPrice[seg][copy]    = gdPrice[copy];
-        omWork.Add(gdPrice[copy]);
-      }
-    }
-    
-    omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
+    pfractal.Update();    
   }
 
 //+------------------------------------------------------------------+
@@ -277,17 +239,17 @@ void RefreshControlPanel(void)
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
                       
     UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));
-    UpdateLabel("lbLongOrder",BoolToStr(om[OP_BUY].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_BUY].OrderStatus)+
-                       " on "+EnumToString(om[OP_BUY].OrderEvent)),
-                       BoolToInt(om[OP_BUY].OrderStatus==Waiting,clrDarkGray,clrYellow));
+//    UpdateLabel("lbLongOrder",BoolToStr(om[OP_BUY].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_BUY].OrderStatus)+
+//                      " on "+EnumToString(om[OP_BUY].OrderEvent)),
+//                       BoolToInt(om[OP_BUY].OrderStatus==Waiting,clrDarkGray,clrYellow));
                        
     UpdateLabel("lbShortState",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
-    UpdateLabel("lbShortOrder",BoolToStr(om[OP_SELL].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_SELL].OrderStatus)+
-                       " on "+EnumToString(om[OP_SELL].OrderEvent)),
-                       BoolToInt(om[OP_SELL].OrderStatus==Waiting,clrDarkGray,clrYellow));
+    //UpdateLabel("lbShortOrder",BoolToStr(om[OP_SELL].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_SELL].OrderStatus)+
+    //                   " on "+EnumToString(om[OP_SELL].OrderEvent)),
+    //                   BoolToInt(om[OP_SELL].OrderStatus==Waiting,clrDarkGray,clrYellow));
     
-    UpdateLabel("lbLongPlan",EnumToString(om[OP_BUY].Strategy)+":"+EnumToString(om[OP_BUY].Plan),clrDarkGray);
-    UpdateLabel("lbShortPlan",EnumToString(om[OP_SELL].Strategy)+":"+EnumToString(om[OP_SELL].Plan),clrDarkGray);
+    //UpdateLabel("lbLongPlan",EnumToString(om[OP_BUY].Strategy)+":"+EnumToString(om[OP_BUY].Plan),clrDarkGray);
+    //UpdateLabel("lbShortPlan",EnumToString(om[OP_SELL].Strategy)+":"+EnumToString(om[OP_SELL].Plan),clrDarkGray);
     
     UpdateLabel("lbRetrace","Retrace",BoolToInt(pfractal.Wave().Retrace,clrYellow,clrDarkGray));
     UpdateLabel("lbBreakout","Breakout",BoolToInt(pfractal.Wave().Breakout,clrYellow,clrDarkGray));
@@ -303,7 +265,7 @@ void RefreshControlPanel(void)
 
     for (int row=0;row<5;row++)
       for (int col=0;col<5;col++)
-        UpdateLabel("lb"+colHead[col]+(string)row,DoubleToStr(omPrice[col][row],Digits),Color(omPrice[col][row],IN_PROXIMITY));
+        UpdateLabel("lb"+colHead[col]+(string)row,DoubleToStr(omMatrix[col][row],Digits),Color(omMatrix[col][row],IN_PROXIMITY));
 
     for (int row=0;row<25;row++)
       if (row<ArraySize(omInterlace))
@@ -339,12 +301,14 @@ void ZeroLines(void)
       UpdateLine("lnLow",0.00);
       UpdateLine("lnClose",0.00);
       UpdateLine("lnRetrace",0.00);
-      UpdateLine("lnProfit",0.00);
+
+      UpdateLine("lnYield",0.00);
+      UpdateLine("lnGoal",0.00);
       UpdateLine("lnRisk",0.00);
       UpdateLine("lnBuild",0.00);
       UpdateLine("lnGo",0.00);
       UpdateLine("lnDoom",0.00);
-      UpdateLine("lnRecovery",0.00);
+      UpdateLine("lnChance",0.00);
       UpdateLine("lnMercy",0.00);
       UpdateLine("lnOpportunity",0.00);
       UpdateLine("lnKill",0.00);
@@ -372,22 +336,22 @@ void ShowLines(void)
     else
     if (pfractal.Wave().Action==rsAction)
     {
-      UpdateLine("lnProfit",pfractal.ActionLine(rsAction).Profit,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnClose",pfractal.ActionLine(rsAction).Close,STYLE_DASH,clrSteelBlue);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnBuild",pfractal.ActionLine(rsAction).Build,STYLE_DASH,clrLawnGreen);
+      UpdateLine("lnGoal",pfractal.ActionLine(rsAction).Goal,STYLE_DOT,clrLawnGreen);
       UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
+      UpdateLine("lnYield",pfractal.ActionLine(rsAction).Yield,STYLE_DOT,clrGoldenrod);
+      UpdateLine("lnBuild",pfractal.ActionLine(rsAction).Build,STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
       UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
     }
     else
     {
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
       UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
-      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
-      UpdateLine("lnRecovery",pfractal.ActionLine(rsAction).Recovery,STYLE_DOT,clrLawnGreen);
+      UpdateLine("lnChance",pfractal.ActionLine(rsAction).Chance,STYLE_DOT,clrLawnGreen);
       UpdateLine("lnMercy",pfractal.ActionLine(rsAction).Mercy,STYLE_DOT,clrSteelBlue);      
       UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction).Opportunity,STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnKill",pfractal.ActionLine(rsAction).Kill,STYLE_DASH,clrOrangeRed);
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
+      UpdateLine("lnKill",pfractal.ActionLine(rsAction).Kill,STYLE_DOT,clrMaroon);
     }
   }
 
@@ -637,8 +601,6 @@ int OrderBias(int Measure=InDirection)
 //+------------------------------------------------------------------+
 void SetNewDayPlan(void)
   {
-    ArrayCopy(history,detail);
-    
     //--- Reset Session Detail for this trading day
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
@@ -674,18 +636,9 @@ void SetOpenPlan(SessionType Type)
   }
 
 //+------------------------------------------------------------------+
-//| ProcessPipMA - Process PipMA data and prepare recommendations    |
+//| ProcessSession - Process and consolidate Session data **FIRST**  |
 //+------------------------------------------------------------------+
-void ProcessPipMA(void)
-  {
-    pfractal.DrawStateLines();
-
-  }
-
-//+------------------------------------------------------------------+
-//| AnalyzeData - Verify health and safety of open positions         |
-//+------------------------------------------------------------------+
-void AnalyzeData(void)
+void ProcessSession(void)
   {
     //--- Analyze an prepare session data
     CheckSessionEvents();
@@ -698,9 +651,68 @@ void AnalyzeData(void)
       
     if (sEvent[SessionOpen])
       SetOpenPlan(lead.Type());
+  }
 
-    //--- Analyze an prepare session data
+//+------------------------------------------------------------------+
+//| ProcessPipMA - Process PipMA data and prepare recommendations    |
+//+------------------------------------------------------------------+
+void ProcessPipMA(void)
+  {
+    double ppmaPrice[5];
+    
+    //--- Extract and Process tick interlace data
+    omWork.Clear();
+    
+    //-- Extract the equalization matrix
+    for (int seg=0;seg<5;seg++)
+    {
+      ppmaPrice[0]            = pfractal.WaveSegment(SegmentType[seg]).Open;
+      ppmaPrice[1]            = pfractal.WaveSegment(SegmentType[seg]).High;
+      ppmaPrice[2]            = pfractal.WaveSegment(SegmentType[seg]).Low;
+      ppmaPrice[3]            = pfractal.WaveSegment(SegmentType[seg]).Close;
+      ppmaPrice[4]            = pfractal.WaveSegment(SegmentType[seg]).Retrace;
+      
+      ArraySort(ppmaPrice,WHOLE_ARRAY,0,MODE_DESCEND);
+      
+      for (int copy=0;copy<5;copy++)
+      {
+        omMatrix[seg][copy]   = ppmaPrice[copy];
+        omWork.Add(ppmaPrice[copy]);
+      }
+    }
+    
+    omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
+
+    pfractal.DrawStateLines();
+  }
+
+//+------------------------------------------------------------------+
+//| ProcessFractal - Process and prepare fractal data                |
+//+------------------------------------------------------------------+
+void ProcessFractal(void)
+  {
+    return;
+  }
+
+//+------------------------------------------------------------------+
+//| Publish - Consolidate and publish data processed                 |
+//+------------------------------------------------------------------+
+void Publish(void)
+  {
+    return;
+  }
+
+//+------------------------------------------------------------------+
+//| AnalyzeData - Verify health and safety of open positions         |
+//+------------------------------------------------------------------+
+void AnalyzeData(void)
+  {
+    //--- Analyze an prepare data
+    ProcessSession();
     ProcessPipMA();
+    ProcessFractal();
+    
+    Publish();
   }
 
 //+------------------------------------------------------------------+
@@ -708,39 +720,8 @@ void AnalyzeData(void)
 //+------------------------------------------------------------------+
 void SetStrategy(const int Action, StrategyType Strategy, ActionState Plan)
   {
-    om[Action].Strategy         = Strategy;
+//    om[Action].Strategy         = Strategy;
     om[Action].Plan             = Plan;
-  }
-
-//+------------------------------------------------------------------+
-//| SetOrderStatus - updates session detail on a new order event     |
-//+------------------------------------------------------------------+
-void SetOrderStatus(int Action, OrderState OrderStatus, EventType Event=NoEvent)
-  {
-    switch (OrderStatus)
-    {
-      case Waiting:    om[Action].OrderStatus         = Waiting;
-                       om[Action].OrderEvent          = NoEvent;
-                       break;
-    
-      case Pending:    om[Action].OrderStatus         = OrderStatus;
-                       om[Action].OrderEvent          = Event;
-                       break;
-
-      case Requested:  if (om[Action].OrderStatus==Pending)
-                         om[Action].OrderStatus       = Requested;
-                       break;
-
-      case Approved:   if (om[Action].OrderStatus==Requested)
-                         om[Action].OrderStatus       = Approved;
-                       break;
-
-      case Rejected:   om[Action].OrderStatus         = Rejected;
-                       break;
-                       
-      case Fulfilled:     
-                       break;
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -749,10 +730,8 @@ void SetOrderStatus(int Action, OrderState OrderStatus, EventType Event=NoEvent)
 bool OrderApproved(int Action)
   {
     if (TradingOn)
-    {
-      SetOrderStatus(Action,Approved);
       return (true);
-    }
+
     return (false);
   }
 
@@ -761,21 +740,10 @@ bool OrderApproved(int Action)
 //+------------------------------------------------------------------+
 bool OrderProcessed(int Action)
   {
-    if (OpenOrder(Action,EnumToString(om[Action].Strategy)+":"+EnumToString(om[Action].Plan)+"("+EnumToString(om[Action].OrderEvent)+")"))
-    {
-      SetOrderStatus(Action,Fulfilled);
-      return (true);
-    }
-    
+//    if (OpenOrder(Action,EnumToString(om[Action].Strategy)+":"+EnumToString(om[Action].Plan)))
+//      return (true);
+//    
     return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| OrderStatus - Returns the order status for the supplied action   |
-//+------------------------------------------------------------------+
-OrderState OrderStatus(const int Action)
-  {
-    return (om[Action].OrderStatus);
   }
 
 //+------------------------------------------------------------------+
@@ -785,13 +753,6 @@ void Scalper(const int Action)
   {
     switch (Action)
     {
-      case OP_SELL:   if (OrderStatus(OP_SELL)==Waiting)
-                        if (sEvent[NewCrest])
-                          SetOrderStatus(OP_SELL,Pending,NewCrest);
-
-                      if (OrderStatus(OP_SELL)==Pending)
-                        if (pfractal.ActiveSegment().Direction==DirectionDown)
-                          SetOrderStatus(OP_SELL,Requested);
     }
   }
 
@@ -800,7 +761,7 @@ void Scalper(const int Action)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    SetStrategy(OP_SELL,Scalp,Build);
+//    SetStrategy(OP_SELL,Scalp,Build);
   }
 
 //+------------------------------------------------------------------+
@@ -810,18 +771,11 @@ void OrderManagement(void)
   {
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      switch (om[action].Strategy)
-      {
-        case Scalp:  Scalper(action);
-                     break;
-      }
-      
-      if (om[action].OrderStatus==Requested)
-        if (OrderApproved(action))
-          if (OrderProcessed(action))
-            SetOrderStatus(action,Waiting);
-          else
-            SetOrderStatus(action,Rejected);
+      //switch (om[action].Strategy)
+      //{
+      //  case Scalp:  Scalper(action);
+      //               break;
+      //}
     }
   }
 
@@ -834,10 +788,14 @@ void Execute(void)
       if (sEvent[NewHour])
         if (ServerHour()==PauseOnHour)
           CallPause("Pause requested on Server Hour "+IntegerToString(PauseOnHour),Always);
-      
-
-    AnalyzeData();
     
+    if (PauseOnPrice!=0.00)
+      if ((PauseOnPrice>NoValue&&Close[0]>PauseOnPrice)||(PauseOnPrice<NoValue&&Close[0]<fabs(PauseOnPrice)))
+      {
+        CallPause("Pause requested at price "+DoubleToString(fabs(PauseOnPrice),Digits),Always);
+        PauseOnPrice  = 0.00;
+      }
+       
     ShortManagement();
     OrderManagement();
   }
@@ -870,7 +828,9 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="PAUSE")
     {
       PauseOn                          = true;
-
+      if (Command[1]=="PRICE")
+        PauseOnPrice                   = StringToDouble(Command[2]);
+      else
       if (Command[1]=="")
         PauseOnHour                    = NoValue;
       else
@@ -883,32 +843,43 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="SHOW")
       if (Command[1]=="LINES")
       {
-        if (Command[2]=="CREST")
-          rsSegment                    = 2;
-        else
-        if (Command[2]=="TROUGH")
-          rsSegment                    = 3;
-        else
-        if (Command[2]=="DECAY")
-          rsSegment                    = 4;
-        else
-        if (Command[2]=="BUY"||Command[2]=="LONG")
-        {
-          rsAction                     = OP_BUY;
-          rsSegment                    = NoValue;
-          
-          if (Command[3]=="SEG")
-            rsSegment                  = OP_BUY;
-        }
-        else
-        if (Command[2]=="SELL"||Command[2]=="SHORT")
-        {
-          rsAction                     = OP_SELL;
-          rsSegment                    = NoValue;
+         if (Command[2]=="CREST")
+           rsSegment                   = 2;
+         else
+         if (Command[2]=="TROUGH")
+           rsSegment                   = 3;
+         else
+         if (Command[2]=="DECAY")
+           rsSegment                   = 4;
+         else
+         if (Command[2]=="BUY"||Command[2]=="LONG")
+         {
+           rsAction                    = OP_BUY;
+           rsSegment                   = NoValue;
 
-          if (Command[3]=="SEG")
-            rsSegment                  = OP_SELL;
-        }
+           if (Command[3]=="SEG")
+           {
+             rsSegment                 = OP_BUY;
+             rsAction                  = OP_CLOSE;
+           }
+         }
+         else
+         if (Command[2]=="SELL"||Command[2]=="SHORT")
+         {
+           rsAction                    = OP_SELL;
+           rsSegment                   = NoValue;
+
+           if (Command[3]=="SEG")
+           {
+             rsSegment                 = OP_SELL;
+             rsAction                  = OP_CLOSE;
+           }
+         }
+         else
+         {
+           rsSegment                   = NoValue;
+           rsAction                    = OP_NO_ACTION;
+         }
        }
      else
        rsShow                          = Command[1];
@@ -1000,6 +971,8 @@ void OnTick()
 
     OrderMonitor();
     GetData();
+    
+    AnalyzeData();
 
     RefreshScreen();
     
@@ -1032,12 +1005,14 @@ int OnInit()
     NewLine("lnLow");
     NewLine("lnClose");
     NewLine("lnRetrace");
-    NewLine("lnProfit");
+
+    NewLine("lnYield");
+    NewLine("lnGoal");
     NewLine("lnDoom");
     NewLine("lnRisk");
     NewLine("lnBuild");
     NewLine("lnGo");
-    NewLine("lnRecovery");
+    NewLine("lnChance");
     NewLine("lnMercy");
     NewLine("lnOpportunity");
     NewLine("lnKill");
@@ -1059,16 +1034,12 @@ int OnInit()
     //--- Initialize Order Management
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      om[action].Strategy       = Stop;
-      om[action].Plan           = Halt;
-      om[action].OrderStatus    = Waiting;
-      om[action].OrderCount     = 0;
-      om[action].LotCount       = 0.00;
+//      om[action].Plan           = Halt;
+      om[action].OrderTotal     = 0;
+      om[action].LotsTotal      = 0.00;
       om[action].NetMargin      = 0.00;
       om[action].EQProfit       = 0.00;
       om[action].EQLoss         = 0.00;
-      om[action].ClosedProfit   = 0.00;
-      om[action].ClosedLoss     = 0.00;
     }
 
     return(INIT_SUCCEEDED);    

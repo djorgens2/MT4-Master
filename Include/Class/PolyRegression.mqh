@@ -24,29 +24,33 @@ public:
      //--- Action States
      enum       ActionState
                 {
+                  Bank,
                   Goal,
                   Yield,
-                  Take,
+                  Go,
                   Build,
-                  Hold,
                   Risk,
-                  Halt,
                   Opportunity,
-                  Grab
+                  Chance,
+                  Mercy,
+                  Doom,
+                  Kill,
+                  Hold                  
                 };
                 
      //--- Target/Risk Price Record
      struct     PriceLineRec
                 {
-                  double          Profit;
+                  double          Bank;
+                  double          Goal;
                   double          Go;
-                  double          Close;
+                  double          Yield;
                   double          Risk;
                   double          Build;
                   double          Doom;
                   double          Kill;
                   double          Mercy;
-                  double          Recovery;
+                  double          Chance;
                   double          Opportunity;
                 };
 
@@ -140,6 +144,7 @@ protected:
        void             ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }            //-- clears the event condition
        
        bool             NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
+       bool             NewActionState(ActionState &State, ActionState ChangeState, bool Update=true);
        bool             NewDirection(int &Direction, int ChangeDirection, bool Update=true);
 
 
@@ -252,6 +257,23 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
     return (false);
   }
   
+//+------------------------------------------------------------------+
+//| NewActionState - Returns true if state has a legit change        |
+//+------------------------------------------------------------------+
+bool CPolyRegression::NewActionState(ActionState &State, ActionState ChangeState, bool Update=true)
+  {    
+    if (ChangeState==Hold)
+      return (false);
+
+    if (State<ChangeState)
+      return (false);
+
+    if (IsChanged(State,ChangeState))
+      return (true);
+      
+    return (false);
+  }
+
 //+------------------------------------------------------------------+
 //| CalcWaveState - Calculates the state of wave                     |
 //+------------------------------------------------------------------+
@@ -687,45 +709,56 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
     {
       switch (Action)
       {
-        case OP_BUY:      prLine[Action].Recovery     = prWave.Active[OP_BUY].Low;
-                          prLine[Action].Go           = prWave.Active[OP_SELL].Open;
+        case OP_BUY:      prLine[Action].Go           = prWave.Active[OP_SELL].Open;
                           prLine[Action].Opportunity  = prWave.Active[OP_SELL].Close;
                           prLine[Action].Kill         = prWave.Trough.Low;
+                          prLine[Action].Mercy        = fdiv(prWave.Active[OP_BUY].Open+fmin(prWave.Active[OP_SELL].Open,prWave.Trough.Low),2,Digits);
 
+                          if (prLastSegment.Type==Trough&&prLastSegment.Direction==DirectionDown)
+                            if (IsLower(Close[0],prLine[OP_SELL].Go,NoUpdate))
+                              prLine[Action].Chance   = prWave.Active[OP_SELL].High;
+                          
                           prLine[OP_SELL].Risk        = fmin(prWave.Active[OP_SELL].High,prLine[OP_SELL].Risk);
                           break;
 
-        case OP_SELL:     prLine[Action].Recovery     = prWave.Active[OP_SELL].High;
-                          prLine[Action].Go           = prWave.Active[OP_BUY].Open;
+        case OP_SELL:     prLine[Action].Go           = prWave.Active[OP_BUY].Open;
                           prLine[Action].Opportunity  = prWave.Active[OP_BUY].Close;
                           prLine[Action].Kill         = prWave.Crest.High;
+                          prLine[Action].Mercy        = fdiv(prWave.Active[OP_BUY].Open+fmax(prWave.Active[OP_SELL].Open,prWave.Crest.High),2,Digits);
+                          
+                          if (prLastSegment.Type==Crest&&prLastSegment.Direction==DirectionUp)
+                            if (IsHigher(Close[0],prLine[OP_BUY].Go,NoUpdate))
+                              prLine[Action].Chance   = prWave.Active[OP_BUY].Low;
                           
                           prLine[OP_BUY].Risk         = fmax(prLine[OP_BUY].Risk,prWave.Active[OP_BUY].Low);
                           break;
       }
       
       prLine[Action].Build                            = prLine[Action].Opportunity;
-      prLine[Action].Mercy                            = fdiv(prWave.Active[OP_BUY].Open+prWave.Active[OP_SELL].Open,2,Digits);
     }
     else
       switch (Action)
       {
-        case OP_BUY:      prLine[Action].Profit       = prWave.Active[OP_BUY].High;
+        case OP_BUY:      prLine[Action].Goal         = prWave.Active[OP_BUY].High;
                           prLine[Action].Doom         = prWave.Active[OP_BUY].Open;
-                          prLine[Action].Close        = prWave.Active[OP_BUY].Close;
+                          prLine[Action].Yield        = prWave.Active[OP_BUY].Close;
+                          prLine[Action].Chance       = prWave.Active[OP_BUY].Low;                          
                           prLine[Action].Build        = fmax(prLine[Action].Build,fdiv(prWave.Active[OP_SELL].Close+prWave.Active[OP_BUY].Low,2));
+                          prLine[Action].Bank         = fdiv(prWave.Active[OP_SELL].Retrace,prLine[OP_BUY].Yield,2);
 
                           if (Event(NewWaveReversal))
                             prLine[OP_BUY].Risk       = prWave.Active[OP_SELL].Low;
                           break;
 
-        case OP_SELL:     prLine[Action].Profit       = prWave.Active[OP_SELL].Low;
+        case OP_SELL:     prLine[Action].Goal         = prWave.Active[OP_SELL].Low;
                           prLine[Action].Doom         = prWave.Active[OP_SELL].Open;
-                          prLine[Action].Close        = prWave.Active[OP_SELL].Close;
+                          prLine[Action].Yield        = prWave.Active[OP_SELL].Close;
+                          prLine[Action].Chance       = prWave.Active[OP_SELL].High;
                           prLine[Action].Build        = fmin(prLine[Action].Build,fdiv(prWave.Active[OP_BUY].Close+prWave.Active[OP_SELL].High,2));
+                          prLine[Action].Bank         = fdiv(prWave.Active[OP_BUY].Retrace,prLine[OP_SELL].Yield,2);
 
                           if (Event(NewWaveReversal))
-                            prLine[OP_SELL].Risk       = prWave.Active[OP_BUY].High;
+                            prLine[OP_SELL].Risk      = prWave.Active[OP_BUY].High;
                           break;
       }      
   }
@@ -735,67 +768,54 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcActionState(const int Action)
   {                  
-    ActionState asActionState    = Hold;
-    bool        asOscillatory    = ActiveSegment().IsOpen;
+    ActionState asActionState          = Hold;
 
-    if (Action==prWave.Action)
+    if (Event(NewWaveClose))
     {
-      //-- return trend states
-      if (Event(NewWaveClose))
+      if (Action==prWave.Action)
         CalcLines(Action);
-        
-      if (Action==OP_BUY)
-      {
-        //--- Open crest wave segment states
-        if (prWave.Crest.IsOpen)
-        {
-          if (IsHigher(Close[0],prLine[OP_BUY].Go,NoUpdate))
-            if (prWave.Retrace)
-            {
-              if (PolyState()==Pullback)
-                asActionState           = Take;
-                
-              if (PolyState()==Rally)
-                if (IsHigher(Close[0],prLine[OP_BUY].Risk,NoUpdate))
-                  asActionState         = Build;
-            }
-            else
-              asActionState             = Goal;
-         }
-         //--- Closed crest wave segment states (Non-oscillatory states)
-         else
-         {
-//           if (IsLower(Close[0],prLine[OP_BUY].Close,NoUpdate))
-//             asActionState
-         }
-      }
       else
-      {
-        if (IsLower(Close[0],prLine[OP_SELL].Go,NoUpdate))
-          if (prWave.Retrace)
-          {}
-          else
-            asActionState             = Goal;      
-      }
-    }
-    else
-    {
-      //-- return contrarian states
-      if (Event(NewWaveClose))
         CalcLines(Action,InContrarian);
 
-      if (Action==OP_BUY)
-      {
-        if (IsHigher(Close[0],prWave.Active[OP_SELL].Close,NoUpdate))
-          asActionState                = Opportunity;
-      }
-      else
-      {
-        if (IsLower(Close[0],prWave.Active[OP_BUY].Close,NoUpdate))
-          asActionState                = Opportunity;
-      }
+      //--- Force reset the state on segment change
+      if (ActiveWave().Type==prLastSegment.Type)
+        prWave.ActionState[Action]     = Hold;
     }
+
+//                  Bank,
+//                  Goal,
+//                  Yield,
+//                  Go,
+//                  Build,
+//                  Hold,
+//                  Risk,
+//                  Opportunity,
+//                  Chance,
+//                  Mercy,
+//                  Doom,
+//                  Kill
+//
+
+    if (Action==prWave.Action)
+      switch (Action)
+      {
+        case OP_BUY:    
+                        break;
+
+        case OP_SELL:       
+                        break;
+      }
+    else
+      switch (Action)
+      {
+        case OP_BUY:       
+                        break;
+
+        case OP_SELL:       
+                        break;
+      }
     
+    //--- Set state on change
     if (IsChanged(prWave.ActionState[Action],asActionState))
       SetEvent(NewActionState,Notify);
   }
@@ -861,8 +881,6 @@ void CPolyRegression::CalcWave(void)
     
     if (IsChanged(prWave.State,CalcWaveState()))
       SetEvent(NewWaveState);
-      
-//    DrawStateLines();  
       
     CalcActionState(OP_BUY);
     CalcActionState(OP_SELL);
@@ -1324,31 +1342,29 @@ void CPolyRegression::DrawStateLines(void)
     static int           dsBarIndex  = 0;
     static int           dsEventIdx  = 0;
     static int           dsHourIdx   = 0;
+    static int           dsLastIdx   = 0;
+    
     static ReservedWords dsState     = Default;
-    bool                 dsNewLine   = false;
         
     if (Event(NewCrest)||Event(NewTrough))
     {
       dsHourIdx                      = TimeHour(Time[0]);
       dsBarIndex                     = 0;
       dsState                        = (ReservedWords)BoolToInt(Event(NewCrest),Crest,Trough);
-      dsNewLine                      = true;
       dsEventIdx++;
     }
-    
-    if (IsChanged(dsHourIdx,TimeHour(Time[0])))
-    {
-      dsNewLine                      = true;
-      dsBarIndex++;
-    }
 
-    if (IsChanged(dsState,prPolyState))
-      return;
-    else
     if (dsState==Crest||dsState==Trough)
     {
-      if (dsNewLine)
+      if (IsChanged(dsHourIdx,TimeHour(Time[0])))
       {
+        dsBarIndex++;
+        dsEventIdx++;
+      }
+    
+      if (IsChanged(dsLastIdx,dsEventIdx))
+      {
+      
         NewRay("tlHL"+EnumToString(dsState)+(string)dsEventIdx,false);
         NewRay("tlOC"+EnumToString(dsState)+(string)dsEventIdx,false);
 
@@ -1362,17 +1378,20 @@ void CPolyRegression::DrawStateLines(void)
 
       for (int carry=dsBarIndex;carry>NoValue;carry--)
       {
-        if (IsBetween(ActiveSegment().Open,High[carry],Low[0]))
-          ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,ActiveSegment().Open);
+        if (IsBetween(this.WaveSegment(dsState).Open,High[carry],Low[0]))
+          ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,this.WaveSegment(dsState).Open);
 
         if (IsBetween(Close[0],High[carry],Low[carry]))
           ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE2,Close[0]);
 
-        ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_COLOR,DirColor(ActiveSegment().Direction,clrForestGreen,clrMaroon));
-        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,fmin(High[carry],ActiveSegment().High));
-        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE2,fmax(Low[carry],ActiveSegment().Low));
+        ObjectSet("tlOC"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_COLOR,DirColor(this.WaveSegment(dsState).Direction,clrForestGreen,clrMaroon));
+        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE1,fmin(High[carry],this.WaveSegment(dsState).High));
+        ObjectSet("tlHL"+EnumToString(dsState)+(string)(dsEventIdx-carry),OBJPROP_PRICE2,fmax(Low[carry],this.WaveSegment(dsState).Low));
       }
     }
+
+    dsState                          = prPolyState;
+
   }
 
 //+------------------------------------------------------------------+

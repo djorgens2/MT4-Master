@@ -16,7 +16,24 @@
 //+------------------------------------------------------------------+
 class COrder
   {
+  
 private:
+  //--- Order Statuses
+  enum                OrderState
+                      {
+                        Waiting,
+                        Pending,
+                        Requested,
+                        Canceled,
+                        Approved,
+                        Rejected,
+                        Fulfilled,
+                        Expired,
+                        Closed,
+                        OrderStates
+                      };
+                      
+
 
           struct OrderRecord
           {  
