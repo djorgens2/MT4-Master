@@ -38,7 +38,6 @@ protected:
                   NewFOC,
                   NewState,
                   NewAction,
-                  NewActionState,
                   NewBias,
                   NewRange,
                   NewWaveOpen,

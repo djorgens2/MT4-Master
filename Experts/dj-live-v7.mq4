@@ -198,16 +198,21 @@ void RefreshControlPanel(void)
       UpdateBox("hdLong",clrBoxOff);
       UpdateBox("hdShort",clrBoxOff);
       
+      UpdateBox("hdActionLong",clrBoxOff);
+      UpdateBox("hdActionShort",clrBoxOff);
+      
       if (pfractal.WaveSegment(OP_BUY).IsOpen)
       {
         UpdateLabel("lbh-1L","Long",clrWhite); 
-        UpdateBox("hdLong",clrDarkGreen);
+        UpdateBox("hdLong",clrDarkGreen);        
+        UpdateBox("hdActionLong",clrDarkGreen);
       }
 
       if (pfractal.WaveSegment(OP_SELL).IsOpen)
       {
         UpdateLabel("lbh-1S","Short",clrWhite); 
         UpdateBox("hdShort",clrMaroon);
+        UpdateBox("hdActionShort",clrMaroon);
       }
     }
     
@@ -254,6 +259,8 @@ void RefreshControlPanel(void)
     UpdateLabel("lbRetrace","Retrace",BoolToInt(pfractal.Wave().Retrace,clrYellow,clrDarkGray));
     UpdateLabel("lbBreakout","Breakout",BoolToInt(pfractal.Wave().Breakout,clrYellow,clrDarkGray));
     UpdateLabel("lbReversal","Reversal",BoolToInt(pfractal.Wave().Reversal,clrYellow,clrDarkGray));
+    UpdateLabel("lbBank","Bank",BoolToInt(pfractal.Wave().Bank,clrYellow,clrDarkGray));
+    UpdateLabel("lbKill","Kill",BoolToInt(pfractal.Wave().Kill,clrYellow,clrDarkGray));
     
     UpdateLabel("lbLongCount",(string)pfractal.WaveSegment(OP_BUY).Count,clrDarkGray);
     UpdateLabel("lbShortCount",(string)pfractal.WaveSegment(OP_SELL).Count,clrDarkGray);
@@ -272,6 +279,10 @@ void RefreshControlPanel(void)
         UpdateLabel("lbInterlace"+(string)row,DoubleToStr(omInterlace[row],Digits),Color(omInterlace[row],IN_PROXIMITY));
       else
         UpdateLabel("lbInterlace"+(string)row,"");
+
+    for (ActionState row=Bank;row<Hold;row++)
+      for (int col=OP_BUY;col<=OP_SELL;col++)
+        UpdateLabel("lbPL"+(string)col+":"+(string)row,DoubleToStr(pfractal.ActionLine(col,row),Digits),Color(pfractal.ActionLine(col,row),IN_PROXIMITY));
 
     UpdateBox("hdInterlace",BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2)<Close[0],clrDarkGreen,clrMaroon));
     UpdateLabel("lbLongNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_BUY).Retrace-pfractal.WaveSegment(OP_BUY).High),1),clrRed);    
@@ -302,15 +313,17 @@ void ZeroLines(void)
       UpdateLine("lnClose",0.00);
       UpdateLine("lnRetrace",0.00);
 
-      UpdateLine("lnYield",0.00);
+      UpdateLine("lnBank",0.00);
       UpdateLine("lnGoal",0.00);
-      UpdateLine("lnRisk",0.00);
+      UpdateLine("lnYield",0.00);
       UpdateLine("lnBuild",0.00);
       UpdateLine("lnGo",0.00);
-      UpdateLine("lnDoom",0.00);
-      UpdateLine("lnChance",0.00);
+      UpdateLine("lnStop",0.00);
+      UpdateLine("lnRisk",0.00);
       UpdateLine("lnMercy",0.00);
+      UpdateLine("lnChance",0.00);
       UpdateLine("lnOpportunity",0.00);
+      UpdateLine("lnHalt",0.00);
       UpdateLine("lnKill",0.00);
     }
   }
@@ -336,22 +349,24 @@ void ShowLines(void)
     else
     if (pfractal.Wave().Action==rsAction)
     {
-      UpdateLine("lnGoal",pfractal.ActionLine(rsAction).Goal,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
-      UpdateLine("lnYield",pfractal.ActionLine(rsAction).Yield,STYLE_DOT,clrGoldenrod);
-      UpdateLine("lnBuild",pfractal.ActionLine(rsAction).Build,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
+      UpdateLine("lnBank",pfractal.ActionLine(rsAction,Bank),STYLE_DOT,clrGoldenrod);
+      UpdateLine("lnGoal",pfractal.ActionLine(rsAction,Goal),STYLE_DOT,clrLawnGreen);
+      UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
+      UpdateLine("lnChance",pfractal.ActionLine(rsAction,Chance),STYLE_DOT,clrSteelBlue);
+      UpdateLine("lnYield",pfractal.ActionLine(rsAction,Yield),STYLE_SOLID,clrGoldenrod);
+      UpdateLine("lnBuild",pfractal.ActionLine(rsAction,Build),STYLE_SOLID,clrLawnGreen);
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
     }
     else
     {
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction).Go,STYLE_SOLID,clrYellow);
-      UpdateLine("lnChance",pfractal.ActionLine(rsAction).Chance,STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnMercy",pfractal.ActionLine(rsAction).Mercy,STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction).Opportunity,STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction).Risk,STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnDoom",pfractal.ActionLine(rsAction).Doom,STYLE_SOLID,clrOrangeRed);
-      UpdateLine("lnKill",pfractal.ActionLine(rsAction).Kill,STYLE_DOT,clrMaroon);
+      UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
+      UpdateLine("lnMercy",pfractal.ActionLine(rsAction,Mercy),STYLE_DOT,clrSteelBlue);      
+      UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction,Opportunity),STYLE_SOLID,clrSteelBlue);
+      UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnHalt",pfractal.ActionLine(rsAction,Halt),STYLE_DOT,clrOrangeRed);
+      UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
+      UpdateLine("lnKill",pfractal.ActionLine(rsAction,Kill),STYLE_DOT,clrMaroon);
     }
   }
 
@@ -1006,12 +1021,14 @@ int OnInit()
     NewLine("lnClose");
     NewLine("lnRetrace");
 
+    NewLine("lnBank");
     NewLine("lnYield");
     NewLine("lnGoal");
-    NewLine("lnDoom");
+    NewLine("lnHalt");
     NewLine("lnRisk");
     NewLine("lnBuild");
     NewLine("lnGo");
+    NewLine("lnStop");
     NewLine("lnChance");
     NewLine("lnMercy");
     NewLine("lnOpportunity");

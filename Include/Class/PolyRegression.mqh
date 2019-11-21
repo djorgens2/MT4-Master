@@ -24,36 +24,21 @@ public:
      //--- Action States
      enum       ActionState
                 {
-                  Bank,
-                  Goal,
-                  Yield,
-                  Go,
-                  Build,
-                  Risk,
-                  Opportunity,
-                  Chance,
-                  Mercy,
-                  Doom,
-                  Kill,
-                  Hold                  
+                  Bank,         //--- Profit management slider         
+                  Goal,         //--- Out-of-Band indcator
+                  Yield,        //--- line of the last hard crest or trough
+                  Go,           //--- Where it started, the first OOB line
+                  Build,        //--- Pulback/Rally box - manage risk/increase volume
+                  Risk,         //--- Intermediate support/resistance levels - cover or balance
+                  Opportunity,  //--- First entry reversal alert
+                  Chance,       //--- Recovery management slider
+                  Mercy,        //--- retained prior intial breakout point, for "mercy" rallies/pullbacks
+                  Stop,         //--- main support/resistance boundary;
+                  Halt,         //--- Forward contrarian progress line; if inbounds, manage risk; oob - kill;
+                  Kill,         //--- Risk Management slider
+                  Hold          //--- When nothing statistically viable occurs
                 };
                 
-     //--- Target/Risk Price Record
-     struct     PriceLineRec
-                {
-                  double          Bank;
-                  double          Goal;
-                  double          Go;
-                  double          Yield;
-                  double          Risk;
-                  double          Build;
-                  double          Doom;
-                  double          Kill;
-                  double          Mercy;
-                  double          Chance;
-                  double          Opportunity;
-                };
-
      //--- Wave Analytics Record
      struct     WaveSegment
                 {
@@ -83,6 +68,8 @@ public:
                   bool            Breakout;
                   bool            Reversal;
                   bool            Retrace;
+                  bool            Bank;
+                  bool            Kill;
                 };
 
                 CPolyRegression(int Degree, int PolyPeriods, int MAPeriods);
@@ -109,7 +96,7 @@ public:
        void             DrawStateLines(void);
        ReservedWords    PolyState(void) { return(prPolyState); }
        ActionState      ActionState(const int Action) {return (prWave.ActionState[Action]); }
-       PriceLineRec     ActionLine(const int Action) {return (prLine[Action]); }
+       double           ActionLine(const int Action, const ActionState Line) {return (prLine[Action][Line]); }
        
        //--- Wave methods
        bool             SegmentIsOpen(void) {return (prWave.Crest.IsOpen||prWave.Trough.IsOpen); }
@@ -144,7 +131,6 @@ protected:
        void             ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }            //-- clears the event condition
        
        bool             NewState(ReservedWords &State, ReservedWords ChangeState, bool Update=true);
-       bool             NewActionState(ActionState &State, ActionState ChangeState, bool Update=true);
        bool             NewDirection(int &Direction, int ChangeDirection, bool Update=true);
 
 
@@ -204,7 +190,8 @@ private:
 
        WaveRec          prWave;
        WaveSegment      prLastSegment;
-       PriceLineRec     prLine[2];
+       double           prLine[2][Hold];
+       
   };
 
 //+------------------------------------------------------------------+
@@ -257,23 +244,6 @@ bool CPolyRegression::NewState(ReservedWords &State, ReservedWords ChangeState, 
     return (false);
   }
   
-//+------------------------------------------------------------------+
-//| NewActionState - Returns true if state has a legit change        |
-//+------------------------------------------------------------------+
-bool CPolyRegression::NewActionState(ActionState &State, ActionState ChangeState, bool Update=true)
-  {    
-    if (ChangeState==Hold)
-      return (false);
-
-    if (State<ChangeState)
-      return (false);
-
-    if (IsChanged(State,ChangeState))
-      return (true);
-      
-    return (false);
-  }
-
 //+------------------------------------------------------------------+
 //| CalcWaveState - Calculates the state of wave                     |
 //+------------------------------------------------------------------+
@@ -709,56 +679,52 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
     {
       switch (Action)
       {
-        case OP_BUY:      prLine[Action].Go           = prWave.Active[OP_SELL].Open;
-                          prLine[Action].Opportunity  = prWave.Active[OP_SELL].Close;
-                          prLine[Action].Kill         = prWave.Trough.Low;
-                          prLine[Action].Mercy        = fdiv(prWave.Active[OP_BUY].Open+fmin(prWave.Active[OP_SELL].Open,prWave.Trough.Low),2,Digits);
-
-                          if (prLastSegment.Type==Trough&&prLastSegment.Direction==DirectionDown)
-                            if (IsLower(Close[0],prLine[OP_SELL].Go,NoUpdate))
-                              prLine[Action].Chance   = prWave.Active[OP_SELL].High;
-                          
-                          prLine[OP_SELL].Risk        = fmin(prWave.Active[OP_SELL].High,prLine[OP_SELL].Risk);
+        case OP_BUY:      prLine[Action][Go]           = prWave.Active[OP_SELL].Open;
+                          prLine[Action][Opportunity]  = prWave.Active[OP_SELL].Close;
+                          prLine[Action][Halt]         = prWave.Trough.Low;
+                          prLine[Action][Mercy]        = fdiv(prLine[OP_BUY][Halt]+prLine[OP_BUY][Go],2,Digits);
+                          prLine[Action][Kill]         = fdiv(prLine[Action][Opportunity]+prWave.Active[OP_BUY].Retrace,2,Digits);
+                          prLine[OP_SELL][Risk]        = fmin(prWave.Active[OP_SELL].High,prLine[OP_SELL][Risk]);
                           break;
 
-        case OP_SELL:     prLine[Action].Go           = prWave.Active[OP_BUY].Open;
-                          prLine[Action].Opportunity  = prWave.Active[OP_BUY].Close;
-                          prLine[Action].Kill         = prWave.Crest.High;
-                          prLine[Action].Mercy        = fdiv(prWave.Active[OP_BUY].Open+fmax(prWave.Active[OP_SELL].Open,prWave.Crest.High),2,Digits);
-                          
-                          if (prLastSegment.Type==Crest&&prLastSegment.Direction==DirectionUp)
-                            if (IsHigher(Close[0],prLine[OP_BUY].Go,NoUpdate))
-                              prLine[Action].Chance   = prWave.Active[OP_BUY].Low;
-                          
-                          prLine[OP_BUY].Risk         = fmax(prLine[OP_BUY].Risk,prWave.Active[OP_BUY].Low);
+        case OP_SELL:     prLine[Action][Go]           = prWave.Active[OP_BUY].Open;
+                          prLine[Action][Opportunity]  = prWave.Active[OP_BUY].Close;
+                          prLine[Action][Halt]         = prWave.Crest.High;
+                          prLine[Action][Mercy]        = fdiv(prLine[OP_SELL][Halt]+prLine[OP_SELL][Go],2,Digits);
+                          prLine[Action][Kill]         = fdiv(prLine[Action][Opportunity]+prWave.Active[OP_SELL].Retrace,2,Digits);
+                          prLine[OP_BUY][Risk]         = fmax(prLine[OP_BUY][Risk],prWave.Active[OP_BUY].Low);
                           break;
       }
       
-      prLine[Action].Build                            = prLine[Action].Opportunity;
+      prLine[Action][Build]                            = prLine[Action][Opportunity];
     }
     else
       switch (Action)
       {
-        case OP_BUY:      prLine[Action].Goal         = prWave.Active[OP_BUY].High;
-                          prLine[Action].Doom         = prWave.Active[OP_BUY].Open;
-                          prLine[Action].Yield        = prWave.Active[OP_BUY].Close;
-                          prLine[Action].Chance       = prWave.Active[OP_BUY].Low;                          
-                          prLine[Action].Build        = fmax(prLine[Action].Build,fdiv(prWave.Active[OP_SELL].Close+prWave.Active[OP_BUY].Low,2));
-                          prLine[Action].Bank         = fdiv(prWave.Active[OP_SELL].Retrace,prLine[OP_BUY].Yield,2);
+        case OP_BUY:      prLine[Action][Goal]         = prWave.Active[OP_BUY].High;
+                          prLine[Action][Stop]         = prWave.Active[OP_BUY].Open;
+                          prLine[Action][Yield]        = prWave.Active[OP_BUY].Close;
+                          prLine[Action][Build]        = fmax(prLine[OP_BUY][Build],fdiv(prWave.Active[OP_SELL].Close+prWave.Active[OP_BUY].Low,2));
+                          prLine[Action][Bank]         = fmax(prLine[OP_BUY][Yield],fdiv(prWave.Active[OP_SELL].Retrace+prLine[OP_BUY][Yield],2));
 
                           if (Event(NewWaveReversal))
-                            prLine[OP_BUY].Risk       = prWave.Active[OP_SELL].Low;
+                          {
+                            prLine[OP_SELL][Chance]    = prLine[OP_SELL][Risk];
+                            prLine[OP_BUY][Risk]       = prWave.Active[OP_SELL].Low;
+                          }
                           break;
 
-        case OP_SELL:     prLine[Action].Goal         = prWave.Active[OP_SELL].Low;
-                          prLine[Action].Doom         = prWave.Active[OP_SELL].Open;
-                          prLine[Action].Yield        = prWave.Active[OP_SELL].Close;
-                          prLine[Action].Chance       = prWave.Active[OP_SELL].High;
-                          prLine[Action].Build        = fmin(prLine[Action].Build,fdiv(prWave.Active[OP_BUY].Close+prWave.Active[OP_SELL].High,2));
-                          prLine[Action].Bank         = fdiv(prWave.Active[OP_BUY].Retrace,prLine[OP_SELL].Yield,2);
+        case OP_SELL:     prLine[Action][Goal]         = prWave.Active[OP_SELL].Low;
+                          prLine[Action][Stop]         = prWave.Active[OP_SELL].Open;
+                          prLine[Action][Yield]        = prWave.Active[OP_SELL].Close;
+                          prLine[Action][Build]        = fmin(prLine[OP_SELL][Build],fdiv(prWave.Active[OP_BUY].Close+prWave.Active[OP_SELL].High,2));
+                          prLine[Action][Bank]         = fmin(prLine[OP_SELL][Yield],fdiv(prWave.Active[OP_BUY].Retrace+prLine[OP_SELL][Yield],2));
 
                           if (Event(NewWaveReversal))
-                            prLine[OP_SELL].Risk      = prWave.Active[OP_BUY].High;
+                          {
+                            prLine[OP_BUY][Chance]     = prLine[OP_BUY][Risk];
+                            prLine[OP_SELL][Risk]      = prWave.Active[OP_BUY].High;
+                          }
                           break;
       }      
   }
@@ -767,57 +733,170 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
 //| CalcActionState - Calculates the state for a specific action     |
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcActionState(const int Action)
-  {                  
-    ActionState asActionState          = Hold;
-
+  {
     if (Event(NewWaveClose))
-    {
       if (Action==prWave.Action)
         CalcLines(Action);
       else
         CalcLines(Action,InContrarian);
 
-      //--- Force reset the state on segment change
-      if (ActiveWave().Type==prLastSegment.Type)
-        prWave.ActionState[Action]     = Hold;
-    }
-
-//                  Bank,
-//                  Goal,
-//                  Yield,
-//                  Go,
-//                  Build,
-//                  Hold,
-//                  Risk,
-//                  Opportunity,
-//                  Chance,
-//                  Mercy,
-//                  Doom,
-//                  Kill
-//
-
+    //--- Handle Non-Contrarian States
     if (Action==prWave.Action)
-      switch (Action)
+    {
+      //--- Interior states
+      if (IsBetween(Close[0],prLine[Action][Stop],prLine[Action][Goal]))
       {
-        case OP_BUY:    
-                        break;
+        //--- Reset profit flag
+        prWave.Bank                              = false;
+        
+        //--- Hold Line -- the decision box ("pivot box" or "pivot range")
+        if (prWave.ActionState[Action]==Hold)
+        {
+          if (Action==OP_BUY)
+          {
+            if (IsLower(Close[0],prLine[OP_BUY][Risk],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Risk;
 
-        case OP_SELL:       
-                        break;
+            if (IsHigher(Close[0],prLine[OP_BUY][Build],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Build;
+          }
+              
+          if (Action==OP_SELL)
+          {
+            if (IsHigher(Close[0],prLine[OP_SELL][Risk],NoUpdate))
+              prWave.ActionState[OP_SELL]         = Risk;
+
+            if (IsLower(Close[0],prLine[OP_SELL][Build],NoUpdate))
+              prWave.ActionState[OP_SELL]         = Build;
+          }
+        }
+
+        //--- Yield Line
+        if (prWave.ActionState[Action]==Yield)
+        {
+          if (Action==OP_BUY)
+            if (IsLower(Close[0],prLine[OP_BUY][Risk],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Risk;
+            else
+            if (IsLower(Close[0],prLine[OP_BUY][Build],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Hold;
+            else
+            if (ActiveSegment().Type==Trough)
+              prWave.ActionState[OP_BUY]         = Build;
+              
+          if (Action==OP_SELL)
+            if (IsHigher(Close[0],prLine[OP_SELL][Risk],NoUpdate))
+              prWave.ActionState[OP_SELL]        = Risk;
+            else
+            if (IsHigher(Close[0],prLine[OP_SELL][Build],NoUpdate))
+              prWave.ActionState[OP_SELL]        = Hold;
+            else
+            if (ActiveSegment().Type==Crest)
+              prWave.ActionState[OP_SELL]        = Build;
+        }
+
+        //--- Goal Line
+        if (prWave.ActionState[Action]==Goal)
+        {
+          if (Action==OP_BUY)
+            if (IsLower(Close[0],prLine[OP_BUY][Bank],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Yield;
+              
+          if (Action==OP_SELL)
+            if (IsHigher(Close[0],prLine[OP_SELL][Bank],NoUpdate))
+              prWave.ActionState[OP_SELL]        = Yield;
+        }
       }
+      else
+
+      //--- Out-of-Bounds states
+      if (Action==OP_BUY)
+        if (IsHigher(Close[0],prLine[OP_BUY][Goal],NoUpdate))
+        {
+          prWave.ActionState[OP_BUY]             = Goal;
+          prWave.Bank                            = true;
+        }
+        else
+        {
+          prWave.ActionState[OP_BUY]             = Halt;  //--- Happens either in tight quarters or volatile snaps
+          prWave.Kill                            = true;
+        }
+      else
+      if (Action==OP_SELL)
+        if (IsLower(Close[0],prLine[OP_SELL][Goal],NoUpdate))
+        {
+          prWave.ActionState[OP_SELL]            = Goal;
+          prWave.Bank                            = true;
+        }
+        else
+        {
+          prWave.ActionState[OP_SELL]            = Halt;  //--- Happens either in tight quarters or volatile snaps
+          prWave.Kill                            = true;
+        }
+    }
     else
-      switch (Action)
-      {
-        case OP_BUY:       
-                        break;
-
-        case OP_SELL:       
-                        break;
-      }
     
-    //--- Set state on change
-    if (IsChanged(prWave.ActionState[Action],asActionState))
-      SetEvent(NewActionState,Notify);
+    //--- Handle Contrarian States
+    {
+      //--- Interior states
+      if (IsBetween(Close[0],prLine[Action][Go],prLine[Action][Halt]))
+      {
+        //--- Reset profit flag
+        if (prWave.ActionState[Action]==Opportunity)
+        {
+          if (Action==OP_BUY)
+            if (IsLower(Close[0],prLine[OP_BUY][Kill],NoUpdate))
+              prWave.ActionState[OP_BUY]         = Halt;
+
+          if (Action==OP_SELL)
+            if (IsHigher(Close[0],prLine[OP_SELL][Kill],NoUpdate))
+              prWave.ActionState[OP_SELL]        = Halt;
+        }
+        else
+        {
+          if (Action==OP_BUY)
+            if (IsHigher(Close[0],prLine[OP_BUY][Opportunity],NoUpdate))
+              if (IsChanged(prWave.Kill,false))
+                prWave.ActionState[OP_BUY]       = Opportunity;
+              else
+                prWave.ActionState[OP_BUY]       = Build;
+
+            
+          if (Action==OP_SELL)
+            if (IsLower(Close[0],prLine[OP_SELL][Opportunity],NoUpdate))
+              if (IsChanged(prWave.Kill,false))
+                prWave.ActionState[OP_SELL]      = Opportunity;
+              else
+                prWave.ActionState[OP_SELL]      = Build;
+         } 
+      }
+      else
+
+      //--- Out-of-Bounds states
+      if (Action==OP_BUY)
+        if (IsHigher(Close[0],prLine[OP_BUY][Go],NoUpdate))
+        {
+          prWave.ActionState[OP_BUY]             = Goal;   //--- Happens either in tight quarters or volatile snaps
+          prWave.Bank                            = true;
+        }
+        else
+        {
+          prWave.ActionState[OP_BUY]             = Halt;
+          prWave.Kill                            = true;
+        }
+      else
+      if (Action==OP_SELL)
+        if (IsLower(Close[0],prLine[OP_SELL][Go],NoUpdate))
+        {
+          prWave.ActionState[OP_SELL]            = Goal;   //--- Happens either in tight quarters or volatile snaps
+          prWave.Bank                            = true;
+        }
+        else
+        {
+          prWave.ActionState[OP_SELL]            = Halt;
+          prWave.Kill                            = true;
+        }
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -829,7 +908,6 @@ void CPolyRegression::CalcWave(void)
     ClearEvent(NewWaveClose);
     ClearEvent(NewWaveState);
     ClearEvent(NewWaveReversal);
-    ClearEvent(NewActionState);
 
     switch (prPolyState)
     {
