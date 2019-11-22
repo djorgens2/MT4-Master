@@ -36,12 +36,14 @@
 #define OP_RESUME             -7  //--- Resume trading
 #define OP_ALERT              -8  //--- Event action that causes an alert
 #define OP_HEDGE              -9  //--- Contrarian action opportunity
+#define OP_TARGET             -10 //--- Target price indicator
 
 
 //---- Format Constants
 #define IN_DIRECTION           8
 #define IN_ACTION              9
 #define IN_PROXIMITY          10
+#define IN_DARK_DIR           11
 
 
 //---- Screen Locations
@@ -347,6 +349,9 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
                          if (Close[0]>Value-point(3))   return(clrGoldenrod);
                          if (Close[0]>Value-point(6))   return(clrChocolate);
                          return (clrRed);
+    case IN_DARK_DIR:    if (Value<0.00) return (clrMaroon);
+                         if (Value>0.00) return (clrDarkGreen);
+                         return (clrDarkGray);
   }
   return (clrDarkGray);
 }
@@ -506,6 +511,12 @@ void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10)
     if (Color == 0)
       Color = (int)ObjectGet(LabelName,OBJPROP_COLOR);
               
+    if (Direction==OP_TARGET)
+      ObjectSetText(LabelName,CharToStr(176),Size,"Wingdings",Color);    
+    else
+    if (Direction==OP_HALT)
+      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
+    else
     if (Direction > 0)
       ObjectSetText(LabelName,CharToStr(241),Size,"Wingdings",Color);
     else

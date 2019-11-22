@@ -182,13 +182,6 @@ void RefreshScreen(int Bar=0)
       
       UpdateLine("lnS_CorrectionHi:"+sessionIndex,session.Fractal(ftCorrection).High,STYLE_DASH,clrWhite);
       UpdateLine("lnS_CorrectionLo:"+sessionIndex,session.Fractal(ftCorrection).Low,STYLE_DASH,clrWhite);
-
-      //PeriodType show=ActiveSession;
-      //UpdateLine("lnS_ActiveMid",session.Pivot(show),STYLE_SOLID,clrSteelBlue);
-      //UpdateLine("lnS_Support",session[show].Support,STYLE_SOLID,clrRed);
-      //UpdateLine("lnS_Resistance",session[show].Resistance,STYLE_SOLID,clrLawnGreen);
-      //UpdateLine("lnS_Low",session[show].Low,STYLE_DOT,clrFireBrick);
-      //UpdateLine("lnS_High",session[show].High,STYLE_DOT,clrForestGreen);
     }
     
     if (inpShowData>dpNone)

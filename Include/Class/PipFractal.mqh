@@ -104,7 +104,7 @@ void CPipFractal::CalcFiboChange(void)
     
     ClearEvent(NewIdle);
     ClearEvent(NewResume);
-    ClearEvent(NewFibonacci);
+    ClearEvent(NewFractal);
 
     if (IsChanged(cfcFiboDir,this.Direction(Term)))
       cfcFiboLevel              = FiboRoot;
@@ -121,10 +121,10 @@ void CPipFractal::CalcFiboChange(void)
       cfcFiboLevel              = cfcFiboLevelNow;
       
       if (cfcFiboLevel>Fibo100)
-        SetEvent(NewFibonacci,Major);
+        SetEvent(NewFractal,Major);
       else
       if (cfcFiboLevel==Fibo100)
-        SetEvent(NewFibonacci,Minor);
+        SetEvent(NewFractal,Minor);
     }
 
     if (cfcFiboLevelNow>Fibo100)

@@ -734,6 +734,8 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcActionState(const int Action)
   {
+    ActionState casActionState   = prWave.ActionState[Action];
+    
     if (Event(NewWaveClose))
       if (Action==prWave.Action)
         CalcLines(Action);
@@ -897,6 +899,9 @@ void CPolyRegression::CalcActionState(const int Action)
           prWave.Kill                            = true;
         }
       }
+      
+    if (IsChanged(casActionState,prWave.ActionState[Action]))
+      SetEvent(NewActionState);
   }
 
 //+------------------------------------------------------------------+
@@ -908,6 +913,7 @@ void CPolyRegression::CalcWave(void)
     ClearEvent(NewWaveClose);
     ClearEvent(NewWaveState);
     ClearEvent(NewWaveReversal);
+    ClearEvent(NewActionState);
 
     switch (prPolyState)
     {

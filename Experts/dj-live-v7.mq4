@@ -8,8 +8,10 @@
 #property version   "7.00"
 #property strict
 
-#define   Always     true
-#define   clrBoxOff C'60,60,60'
+#define   Always         true
+#define   clrBoxOff      C'60,60,60'
+#define   clrBoxRedOff   C'42,0,0'
+#define   clrBoxGreenOff C'0,42,0'
 
 #include <manual.mqh>
 #include <Class\Session.mqh>
@@ -45,6 +47,27 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
   CEvent             *sEvent         = new CEvent();
 
+  //--- Fractal Sources
+  enum                ViewPoint
+                      {
+                        Macro,
+                        Meso,
+                        Micro,
+                        ViewPoints
+                      };
+                      
+  enum                FractalPoint
+                      {
+                        fpTarget,
+                        fpYield,
+                        fpLoad,
+                        fpBounce,
+                        fpRisk,
+                        fpHalt,
+                        fpCheck,
+                        FractalPoints
+                      };
+
   //--- Recommendation Alerts
   enum                AnalystAlert
                       {
@@ -54,27 +77,37 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         EarlyFractal,    //-- May result in reversal; occurs on an early daily session fractal
                         SlantReversal,   //-- High probability of reversal; occurs between the 9th and 10th hour
                         YanksReversal,   //-- High probability of reversal; occurs between the 14th (Yanks) and 15th hour
-                        Shsnanigans,     //-- Excessive volatility leading to a late session breakout or reversal; occurs 16th or 17th hour on a bounds extremity
+                        Shananigans,     //-- Excessive volatility leading to a late session breakout or reversal; occurs 16th or 17th hour on a bounds extremity
                         MidEasternYaw,   //-- High probabilty of short term correction; occurs after a daily outer extremity rolls the Asian bellwether midpoint
                         ScissorKick,     //-- Excessive volatility where price tests of both daily outer extremities and comes to rest at the session midpoint
                         PoundKick,       //-- Excessive volatility where price fluctuates rapidly (anti-trend) then resumes the greater trend. Occurs early europe
                         SnapReversal,    //-- Reversal during an oscillatory state; typically indicates a long term term trend change;
                         AsianClose,      //-- Price direction change intraday; when the Asian session is about to close on an extremity;
                         RogueWave,       //-- Extreme reversal generally near a Fibonacci 50
-                        HatsOff,         //-- High probability of reversal; occurs near a Fibonacci 161
+                        TopHat,          //-- High probability of reversal; occurs near a Fibonacci 161
                         Riptide,         //-- Excessive volatility on the interior wave lines; hold on and follow the trend
-                        TidalWave        //-- Non-volatile steady wave growth lasting several hours or days;
+                        TidalWave,       //-- Non-volatile steady wave growth lasting several hours or days;
+                        MercyBounce,     //-- Recovering 50% fibo
+                        SecondChance,    //-- Better than a mercy bounce; indicates the strong probability of reversal
+                        AnalystAlerts
                       };
                       
+  enum                SourceType
+                      {
+                        NoSource,
+                        indFractal,
+                        indPipMA,
+                        indSession,
+                        SourceTypes
+                      };
   //--- Strategies
   enum                StrategyType
                       {
-//                        Kill,
-//                        Stop,
+                        Load,
                         Spot,
                         FFE,
-//                        Capture,
-//                        Bank,
+                        Capture,
+                        Deposit,
                         StrategyTypes
                       };
                        
@@ -113,6 +146,22 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         double          EQLoss;
                         double          EQNet;
                       };
+                      
+  struct              FractalAnalysis
+                      {
+                        SourceType      Source;
+                        int             Direction;
+                        int             BreakoutDir;
+                        ReservedWords   State;
+                        FibonacciLevel  FiboLevel;
+                        RetraceType     Leg;
+                        bool            Peg;
+                        bool            Risk;
+                        bool            Corrected;
+                        bool            Trap;
+                        double          FiboRetrace;
+                        double          FiboExpansion;
+                      };
 
   const int SegmentType[5]   = {OP_BUY,OP_SELL,Crest,Trough,Decay};
 
@@ -133,12 +182,22 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   //--- Trade operationals
   int                 SessionHour;
   
+  //--- Order Manager operationals
   OrderManagerRec     om[2];
   double              omMatrix[5][5];
   double              omInterlace[];
+  int                 omInterlaceDir;
   CArrayDouble       *omWork;
-   
   
+  double              pfExpansion[10];
+
+  //--- Analyst operationals
+  bool                anIssueQueue[AnalystAlerts];
+  double              anFractal[ViewPoints][FractalPoints];
+  FractalAnalysis     anFiboDetail[3];
+  double              anBelwether[3];       //--- Asian market analysis
+  ReservedWords       anBelwetherState;     //--- Asian market state
+
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -243,18 +302,11 @@ void RefreshControlPanel(void)
                       +BoolToStr(pfractal.ActiveSegment().Type==Decay,"Decay ")
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
                       
-    UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));
-//    UpdateLabel("lbLongOrder",BoolToStr(om[OP_BUY].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_BUY].OrderStatus)+
-//                      " on "+EnumToString(om[OP_BUY].OrderEvent)),
-//                       BoolToInt(om[OP_BUY].OrderStatus==Waiting,clrDarkGray,clrYellow));
-                       
+    UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));                     
     UpdateLabel("lbShortState",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
-    //UpdateLabel("lbShortOrder",BoolToStr(om[OP_SELL].OrderStatus==Waiting,"Waiting","Order "+EnumToString(om[OP_SELL].OrderStatus)+
-    //                   " on "+EnumToString(om[OP_SELL].OrderEvent)),
-    //                   BoolToInt(om[OP_SELL].OrderStatus==Waiting,clrDarkGray,clrYellow));
     
-    //UpdateLabel("lbLongPlan",EnumToString(om[OP_BUY].Strategy)+":"+EnumToString(om[OP_BUY].Plan),clrDarkGray);
-    //UpdateLabel("lbShortPlan",EnumToString(om[OP_SELL].Strategy)+":"+EnumToString(om[OP_SELL].Plan),clrDarkGray);
+    UpdateLabel("lbLongPlan","Waiting...",clrDarkGray);
+    UpdateLabel("lbShortPlan","Waiting...",clrDarkGray);
     
     UpdateLabel("lbRetrace","Retrace",BoolToInt(pfractal.Wave().Retrace,clrYellow,clrDarkGray));
     UpdateLabel("lbBreakout","Breakout",BoolToInt(pfractal.Wave().Breakout,clrYellow,clrDarkGray));
@@ -284,7 +336,7 @@ void RefreshControlPanel(void)
       for (int col=OP_BUY;col<=OP_SELL;col++)
         UpdateLabel("lbPL"+(string)col+":"+(string)row,DoubleToStr(pfractal.ActionLine(col,row),Digits),Color(pfractal.ActionLine(col,row),IN_PROXIMITY));
 
-    UpdateBox("hdInterlace",BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2)<Close[0],clrDarkGreen,clrMaroon));
+    UpdateBox("hdInterlace",Color(omInterlaceDir,IN_DARK_DIR));
     UpdateLabel("lbLongNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_BUY).Retrace-pfractal.WaveSegment(OP_BUY).High),1),clrRed);    
     UpdateLabel("lbShortNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_SELL).Low-pfractal.WaveSegment(OP_SELL).Retrace),1),clrLawnGreen);    
     UpdateLabel("lbCrestNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Crest).Retrace-pfractal.WaveSegment(Crest).High),1),clrRed);
@@ -295,6 +347,15 @@ void RefreshControlPanel(void)
 
     if (pfractal.WaveSegment(Last).Type==Trough)
       UpdateLabel("lbDecayNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Decay).Low-pfractal.WaveSegment(Decay).Retrace),1),clrLawnGreen);
+      
+    for (FractalPoint row=0;row<FractalPoints;row++)
+      for (FractalType col=ftOrigin;col<ftPrior;col++)
+      {
+        UpdateLabel("lbAN"+(string)col+":"+(string)row,BoolToStr(IsEqual(anFractal[col][row],0.00),"  Viable",DoubleToStr(anFractal[col][row],Digits)),Color(anFractal[col][row],IN_PROXIMITY));
+        
+        if (row==0)
+          UpdateBox("hdAN"+StringSubstr(EnumToString(col),2),clrBoxRedOff);
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -438,12 +499,14 @@ void RefreshScreen(void)
         CallPause(rsEvent,Always);
 
     if (rsShow=="FRACTAL")
-      fractal.RefreshScreen();
+      fractal.RefreshScreen(true);
     else
     if (rsShow=="PIPMA")
     {
       if (pfractal.HistoryLoaded())
         pfractal.RefreshScreen();
+      else
+        Comment("PipMA is loading history...");
     }
     else
     if (rsShow=="DAILY")
@@ -514,26 +577,51 @@ int PriceRating(double Price, double Max=6.0, double Min=3.0, double Mean=0.2)
   }
 
 //+------------------------------------------------------------------+
-//| CheckSessionEvents - updates trading strategy on session events  |
+//| ProcessSession - Process and consolidate Session data **FIRST**  |
 //+------------------------------------------------------------------+
-void CheckSessionEvents(void)
-  {          
+void ProcessSession(void)
+  {
     bool cseIsValid;
     
     sEvent.ClearEvents();
     
     //-- Set General Notification Events
     if (session[Daily].Event(NewDay))
+    {
+      //--- Reset Session Detail for this trading day
+      for (SessionType type=Daily;type<SessionTypes;type++)
+      {
+        detail[type].FractalDir      = DirectionNone;
+        detail[type].NewFractal      = false;
+        detail[type].Reversal        = false;
+        detail[type].HighHour        = ServerHour();
+        detail[type].LowHour         = ServerHour();
+      }
+    
       sEvent.SetEvent(NewDay);
+    }
       
     if (session[Daily].Event(NewHour))
+    {
+      for (SessionType type=Daily;type<SessionTypes;type++)
+        detail[type].NewFractal      = false;    
+
       sEvent.SetEvent(NewHour);
+    }
       
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       //-- Set Session Notification Events
       if (session[type].Event(SessionOpen))
+      {
+        if (NewDirection(detail[type].OpenDir,Direction(session[type].Pivot(OffSession)-session[type].Pivot(PriorSession))))
+          sEvent.SetEvent(NewPivot,Major);
+      
+        if (NewBias(detail[type].OpenBias,session[type].Bias()))
+          sEvent.SetEvent(NewBias);
+
         sEvent.SetEvent(SessionOpen);
+      }
         
       //-- Evaluate and Set Session Fractal Events
       if (session[type].Event(NewFractal))
@@ -590,91 +678,30 @@ void CheckSessionEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| OrderBias - Trade direction/action all factors considered        |
-//+------------------------------------------------------------------+
-int OrderBias(int Measure=InDirection)
-  {
-    static int odDirection      = DirectionNone;
-    
-    if (ServerHour()>3)
-      odDirection               = Direction(detail[Daily].HighHour-detail[Daily].LowHour);
-      
-    return (odDirection);
-   
-   if (lead.SessionHour()>4)
-     if ((lead[ActiveSession].Direction!=Direction(Close[0]-lead.Pivot(ActiveSession))))
-       sEvent.SetEvent(NewReversal,Warning);    
-  
-    if (sEvent.EventAlert(NewReversal,Warning))
-      return(Direction(lead[ActiveSession].Direction,InDirection,Contrarian));
-
-    return (lead[ActiveSession].Direction);
-  }
-
-//+------------------------------------------------------------------+
-//| SetNewDayPlan - Prepare the daily strategy                       |
-//+------------------------------------------------------------------+
-void SetNewDayPlan(void)
-  {
-    //--- Reset Session Detail for this trading day
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-      detail[type].FractalDir      = DirectionNone;
-      detail[type].NewFractal      = false;
-      detail[type].Reversal        = false;
-      detail[type].HighHour        = ServerHour();
-      detail[type].LowHour         = ServerHour();
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| SetHourlyPlan - sets session hold/hedge detail by type hourly    |
-//+------------------------------------------------------------------+
-void SetHourlyPlan(void)
-  {
-    for (SessionType type=Daily;type<SessionTypes;type++)
-    {
-      detail[type].NewFractal      = false;
-    }  
-  }
-
-//+------------------------------------------------------------------+
-//| SetOpenPlan - sets session hold/hedge detail by type on open     |
-//+------------------------------------------------------------------+
-void SetOpenPlan(SessionType Type)
-  {
-    if (NewDirection(detail[Type].OpenDir,Direction(session[Type].Pivot(OffSession)-session[Type].Pivot(PriorSession))))
-      sEvent.SetEvent(NewPivot,Major);
-      
-    if (NewBias(detail[Type].OpenBias,session[Type].Bias()))
-      sEvent.SetEvent(NewBias);
-  }
-
-//+------------------------------------------------------------------+
-//| ProcessSession - Process and consolidate Session data **FIRST**  |
-//+------------------------------------------------------------------+
-void ProcessSession(void)
-  {
-    //--- Analyze an prepare session data
-    CheckSessionEvents();
-
-    if (sEvent[NewDay])
-      SetNewDayPlan();
-      
-    if (sEvent[NewHour])
-      SetHourlyPlan();
-      
-    if (sEvent[SessionOpen])
-      SetOpenPlan(lead.Type());
-  }
-
-//+------------------------------------------------------------------+
 //| ProcessPipMA - Process PipMA data and prepare recommendations    |
 //+------------------------------------------------------------------+
 void ProcessPipMA(void)
   {
     double ppmaPrice[5];
     
+    if (pfractal.EventAlert(NewFractal,Minor))
+      sEvent.SetEvent(NewFractal,Minor);
+
+    if (pfractal.EventAlert(NewFractal,Major))
+      sEvent.SetEvent(NewFractal,Major);
+      
+    if (pfractal.HistoryLoaded())
+    {
+      //--- do stuff?
+    }
+
+    //--- Load fibo matrix
+    for (FibonacciLevel fibo=0;fibo<=Fibo823;fibo++)
+    {
+      pfExpansion[fibo]       = FiboPrice(fibo,pfractal[Term].Base,pfractal[Term].Root,Expansion);
+      Print(DoubleToStr(pfExpansion[fibo],Digits));
+    }
+
     //--- Extract and Process tick interlace data
     omWork.Clear();
     
@@ -697,8 +724,10 @@ void ProcessPipMA(void)
     }
     
     omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
-
+    omInterlaceDir = BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
+    
     pfractal.DrawStateLines();
+    pfractal.ShowFiboArrow();
   }
 
 //+------------------------------------------------------------------+
@@ -706,6 +735,162 @@ void ProcessPipMA(void)
 //+------------------------------------------------------------------+
 void ProcessFractal(void)
   {
+    if (fractal.Event(NewFractal))
+      sEvent.SetEvent(NewFractal,Critical);
+
+    for (FractalType type=ftOrigin;type<ftPrior;type++)
+    {                        
+      anFiboDetail[type].Direction       = session[Daily].Fractal(type).Direction;
+      anFiboDetail[type].BreakoutDir     = session[Daily].Fractal(type).BreakoutDir;
+      anFiboDetail[type].State           = session[Daily].Fractal(type).State;
+      anFiboDetail[type].Source          = NoSource;
+      
+      anFiboDetail[type].FiboRetrace     = session[Daily].Fibonacci(type).RetraceNow;
+      anFiboDetail[type].FiboExpansion   = session[Daily].Fibonacci(type).ExpansionNow;
+      
+      if (IsLower(Fibo100,anFiboDetail[type].FiboLevel))
+      {
+Print("Didn''t I Get Here (100)???");
+        //--- Monitor risk and reload points
+        if (anFiboDetail[type].FiboLevel==Fibo50)
+          anFiboDetail[type].Peg         = true;
+ 
+        if (anFiboDetail[type].FiboLevel==Fibo23)
+        {
+          anFiboDetail[type].Risk        = true;
+          anFractal[type][fpYield]       = session[Daily].Fibonacci(type).Expansion[Fibo50];
+          anFractal[type][fpTarget]      = session[Daily].Fibonacci(type).Retrace[Fibo23];
+        }
+        
+        if (anFiboDetail[type].FiboLevel==FiboRoot)
+        {
+          anFiboDetail[type].Corrected   = true;
+          anFractal[type][fpYield]       = session[Daily].Fibonacci(type).Expansion[Fibo23];
+          anFractal[type][fpTarget]      = session[Daily].Fibonacci(type).Retrace[Fibo38];
+        }
+      }
+      else
+      if (FiboLevel(session[Daily].Fibonacci(type).ExpansionNow)==Fibo100)
+      {
+Print("Didn''t I Get Here (=100)???");
+        if (anFiboDetail[type].Direction!=anFiboDetail[type].BreakoutDir)
+          anFiboDetail[type].Trap        = true;
+
+        anFiboDetail[type].FiboLevel     = Fibo100;
+        
+        if (anFiboDetail[type].Corrected)
+        {
+          //--- hmm, what to do? Need a case study
+        }
+        else
+        if (anFiboDetail[type].Risk)
+        {
+          //--- hmm, what to do? Set short Yield/Targets?
+        }
+        else
+        if (anFiboDetail[type].Peg)
+        {
+          //--- hmm, what to do?  Mark strategy FFE?
+        }
+        else
+        {
+          anFractal[type][fpTarget]      = session[Daily].Fibonacci(type).Expansion[Fibo161];
+          anFractal[type][fpYield]       = session[Daily].Fibonacci(type).Expansion[Fibo100];
+          anFractal[type][fpLoad]        = session[Daily].Fibonacci(type).Expansion[Fibo61];
+          anFractal[type][fpBounce]      = session[Daily].Fibonacci(type).Expansion[Fibo50];
+          anFractal[type][fpRisk]        = session[Daily].Fibonacci(type).Expansion[Fibo38];
+          anFractal[type][fpHalt]        = session[Daily].Fibonacci(type).Expansion[FiboRoot];
+          anFractal[type][fpCheck]       = 0.00;
+          anFiboDetail[type].Source      = indSession;
+        }
+      }
+      else
+      if (IsLower(FiboLevels[Fibo161],anFiboDetail[type].FiboExpansion,NoUpdate))
+      {
+        //-- Less viable alternative - caused by severely expanding market; hmmm... should the short term continue?
+Print("Didn''t I Get Here (<161)???");
+        anFractal[type][fpTarget]        = pfExpansion[Fibo161];
+        anFractal[type][fpYield]         = pfExpansion[Fibo100];
+        anFractal[type][fpLoad]          = pfExpansion[Fibo50];
+        anFractal[type][fpBounce]        = pfExpansion[FiboRoot];
+        anFractal[type][fpRisk]          = pfExpansion[FiboRoot];
+        anFractal[type][fpHalt]          = pfExpansion[FiboRoot];
+        anFractal[type][fpCheck]         = pfExpansion[FiboRoot];
+        anFiboDetail[type].Source        = indPipMA;
+      }
+      else
+      if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].FiboExpansion,NoUpdate))
+      {
+Print("Didn''t I Get Here (<50)???");
+        //-- Less viable alternative - could be due to severely contracting/expanding markets
+        if (type==ftOrigin)
+        {
+          //--- Find the best Origin candidate
+          if (session[Daily].Fractal(ftOrigin).State==Correction)
+            if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].FiboExpansion,NoUpdate))
+            {
+              anFractal[type][fpTarget]  = session[Daily].Fibonacci(type).Expansion[Fibo100];
+              anFractal[type][fpYield]   = session[Daily].Fibonacci(type).Retrace[Fibo23];
+              anFractal[type][fpLoad]    = session[Daily].Fibonacci(type).Expansion[Fibo50];
+              anFractal[type][fpBounce]  = session[Daily].Fibonacci(type).Expansion[Fibo50];
+              anFractal[type][fpRisk]    = session[Daily].Fibonacci(type).Expansion[Fibo38];
+              anFractal[type][fpHalt]    = session[Daily].Fibonacci(type).Expansion[Fibo23];
+              anFractal[type][fpCheck]   = session[Daily].Fibonacci(type).Expansion[Fibo23];
+              anFiboDetail[type].Source  = indSession;
+            }
+            
+          //--- Consider using Papa Fractal
+          
+        }
+      }
+      else
+      {
+        Print("Bad Fibo Data: "+EnumToString(type));
+          
+      }
+
+      switch (type)
+      {
+        case ftOrigin:     //--- Macro Configuration/Corrections
+                           anFiboDetail[type].Leg           = fractal.State(Max);
+        
+                           if (fractal.IsDivergent())
+                             anFiboDetail[type].Trap        = false;
+                           
+                           if (session[Daily].Fractal(type).State==Correction)
+                           {
+                             anFiboDetail[type].Corrected   = true;
+          
+                             //--- do correction stuff and revalidation
+                           }
+                           break;
+
+         case ftTrend:     //--- Meso Configuration/Corrections
+                           break;
+
+         case ftTerm:      //--- Micro Configuration/Corrections
+                           if (IsLower(FiboLevel(Fibo23),anFiboDetail[type].FiboExpansion,NoUpdate))
+                             anFiboDetail[type].Corrected     = true;
+
+                           break;
+      }
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| SetDailyPlan - Review and analyze daily objectives               |
+//+------------------------------------------------------------------+
+void SetDailyPlan(void)
+  {
+
+  }
+
+//+------------------------------------------------------------------+
+//|  SetHourlyPlan - Updates the daily plan based on new data        |
+//+------------------------------------------------------------------+
+void SetHourlyPlan(void)
+  {
+  
     return;
   }
 
@@ -713,6 +898,18 @@ void ProcessFractal(void)
 //| Publish - Consolidate and publish data processed                 |
 //+------------------------------------------------------------------+
 void Publish(void)
+  {
+    anIssueQueue[SecondChance]  = sEvent.ProximityAlert(pfractal.ActionLine(OP_BUY,Chance),5);
+    anIssueQueue[SecondChance]  = sEvent.ProximityAlert(pfractal.ActionLine(OP_SELL,Chance),5);
+    
+  
+    return;
+  }
+
+//+------------------------------------------------------------------+
+//| AnalyzeFractalEvents - Analyze fractal combine and assess plan   |
+//+------------------------------------------------------------------+
+void AnalyzeFractalEvents(void)
   {
     return;
   }
@@ -726,8 +923,39 @@ void AnalyzeData(void)
     ProcessSession();
     ProcessPipMA();
     ProcessFractal();
+
+    if (sEvent[NewDay])
+      SetDailyPlan();
+      
+    if (sEvent[NewHour])
+      SetHourlyPlan();
     
+    if (sEvent[NewFractal])
+      AnalyzeFractalEvents();
+
     Publish();
+  }
+
+//+------------------------------------------------------------------+
+//| OrderBias - Trade direction/action all factors considered        |
+//+------------------------------------------------------------------+
+int OrderBias(int Measure=InDirection)
+  {
+    static int odDirection      = DirectionNone;
+    
+    if (ServerHour()>3)
+      odDirection               = Direction(detail[Daily].HighHour-detail[Daily].LowHour);
+      
+    return (odDirection);
+   
+   if (lead.SessionHour()>4)
+     if ((lead[ActiveSession].Direction!=Direction(Close[0]-lead.Pivot(ActiveSession))))
+       sEvent.SetEvent(NewReversal,Warning);    
+  
+    if (sEvent.EventAlert(NewReversal,Warning))
+      return(Direction(lead[ActiveSession].Direction,InDirection,Contrarian));
+
+    return (lead[ActiveSession].Direction);
   }
 
 //+------------------------------------------------------------------+

@@ -578,6 +578,22 @@ bool IsLower(double Compare, double &Check, bool Update=true, int Precision=0)
   }
 
 //+------------------------------------------------------------------+
+//| IsLower - returns true if compare value lower than check         |
+//+------------------------------------------------------------------+
+bool IsLower(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
+  {
+    if (Compare < Check)
+    {
+      if (Update)
+        Check    = Compare;
+
+      return (true);
+    }
+    
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
 //| IsHigher - returns true if compare value higher than check       |
 //+------------------------------------------------------------------+
 bool IsHigher(double Compare, double &Check, bool Update=true, int Precision=0)

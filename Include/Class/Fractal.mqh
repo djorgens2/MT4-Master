@@ -94,7 +94,7 @@ public:
        //--- Fractal refresh methods
        void          Update(void);
        void          UpdateBuffer(double &Fractal[]);
-       void          RefreshScreen(void);
+       void          RefreshScreen(bool WithEvents=false);
 
        int           Origin(const ReservedWords Measure);
        int           Direction(RetraceType Type=Expansion, bool Contrarian=false, int Format=InDirection);
@@ -270,7 +270,7 @@ void CFractal::CalcOrigin(void)
       }
     else
         
-    if (fEvents.EventAlert(NewFibonacci,Major))
+    if (fEvents.EventAlert(NewFractal,Major))
     {
       if (fStateMajor==Divergent)
       {
@@ -427,10 +427,10 @@ void CFractal::CalcRetrace(void)
 
     //--- Calc fractal change events
     if (IsChanged(fStateMinor,crStateMinor))
-      fEvents.SetEvent(NewFibonacci,Minor);
+      fEvents.SetEvent(NewFractal,Minor);
       
     if (IsChanged(fStateMajor,crStateMajor))
-      fEvents.SetEvent(NewFibonacci,Major);
+      fEvents.SetEvent(NewFractal,Major);
   }
 
   
@@ -1249,7 +1249,7 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints screen objects, data                    |
 //+------------------------------------------------------------------+
-void CFractal::RefreshScreen(void)
+void CFractal::RefreshScreen(bool WithEvents=false)
   {
     string           rsReport    = "";
     string           rsFlag      = "";
@@ -1302,6 +1302,7 @@ void CFractal::RefreshScreen(void)
         Append(rsReport,BoolToStr(this[type].Peg,"Peg"));
         Append(rsReport,BoolToStr(this[type].Breakout,"Breakout"));
         Append(rsReport,BoolToStr(this[type].Reversal,"Reversal"));
+        Append(rsReport,BoolToStr(this[type].Correction,"Correction"));
 
         if (type==Trend)
         {
@@ -1325,6 +1326,9 @@ void CFractal::RefreshScreen(void)
                      +"  Leg: (c) "+DoubleToString(this.Range(type,Now,InPips),1)+" (a) "+DoubleToString(this.Range(type,Max,InPips),1)+"\n";
       };
     }
+    
+    if (WithEvents)
+      rsReport       += "\n\nFractal "+ActiveEventText()+"\n";
     
     Comment(rsReport);
   }

@@ -48,6 +48,18 @@ public:
                US,
                SessionTypes
              };
+
+             //-- FractalDetail
+             struct FiboDetail
+             {
+               double Correction;
+               double Retrace[5];
+               double RetraceNow;
+               double RetraceMax;
+               double Expansion[10];
+               double ExpansionNow;
+               double ExpansionMax;
+             };
              
              //-- Session Record Definition
              struct SessionRec
@@ -59,7 +71,6 @@ public:
                double         Low;
                double         Support;         //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
-               double         Fibonacci[10];   //--- Stores the pre-calculated fibo price levels
              };
              
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
@@ -81,6 +92,8 @@ public:
              
              double           Pivot(const PeriodType Type);
              int              Bias(void);
+             
+             FiboDetail       Fibonacci(FractalType Type);
              double           Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
              double           Expansion(FractalType Type, int Measure, int Format=InDecimal);     //--- returns fibonacci expansion
 
@@ -110,6 +123,8 @@ private:
              int              sBarHour;
              
              SessionRec       sfractal[FractalTypes];
+             FiboDetail       sFibo[FractalTypes];
+             
              int              sBarFE;          //--- Fractal Expansion Bar
              
              //--- Private class collections
@@ -1054,6 +1069,38 @@ double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
       }
       
     return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Fibonacci - Returns precalcuated Fibonacci sequences for Type    |
+//+------------------------------------------------------------------+
+FiboDetail CSession::Fibonacci(FractalType Type)
+  {
+    FiboDetail fWork;
+    
+    fWork.RetraceNow           = Retrace(Type,Now);
+    fWork.RetraceMax           = Retrace(Type,Max);
+    fWork.ExpansionNow         = Expansion(Type,Now);
+    fWork.ExpansionMax         = Expansion(Type,Max);
+
+    if (sfractal[Type].Direction==DirectionUp)
+      fWork.Correction         = FiboPrice(Fibo23,sfractal[Type].Support,fmax(sfractal[Type].High,sfractal[Type].Resistance),Retrace);
+    else
+      fWork.Correction         = FiboPrice(Fibo23,fmax(sfractal[Type].High,sfractal[Type].Resistance),sfractal[Type].Support,Retrace);
+
+    for (FibonacciLevel fibo=FiboRoot;fibo<Fibo100;fibo++)
+      if (sfractal[Type].Direction==DirectionUp)
+        fWork.Retrace[fibo]    = FiboPrice(fibo,fmax(sfractal[Type].High,sfractal[Type].Resistance),sfractal[Type].Support,Retrace);
+      else
+        fWork.Retrace[fibo]    = FiboPrice(fibo,sfractal[Type].Support,fmax(sfractal[Type].High,sfractal[Type].Resistance),Retrace);
+        
+    for (FibonacciLevel fibo=FiboRoot;fibo<Fibo823;fibo++)
+      if (sfractal[Type].Direction==DirectionUp)
+        fWork.Expansion[fibo]  = FiboPrice(fibo,sfractal[Type].Resistance,sfractal[Type].Support,Expansion);
+      else
+        fWork.Expansion[fibo]  = FiboPrice(fibo,sfractal[Type].Support,sfractal[Type].Resistance,Expansion);
+        
+     return (fWork);
   }
 
 //+------------------------------------------------------------------+

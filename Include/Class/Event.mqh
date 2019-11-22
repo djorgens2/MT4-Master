@@ -32,12 +32,13 @@ protected:
                   NoEvent,
                   NewDirection,
                   NewFractal,
-                  NewFibonacci,
                   NewPivot,
                   NewStdDev,
                   NewFOC,
                   NewState,
                   NewAction,
+                  NewActionState,
+                  NewProximityAlert,
                   NewBias,
                   NewRange,
                   NewWaveOpen,
@@ -103,6 +104,9 @@ public:
 
       bool           ActiveEvent(void)           {return(!eEvents[NoEvent]);}
       string         ActiveEventText(bool WithHeader=true);
+      
+      //---  General use events
+      bool           ProximityAlert(double Price, double Proximity);
 
       bool           operator[](const EventType Event) const {return(eEvents[Event]);}
 
@@ -156,7 +160,7 @@ void CEvent::ClearEvents(void)
   }
   
 //+------------------------------------------------------------------+
-//| ActiveEvents - Returns a string of crlf translated enums         |
+//| ActiveEvents - String of active events formatted for display     |
 //+------------------------------------------------------------------+
 string CEvent::ActiveEventText(bool WithHeader=true)
   {
@@ -175,7 +179,36 @@ string CEvent::ActiveEventText(bool WithHeader=true)
     
     return (aeActiveEvents);
   }
-  
+
+//+------------------------------------------------------------------+
+//| ProximityAlert - Returns a true when price in proximity          |
+//+------------------------------------------------------------------+
+bool CEvent::ProximityAlert(double Price, double Proximity)
+  {
+    if (IsBetween(Close[0],Price+Pip(Proximity,InPoints),Price-Pip(Proximity,InPoints),Digits))
+    {      
+      SetEvent(NewProximityAlert);
+      return (true);
+    }
+    
+    return (false);
+  }
+/*
+//+------------------------------------------------------------------+
+//| ProximityAlert - Returns a true when value (fibo) in proximity   |
+//+------------------------------------------------------------------+
+bool CEvent::ProximityAlert(double Basis, double Check, double Proximity, double Precision)
+  {
+    if (IsBetween(Basis,Check+Proximity,Check-Proximity,Precision))
+    {      
+      SetEvent(NewProximityAlert);
+      return (true);
+    }
+    
+    return (false);
+  }
+*/
+
 //+------------------------------------------------------------------+
 //| IsChanged - Compares events to determine if a change occurred    |
 //+------------------------------------------------------------------+
