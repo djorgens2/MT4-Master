@@ -64,7 +64,6 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         fpBounce,
                         fpRisk,
                         fpHalt,
-                        fpCheck,
                         FractalPoints
                       };
 
@@ -73,12 +72,14 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                       {
                         Papa161,         //-- Major reversal point approaching at the bre 161
                         Papa50,          //-- Major reversal point approaching at the bre 50
+                        RiceTerrace,     //-- Major long term trend indicator identified by a series of continuation breakouts without reversal
                         PapaReversal,    //-- Major reversal pattern confirmed on divergence
+                        CheckReversal,   //-- Major reversal pattern confirmed on a junior 261 check rally
                         EarlyFractal,    //-- May result in reversal; occurs on an early daily session fractal
                         SlantReversal,   //-- High probability of reversal; occurs between the 9th and 10th hour
                         YanksReversal,   //-- High probability of reversal; occurs between the 14th (Yanks) and 15th hour
                         Shananigans,     //-- Excessive volatility leading to a late session breakout or reversal; occurs 16th or 17th hour on a bounds extremity
-                        MidEasternYaw,   //-- High probabilty of short term correction; occurs after a daily outer extremity rolls the Asian bellwether midpoint
+                        AsianMidPitch,   //-- High probabilty of short term correction; occurs after a daily outer extremity rolls the Asian bellwether midpoint
                         ScissorKick,     //-- Excessive volatility where price tests of both daily outer extremities and comes to rest at the session midpoint
                         PoundKick,       //-- Excessive volatility where price fluctuates rapidly (anti-trend) then resumes the greater trend. Occurs early europe
                         SnapReversal,    //-- Reversal during an oscillatory state; typically indicates a long term term trend change;
@@ -149,18 +150,22 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                       
   struct              FractalAnalysis
                       {
-                        SourceType      Source;
-                        int             Direction;
-                        int             BreakoutDir;
-                        ReservedWords   State;
-                        FibonacciLevel  FiboLevel;
-                        RetraceType     Leg;
-                        bool            Peg;
-                        bool            Risk;
-                        bool            Corrected;
-                        bool            Trap;
-                        double          FiboRetrace;
-                        double          FiboExpansion;
+                        SourceType      Source;                //--- the source of fibo data
+                        int             Direction;             //--- the direction indicated by the source
+                        int             BreakoutDir;           //--- the last breakout direction; contrary indicates reversing pattern
+                        ReservedWords   State;                 //--- the state of the fractal provided by the source
+                        FibonacciLevel  FiboLevel;             //--- the now expansion fibo level
+                        int             FiboNetChange;         //--- the net change in a declining fibo pattern
+                        bool            FiboChanged;           //--- indicates a fibo drop; prompts review of targets and risk
+                        double          FiboRetrace;           //--- now retrace fibo reported by source
+                        double          FiboExpansion;         //--- now expansion fibo reported by source
+                        double          TargetStart;           //--- the price at which the source stated a target
+                        double          MaxProximityToTarget;  //--- the max price nearest to the target; a positive value indicates target hit
+                        RetraceType     Leg;                   //--- the papa fractal leg
+                        bool            Peg;                   //--- peg occurs at expansion fibo50
+                        bool            Risk;                  //--- risk occurs on risk mit
+                        bool            Corrected;             //--- Correction occurs on correction mit
+                        bool            Trap;                  //--- when a Meso breakout occurs
                       };
 
   const int SegmentType[5]   = {OP_BUY,OP_SELL,Crest,Trough,Decay};
@@ -194,6 +199,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   //--- Analyst operationals
   bool                anIssueQueue[AnalystAlerts];
   double              anFractal[ViewPoints][FractalPoints];
+  double              anMaster[ViewPoints][SourceTypes][2][FractalPoints];
   FractalAnalysis     anFiboDetail[3];
   double              anBelwether[3];       //--- Asian market analysis
   ReservedWords       anBelwetherState;     //--- Asian market state
@@ -232,11 +238,31 @@ void GetData(void)
   }
 
 //+------------------------------------------------------------------+
-//| ServerHour - returns the server hour adjused for gmt             |
+//| ServerHour - returns the server hour adjusted for gmt            |
 //+------------------------------------------------------------------+
 int ServerHour(void)
   { 
     return (TimeHour(session[Daily].ServerTime()));
+  }
+
+//+------------------------------------------------------------------+
+//| FiboState - returns the state for the supplied fibo              |
+//+------------------------------------------------------------------+
+ReservedWords FiboState(FractalType Type)
+  { 
+    if (anFiboDetail[Type].Corrected)
+      return (Correction);
+      
+    if (anFiboDetail[Type].Risk)
+      return (AtRisk);
+    
+    if (anFiboDetail[Type].Peg)
+      return (Peg);
+      
+    if (anFiboDetail[Type].Trap)
+      return (Trap);
+
+    return (NoState);
   }
 
 //+------------------------------------------------------------------+
@@ -347,14 +373,38 @@ void RefreshControlPanel(void)
 
     if (pfractal.WaveSegment(Last).Type==Trough)
       UpdateLabel("lbDecayNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Decay).Low-pfractal.WaveSegment(Decay).Retrace),1),clrLawnGreen);
-      
+    
+    string colFiboHead   = "";
+    
     for (FractalPoint row=0;row<FractalPoints;row++)
       for (FractalType col=ftOrigin;col<ftPrior;col++)
       {
         UpdateLabel("lbAN"+(string)col+":"+(string)row,BoolToStr(IsEqual(anFractal[col][row],0.00),"  Viable",DoubleToStr(anFractal[col][row],Digits)),Color(anFractal[col][row],IN_PROXIMITY));
         
         if (row==0)
+        {
           UpdateBox("hdAN"+StringSubstr(EnumToString(col),2),clrBoxRedOff);
+          
+          if (FiboState(col)==NoState)
+            UpdateLabel("lbAN"+(string)col+":Flag","",clrYellow);
+          else
+          {
+            switch (FiboState(col))
+            {
+              case Correction: colFiboHead = "Correct";
+                               break;
+              case AtRisk:     colFiboHead = " Risk ";
+                               break;
+              case Peg:        colFiboHead = "  Peg  ";
+                               break;
+              case Trap:       colFiboHead = " Trap ";
+                               break;
+            }
+            
+            UpdateLabel("lbAN"+(string)col+":Flag",colFiboHead,clrYellow);
+            UpdateLabel("lbAN"+(string)col+":Source",StringSubstr(EnumToString(anFiboDetail[col].Source),3),clrDarkGray);
+          }
+        }
       }
   }
 
@@ -750,7 +800,6 @@ void ProcessFractal(void)
       
       if (IsLower(Fibo100,anFiboDetail[type].FiboLevel))
       {
-Print("Didn''t I Get Here (100)???");
         //--- Monitor risk and reload points
         if (anFiboDetail[type].FiboLevel==Fibo50)
           anFiboDetail[type].Peg         = true;
@@ -769,10 +818,9 @@ Print("Didn''t I Get Here (100)???");
           anFractal[type][fpTarget]      = session[Daily].Fibonacci(type).Retrace[Fibo38];
         }
       }
-      else
+
       if (FiboLevel(session[Daily].Fibonacci(type).ExpansionNow)==Fibo100)
       {
-Print("Didn''t I Get Here (=100)???");
         if (anFiboDetail[type].Direction!=anFiboDetail[type].BreakoutDir)
           anFiboDetail[type].Trap        = true;
 
@@ -800,7 +848,6 @@ Print("Didn''t I Get Here (=100)???");
           anFractal[type][fpBounce]      = session[Daily].Fibonacci(type).Expansion[Fibo50];
           anFractal[type][fpRisk]        = session[Daily].Fibonacci(type).Expansion[Fibo38];
           anFractal[type][fpHalt]        = session[Daily].Fibonacci(type).Expansion[FiboRoot];
-          anFractal[type][fpCheck]       = 0.00;
           anFiboDetail[type].Source      = indSession;
         }
       }
@@ -808,20 +855,17 @@ Print("Didn''t I Get Here (=100)???");
       if (IsLower(FiboLevels[Fibo161],anFiboDetail[type].FiboExpansion,NoUpdate))
       {
         //-- Less viable alternative - caused by severely expanding market; hmmm... should the short term continue?
-Print("Didn''t I Get Here (<161)???");
         anFractal[type][fpTarget]        = pfExpansion[Fibo161];
         anFractal[type][fpYield]         = pfExpansion[Fibo100];
         anFractal[type][fpLoad]          = pfExpansion[Fibo50];
         anFractal[type][fpBounce]        = pfExpansion[FiboRoot];
         anFractal[type][fpRisk]          = pfExpansion[FiboRoot];
         anFractal[type][fpHalt]          = pfExpansion[FiboRoot];
-        anFractal[type][fpCheck]         = pfExpansion[FiboRoot];
         anFiboDetail[type].Source        = indPipMA;
       }
       else
       if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].FiboExpansion,NoUpdate))
       {
-Print("Didn''t I Get Here (<50)???");
         //-- Less viable alternative - could be due to severely contracting/expanding markets
         if (type==ftOrigin)
         {
@@ -835,7 +879,6 @@ Print("Didn''t I Get Here (<50)???");
               anFractal[type][fpBounce]  = session[Daily].Fibonacci(type).Expansion[Fibo50];
               anFractal[type][fpRisk]    = session[Daily].Fibonacci(type).Expansion[Fibo38];
               anFractal[type][fpHalt]    = session[Daily].Fibonacci(type).Expansion[Fibo23];
-              anFractal[type][fpCheck]   = session[Daily].Fibonacci(type).Expansion[Fibo23];
               anFiboDetail[type].Source  = indSession;
             }
             
@@ -915,6 +958,24 @@ void AnalyzeFractalEvents(void)
   }
 
 //+------------------------------------------------------------------+
+//| SetFiboSource - Identify best source for the supplied viewpoint  |
+//+------------------------------------------------------------------+
+void SetFiboSource(ViewPoint View)
+  {
+    FractalType vpSource    = NoValue;
+    
+    switch (View)
+    {
+      case Macro:  
+                  break;
+      case Meso:  
+                  break;
+      case Micro:  
+                  break;
+    };
+  }
+
+//+------------------------------------------------------------------+
 //| AnalyzeData - Verify health and safety of open positions         |
 //+------------------------------------------------------------------+
 void AnalyzeData(void)
@@ -922,6 +983,11 @@ void AnalyzeData(void)
     //--- Analyze an prepare data
     ProcessSession();
     ProcessPipMA();
+
+    for (ViewPoint view=Macro;view<ViewPoints;view++)
+      if (anFiboDetail[view].Source==NoSource)
+        SetFiboSource(view);
+
     ProcessFractal();
 
     if (sEvent[NewDay])
@@ -1287,6 +1353,10 @@ int OnInit()
       om[action].EQLoss         = 0.00;
     }
 
+    //--- Initialize Fibo Management
+    for (FractalType type=ftOrigin;type<ftPrior;type++)
+      anFiboDetail[type].Source = NoSource;
+      
     return(INIT_SUCCEEDED);    
   }
 
