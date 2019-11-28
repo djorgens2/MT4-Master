@@ -164,6 +164,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Below,
                   Higher,
                   Lower,
+                  AtRisk,
                   Deviation,
                   Strength,
                   Mean,
@@ -289,6 +290,17 @@ double FiboPrice(FibonacciLevel Level, double Base, double Root, int Method=Expa
       return (NormalizeDouble(Base-((Base-Root)*FiboPercent(Level)),Digits));
 
     return (NormalizeDouble(Root+((Base-Root)*FiboPercent(Level)),Digits));
+  }
+
+//+------------------------------------------------------------------+
+//| FiboPrice - Derived price for a variable fibonacci level         |
+//+------------------------------------------------------------------+
+double FiboPrice(double Fibo, double Base, double Root, int Method=Expansion)
+  {
+    if (Method == Retrace)     
+      return (NormalizeDouble(Base-((Base-Root)*Fibo),Digits));
+
+    return (NormalizeDouble(Root+((Base-Root)*Fibo),Digits));
   }
 
 //+------------------------------------------------------------------+

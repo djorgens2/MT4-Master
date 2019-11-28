@@ -16,6 +16,7 @@
 #include <manual.mqh>
 #include <Class\Session.mqh>
 #include <Class\PipFractal.mqh>
+#include <Class\ArrayInteger.mqh>
 
   
 input string    fractalHeader        = "";    //+------ Fractal Options ---------+
@@ -46,7 +47,8 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CFractal           *fractal        = new CFractal(inpRangeMax,inpRangeMin);
   CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
   CEvent             *sEvent         = new CEvent();
-
+  CEvent             *rsEvents       = new CEvent();
+  
   //--- Fractal Sources
   enum                ViewPoint
                       {
@@ -54,6 +56,22 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         Meso,
                         Micro,
                         ViewPoints
+                      };
+                      
+  //--- Order Statuses
+  enum                OrderStatus
+                      {
+                        Waiting,
+                        Pending,
+                        Immediate,
+                        Canceled,
+                        Approved,
+                        Declined,
+                        Rejected,
+                        Fulfilled,
+                        Expired,
+                        Closed,
+                        OrderStates
                       };
                       
   enum                FractalPoint
@@ -131,37 +149,35 @@ input int       inpGMTOffset         = 0;     // GMT Offset
 
   struct              ActionRequest
                       {
+                        int             Key;
+                        int             Action;
+                        string          Requestor;
                         double          Price;
-                        double          Lots;                      
-                      };
-                      
-  struct              OrderManagerRec
-                      {
-                        ActionState     Plan;
-                        ActionRequest   ShortAction[StrategyTypes];
-                        ActionRequest   LongAction[StrategyTypes];
-                        int             OrderTotal;
-                        double          LotsTotal;
-                        double          NetMargin;
-                        double          EQProfit;
-                        double          EQLoss;
-                        double          EQNet;
+                        double          Lots;
+                        double          Target;
+                        double          Stop;
+                        string          Memo;
+                        datetime        Expiry;
+                        OrderStatus     Status;
                       };
                       
   struct              FractalAnalysis
                       {
-                        SourceType      Source;                //--- the source of fibo data
+                        SessionType     Session;               //--- the session fibo data was collected from
                         int             Direction;             //--- the direction indicated by the source
                         int             BreakoutDir;           //--- the last breakout direction; contrary indicates reversing pattern
                         ReservedWords   State;                 //--- the state of the fractal provided by the source
+                        ActionState     FiboActionState;       //--- the derived proposed action plan for this fractal
                         FibonacciLevel  FiboLevel;             //--- the now expansion fibo level
                         int             FiboNetChange;         //--- the net change in a declining fibo pattern
                         bool            FiboChanged;           //--- indicates a fibo drop; prompts review of targets and risk
-                        double          FiboRetrace;           //--- now retrace fibo reported by source
-                        double          FiboExpansion;         //--- now expansion fibo reported by source
+                        double          RetraceNow;            //--- now retrace fibo reported by source
+                        double          RetraceMax;            //--- max retrace fibo reported by source
+                        double          ExpansionNow;          //--- now expansion fibo reported by source
+                        double          ExpansionMax;          //--- max expansion fibo reported by source
                         double          TargetStart;           //--- the price at which the source stated a target
                         double          MaxProximityToTarget;  //--- the max price nearest to the target; a positive value indicates target hit
-                        RetraceType     Leg;                   //--- the papa fractal leg
+                        RetraceType     FractalLeg;            //--- the papa fractal leg
                         bool            Peg;                   //--- peg occurs at expansion fibo50
                         bool            Risk;                  //--- risk occurs on risk mit
                         bool            Corrected;             //--- Correction occurs on correction mit
@@ -174,11 +190,13 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   string              rsShow              = "APP";
   int                 rsAction            = OP_BUY;
   int                 rsSegment           = NoValue;
+    
   bool                PauseOn             = true;
   int                 PauseOnHour         = NoValue;
   double              PauseOnPrice        = 0.00;
   bool                LoggingOn           = false;
   bool                TradingOn           = true;
+
   bool                Alerts[EventTypes];
   
   //--- Session operationals
@@ -188,22 +206,48 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   int                 SessionHour;
   
   //--- Order Manager operationals
-  OrderManagerRec     om[2];
+  ActionRequest       omQueue[];
+  CArrayInteger      *omOrderKey;
   double              omMatrix[5][5];
   double              omInterlace[];
   int                 omInterlaceDir;
   CArrayDouble       *omWork;
   
+  
+  double              pfFiboDetail[2][FractalTypes];
   double              pfExpansion[10];
+
+  //--- Fractal Manager Operationals
+  FractalType         rm[2];        //--- Retrace (Risk) Manager
+  FractalType         tm[2];        //--- Traverse (Range) Manager
+  FractalType         lm[2];        //--- Location (GPS) Manager
+  FractalType         em[2];        //--- Expansion (Profit) Manager
 
   //--- Analyst operationals
   bool                anIssueQueue[AnalystAlerts];
   double              anFractal[ViewPoints][FractalPoints];
   double              anMaster[ViewPoints][SourceTypes][2][FractalPoints];
-  FractalAnalysis     anFiboDetail[3];
-  double              anBelwether[3];       //--- Asian market analysis
-  ReservedWords       anBelwetherState;     //--- Asian market state
+  FractalAnalysis     anFiboDetail[FractalTypes];
 
+//+------------------------------------------------------------------+
+//| Trim - on of several function overloads to extract enum text     |
+//+------------------------------------------------------------------+
+string Trim(FractalType Type)
+  {
+    return(StringSubstr(EnumToString(Type),2));
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Compares events to determine if a change occurred    |
+//+------------------------------------------------------------------+
+bool IsChanged(OrderStatus &Compare, OrderStatus Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -264,6 +308,59 @@ ReservedWords FiboState(FractalType Type)
 
     return (NoState);
   }
+  
+//+------------------------------------------------------------------+
+//| RepaintOrder - Repaints a specific order line                    |
+//+------------------------------------------------------------------+
+void RepaintOrder(ActionRequest &Order, int Col, int Row)
+  {
+    string roLabel      = "lb-OM"+StringSubstr(ActionText(Col),0,1)+"-"+(string)Row;
+    
+    UpdateLabel(roLabel+"Key",LPad((string)Order.Key,"0",7),clrDarkGray);
+    UpdateLabel(roLabel+"Status",EnumToString(Order.Status),clrDarkGray);
+    UpdateLabel(roLabel+"Requestor",Order.Requestor,clrDarkGray);
+    UpdateLabel(roLabel+"Price",DoubleToStr(Order.Price,Digits),clrDarkGray);
+    UpdateLabel(roLabel+"Lots",DoubleToStr(Order.Lots,2),clrDarkGray);
+    UpdateLabel(roLabel+"Target",DoubleToStr(Order.Target,Digits),clrDarkGray);
+    UpdateLabel(roLabel+"Stop",DoubleToStr(Order.Stop,Digits),clrDarkGray);
+    UpdateLabel(roLabel+"Expiry",TimeToStr(Order.Expiry),clrDarkGray);
+    UpdateLabel(roLabel+"Memo",Order.Memo,clrDarkGray);
+  }
+  
+//+------------------------------------------------------------------+
+//| RefreshOrders - Repaints the order control panel display area    |
+//+------------------------------------------------------------------+
+void RefreshOrders(void)
+  {
+    string roLabel      = "";
+    int    roLong       = 0;
+    int    roShort      = 0;
+    
+    for (int col=0;col<2;col++)
+      for (int row=0;row<25;row++)
+      {
+        roLabel       = "lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row;
+        
+        UpdateLabel(roLabel+"Key","");
+        UpdateLabel(roLabel+"Status","");
+        UpdateLabel(roLabel+"Requestor","");
+        UpdateLabel(roLabel+"Price","");
+        UpdateLabel(roLabel+"Lots","");
+        UpdateLabel(roLabel+"Target","");
+        UpdateLabel(roLabel+"Stop","");
+        UpdateLabel(roLabel+"Expiry","");
+        UpdateLabel(roLabel+"Memo","");
+      }
+     
+    for (int ord=0;ord<ArraySize(omQueue);ord++)
+    {
+      if (omQueue[ord].Action==OP_BUY)
+        RepaintOrder(omQueue[ord],OP_BUY,roLong++);
+
+      if (omQueue[ord].Action==OP_SELL)
+        RepaintOrder(omQueue[ord],OP_SELL,roShort++);
+    }
+  }  
 
 //+------------------------------------------------------------------+
 //| RefreshControlPanel - Repaints the control panel display area    |
@@ -333,7 +430,7 @@ void RefreshControlPanel(void)
     
     UpdateLabel("lbLongPlan","Waiting...",clrDarkGray);
     UpdateLabel("lbShortPlan","Waiting...",clrDarkGray);
-    
+   
     UpdateLabel("lbRetrace","Retrace",BoolToInt(pfractal.Wave().Retrace,clrYellow,clrDarkGray));
     UpdateLabel("lbBreakout","Breakout",BoolToInt(pfractal.Wave().Breakout,clrYellow,clrDarkGray));
     UpdateLabel("lbReversal","Reversal",BoolToInt(pfractal.Wave().Reversal,clrYellow,clrDarkGray));
@@ -383,7 +480,7 @@ void RefreshControlPanel(void)
         
         if (row==0)
         {
-          UpdateBox("hdAN"+StringSubstr(EnumToString(col),2),clrBoxRedOff);
+          UpdateBox("hdAN"+StringSubstr(EnumToString(col),2),Color(anFiboDetail[col].Direction,IN_DARK_DIR));
           
           if (FiboState(col)==NoState)
             UpdateLabel("lbAN"+(string)col+":Flag","",clrYellow);
@@ -402,7 +499,7 @@ void RefreshControlPanel(void)
             }
             
             UpdateLabel("lbAN"+(string)col+":Flag",colFiboHead,clrYellow);
-            UpdateLabel("lbAN"+(string)col+":Source",StringSubstr(EnumToString(anFiboDetail[col].Source),3),clrDarkGray);
+            UpdateLabel("lbAN"+(string)col+":Source",StringSubstr(EnumToString(anFiboDetail[col].Session),3),clrDarkGray);
           }
         }
       }
@@ -500,8 +597,6 @@ void RefreshScreen(void)
 
     ShowLines();
 
-    sEvent.ClearEvents();
-    
     for (EventType type=1;type<EventTypes;type++)
       if (Alerts[type]&&pfractal.Event(type))
       {
@@ -516,6 +611,8 @@ void RefreshScreen(void)
         break;
       }
 
+    rsEvents.ClearEvents();
+    
     for (SessionType show=Daily;show<SessionTypes;show++)
       if (detail[show].Alerts)
         for (EventType type=1;type<EventTypes;type++)
@@ -524,17 +621,17 @@ void RefreshScreen(void)
             if (type==NewFractal)
             {
               if (!detail[show].NewFractal)
-                sEvent.SetEvent(type);
+                rsEvents.SetEvent(type);
                 
               detail[show].FractalHour = ServerHour();
             }
             else
-              sEvent.SetEvent(type);
+              rsEvents.SetEvent(type);
           }
 
-    if (sEvent.ActiveEvent())
+    if (rsEvents.ActiveEvent())
     {
-      Append(rsEvent,"Processed "+sEvent.ActiveEventText(true)+"\n","\n");
+      Append(rsEvent,"Processed "+rsEvents.ActiveEventText(true)+"\n","\n");
     
       for (SessionType show=Daily;show<SessionTypes;show++)
         Append(rsEvent,EnumToString(show)+" ("+BoolToStr(session[show].IsOpen(),
@@ -646,6 +743,7 @@ void ProcessSession(void)
         detail[type].Reversal        = false;
         detail[type].HighHour        = ServerHour();
         detail[type].LowHour         = ServerHour();
+        detail[type].FractalHour     = NoValue;
       }
     
       sEvent.SetEvent(NewDay);
@@ -749,7 +847,6 @@ void ProcessPipMA(void)
     for (FibonacciLevel fibo=0;fibo<=Fibo823;fibo++)
     {
       pfExpansion[fibo]       = FiboPrice(fibo,pfractal[Term].Base,pfractal[Term].Root,Expansion);
-      Print(DoubleToStr(pfExpansion[fibo],Digits));
     }
 
     //--- Extract and Process tick interlace data
@@ -776,7 +873,7 @@ void ProcessPipMA(void)
     omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
     omInterlaceDir = BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
     
-    pfractal.DrawStateLines();
+//    pfractal.DrawStateLines();
     pfractal.ShowFiboArrow();
   }
 
@@ -785,19 +882,58 @@ void ProcessPipMA(void)
 //+------------------------------------------------------------------+
 void ProcessFractal(void)
   {
-    if (fractal.Event(NewFractal))
-      sEvent.SetEvent(NewFractal,Critical);
+    for (FractalType type=ftOrigin;type<FractalTypes;type++)
+    {
+      if (type==ftPrior)
+        continue;
+        
+      if (type==ftCorrection)
+        if (anFiboDetail[type].Session==Daily)
+          anFiboDetail[type].Session     = Asia;
+                                     
+      anFiboDetail[type].Direction       = session[anFiboDetail[type].Session].Fractal(type).Direction;
+      anFiboDetail[type].BreakoutDir     = session[anFiboDetail[type].Session].Fractal(type).BreakoutDir;
+      anFiboDetail[type].State           = session[anFiboDetail[type].Session].Fractal(type).State;
+      anFiboDetail[type].RetraceNow      = session[anFiboDetail[type].Session].Fibonacci(type).RetraceNow;
+      anFiboDetail[type].RetraceMax      = session[anFiboDetail[type].Session].Fibonacci(type).RetraceMax;
+      anFiboDetail[type].ExpansionNow    = session[anFiboDetail[type].Session].Fibonacci(type).ExpansionNow;
+      anFiboDetail[type].ExpansionMax    = session[anFiboDetail[type].Session].Fibonacci(type).ExpansionMax;
+    }
+    
+    if (sEvent[NewDay])
+      SetDailyPlan();
 
     for (FractalType type=ftOrigin;type<ftPrior;type++)
-    {                        
-      anFiboDetail[type].Direction       = session[Daily].Fractal(type).Direction;
-      anFiboDetail[type].BreakoutDir     = session[Daily].Fractal(type).BreakoutDir;
-      anFiboDetail[type].State           = session[Daily].Fractal(type).State;
-      anFiboDetail[type].Source          = NoSource;
-      
-      anFiboDetail[type].FiboRetrace     = session[Daily].Fibonacci(type).RetraceNow;
-      anFiboDetail[type].FiboExpansion   = session[Daily].Fibonacci(type).ExpansionNow;
-      
+    {
+//      switch (type)
+//      {
+//        case ftOrigin:     //--- Macro Configuration/Corrections
+//                           anFiboDetail[type].FractalLeg   = fractal.State(Max);
+//        
+//                           if (fractal.IsDivergent())
+//                             anFiboDetail[type].Trap        = false;
+//                           
+//                           if (session[Daily].Fractal(type).State==Correction)
+//                           {
+//                             anFiboDetail[type].Corrected   = true;
+//          
+//                             //--- do correction stuff and revalidation
+//                           }
+//                           break;
+//
+//         case ftTrend:     //--- Meso Configuration/Corrections
+//                           anFiboDetail[type].FractalLeg   = fractal.State(Min);
+//                           break;
+//
+//         case ftTerm:      //--- Micro Configuration/Corrections
+//                           anFiboDetail[type].FractalLeg   = fractal.State(Now);
+//
+//                           if (IsLower(FiboLevel(Fibo23),anFiboDetail[type].FiboExpansion,NoUpdate))
+//                             anFiboDetail[type].Corrected     = true;
+//
+//                           break;
+//      }
+//    
       if (IsLower(Fibo100,anFiboDetail[type].FiboLevel))
       {
         //--- Monitor risk and reload points
@@ -848,11 +984,10 @@ void ProcessFractal(void)
           anFractal[type][fpBounce]      = session[Daily].Fibonacci(type).Expansion[Fibo50];
           anFractal[type][fpRisk]        = session[Daily].Fibonacci(type).Expansion[Fibo38];
           anFractal[type][fpHalt]        = session[Daily].Fibonacci(type).Expansion[FiboRoot];
-          anFiboDetail[type].Source      = indSession;
         }
       }
       else
-      if (IsLower(FiboLevels[Fibo161],anFiboDetail[type].FiboExpansion,NoUpdate))
+      if (IsLower(FiboLevels[Fibo161],anFiboDetail[type].ExpansionNow,NoUpdate))
       {
         //-- Less viable alternative - caused by severely expanding market; hmmm... should the short term continue?
         anFractal[type][fpTarget]        = pfExpansion[Fibo161];
@@ -861,17 +996,16 @@ void ProcessFractal(void)
         anFractal[type][fpBounce]        = pfExpansion[FiboRoot];
         anFractal[type][fpRisk]          = pfExpansion[FiboRoot];
         anFractal[type][fpHalt]          = pfExpansion[FiboRoot];
-        anFiboDetail[type].Source        = indPipMA;
       }
       else
-      if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].FiboExpansion,NoUpdate))
+      if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].ExpansionNow,NoUpdate))
       {
         //-- Less viable alternative - could be due to severely contracting/expanding markets
         if (type==ftOrigin)
         {
           //--- Find the best Origin candidate
           if (session[Daily].Fractal(ftOrigin).State==Correction)
-            if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].FiboExpansion,NoUpdate))
+            if (IsLower(FiboLevels[Fibo50],anFiboDetail[type].ExpansionNow,NoUpdate)) 
             {
               anFractal[type][fpTarget]  = session[Daily].Fibonacci(type).Expansion[Fibo100];
               anFractal[type][fpYield]   = session[Daily].Fibonacci(type).Retrace[Fibo23];
@@ -879,7 +1013,6 @@ void ProcessFractal(void)
               anFractal[type][fpBounce]  = session[Daily].Fibonacci(type).Expansion[Fibo50];
               anFractal[type][fpRisk]    = session[Daily].Fibonacci(type).Expansion[Fibo38];
               anFractal[type][fpHalt]    = session[Daily].Fibonacci(type).Expansion[Fibo23];
-              anFiboDetail[type].Source  = indSession;
             }
             
           //--- Consider using Papa Fractal
@@ -891,32 +1024,6 @@ void ProcessFractal(void)
         Print("Bad Fibo Data: "+EnumToString(type));
           
       }
-
-      switch (type)
-      {
-        case ftOrigin:     //--- Macro Configuration/Corrections
-                           anFiboDetail[type].Leg           = fractal.State(Max);
-        
-                           if (fractal.IsDivergent())
-                             anFiboDetail[type].Trap        = false;
-                           
-                           if (session[Daily].Fractal(type).State==Correction)
-                           {
-                             anFiboDetail[type].Corrected   = true;
-          
-                             //--- do correction stuff and revalidation
-                           }
-                           break;
-
-         case ftTrend:     //--- Meso Configuration/Corrections
-                           break;
-
-         case ftTerm:      //--- Micro Configuration/Corrections
-                           if (IsLower(FiboLevel(Fibo23),anFiboDetail[type].FiboExpansion,NoUpdate))
-                             anFiboDetail[type].Corrected     = true;
-
-                           break;
-      }
     }
   }
 
@@ -925,7 +1032,66 @@ void ProcessFractal(void)
 //+------------------------------------------------------------------+
 void SetDailyPlan(void)
   {
+    string sdpPlan              = "";
+    
+    //double sdpTraverse          = anFiboDetail[ftOrigin].RetraceNow;    //--- How far back I have returned
+    //double sdpRetrace           = anFiboDetail[ftOrigin].RetraceMax;    //--- How far back I went
+    //double sdpLocation          = anFiboDetail[ftOrigin].ExpansionNow;  //--- Where I am  at right now
+    //double sdpExpansion         = anFiboDetail[ftOrigin].ExpansionMax;  //--- How far I have gone
 
+    double sdpTraverse          = 0.00;    //--- How far back I have returned
+    double sdpRetrace           = 0.00;    //--- How far back I went
+    double sdpLocation          = 0.00;    //--- Where I am  at right now
+    double sdpExpansion         = 0.00;    //--- How far I have gone
+
+    ArrayInitialize(tm,ftPrior);
+    ArrayInitialize(rm,ftPrior);
+    ArrayInitialize(lm,ftPrior);
+    ArrayInitialize(em,ftPrior);
+    
+    for (FractalType type=ftOrigin;type<FractalTypes;type++)
+    {
+      if (type==ftPrior)
+        continue;
+      else
+      {  
+        if (IsHigher(anFiboDetail[type].RetraceNow,sdpTraverse))
+          tm[Action(anFiboDetail[type].Direction)]    = type;
+
+        if (IsHigher(anFiboDetail[type].RetraceMax,sdpRetrace))
+          rm[Action(anFiboDetail[type].Direction)]    = type;
+
+        if (IsHigher(anFiboDetail[type].ExpansionNow,sdpLocation))
+          lm[Action(anFiboDetail[type].Direction)]    = type;
+
+        if (IsHigher(anFiboDetail[type].ExpansionMax,sdpExpansion))
+          em[Action(anFiboDetail[type].Direction)]    = type;
+      }
+    }
+/*    
+    sdpPlan   = "Daily Plan:\n------------------------------------";
+    
+    for (int action=0;action<2;action++)
+    {
+      sdpPlan += "\n\nAction Manager: "+proper(ActionText(action));
+
+      Append(sdpPlan,"  Retrace:      "+BoolToStr(rm[action]==ftPrior,"Unassigned",Trim(rm[action])+" ("+DoubleToStr(anFiboDetail[rm[action]].RetraceMax*100,1)+"%)"),"\n");
+      Append(sdpPlan,"  Traverse:     "+BoolToStr(tm[action]==ftPrior,"Unassigned",Trim(tm[action])+" ("+DoubleToStr(anFiboDetail[tm[action]].RetraceNow*100,1)+"%)"),"\n");
+      Append(sdpPlan,"  Location:    "+BoolToStr(lm[action]==ftPrior,"Unassigned",Trim(lm[action])+" ("+DoubleToStr(anFiboDetail[lm[action]].ExpansionNow*100,1)+"%)"),"\n");
+      Append(sdpPlan,"  Expansion: "+BoolToStr(em[action]==ftPrior,"Unassigned",Trim(em[action])+" ("+DoubleToStr(anFiboDetail[em[action]].ExpansionMax*100,1)+"%)"),"\n");
+    }
+    Pause(sdpPlan,"Daily Plan Check");
+*/
+//     if (session[Daily].Fractal(ftOrigin).Direction==DirectionDown)
+//       if (session[Daily].Fractal(ftTrend).Direction==DirectionDown)
+//         if (session[Daily].Fractal(ftTerm).Direction==DirectionDown)
+//           if (session[Asia].Fractal(ftTerm).Direction==DirectionDown)
+//           {
+//           };
+//         else
+//         {
+//           
+//         }
   }
 
 //+------------------------------------------------------------------+
@@ -958,24 +1124,6 @@ void AnalyzeFractalEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| SetFiboSource - Identify best source for the supplied viewpoint  |
-//+------------------------------------------------------------------+
-void SetFiboSource(ViewPoint View)
-  {
-    FractalType vpSource    = NoValue;
-    
-    switch (View)
-    {
-      case Macro:  
-                  break;
-      case Meso:  
-                  break;
-      case Micro:  
-                  break;
-    };
-  }
-
-//+------------------------------------------------------------------+
 //| AnalyzeData - Verify health and safety of open positions         |
 //+------------------------------------------------------------------+
 void AnalyzeData(void)
@@ -983,21 +1131,7 @@ void AnalyzeData(void)
     //--- Analyze an prepare data
     ProcessSession();
     ProcessPipMA();
-
-    for (ViewPoint view=Macro;view<ViewPoints;view++)
-      if (anFiboDetail[view].Source==NoSource)
-        SetFiboSource(view);
-
     ProcessFractal();
-
-    if (sEvent[NewDay])
-      SetDailyPlan();
-      
-    if (sEvent[NewHour])
-      SetHourlyPlan();
-    
-    if (sEvent[NewFractal])
-      AnalyzeFractalEvents();
 
     Publish();
   }
@@ -1025,44 +1159,34 @@ int OrderBias(int Measure=InDirection)
   }
 
 //+------------------------------------------------------------------+
-//| SetStrategy - Configures the order manager trading strategy      |
-//+------------------------------------------------------------------+
-void SetStrategy(const int Action, StrategyType Strategy, ActionState Plan)
-  {
-//    om[Action].Strategy         = Strategy;
-    om[Action].Plan             = Plan;
-  }
-
-//+------------------------------------------------------------------+
 //| OrderApproved - Performs health and sanity checks for approval   |
 //+------------------------------------------------------------------+
-bool OrderApproved(int Action)
+bool OrderApproved(ActionRequest &Order)
   {
     if (TradingOn)
+    {
+      Order.Status      = Approved;
       return (true);
+    }
 
+    Order.Status        = Declined;
     return (false);
   }
 
 //+------------------------------------------------------------------+
 //| OrderProcessed - Executes orders from the order manager          |
 //+------------------------------------------------------------------+
-bool OrderProcessed(int Action)
+bool OrderProcessed(ActionRequest &Order)
   {
-//    if (OpenOrder(Action,EnumToString(om[Action].Strategy)+":"+EnumToString(om[Action].Plan)))
-//      return (true);
-//    
-    return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| Scalper - Contrarian Model Short Term by Action                  |
-//+------------------------------------------------------------------+
-void Scalper(const int Action)
-  {
-    switch (Action)
+    if (OpenOrder(Order.Action,Order.Requestor+":"+Order.Memo,Order.Lots))
     {
+      UpdateTicket(ordOpen.Ticket,Order.Target,Order.Stop);
+      Order.Key              = ordOpen.Ticket;
+
+      return (true);
     }
+    
+    return (false);
   }
 
 //+------------------------------------------------------------------+
@@ -1070,21 +1194,140 @@ void Scalper(const int Action)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-//    SetStrategy(OP_SELL,Scalp,Build);
-  }
 
+  }
+  
+//+------------------------------------------------------------------+
+//| OrderRequest - Manages short order positions, profit and risk    |
+//+------------------------------------------------------------------+
+void OrderRequest(ActionRequest &Order)
+  {
+    Order.Key             = omOrderKey.Count;
+    Order.Status          = Pending;
+
+    omOrderKey.Add(ArraySize(omQueue));
+    ArrayResize(omQueue,omOrderKey[Order.Key]+1);
+    omQueue[Order.Key]    = Order;
+    RefreshOrders();
+  }
+   
 //+------------------------------------------------------------------+
 //| OrderManagement - Manages the order cycle                        |
 //+------------------------------------------------------------------+
 void OrderManagement(void)
   {
-    for (int action=OP_BUY;action<=OP_SELL;action++)
+    OrderStatus omState               = Waiting;
+    
+    for (int request=0;request<ArraySize(omQueue);request++)
     {
-      //switch (om[action].Strategy)
-      //{
-      //  case Scalp:  Scalper(action);
-      //               break;
-      //}
+      omState                         = omQueue[request].Status;
+      
+      if (omQueue[request].Status==Fulfilled)
+        if (OrderSelect(omQueue[request].Key,SELECT_BY_TICKET,MODE_HISTORY))
+          if (OrderCloseTime()>0)
+            omQueue[request].Status   = Closed;
+          
+      if (omQueue[request].Status==Pending)
+      {
+        if (omQueue[request].Action==OP_BUY&&Ask>=omQueue[request].Price)
+          omQueue[request].Status     = Immediate;
+
+        if (omQueue[request].Action==OP_SELL&&Bid<=omQueue[request].Price)
+          omQueue[request].Status     = Immediate;
+          
+        if (Time[0]>omQueue[request].Expiry)
+          omQueue[request].Status     = Expired;
+      }
+
+      if (omQueue[request].Status==Immediate)
+        if (OrderApproved(omQueue[request]))
+          if (OrderProcessed(omQueue[request]))
+            omQueue[request].Status   = Fulfilled;
+          else
+            omQueue[request].Status   = Rejected;
+            
+      if (IsChanged(omState,omQueue[request].Status))
+        RefreshOrders();
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| ProcessBelwether - Strategy calculated by the Asian bellwether   |
+//+------------------------------------------------------------------+
+void ProcessMidPitch(void)
+  {
+    static ActionRequest pmpRequest  = {0,OP_NO_ACTION,"Belwether",0,0,0,0,"",0,Waiting};
+    static bool          pmpBreak    = false;
+    static bool          pmpOuter    = false;
+    
+    if (session[Asia].Event(NewDay))
+    {
+      pmpRequest.Action              = OP_NO_ACTION;
+      pmpBreak                       = false;
+      pmpOuter                       = false;
+    }      
+
+    if (pmpRequest.Action==OP_NO_ACTION)
+    {
+      if (session[Asia].IsOpen())
+      {
+        if (session[Asia].Event(NewHigh))
+          if (detail[Asia].HighHour>6)
+            pmpRequest.Action        = OP_BUY;
+
+        if (session[Asia].Event(NewLow))
+          if (detail[Asia].LowHour>6)
+            pmpRequest.Action        = OP_SELL;
+      }
+      else
+      {      
+      }
+    }
+    else
+    if (pmpBreak)
+    {
+      if (session[Asia].Event(NewHigh))
+        if (IsChanged(pmpRequest.Action,OP_BUY))
+          pmpOuter                   = true;
+          
+      if (session[Asia].Event(NewLow))
+        if (IsChanged(pmpRequest.Action,OP_SELL))
+          pmpOuter                   = true;
+    }
+    else
+    {
+      pmpBreak                       = true;
+
+      pmpRequest.Memo                = "A-Break ("+(string)ServerHour()+")";
+      pmpRequest.Lots                = LotSize();
+      pmpRequest.Expiry              = Time[0]+(Period()*60);
+
+      if (pmpRequest.Action==OP_BUY)
+      {
+        pmpRequest.Price             = High[1];
+        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].High,session[Asia][ActiveSession].Low,Expansion);
+        pmpRequest.Stop              = session[Asia][ActiveSession].Low;
+      }
+
+      if (pmpRequest.Action==OP_SELL)
+      {
+        pmpRequest.Price             = Low[1];
+        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].Low,session[Asia][ActiveSession].High,Expansion);
+        pmpRequest.Stop              = session[Asia][ActiveSession].High;
+      }
+        
+      OrderRequest(pmpRequest);
+    }        
+  }
+
+//+------------------------------------------------------------------+
+//| Scalper - Short Term Asian mid-pitch trading                     |
+//+------------------------------------------------------------------+
+void Scalper(void)
+  {
+//    switch ({EnabledScalpers})
+    {
+      ProcessMidPitch(); 
     }
   }
 
@@ -1105,6 +1348,7 @@ void Execute(void)
         PauseOnPrice  = 0.00;
       }
        
+    Scalper();
     ShortManagement();
     OrderManagement();
   }
@@ -1143,7 +1387,10 @@ void ExecAppCommands(string &Command[])
       if (Command[1]=="")
         PauseOnHour                    = NoValue;
       else
+      {
         PauseOnHour                    = (int)StringToInteger(Command[1]);
+        Print("Pause on hour "+Command[1]+" enabled.");
+      }
     }
       
     if (Command[0]=="PLAY")
@@ -1304,6 +1551,11 @@ int OnInit()
     omWork.SetPrecision(Digits);
     omWork.Initialize(0.00);
     
+    omOrderKey            = new CArrayInteger(0);
+    omOrderKey.Truncate   = false;
+    omOrderKey.AutoExpand = true;    
+    omOrderKey.Initialize(0.00);
+
     session[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
@@ -1343,19 +1595,19 @@ int OnInit()
     }
 
     //--- Initialize Order Management
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-//      om[action].Plan           = Halt;
-      om[action].OrderTotal     = 0;
-      om[action].LotsTotal      = 0.00;
-      om[action].NetMargin      = 0.00;
-      om[action].EQProfit       = 0.00;
-      om[action].EQLoss         = 0.00;
-    }
-
+//    for (int action=OP_BUY;action<=OP_SELL;action++)
+//    {
+//      omQueue[action].Plan           = Halt;
+//      omQueue[action].OrderTotal     = 0;
+//      omQueue[action].LotsTotal      = 0.00;
+//      omQueue[action].NetMargin      = 0.00;
+//      omQueue[action].EQProfit       = 0.00;
+//      omQueue[action].EQLoss         = 0.00;
+//    }
+//
     //--- Initialize Fibo Management
-    for (FractalType type=ftOrigin;type<ftPrior;type++)
-      anFiboDetail[type].Source = NoSource;
+    for (FractalType type=ftOrigin;type<FractalTypes;type++)
+      anFiboDetail[type].Session = Daily;
       
     return(INIT_SUCCEEDED);    
   }
@@ -1371,5 +1623,7 @@ void OnDeinit(const int reason)
     delete fractal;
     delete pfractal;
     delete sEvent;
+    delete rsEvents;
     delete omWork;
+    delete omOrderKey;
   }

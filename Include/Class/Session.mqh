@@ -289,7 +289,7 @@ void CSession::SetCorrectionState(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTerm(void)
   {
-    int           ufDoubleReversalBar  = NoValue;
+    static bool   ufOutsideReversal    = false;
     double        ufExpansion          = 0.00;
     ReservedWords ufState              = NoState;
     SessionRec    ufPrior              = sfractal[ftTerm];
@@ -298,7 +298,11 @@ void CSession::UpdateTerm(void)
     if (sEvent[NewReversal])
       if (NewDirection(sfractal[ftTerm].Direction,srec[ActiveSession].Direction))
       {
-        sBarFE                         = sBar;
+        if (IsChanged(sBarFE,sBar))
+          ufOutsideReversal            = false;
+        else
+          ufOutsideReversal            = true;
+          
         sfractal[ftPrior]              = ufPrior;
         sEvent.SetEvent(NewTerm,Minor);        
                 
@@ -318,19 +322,22 @@ void CSession::UpdateTerm(void)
           sfractal[ftTerm].High        = Close[sBar];
         }
       }
-      else
-      {
-        //--- occurs on rare outside reversal conditions(?); requires analysis
-        ufDoubleReversalBar            = sBar;
-      }
+
+    //--- occurs on rare outside reversal conditions(?); requires analysis
+    if (sEvent[NewHour])
+      ufOutsideReversal                = false;
     
     //--- Check for term boundary changes
     if (sfractal[ftTerm].Direction==DirectionUp)
       if (IsHigher(High[sBar],sfractal[ftTerm].High))
       {
         sEvent.SetEvent(NewFractal);
-        sFractalBuffer.Delete(sBarFE);
-        sFractalBuffer.Insert(sBar,High[sBar]);
+        
+        if (!ufOutsideReversal)
+        {
+          sFractalBuffer.Delete(sBarFE);
+          sFractalBuffer.Insert(sBar,High[sBar]);
+        }
 
         sfractal[ftTerm].Low           = Close[sBar];
         
@@ -347,9 +354,13 @@ void CSession::UpdateTerm(void)
       if (IsLower(Low[sBar],sfractal[ftTerm].Low))
       {
         sEvent.SetEvent(NewFractal);
-        sFractalBuffer.Delete(sBarFE);
-        sFractalBuffer.Insert(sBar,Low[sBar]);
 
+        if (!ufOutsideReversal)
+        {
+          sFractalBuffer.Delete(sBarFE);
+          sFractalBuffer.Insert(sBar,Low[sBar]);
+        }
+        
         sfractal[ftTerm].High          = Close[sBar];
 
         ufExpansion                    = sfractal[ftTerm].Low;
@@ -1108,7 +1119,7 @@ FiboDetail CSession::Fibonacci(FractalType Type)
 //+------------------------------------------------------------------+
 void CSession::RefreshScreen(void)
   {  
-    Comment("*---------- "+EnumToString(this.Type())+ "Session Fractal ----------*\n"+
+    Comment("*---------- "+EnumToString(this.Type())+ " Session Fractal ----------*\n"+
         "Correction: "+EnumToString(sfractal[ftCorrection].State)+" Direction: "+DirText(sfractal[ftCorrection].Direction)+"/"+DirText(sfractal[ftCorrection].BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[ftTerm].State)+" Direction: "+DirText(sfractal[ftTerm].Direction)+"/"+DirText(sfractal[ftTerm].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(ftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftTerm,Max,InPercent),1)+"%"+

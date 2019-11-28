@@ -258,7 +258,11 @@ int OnInit()
     SetIndexStyle(2,DRAW_SECTION);
     
     if (inpType!=Daily)
-      SetIndexStyle(2,DRAW_SECTION,STYLE_SOLID,1,clrDodgerBlue);    
+    {
+      SetIndexStyle(0,DRAW_SECTION,STYLE_SOLID,1,clrMaroon);
+      SetIndexStyle(1,DRAW_SECTION,STYLE_DOT,1,clrMaroon);
+      SetIndexStyle(2,DRAW_SECTION,STYLE_SOLID,1,clrDodgerBlue);
+    }
     
     NewLine("lnS_ActiveMid:"+sessionIndex);
     NewLine("lnS_Support:"+sessionIndex);

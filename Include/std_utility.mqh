@@ -44,6 +44,7 @@
 #define IN_ACTION              9
 #define IN_PROXIMITY          10
 #define IN_DARK_DIR           11
+#define IN_CHART_DIR          12
 
 
 //---- Screen Locations
@@ -351,6 +352,9 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
                          return (clrRed);
     case IN_DARK_DIR:    if (Value<0.00) return (clrMaroon);
                          if (Value>0.00) return (clrDarkGreen);
+                         return (clrDarkGray);
+    case IN_CHART_DIR:   if (Value<0.00) return (clrRed);
+                         if (Value>0.00) return (clrYellow);
                          return (clrDarkGray);
   }
   return (clrDarkGray);

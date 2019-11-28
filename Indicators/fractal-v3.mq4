@@ -10,6 +10,7 @@
 #property indicator_chart_window
 
 #include <std_utility.mqh>
+#include <stdutil.mqh>
 #include <Class\Fractal.mqh>
 
 //--- Input params
@@ -85,6 +86,37 @@ void RefreshFibo(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    static FibonacciLevel expand[3]  = {Fibo161,Fibo161,Fibo61};
+    static int expdir[3]  = {DirectionNone,DirectionNone,DirectionNone};
+    
+    if (IsChanged(expdir[2],fractal.Direction(Base)))
+      expand[2]                 = Fibo161;
+      
+    if (FiboLevels[expand[2]]<fractal.Fibonacci(Base,Expansion,Now))
+    {
+      Flag(EnumToString(expand[2]),clrWhite);
+      expand[2]++;
+    }
+
+    for (RetraceType fibo=Trend;fibo<=Term;fibo++)
+    {
+      if (IsChanged(expdir[fibo],fractal.Direction(fibo)))
+      {
+        expand[fibo]            = Fibo161;
+        
+        if (fibo==Trend)
+          NewArrow(BoolToInt(fractal.Direction(Trend)==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(fractal.Direction(Trend),IN_CHART_DIR));
+      }
+        
+      if (FiboLevels[expand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
+      {
+        Flag(EnumToString(expand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
+        expand[fibo]++;
+      }
+    }   
+      UpdateLine("fOriginTop",fractal.Price(Origin,Top),STYLE_SOLID,DirColor(fractal.Origin(Direction)));
+      UpdateLine("fOriginBottom",fractal.Price(Origin,Bottom),STYLE_DOT,DirColor(fractal.Origin(Direction)));
+      
     if (inpShowComment)
       fractal.RefreshScreen();
     
@@ -191,6 +223,8 @@ int OnInit()
     SetIndexEmptyValue(2,0.00);
     ArrayInitialize(indConvergentBuffer,0.00);
 
+      NewLine("fOriginTop");
+      NewLine("fOriginBottom");
     if (inpShowLines)
     {
       NewLine("fOriginTop");

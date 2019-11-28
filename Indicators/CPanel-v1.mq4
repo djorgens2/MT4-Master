@@ -23,7 +23,6 @@ string    ShortName             = "CPanel-v1";
                   fpBounce,
                   fpRisk,
                   fpHalt,
-                  fpCheck,
                   FractalPoints
                 };
 
@@ -82,13 +81,43 @@ int OnInit()
   
     NewLabel("lbState","",20,130,clrNONE,SCREEN_UL,IndWinId);
     
-    NewLabel("lbh-0A","Order Management",1200,4,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbh-0A","Order Management",1650,4,clrWhite,SCREEN_UL,IndWinId);
     
     NewLabel("lbh-OML1A","Long:",1200,16,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbh-OML2A","Short:",1500,16,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-OML2A","Short:",1850,16,clrWhite,SCREEN_UL,IndWinId);
 
     NewLabel("lbLongPlan","No Plan",1240,16,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbShortPlan","No Plan",1540,16,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbShortPlan","No Plan",1890,16,clrDarkGray,SCREEN_UL,IndWinId);
+    
+    NewArrow(SYMBOL_ARROWUP,clrWhite,"test",Close[0],0);
+    
+    for (int row=0;row<25;row++)
+      for (int col=0;col<2;col++)
+      {
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Key","0000000",1200+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Status","Pending",1258+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Requestor","Belwether",1310+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Price","0.00000",1370+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Lots","0.00",1430+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Target","0.00000",1475+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Stop","0.00000",1540+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Expiry","12/1/2019 11:00",1600+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Memo","Yadda Yadda Yadda",1700+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+      }
+
+      for (int col=0;col<2;col++)
+      {
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Key","Order No.",1200+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Status","Status",1258+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Requestor","Requestor",1310+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Price","Price",1378+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Lots","Lots",1430+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Target","Target",1479+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Stop","Stop",1547+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Expiry","Expiration",1614+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Memo","Order Comments",1700+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+      }
+      
 
     NewLabel("lbh-WS1","State:",600,124,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbh-WS2","Flags:",600,137,clrWhite,SCREEN_UL,IndWinId);
@@ -151,7 +180,11 @@ int OnInit()
         NewLabel("lbAN"+(string)(col-1)+":"+(string)row,StringSubstr(EnumToString(row),2),5+BoolToInt(col==0,15,90*col),34+(11*row),clrWhite,SCREEN_UL,IndWinId);
         
         if (row==0&&col<ftPrior)
+        {
           DrawBox("hdAN"+StringSubstr(EnumToString(col),2),(90*col)+70,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
+          NewLabel("lbAN"+(string)col+":Flag","====",100+(90*col),45+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel("lbAN"+(string)col+":Source","====",100+(90*col),58+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
+        }
       }
 
     DrawBox("hdAnalyst",5,32,330,140,clrNONE,BORDER_FLAT,IndWinId);
