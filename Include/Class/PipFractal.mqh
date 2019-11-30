@@ -9,7 +9,6 @@
 #property strict
 
 #include <Class\PipRegression.mqh>
-#include <Class\Fractal.mqh>
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -59,7 +58,7 @@ class CPipFractal : public CPipRegression
           
 
     public:
-                     CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime, CFractal &Fractal);
+                     CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime);
                     ~CPipFractal();
                              
        virtual
@@ -339,53 +338,81 @@ void CPipFractal::CalcPipFractal(void)
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime, CFractal &Fractal) : CPipRegression(Degree,Periods,Tolerance,IdleTime)
+CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime) : CPipRegression(Degree,Periods,Tolerance,IdleTime)
   {
-    RetraceType   state        = Fractal.State();
-    
-    //--- PipFractal Initialization
-    pf[Term].Direction         = Fractal[state].Direction;
+    int    pfPoint     = 0;
+    int    pfBar       = 0;
+    int    pfSeed      = 3;
+    int    pfDir       = DirectionChange;
 
-    for (int idx=0;idx<5;idx++)
+    int    pfHiBar;
+    int    pfLoBar;
+
+    double pfLoVal     = Close[0];    
+    double pfHiVal     = Close[0];    
+
+    double pfPoints[6];
+
+    ArrayInitialize(pfPoints,Close[0]);
+    
+    while (pfPoint<6)
     {
-      switch (idx)
+      pfHiBar     = iHighest(Symbol(),Period(),MODE_HIGH,pfSeed,pfBar);
+      pfLoBar     = iLowest(Symbol(),Period(),MODE_LOW,pfSeed,pfBar);
+      
+      pfHiVal     = fmax(pfHiVal,High[pfHiBar]);
+      pfLoVal     = fmin(pfLoVal,Low[pfLoBar]);
+      
+      if (NewDirection(pfDir,Direction(pfHiBar-pfLoBar,InDirection,false)))
       {
-        case 0:  pf[Term].Retrace        = Fractal.Price(state,Next);
-                 pf[Term].Expansion      = Fractal.Price(state);
-                 pf[Term].ExpansionTime  = Fractal[Fractal.State()].Updated;
-        case 1:  pf[Term].Root           = Fractal.Price(state);
-                 pf[Term].RootTime       = Fractal[Fractal.State()].Updated;                                           
-        case 2:  pf[Term].Base           = Fractal.Price(state);
-                 pf[Term].Prior          = Fractal.Price(state);
-        case 3:  pfOrigin                = Fractal.Price(state);
-        case 4:  pfPrior                 = Fractal.Price(state);
+        if (pfDir==DirectionUp)
+          pfPoints[pfPoint++]    = pfLoVal;
+
+        if (pfDir==DirectionDown)
+          pfPoints[pfPoint++]    = pfHiVal;
       }
 
-      state                  = Fractal.Previous(state);
+      if (pfDir==DirectionUp)
+        pfLoVal                  = pfHiVal;
+
+      if (pfDir==DirectionDown)
+        pfHiVal                  = pfLoVal;
+
+      pfBar++;
     }
-      
-    pf[Term].PriceHigh       = fmax(pf[Term].Base,pf[Term].Root);
-    pf[Term].PriceLow        = fmin(pf[Term].Base,pf[Term].Root);
     
-    pf[Trend]                = pf[Term];
+    //--- PipFractal Initialization
+    pf[Term].Direction           = Direction(pfPoints[1]-pfPoints[0]);
+    pf[Term].Retrace             = pfPoints[0];
+    pf[Term].Expansion           = pfPoints[1];
+    pf[Term].Root                = pfPoints[2];
+    pf[Term].Base                = pfPoints[3];
+    pf[Term].Prior               = pfPoints[4];
+    
+    pfOrigin                     = pfPoints[5];
+      
+    pf[Term].PriceHigh           = fmax(pf[Term].Base,pf[Term].Root);
+    pf[Term].PriceLow            = fmin(pf[Term].Base,pf[Term].Root);
+    
+    pf[Trend]                    = pf[Term];
     
     //--- Initialize origin
     if (IsEqual(pfOrigin,this.Price(Origin,Bottom)))
-      pfOriginDir            = DirectionDown;
+      pfOriginDir                = DirectionDown;
 
     if (IsEqual(pfOrigin,this.Price(Origin,Top)))
-      pfOriginDir            = DirectionUp;
+      pfOriginDir                = DirectionUp;
 
     //--- Initialize peg values
-    pfPegExpansion           = pf[Trend].Base;
+    pfPegExpansion               = pf[Trend].Base;
 
-    pfPeg                    = true;
+    pfPeg                        = true;
 
-    pfPegMax                 = fmax(pf[Trend].Root,pf[Trend].Base);
-    pfPegMin                 = fmin(pf[Trend].Root,pf[Trend].Base);
+    pfPegMax                     = fmax(pf[Trend].Root,pf[Trend].Base);
+    pfPegMin                     = fmin(pf[Trend].Root,pf[Trend].Base);
 
-    pf[Trend].Count          = 0;
-    pf[Term].Count           = 0;
+    pf[Trend].Count              = 0;
+    pf[Term].Count               = 0;
   }
 
 //+------------------------------------------------------------------+

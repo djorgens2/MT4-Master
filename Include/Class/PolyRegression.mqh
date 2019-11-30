@@ -203,6 +203,7 @@ bool CPolyRegression::NewDirection(int &Direction, int ChangeDirection, bool Upd
       return (false);
       
     //--- In this class, an invalid direction is always set with no change
+    //--- To override this behavior, send ChangeDirection=DirectionChange
     if (Direction==DirectionNone)
     {
       Direction                    = ChangeDirection;

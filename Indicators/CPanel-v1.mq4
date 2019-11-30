@@ -82,6 +82,7 @@ int OnInit()
     NewLabel("lbState","",20,130,clrNONE,SCREEN_UL,IndWinId);
     
     NewLabel("lbh-0A","Order Management",1650,4,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbAN-Strategy","Strategy",1750,4,clrWhite,SCREEN_UL,IndWinId);
     
     NewLabel("lbh-OML1A","Long:",1200,16,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbh-OML2A","Short:",1850,16,clrWhite,SCREEN_UL,IndWinId);
@@ -89,14 +90,12 @@ int OnInit()
     NewLabel("lbLongPlan","No Plan",1240,16,clrDarkGray,SCREEN_UL,IndWinId);
     NewLabel("lbShortPlan","No Plan",1890,16,clrDarkGray,SCREEN_UL,IndWinId);
     
-    NewArrow(SYMBOL_ARROWUP,clrWhite,"test",Close[0],0);
-    
     for (int row=0;row<25;row++)
       for (int col=0;col<2;col++)
       {
         NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Key","0000000",1200+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Status","Pending",1258+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Requestor","Belwether",1310+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Requestor","Bellwether",1310+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Price","0.00000",1370+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Lots","0.00",1430+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Target","0.00000",1475+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
@@ -122,11 +121,17 @@ int OnInit()
     NewLabel("lbh-WS1","State:",600,124,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbh-WS2","Flags:",600,137,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbh-WS3","Action:",600,150,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbh-WS4","Long:",870,124,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbh-WS5","Short:",870,137,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbLongState","No State",910,124,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbShortState","No State",910,137,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbh-WS4","Long:",830,124,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-WS5","Short:",830,137,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-WS6","Pivot:",955,154,clrWhite,SCREEN_UL,IndWinId);
 
+    NewLabel("lbLongState","No State",870,124,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbShortState","No State",870,137,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbIntBrkDir","^",1038,127,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbIntDir","^",1058,127,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbIntDev","-999.9",955,124,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbIntPivot","1.99990",990,154,clrDarkGray,SCREEN_UL,IndWinId);
+    
     NewLabel("lbWaveState","No State",650,124,clrDarkGray,SCREEN_UL,IndWinId);    
     NewLabel("lbRetrace","Retrace",650,137,clrDarkGray,SCREEN_UL,IndWinId);
     NewLabel("lbBreakout","Breakout",700,137,clrDarkGray,SCREEN_UL,IndWinId);
@@ -196,7 +201,8 @@ int OnInit()
     DrawBox("hdActionShort",495,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     
     DrawBox("hdSegment",590,32,490,85,clrNONE,BORDER_FLAT,IndWinId);
-    DrawBox("hdWave",590,120,490,52,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("hdWave",590,120,350,52,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("hdIntDetail",945,120,135,52,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdLong",635,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdShort",725,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdCrest",815,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);

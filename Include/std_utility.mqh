@@ -552,6 +552,32 @@ void NewLabel(string LabelName, string Text, int PosX, int PosY, int Color=White
   }
 
 //+------------------------------------------------------------------+
+//| NewBarNote                                                       |
+//+------------------------------------------------------------------+
+string NewBarNote(string Text, int Color=clrWhite)
+  {
+    static int nbnIdx    = 0;
+    
+    ObjectCreate(0,Text+":"+(string)++nbnIdx,OBJ_TEXT,0,Time[0],Close[0]);
+    ObjectSetInteger(0,Text+":"+(string)nbnIdx,OBJPROP_COLOR,Color);
+    ObjectSetString(0,Text+":"+(string)nbnIdx,OBJPROP_TEXT,Text);
+    
+    return (Text+":"+(string)nbnIdx);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateBarNote                                                    |
+//+------------------------------------------------------------------+
+void UpdateBarNote(string LabelName, double Price=0.00, int Color=clrWhite)
+  {
+    if (Price==0.00)
+      Price         = Close[0];
+      
+    ObjectSetInteger(0,LabelName,OBJPROP_COLOR,Color);
+    ObjectSetDouble(0,LabelName,OBJPROP_PRICE,Price);
+  }
+
+//+------------------------------------------------------------------+
 //| UpdatePriceTag                                                   |
 //+------------------------------------------------------------------+
 void UpdatePriceTag(string PriceTagName, int Bar, int Direction)

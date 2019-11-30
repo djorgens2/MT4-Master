@@ -16,6 +16,7 @@
 #include <manual.mqh>
 #include <Class\Session.mqh>
 #include <Class\PipFractal.mqh>
+#include <Class\Fractal.mqh>
 #include <Class\ArrayInteger.mqh>
 
   
@@ -34,7 +35,7 @@ input int       inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
 input string    SessionHeader        = "";    //+---- Session Hours -------+
 input int       inpAsiaOpen          = 1;     // Asian market open hour
 input int       inpAsiaClose         = 10;    // Asian market close hour
-input int       inpEuropeOpen        = 8;     // Europe market open hour
+input int       inpEuropeOpen        = 8;     // Europe market open hour`
 input int       inpEuropeClose       = 18;    // Europe market close hour
 input int       inpUSOpen            = 14;    // US market open hour
 input int       inpUSClose           = 23;    // US market close hour
@@ -45,7 +46,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CSession           *session[SessionTypes];
   CSession           *lead;
   CFractal           *fractal        = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50,fractal);
+  CPipFractal        *pfractal       = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50);
   CEvent             *sEvent         = new CEvent();
   CEvent             *rsEvents       = new CEvent();
   
@@ -198,6 +199,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   bool                TradingOn           = true;
 
   bool                Alerts[EventTypes];
+  bool                SourceAlerts[SourceTypes];
   
   //--- Session operationals
   SessionDetail       detail[SessionTypes];
@@ -210,7 +212,9 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CArrayInteger      *omOrderKey;
   double              omMatrix[5][5];
   double              omInterlace[];
+  double              omInterlacePivot[2];
   int                 omInterlaceDir;
+  int                 omInterlaceBrkDir;
   CArrayDouble       *omWork;
   
   
@@ -225,6 +229,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
 
   //--- Analyst operationals
   bool                anIssueQueue[AnalystAlerts];
+  string              anStrategy;
   double              anFractal[ViewPoints][FractalPoints];
   double              anMaster[ViewPoints][SourceTypes][2][FractalPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
@@ -372,6 +377,8 @@ void RefreshControlPanel(void)
     else
       UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()),24);
 
+    UpdateLabel("lbAN-Strategy",anStrategy,clrDarkGray);
+    
     if (pfractal.Event(NewWaveReversal))
     {
       UpdateLabel("lbh-1L","Long",clrDarkGray);
@@ -425,6 +432,13 @@ void RefreshControlPanel(void)
                       +BoolToStr(pfractal.ActiveSegment().Type==Decay,"Decay ")
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
                       
+    UpdateLabel("lbIntDev",NegLPad(Pip(Close[0]-omInterlacePivot[Action(omInterlaceBrkDir,InDirection)]),1),
+                            Color(Close[0]-omInterlacePivot[Action(omInterlaceBrkDir,InDirection)]),20);
+    
+    UpdateLabel("lbIntPivot",DoubleToStr(omInterlacePivot[Action(omInterlaceBrkDir,InDirection)],Digits),clrDarkGray);
+    UpdateDirection("lbIntBrkDir",omInterlaceBrkDir,Color(omInterlaceBrkDir),28);
+    UpdateDirection("lbIntDir",omInterlaceDir,Color(omInterlaceDir),12);
+
     UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));                     
     UpdateLabel("lbShortState",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
     
@@ -596,20 +610,25 @@ void RefreshScreen(void)
                            +"\n\n";
 
     ShowLines();
+    
+    UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrRed);
+    UpdatePriceLabel("plbInterlaceLow",omInterlace[ArraySize(omInterlace)-1],clrYellow);
 
-    for (EventType type=1;type<EventTypes;type++)
-      if (Alerts[type]&&pfractal.Event(type))
-      {
-        rsEvent   = "PipMA "+pfractal.ActiveEventText()+"\n";
-        break;
-      }
+    if (SourceAlerts[indPipMA])
+      for (EventType type=1;type<EventTypes;type++)
+        if (Alerts[type]&&pfractal.Event(type))
+        {
+          rsEvent   = "PipMA "+pfractal.ActiveEventText()+"\n";
+          break;
+        }
 
-    for (EventType type=1;type<EventTypes;type++)
-      if (Alerts[type]&&fractal.Event(type))
-      {
-        rsEvent   = "Fractal "+fractal.ActiveEventText()+"\n";
-        break;
-      }
+    if (SourceAlerts[indFractal])
+      for (EventType type=1;type<EventTypes;type++)
+        if (Alerts[type]&&fractal.Event(type))
+        {
+          rsEvent   = "Fractal "+fractal.ActiveEventText()+"\n";
+          break;
+        }
 
     rsEvents.ClearEvents();
     
@@ -812,7 +831,7 @@ void ProcessSession(void)
         
       if (NewDirection(detail[type].FractalDir,session[type].Fractal(ftTerm).Direction))
         detail[type].Reversal      = true;
-      
+        
       cseIsValid                   = detail[type].IsValid;
 
       if (detail[type].ActiveDir==detail[type].OpenDir)
@@ -871,8 +890,16 @@ void ProcessPipMA(void)
     }
     
     omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
-    omInterlaceDir = BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
-    
+    omInterlaceDir      = BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
+
+    if (IsEqual(Close[0],omInterlace[0]))
+      if (NewDirection(omInterlaceBrkDir,DirectionUp))
+        omInterlacePivot[OP_BUY] = Close[0];
+
+    if (IsEqual(Close[0],omInterlace[ArraySize(omInterlace)-1]))
+      if (NewDirection(omInterlaceBrkDir,DirectionDown))
+        omInterlacePivot[OP_SELL] = Close[0];
+
 //    pfractal.DrawStateLines();
     pfractal.ShowFiboArrow();
   }
@@ -1068,30 +1095,6 @@ void SetDailyPlan(void)
           em[Action(anFiboDetail[type].Direction)]    = type;
       }
     }
-/*    
-    sdpPlan   = "Daily Plan:\n------------------------------------";
-    
-    for (int action=0;action<2;action++)
-    {
-      sdpPlan += "\n\nAction Manager: "+proper(ActionText(action));
-
-      Append(sdpPlan,"  Retrace:      "+BoolToStr(rm[action]==ftPrior,"Unassigned",Trim(rm[action])+" ("+DoubleToStr(anFiboDetail[rm[action]].RetraceMax*100,1)+"%)"),"\n");
-      Append(sdpPlan,"  Traverse:     "+BoolToStr(tm[action]==ftPrior,"Unassigned",Trim(tm[action])+" ("+DoubleToStr(anFiboDetail[tm[action]].RetraceNow*100,1)+"%)"),"\n");
-      Append(sdpPlan,"  Location:    "+BoolToStr(lm[action]==ftPrior,"Unassigned",Trim(lm[action])+" ("+DoubleToStr(anFiboDetail[lm[action]].ExpansionNow*100,1)+"%)"),"\n");
-      Append(sdpPlan,"  Expansion: "+BoolToStr(em[action]==ftPrior,"Unassigned",Trim(em[action])+" ("+DoubleToStr(anFiboDetail[em[action]].ExpansionMax*100,1)+"%)"),"\n");
-    }
-    Pause(sdpPlan,"Daily Plan Check");
-*/
-//     if (session[Daily].Fractal(ftOrigin).Direction==DirectionDown)
-//       if (session[Daily].Fractal(ftTrend).Direction==DirectionDown)
-//         if (session[Daily].Fractal(ftTerm).Direction==DirectionDown)
-//           if (session[Asia].Fractal(ftTerm).Direction==DirectionDown)
-//           {
-//           };
-//         else
-//         {
-//           
-//         }
   }
 
 //+------------------------------------------------------------------+
@@ -1112,14 +1115,6 @@ void Publish(void)
     anIssueQueue[SecondChance]  = sEvent.ProximityAlert(pfractal.ActionLine(OP_SELL,Chance),5);
     
   
-    return;
-  }
-
-//+------------------------------------------------------------------+
-//| AnalyzeFractalEvents - Analyze fractal combine and assess plan   |
-//+------------------------------------------------------------------+
-void AnalyzeFractalEvents(void)
-  {
     return;
   }
 
@@ -1252,21 +1247,149 @@ void OrderManagement(void)
   }
 
 //+------------------------------------------------------------------+
-//| ProcessBelwether - Strategy calculated by the Asian bellwether   |
+//| SetStrategy - Reviews Analyst Flags and determines action        |
+//+------------------------------------------------------------------+
+void SetStrategy(string ConvStr, string DivStr, string FiboStr)
+  {
+    string ssExtract[];
+    
+    string ssStrategy   = FiboStr;
+    
+    if (DivStr!="")
+      ssStrategy        = DivStr;
+      
+    if (ConvStr!="")
+      ssStrategy        = ConvStr;
+    
+    if (ssStrategy=="")
+      return;
+      
+    if (ssStrategy==ConvStr+DivStr+FiboStr)
+    {
+      StringSplit(ssStrategy,":",ssExtract);
+      anStrategy        = ssExtract[0];
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| ProcessBellwether - Strategy calculated by the Asian bellwether  |
 //+------------------------------------------------------------------+
 void ProcessMidPitch(void)
   {
-    static ActionRequest pmpRequest  = {0,OP_NO_ACTION,"Belwether",0,0,0,0,"",0,Waiting};
-    static bool          pmpBreak    = false;
-    static bool          pmpOuter    = false;
+    static ActionRequest pmpRequest        = {0,OP_NO_ACTION,"Bellwether",0,0,0,0,"",0,Waiting};
+    static bool          pmpBreak          = false;
+    static bool          pmpOuter          = false;
+    static bool          pmpConvergent     = false;
+    static int           pmpDailyTermDir   = DirectionNone;
+    static int           pmpAsiaTermDir    = DirectionNone;
+    static string        pmpConvStr        = "";
+    static string        pmpDivStr         = "";
+           string        pmpFiboStr        = "";
+    static int           pmpTrendFiboLevel = 0;
+    static ReservedWords pmpLastTrendState = NoState;
     
     if (session[Asia].Event(NewDay))
     {
-      pmpRequest.Action              = OP_NO_ACTION;
-      pmpBreak                       = false;
-      pmpOuter                       = false;
-    }      
+      pmpRequest.Action                    = OP_NO_ACTION;
+      pmpBreak                             = false;
+      pmpOuter                             = false;
+    }
 
+    if (session[Asia].IsOpen())
+    {
+      if (session[Asia].Event(SessionOpen))
+        pmpConvStr                         = "";
+
+      if (pmpConvStr!="")
+        if (pmpAsiaTermDir==DirectionUp)
+          UpdateBarNote(pmpConvStr,session[Asia][ActiveSession].High);
+        else
+          UpdateBarNote(pmpConvStr,session[Asia][ActiveSession].Low);
+    }
+    else
+    {
+      pmpConvStr                            = "";
+      
+      if (session[Asia].Fractal(ftTerm).Direction!=session[Daily].Fractal(ftTerm).Direction)
+        if (IsChanged(pmpConvergent,false))
+          if (NewDirection(pmpDailyTermDir,session[Daily].Fractal(ftTerm).Direction))
+            if (NewDirection(pmpAsiaTermDir,session[Asia].Fractal(ftTerm).Direction))
+              pmpDivStr = NewBarNote("(d)-Freak Turn",Color(pmpAsiaTermDir,IN_CHART_DIR));
+            else
+              pmpDivStr = NewBarNote("(d)-Impossible",clrWhite);
+          else
+          if (NewDirection(pmpAsiaTermDir,session[Asia].Fractal(ftTerm).Direction))
+            pmpDivStr = NewBarNote("(d)-Asian Screw",clrYellow);      
+          else
+            pmpDivStr = NewBarNote("(d)-Check",clrYellow);
+    }
+
+    if (session[Asia].Fractal(ftTerm).Direction==session[Daily].Fractal(ftTerm).Direction)
+    {
+      pmpDivStr = "";
+      
+      if (IsChanged(pmpConvergent,true))
+        if (NewDirection(pmpDailyTermDir,session[Daily].Fractal(ftTerm).Direction))
+          if (NewDirection(pmpAsiaTermDir,session[Asia].Fractal(ftTerm).Direction))
+            pmpConvStr = NewBarNote("(c)-Convergent",Color(pmpAsiaTermDir,IN_CHART_DIR));
+          else
+          if (session[Asia].IsOpen())
+            pmpConvStr = NewBarNote("(acr)-Kamikaze",clrWhite);
+          else
+          if (lead.Type()==Europe)
+            pmpConvStr = NewBarNote("(cr)-Tea Break",clrMagenta);
+          else
+            pmpConvStr = NewBarNote("(cr)-Yanks Grab",clrDodgerBlue);
+        else
+        if (NewDirection(pmpAsiaTermDir,session[Asia].Fractal(ftTerm).Direction))
+          if (session[Asia].Event(NewReversal))
+            if (session[Asia].IsOpen())
+              pmpConvStr = NewBarNote("(cr)-Reversi",Color(pmpAsiaTermDir,IN_CHART_DIR));
+            else
+              pmpConvStr = NewBarNote("(cr)-Slant",Color(pmpAsiaTermDir,IN_CHART_DIR));
+          else  
+            pmpConvStr   = NewBarNote("(cb)-Asian Grab",clrYellow);      
+        else
+          pmpConvStr     = NewBarNote("(c)-Check",clrYellow);
+      else
+        if (NewDirection(pmpDailyTermDir,session[Daily].Fractal(ftTerm).Direction))
+          if (NewDirection(pmpAsiaTermDir,session[Asia].Fractal(ftTerm).Direction))
+            if (pmpLastTrendState==Recovery||pmpLastTrendState==Correction)
+              pmpConvStr = NewBarNote("(acr)-Torpedo",Color(pmpAsiaTermDir,IN_CHART_DIR));
+            else
+              pmpConvStr = NewBarNote("(acr)-U-Turn",clrWhite);
+    }
+    else
+    {
+    }
+    
+    //--- Key FiboWatcher
+    if (anFiboDetail[ftTrend].ExpansionNow>FiboLevels[Fibo161])
+      if (pmpFiboStr=="")
+        if (pmpConvStr=="")
+        {
+          pmpTrendFiboLevel = fmax(pmpTrendFiboLevel,FiboLevel(anFiboDetail[ftTrend].ExpansionNow));
+          pmpFiboStr = NewBarNote("Fibo Watch ("+DoubleToStr(FiboLevels[pmpTrendFiboLevel]*100,1)+")",clrWhite);
+        }
+        else
+          pmpFiboStr = "";
+      else
+      {
+        if (IsEqual(anFiboDetail[ftTrend].ExpansionNow,anFiboDetail[ftTrend].ExpansionMax))
+          UpdateBarNote("Fibo(e)",Close[0]);
+      }
+     else
+       if (pmpConvStr!=""||anFiboDetail[ftTrend].ExpansionMax<FiboLevels[Fibo100])
+       {
+         pmpFiboStr          = "";
+         pmpTrendFiboLevel   = Fibo100;
+       }
+
+    SetStrategy(pmpConvStr,pmpDivStr,pmpFiboStr);
+    
+    //--- Store key indicators for comparison on next tick
+    pmpLastTrendState               = session[Daily].Fractal(ftTrend).State;
+    
     if (pmpRequest.Action==OP_NO_ACTION)
     {
       if (session[Asia].IsOpen())
@@ -1280,7 +1403,7 @@ void ProcessMidPitch(void)
             pmpRequest.Action        = OP_SELL;
       }
       else
-      {      
+      {
       }
     }
     else
@@ -1442,6 +1565,15 @@ void ExecAppCommands(string &Command[])
 
     if (Command[0]=="DISABLE")
     {
+      if (Command[1]=="PIPMA")
+        SourceAlerts[indPipMA]         = false;
+      else
+      if (Command[1]=="FRACTAL")
+        SourceAlerts[indFractal]       = false;
+      else
+      if (Command[1]=="SESSION")
+        SourceAlerts[indSession]       = false;
+      else
       if (Command[1]=="ASIA")   detail[Asia].Alerts    = false;
       else      
       if (Command[1]=="EUROPE") detail[Europe].Alerts  = false;
@@ -1477,6 +1609,15 @@ void ExecAppCommands(string &Command[])
 
     if (Command[0]=="ENABLE")
     {
+      if (Command[1]=="PIPMA")
+        SourceAlerts[indPipMA]         = true;
+      else
+      if (Command[1]=="FRACTAL")
+        SourceAlerts[indFractal]       = true;
+      else
+      if (Command[1]=="SESSION")
+        SourceAlerts[indSession]       = true;
+      else    
       if (Command[1]=="ASIA")   detail[Asia].Alerts    = true;
       else
       if (Command[1]=="EUROPE") detail[Europe].Alerts  = true;
@@ -1560,7 +1701,10 @@ int OnInit()
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     session[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
- 
+    
+    NewPriceLabel("plbInterlaceHigh");
+    NewPriceLabel("plbInterlaceLow");
+
     NewLine("lnOpen");
     NewLine("lnHigh");
     NewLine("lnLow");
@@ -1581,6 +1725,7 @@ int OnInit()
     NewLine("lnKill");
 
     ArrayInitialize(Alerts,true);
+    ArrayInitialize(SourceAlerts,true);
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {

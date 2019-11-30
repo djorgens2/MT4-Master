@@ -27,6 +27,7 @@
 #define DirectionNone         0
 #define DirectionUp           1
 #define DirectionInverse     -1
+#define DirectionChange      -2
 
 
 //--- Null value defines

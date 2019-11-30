@@ -44,13 +44,8 @@ input bool   inpShowFibo        = true;  // Display lines and fibonacci points
 input bool   inpShowComment     = false; // Display fibonacci data in Comment
 input bool   inpShowBounds      = true;  // Display trade boundary lines
 
-input string fractalHeader      = "";    //+------ Fractal inputs ------+
-input int    inpRangeMax        = 120;   // Maximum fractal pip range
-input int    inpRangeMin        = 60;    // Minimum fractal pip range
-
 //--- Class defs
-  CFractal         *fractal     = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime,fractal);
+  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime);
 
 string    ShortName             = "pipMA-v6: Degree:"+IntegerToString(inpDegree)+" Period:"+IntegerToString(inpPeriods);
 int       IndWinId  = -1;
@@ -174,10 +169,10 @@ void RefreshScreen()
     if (pfractal.Event(NewDirection))
       UpdateEvent("New Direction",DirColor(pfractal.Direction(Term)));
     else
-    if (pfractal.EventAlert(NewFibonacci,Major))
+    if (pfractal.EventAlert(NewFractal,Major))
       UpdateEvent("New Major",DirColor(pfractal.Direction(Term)));
     else
-    if (pfractal.EventAlert(NewFibonacci,Minor))
+    if (pfractal.EventAlert(NewFractal,Minor))
       UpdateEvent("New Minor",DirColor(pfractal.Direction(Term)));
     else
     if (pfractal.Event(NewWane))
@@ -408,7 +403,6 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete pfractal;
-    delete fractal;
     
     ObjectDelete("piprRngLow");
     ObjectDelete("piprRngMid");

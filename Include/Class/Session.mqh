@@ -81,12 +81,12 @@ public:
              bool             IsOpen(void);
              
              bool             Event(EventType Type,AlertLevelType AlertLevel)
-                                                            {return (sEvent.EventAlert(Type,AlertLevel));}
+                                                               {return (sEvent.EventAlert(Type,AlertLevel));}
              bool             Event(EventType Type)            {return (sEvent[Type]);}
-             AlertLevelType   AlertLevel(EventType Type)      {return (sEvent.AlertLevel(Type));}
+             AlertLevelType   AlertLevel(EventType Type)       {return (sEvent.AlertLevel(Type));}
              bool             ActiveEvent(void)                {return (sEvent.ActiveEvent());}
              string           ActiveEventText(const bool WithHeader=true)
-                                                            {return (sEvent.ActiveEventText(WithHeader));};
+                                                               {return (sEvent.ActiveEventText(WithHeader));};
              
              datetime         ServerTime(int Bar=0);
              
@@ -331,7 +331,7 @@ void CSession::UpdateTerm(void)
     if (sfractal[ftTerm].Direction==DirectionUp)
       if (IsHigher(High[sBar],sfractal[ftTerm].High))
       {
-        sEvent.SetEvent(NewFractal);
+        sEvent.SetEvent(NewFractal,Minor);
         
         if (!ufOutsideReversal)
         {
@@ -353,7 +353,7 @@ void CSession::UpdateTerm(void)
     if (sfractal[ftTerm].Direction==DirectionDown)
       if (IsLower(Low[sBar],sfractal[ftTerm].Low))
       {
-        sEvent.SetEvent(NewFractal);
+        sEvent.SetEvent(NewFractal,Minor);
 
         if (!ufOutsideReversal)
         {
