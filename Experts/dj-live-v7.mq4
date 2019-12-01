@@ -1249,26 +1249,70 @@ void OrderManagement(void)
 //+------------------------------------------------------------------+
 //| SetStrategy - Reviews Analyst Flags and determines action        |
 //+------------------------------------------------------------------+
-void SetStrategy(string ConvStr, string DivStr, string FiboStr)
+void SetStrategy(void)
   {
-    string ssExtract[];
-    
-    string ssStrategy   = FiboStr;
-    
-    if (DivStr!="")
-      ssStrategy        = DivStr;
-      
-    if (ConvStr!="")
-      ssStrategy        = ConvStr;
-    
-    if (ssStrategy=="")
-      return;
-      
-    if (ssStrategy==ConvStr+DivStr+FiboStr)
+    static ActionRequest pmpRequest        = {0,OP_NO_ACTION,"Bellwether",0,0,0,0,"",0,Waiting};
+    static bool          pmpBreak          = false;
+    static bool          pmpOuter          = false;
+
+    if (session[Asia].Event(NewDay))
     {
-      StringSplit(ssStrategy,":",ssExtract);
-      anStrategy        = ssExtract[0];
+      pmpRequest.Action                    = OP_NO_ACTION;
+      pmpBreak                             = false;
+      pmpOuter                             = false;
     }
+  
+    if (pmpRequest.Action==OP_NO_ACTION)
+    {
+      if (session[Asia].IsOpen())
+      {
+        if (session[Asia].Event(NewHigh))
+          if (detail[Asia].HighHour>6)
+            pmpRequest.Action        = OP_BUY;
+
+        if (session[Asia].Event(NewLow))
+          if (detail[Asia].LowHour>6)
+            pmpRequest.Action        = OP_SELL;
+      }
+      else
+      {
+      }
+    }
+    else
+    if (pmpBreak)
+    {
+      if (session[Asia].Event(NewHigh))
+        if (IsChanged(pmpRequest.Action,OP_BUY))
+          pmpOuter                   = true;
+          
+      if (session[Asia].Event(NewLow))
+        if (IsChanged(pmpRequest.Action,OP_SELL))
+          pmpOuter                   = true;
+    }
+    else
+    {
+      pmpBreak                       = true;
+
+      pmpRequest.Memo                = "A-Break ("+(string)ServerHour()+")";
+      pmpRequest.Lots                = LotSize();
+      pmpRequest.Expiry              = Time[0]+(Period()*60);
+
+      if (pmpRequest.Action==OP_BUY)
+      {
+        pmpRequest.Price             = High[1];
+        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].High,session[Asia][ActiveSession].Low,Expansion);
+        pmpRequest.Stop              = session[Asia][ActiveSession].Low;
+      }
+
+      if (pmpRequest.Action==OP_SELL)
+      {
+        pmpRequest.Price             = Low[1];
+        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].Low,session[Asia][ActiveSession].High,Expansion);
+        pmpRequest.Stop              = session[Asia][ActiveSession].High;
+      }
+        
+      OrderRequest(pmpRequest);
+    }            
   }
 
 //+------------------------------------------------------------------+
@@ -1276,30 +1320,17 @@ void SetStrategy(string ConvStr, string DivStr, string FiboStr)
 //+------------------------------------------------------------------+
 void ProcessMidPitch(void)
   {
-    static ActionRequest pmpRequest        = {0,OP_NO_ACTION,"Bellwether",0,0,0,0,"",0,Waiting};
-    static bool          pmpBreak          = false;
-    static bool          pmpOuter          = false;
-    static bool          pmpConvergent     = false;
-    static int           pmpDailyTermDir   = DirectionNone;
-    static int           pmpAsiaTermDir    = DirectionNone;
-    static string        pmpConvStr        = "";
-    static string        pmpDivStr         = "";
-           string        pmpFiboStr        = "";
-    static int           pmpTrendFiboLevel = 0;
-    static ReservedWords pmpLastTrendState = NoState;
+    static bool           pmpConvergent     = false;
+    static int            pmpDailyTermDir   = DirectionNone;
+    static int            pmpAsiaTermDir    = DirectionNone;
+    static string         pmpConvStr        = "";
+    static string         pmpDivStr         = "";
+           string         pmpFiboStr        = "";
+    static FibonacciLevel pmpTrendFiboLevel = Fibo100;
+    static ReservedWords  pmpLastTrendState = NoState;
     
-    if (session[Asia].Event(NewDay))
-    {
-      pmpRequest.Action                    = OP_NO_ACTION;
-      pmpBreak                             = false;
-      pmpOuter                             = false;
-    }
-
     if (session[Asia].IsOpen())
     {
-      if (session[Asia].Event(SessionOpen))
-        pmpConvStr                         = "";
-
       if (pmpConvStr!="")
         if (pmpAsiaTermDir==DirectionUp)
           UpdateBarNote(pmpConvStr,session[Asia][ActiveSession].High);
@@ -1365,93 +1396,29 @@ void ProcessMidPitch(void)
     
     //--- Key FiboWatcher
     if (anFiboDetail[ftTrend].ExpansionNow>FiboLevels[Fibo161])
-      if (pmpFiboStr=="")
-        if (pmpConvStr=="")
-        {
-          pmpTrendFiboLevel = fmax(pmpTrendFiboLevel,FiboLevel(anFiboDetail[ftTrend].ExpansionNow));
-          pmpFiboStr = NewBarNote("Fibo Watch ("+DoubleToStr(FiboLevels[pmpTrendFiboLevel]*100,1)+")",clrWhite);
-        }
-        else
-          pmpFiboStr = "";
-      else
-      {
-        if (IsEqual(anFiboDetail[ftTrend].ExpansionNow,anFiboDetail[ftTrend].ExpansionMax))
-          UpdateBarNote("Fibo(e)",Close[0]);
-      }
-     else
-       if (pmpConvStr!=""||anFiboDetail[ftTrend].ExpansionMax<FiboLevels[Fibo100])
-       {
-         pmpFiboStr          = "";
-         pmpTrendFiboLevel   = Fibo100;
-       }
+    {
+      if (IsHigher((FibonacciLevel)FiboLevel(anFiboDetail[ftTrend].ExpansionNow),pmpTrendFiboLevel))
+        pmpFiboStr = NewBarNote("Fibo Watch ("+DoubleToStr(FiboLevels[pmpTrendFiboLevel]*100,1)+")",clrWhite);
+    }
+    else
+    if (anFiboDetail[ftTrend].ExpansionNow<FiboLevels[Fibo100])    
+      pmpTrendFiboLevel   = Fibo100;
 
-    SetStrategy(pmpConvStr,pmpDivStr,pmpFiboStr);
-    
     //--- Store key indicators for comparison on next tick
     pmpLastTrendState               = session[Daily].Fractal(ftTrend).State;
+
+    string ssStrategy   = pmpFiboStr;
     
-    if (pmpRequest.Action==OP_NO_ACTION)
-    {
-      if (session[Asia].IsOpen())
-      {
-        if (session[Asia].Event(NewHigh))
-          if (detail[Asia].HighHour>6)
-            pmpRequest.Action        = OP_BUY;
-
-        if (session[Asia].Event(NewLow))
-          if (detail[Asia].LowHour>6)
-            pmpRequest.Action        = OP_SELL;
-      }
-      else
-      {
-      }
-    }
-    else
-    if (pmpBreak)
-    {
-      if (session[Asia].Event(NewHigh))
-        if (IsChanged(pmpRequest.Action,OP_BUY))
-          pmpOuter                   = true;
-          
-      if (session[Asia].Event(NewLow))
-        if (IsChanged(pmpRequest.Action,OP_SELL))
-          pmpOuter                   = true;
-    }
-    else
-    {
-      pmpBreak                       = true;
-
-      pmpRequest.Memo                = "A-Break ("+(string)ServerHour()+")";
-      pmpRequest.Lots                = LotSize();
-      pmpRequest.Expiry              = Time[0]+(Period()*60);
-
-      if (pmpRequest.Action==OP_BUY)
-      {
-        pmpRequest.Price             = High[1];
-        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].High,session[Asia][ActiveSession].Low,Expansion);
-        pmpRequest.Stop              = session[Asia][ActiveSession].Low;
-      }
-
-      if (pmpRequest.Action==OP_SELL)
-      {
-        pmpRequest.Price             = Low[1];
-        pmpRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].Low,session[Asia][ActiveSession].High,Expansion);
-        pmpRequest.Stop              = session[Asia][ActiveSession].High;
-      }
-        
-      OrderRequest(pmpRequest);
-    }        
-  }
-
-//+------------------------------------------------------------------+
-//| Scalper - Short Term Asian mid-pitch trading                     |
-//+------------------------------------------------------------------+
-void Scalper(void)
-  {
-//    switch ({EnabledScalpers})
-    {
-      ProcessMidPitch(); 
-    }
+    if (pmpDivStr!="")
+      ssStrategy        = pmpDivStr;
+      
+    if (pmpConvStr!="")
+      ssStrategy        = pmpConvStr;
+    
+    if (ssStrategy=="")
+      return;
+      
+    anStrategy        = ssStrategy;
   }
 
 //+------------------------------------------------------------------+
@@ -1471,7 +1438,8 @@ void Execute(void)
         PauseOnPrice  = 0.00;
       }
        
-    Scalper();
+    ProcessMidPitch(); 
+    SetStrategy();
     ShortManagement();
     OrderManagement();
   }

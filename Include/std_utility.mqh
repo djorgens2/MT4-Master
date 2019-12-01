@@ -557,12 +557,13 @@ void NewLabel(string LabelName, string Text, int PosX, int PosY, int Color=White
 string NewBarNote(string Text, int Color=clrWhite)
   {
     static int nbnIdx    = 0;
+    string     nbnKey    = "bn:"+(string)++nbnIdx;
     
-    ObjectCreate(0,Text+":"+(string)++nbnIdx,OBJ_TEXT,0,Time[0],Close[0]);
-    ObjectSetInteger(0,Text+":"+(string)nbnIdx,OBJPROP_COLOR,Color);
-    ObjectSetString(0,Text+":"+(string)nbnIdx,OBJPROP_TEXT,Text);
+    ObjectCreate(0,nbnKey,OBJ_TEXT,0,Time[0],Close[0]);
+    ObjectSetInteger(0,nbnKey,OBJPROP_COLOR,Color);
+    ObjectSetString(0,nbnKey,OBJPROP_TEXT,Text);
     
-    return (Text+":"+(string)nbnIdx);
+    return (nbnKey);
   }
 
 //+------------------------------------------------------------------+
