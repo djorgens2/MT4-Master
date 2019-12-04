@@ -1252,7 +1252,6 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
 void CFractal::RefreshScreen(bool WithEvents=false)
   {
     string           rsReport    = "";
-    string           rsFlag      = "";
     const  string    rsSeg[RetraceTypes] = {"tr","tm","p","b","r","e","d","c","iv","cv","a"};
     
     if (dOrigin.Bar == NoValue)

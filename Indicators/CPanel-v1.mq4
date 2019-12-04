@@ -184,11 +184,22 @@ int OnInit()
       {
         NewLabel("lbAN"+(string)(col-1)+":"+(string)row,StringSubstr(EnumToString(row),2),5+BoolToInt(col==0,15,90*col),34+(11*row),clrWhite,SCREEN_UL,IndWinId);
         
+        if (col==0)
+        {
+          NewLabel("lhAN"+(string)col+":Flag","Flag:",60+(90*col),45+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhAN"+(string)col+":(e)","( e ):",60+(90*col),58+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhAN"+(string)col+":(r)","( r ):",60+(90*col),71+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
+          UpdateLabel("lhAN"+(string)col+":(e)","[e]:",clrGoldenrod,8,"Consolas");
+          UpdateLabel("lhAN"+(string)col+":(r)","[r]:",clrGoldenrod,8,"Consolas");
+          
+        }
+
         if (row==0&&col<ftPrior)
         {
           DrawBox("hdAN"+StringSubstr(EnumToString(col),2),(90*col)+70,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
           NewLabel("lbAN"+(string)col+":Flag","====",100+(90*col),45+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
-          NewLabel("lbAN"+(string)col+":Source","====",100+(90*col),58+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel("lbAN"+(string)col+":(e)","====",100+(90*col),58+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel("lbAN"+(string)col+":(r)","====",100+(90*col),71+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
         }
       }
 

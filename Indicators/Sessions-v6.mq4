@@ -100,12 +100,8 @@ color SessionColor(void)
 //+------------------------------------------------------------------+
 void CreateRange(int Bar=0)
  {
-   static string crLastRange   = TimeToStr(session.ServerTime(Bars-1),TIME_DATE);
    string        crRangeId;
-   
-   if (IsChanged(crLastRange,TimeToStr(session.ServerTime(Bar),TIME_DATE)))
-     sessionOpen               = false;
-     
+
    if (IsChanged(sessionOpen,true))
    {
      crRangeId          = EnumToString(inpType)+IntegerToString(++sessionRange);
@@ -126,28 +122,41 @@ void CreateRange(int Bar=0)
 //| UpdateRange - Repaints the session box                           |
 //+------------------------------------------------------------------+
 void UpdateRange(int Bar=0)
- {
-   string urRangeId       = EnumToString(inpType)+IntegerToString(sessionRange);
+  {
+    static string urLastRange   = TimeToStr(session.ServerTime(Bars-1),TIME_DATE);
+    string        urRangeId     = EnumToString(inpType)+IntegerToString(sessionRange);
 
-   if (TimeHour(session.ServerTime(Bar))==inpHourClose)
-   {
-     if (sessionOpen)
-       ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
+    if (TimeHour(session.ServerTime(Bar))==inpHourClose)
+    {
+      if (sessionOpen)
+        ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
 
-     sessionOpen          = false;
-   }
+      sessionOpen                = false;
+    }
 
-   if (sessionOpen)
-   {
-     if (IsHigher(High[Bar],sessionHigh))
-       ObjectSet(urRangeId,OBJPROP_PRICE1,sessionHigh);
+    if (IsChanged(urLastRange,TimeToStr(session.ServerTime(Bar),TIME_DATE)))
+    {
+      sessionOpen               = false;
+              
+      if (TimeDayOfWeek(session.ServerTime(Bar))<6)
+        if (TimeHour(session.ServerTime(Bar))>=inpHourOpen && TimeHour(session.ServerTime(Bar))<inpHourClose)
+          CreateRange(Bar);
+    }
+    else
+    if (TimeHour(session.ServerTime(Bar))==inpHourOpen)
+      CreateRange(Bar);
+    else
+    if (sessionOpen)
+    {
+      if (IsHigher(High[Bar],sessionHigh))
+        ObjectSet(urRangeId,OBJPROP_PRICE1,sessionHigh);
      
-     if (IsLower(Low[Bar],sessionLow))
-       ObjectSet(urRangeId,OBJPROP_PRICE2,sessionLow);
+      if (IsLower(Low[Bar],sessionLow))
+        ObjectSet(urRangeId,OBJPROP_PRICE2,sessionLow);
 
-     ObjectSet(urRangeId,OBJPROP_TIME1,sessionOpenTime);
-     ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
-   }
+      ObjectSet(urRangeId,OBJPROP_TIME1,sessionOpenTime);
+      ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
+    }
  }
 
 //+------------------------------------------------------------------+
@@ -165,12 +174,7 @@ void DeleteRanges()
 void RefreshScreen(int Bar=0)
   {
     if (inpShowRange==Yes)
-    {
-      if (TimeHour(session.ServerTime(Bar))==inpHourOpen)
-        CreateRange(Bar);
-
       UpdateRange(Bar);
-    }
 
     if (inpFractalLines!=FractalTypes)
     {

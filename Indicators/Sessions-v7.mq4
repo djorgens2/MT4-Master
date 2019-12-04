@@ -68,7 +68,6 @@ struct SessionData
      double          PriceLow;
   };
   
-const int            sessionEOD      = 0;            // Session End-of-Day hour
 const int            sessionOffset   = 40;           // Display offset
 
 CSession            *session[SessionTypes];
@@ -99,9 +98,6 @@ void CreateRange(SessionType Type, int Bar=0)
  {
    string        crRangeId;
    
-   if (IsChanged(dataDate[Type],TimeToStr(session[Type].ServerTime(Bar),TIME_DATE)))
-     data[Type].IsOpen        = false;
-
    if (IsChanged(data[Type].IsOpen,true))
    {
      crRangeId                = EnumToString(Type)+IntegerToString(++data[Type].Range);
@@ -125,9 +121,6 @@ void UpdateRange(SessionType Type, int Bar=0)
  {
    string urRangeId       = EnumToString(Type)+IntegerToString(data[Type].Range);
 
-   if (TimeHour(session[Type].ServerTime(Bar))==sessionEOD)
-     data[Type].IsOpen    = false;
-     
    if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionClose))
    {
      if (data[Type].IsOpen)
@@ -136,6 +129,18 @@ void UpdateRange(SessionType Type, int Bar=0)
      data[Type].IsOpen    = false;
    }
 
+   if (IsChanged(dataDate[Type],TimeToStr(session[Type].ServerTime(Bar),TIME_DATE)))
+   {
+     data[Type].IsOpen        = false;
+
+     if (TimeDayOfWeek(session[Type].ServerTime(Bar))<6)
+       if (TimeHour(session[Type].ServerTime(Bar))>=session[Type].SessionHour(SessionOpen) && TimeHour(session[Type].ServerTime(Bar))<session[Type].SessionHour(SessionClose))
+         CreateRange(Type, Bar);
+   }
+   else
+   if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionOpen))
+     CreateRange(Type,Bar);
+   else
    if (data[Type].IsOpen)
    {
      if (IsHigher(High[Bar],data[Type].PriceHigh))
@@ -166,9 +171,6 @@ void RefreshScreen(int Bar=0)
   {
     for (SessionType type=Asia;type<SessionTypes;type++)
     {
-      if (TimeHour(session[type].ServerTime(Bar))==session[type].SessionHour(SessionOpen))
-        CreateRange(type,Bar);
-
       UpdateRange(type,Bar);
     }
 
