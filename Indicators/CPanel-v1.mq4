@@ -20,12 +20,12 @@ string    ShortName             = "CPanel-v1";
                   fpTarget,
                   fpYield,
                   fpLoad,
-                  fpBounce,
+                  fpBalance,
                   fpRisk,
                   fpHalt,
                   FractalPoints
                 };
-
+                
     enum        FractalType
                 {
                   ftOrigin,
@@ -85,36 +85,39 @@ int OnInit()
     NewLabel("lbAN-Strategy","Strategy",1750,4,clrWhite,SCREEN_UL,IndWinId);
     
     NewLabel("lbh-OML1A","Long:",1200,16,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbh-OML2A","Short:",1850,16,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-OML2A","Short:",1830,16,clrWhite,SCREEN_UL,IndWinId);
 
     NewLabel("lbLongPlan","No Plan",1240,16,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbShortPlan","No Plan",1890,16,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbShortPlan","No Plan",1870,16,clrDarkGray,SCREEN_UL,IndWinId);
     
     for (int row=0;row<25;row++)
       for (int col=0;col<2;col++)
       {
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Key","0000000",1200+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Status","Pending",1258+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Requestor","Bellwether",1310+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Price","0.00000",1370+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Lots","0.00",1430+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Target","0.00000",1475+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Stop","0.00000",1540+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Expiry","12/1/2019 11:00",1600+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Memo","Yadda Yadda Yadda",1700+(col*650),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Key","00000000",1200+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        UpdateLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Key","00000000",clrDarkGray,8,"Consolas");
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Status","Pending",1260+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Requestor","Bellwether",1312+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Type","Market",1376+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Price","0.00000",1420+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Lots","0.00",1475+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Target","0.00000",1510+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Stop","0.00000",1563+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Expiry","12/1/2019 11:00",1612+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lb-OM"+StringSubstr(ActionText(col),0,1)+"-"+(string)row+"Memo","Yadda Yadda Yadda",1705+(col*630),45+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
       }
 
       for (int col=0;col<2;col++)
       {
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Key","Order No.",1200+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Status","Status",1258+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Requestor","Requestor",1310+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Price","Price",1378+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Lots","Lots",1430+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Target","Target",1479+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Stop","Stop",1547+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Expiry","Expiration",1614+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Memo","Order Comments",1700+(col*650),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Key","Order No.",1200+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Status","Status",1260+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Requestor","Requestor",1312+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Type","Type",1376+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Price","Price",1427+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Lots","Lots",1475+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Target","Target",1515+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Stop","Stop",1572+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Expiry","Expiration",1625+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Memo","Order Comments",1705+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
       }
       
 

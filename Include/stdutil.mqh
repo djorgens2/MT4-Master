@@ -763,10 +763,10 @@ int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
                           else
                             Value       *= dContrarian;
                           break;
-      case InAction:      if (Value==OP_BUY)
+      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
                             Value        = DirectionUp*dContrarian;
                           else
-                          if (Value==OP_SELL)
+                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
                             Value        = DirectionDown*dContrarian;
                           else
                             Value        = DirectionNone;

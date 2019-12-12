@@ -178,8 +178,10 @@ int ActionCode(string Action)
 
     if (Action == "BUYLIMIT")  return (OP_BUYLIMIT);
     if (Action == "BUYMIT")    return (OP_BUYSTOP);
+    if (Action == "BUYSTOP")   return (OP_BUYSTOP);
     if (Action == "SELLLIMIT") return (OP_SELLLIMIT);
     if (Action == "SELLMIT")   return (OP_SELLSTOP);
+    if (Action == "SELLSTOP")  return (OP_SELLSTOP);
     
     if (Action == "OPEN")      return (OP_OPEN);
     if (Action == "CLOSE")     return (OP_CLOSE);

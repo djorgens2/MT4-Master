@@ -170,9 +170,7 @@ void DeleteRanges()
 void RefreshScreen(int Bar=0)
   {
     for (SessionType type=Asia;type<SessionTypes;type++)
-    {
       UpdateRange(type,Bar);
-    }
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
