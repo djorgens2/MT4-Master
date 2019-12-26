@@ -18,7 +18,7 @@
 class CSession
   {
 
-public:             
+public:
              //-- Fractal Types
              enum FractalType
              {
@@ -126,7 +126,8 @@ private:
              FiboDetail       sFibo[FractalTypes];
              
              int              sBarFE;          //--- Fractal Expansion Bar
-             
+             int              sDirFE;          //--- Fractal Direction (Painted)
+
              //--- Private class collections
              SessionRec       srec[PeriodTypes];
              
@@ -143,6 +144,7 @@ private:
              void             UpdateSession(void);
                           
              void             UpdateBuffers(void);
+             void             UpdateFractalBuffer(int Direction, double Value);
 
              void             LoadHistory(void);
              
@@ -285,26 +287,40 @@ void CSession::SetCorrectionState(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateFractalBuffer - Updates the fractal buffer                 |
+//+------------------------------------------------------------------+
+void CSession::UpdateFractalBuffer(int Direction, double Value)
+  {
+    if (sDirFE==Direction)
+    {
+        sFractalBuffer.SetValue(sBarFE,0.00);
+        sFractalBuffer.SetValue(sBar,Value);
+
+        sBarFE                       = sBar;
+      }
+    else
+    if (sBarFE!=sBar)
+    {
+      sFractalBuffer.SetValue(sBar,Value);
+
+      sDirFE                       = Direction;
+      sBarFE                       = sBar;
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateTerm - Updates term fractal bounds and buffers             |
 //+------------------------------------------------------------------+
 void CSession::UpdateTerm(void)
   {
-    static bool   ufOutsideReversal    = false;
     double        ufExpansion          = 0.00;
     ReservedWords ufState              = NoState;
-    SessionRec    ufPrior              = sfractal[ftTerm];
     
     //--- Check for term changes
     if (sEvent[NewReversal])
       if (NewDirection(sfractal[ftTerm].Direction,srec[ActiveSession].Direction))
       {
-        if (IsChanged(sBarFE,sBar))
-          ufOutsideReversal            = false;
-        else
-          ufOutsideReversal            = true;
-          
-        sfractal[ftPrior]              = ufPrior;
-        sEvent.SetEvent(NewTerm,Minor);        
+        sEvent.SetEvent(NewTerm,Minor);
                 
         if (sfractal[ftTerm].Direction==DirectionUp)
         {
@@ -323,26 +339,15 @@ void CSession::UpdateTerm(void)
         }
       }
 
-    //--- occurs on rare outside reversal conditions(?); requires analysis
-    if (sEvent[NewHour])
-      ufOutsideReversal                = false;
-    
     //--- Check for term boundary changes
     if (sfractal[ftTerm].Direction==DirectionUp)
       if (IsHigher(High[sBar],sfractal[ftTerm].High))
       {
         sEvent.SetEvent(NewFractal,Minor);
-        
-        if (!ufOutsideReversal)
-        {
-          sFractalBuffer.Delete(sBarFE);
-          sFractalBuffer.Insert(sBar,High[sBar]);
-        }
+        UpdateFractalBuffer(DirectionUp,High[sBar]);
 
-        sfractal[ftTerm].Low           = Close[sBar];
-        
+        sfractal[ftTerm].Low           = Close[sBar];        
         ufExpansion                    = sfractal[ftTerm].High;
-        sBarFE                         = sBar;
       }
       else
       if (sBar==0)
@@ -354,17 +359,10 @@ void CSession::UpdateTerm(void)
       if (IsLower(Low[sBar],sfractal[ftTerm].Low))
       {
         sEvent.SetEvent(NewFractal,Minor);
+        UpdateFractalBuffer(DirectionDown,Low[sBar]);
 
-        if (!ufOutsideReversal)
-        {
-          sFractalBuffer.Delete(sBarFE);
-          sFractalBuffer.Insert(sBar,Low[sBar]);
-        }
-        
         sfractal[ftTerm].High          = Close[sBar];
-
         ufExpansion                    = sfractal[ftTerm].Low;
-        sBarFE                         = sBar;
       }
       else
       if (sBar==0)
@@ -833,6 +831,9 @@ void CSession::LoadHistory(void)
     sBars                            = Bars;
     sBarDay                          = NoValue;
     sBarHour                         = NoValue;
+    
+    sBarFE                           = sBar;
+    sDirFE                           = DirectionNone;
 
     if (Close[sBar]<Open[sBar])
       lhStartDir                     = DirectionDown;

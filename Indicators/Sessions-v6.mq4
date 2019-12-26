@@ -235,7 +235,7 @@ int OnCalculate(const int rates_total,
       session.Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     else
       session.Update();
-    
+        
     RefreshScreen();
 
     return(rates_total);
@@ -247,7 +247,7 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    IndicatorShortName("PipMA-v6:"+EnumToString(session.Type()));
+    IndicatorShortName("Sessions-v6:"+EnumToString(session.Type()));
     
     SetIndexBuffer(0,indPriorMidBuffer);
     SetIndexEmptyValue(0, 0.00);

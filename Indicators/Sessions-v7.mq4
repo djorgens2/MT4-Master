@@ -230,11 +230,12 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     session[Asia].Update();
     session[Europe].Update();
     session[US].Update();
     
+    session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
+
     RefreshScreen();
 
     return(rates_total);

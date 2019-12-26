@@ -189,12 +189,14 @@ int OnInit()
         
         if (col==0)
         {
-          NewLabel("lhAN"+(string)col+":Flag","Flag:",60+(90*col),45+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhAN"+(string)col+":Flag","Flags:",60+(90*col),45+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
           NewLabel("lhAN"+(string)col+":(e)","( e ):",60+(90*col),58+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
           NewLabel("lhAN"+(string)col+":(r)","( r ):",60+(90*col),71+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
           UpdateLabel("lhAN"+(string)col+":(e)","[e]:",clrGoldenrod,8,"Consolas");
           UpdateLabel("lhAN"+(string)col+":(r)","[r]:",clrGoldenrod,8,"Consolas");
-          
+
+          NewLabel("lhAN"+(string)col+":State","State:",60+(90*col),84+(11*FractalPoints),clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbAN:State","---------------",100+(90*col),84+(11*FractalPoints),clrDarkGray,SCREEN_UL,IndWinId);
         }
 
         if (row==0&&col<ftPrior)
@@ -203,6 +205,7 @@ int OnInit()
           NewLabel("lbAN"+(string)col+":Flag","====",100+(90*col),45+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
           NewLabel("lbAN"+(string)col+":(e)","====",100+(90*col),58+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
           NewLabel("lbAN"+(string)col+":(r)","====",100+(90*col),71+(11*FractalPoints),clrWhite,SCREEN_UL,IndWinId);
+
         }
       }
 

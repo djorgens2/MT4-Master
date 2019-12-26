@@ -1336,79 +1336,205 @@ void UpdateStrategy(StrategyType Strategy)
   }
 
 //+------------------------------------------------------------------+
+//| CheckConvergence - Returns true if on true price convergence     |
+//+------------------------------------------------------------------+
+bool CheckConvergence(bool &Check)
+  {
+    if (sEvent[NewTerm])
+      Check                   = false;
+      
+    if (session[Asia].Fractal(ftTerm).Direction==DirectionUp)
+      if (IsEqual(session[Daily].Fractal(ftTerm).High,session[Asia].Fractal(ftTerm).High,NoUpdate))
+        return (true);
+        
+    if (session[Asia].Fractal(ftTerm).Direction==DirectionDown)
+      if (IsEqual(session[Daily].Fractal(ftTerm).Low,session[Asia].Fractal(ftTerm).Low,NoUpdate))
+        return (true);
+
+    return (Check);
+  }
+
+//+------------------------------------------------------------------+
+//| TermConvergence - Returns Term Convergent strategies             |
+//+------------------------------------------------------------------+
+StrategyType TermConvergence(void)
+  {
+    static bool tcConvergent   = false;
+    
+    UpdateLabel("lbAN:State","Term Convergent");
+    
+    if (IsChanged(tcConvergent,CheckConvergence(tcConvergent)))
+    {
+      //-- Handle new convergence
+      switch (lead.Type())
+      {
+        case Asia:    return (Torpedo);
+        case Europe:  if (session[Asia].IsOpen())
+                        return (Kamikaze);
+                      return (Slant);
+        case US:      return (YanksGrab);
+      }        
+    }
+    else
+    {
+      //-- Handle existing convergence
+    }
+
+    return (NoStrategy);
+  }
+
+//+------------------------------------------------------------------+
+//| TermDivergence - Returns Term Divergent strategies               |
+//+------------------------------------------------------------------+
+StrategyType TermDivergence(void)
+  {
+    static bool tdDivergent    = false;
+
+    UpdateLabel("lbAN:State","Term Divergent");
+        
+    if (IsChanged(tdDivergent,CheckConvergence(tdDivergent)))
+    {
+        //-- Handle new divergence
+    }
+    else
+    {
+      //-- Handle existing divergence
+      return (AsianScrew);
+    }
+
+    return (NoStrategy);
+  }
+
+//+------------------------------------------------------------------+
+//| TrendConvergence - Returns Trend Convergent strategies           |
+//+------------------------------------------------------------------+
+StrategyType TrendConvergence(void)
+  {
+    static bool tcConvergent   = false;
+    
+    UpdateLabel("lbAN:State","Trend Convergent");
+    
+    if (IsChanged(tcConvergent,CheckConvergence(tcConvergent)))
+    {
+      //-- Handle new convergence
+      switch (lead.Type())
+      {
+        case Asia:    return (Kamikaze);
+        case Europe:  return (TeaBreak);
+        case US:      return (YanksGrab);
+      }        
+    }
+    else
+    {
+      //-- Handle existing convergence
+    }
+
+    return (NoStrategy);  
+  }
+
+//+------------------------------------------------------------------+
+//| TrendDivergence - Returns Trend Divergent strategies             |
+//+------------------------------------------------------------------+
+StrategyType TrendDivergence(void)
+  {
+    static bool tdDivergent    = false;
+
+    UpdateLabel("lbAN:State","Trend Divergent");
+
+    if (IsChanged(tdDivergent,CheckConvergence(tdDivergent)))
+    {
+      //-- Handle new divergence
+    }
+    else
+    {
+      //-- Handle existing divergence
+      return (AsianScrew);
+    }
+  
+    return (NoStrategy);
+  }
+
+//+------------------------------------------------------------------+
 //| SetStrategy - Complete analysis of the market and set strategy   |
 //+------------------------------------------------------------------+
 void SetStrategy(void)
   {
     StrategyType   ssStrategy   = NoStrategy;
-    EventType      ssEvent      = NoEvent;
 
-    static bool    ssConvergent = false;
-    static double  ssRetrace    = 0.00;
-
-    if (session[Daily].Event(NewTerm))
-      if (session[Asia].Event(NewTerm))
-        ssEvent                 = NewReversal;
-      else
-        ssEvent                 = NewBreakout;
-    else
-    if (session[Asia].Event(NewTerm))
+    if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
       if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
-        ssEvent                 = NewConvergence;
+        ssStrategy              = TrendConvergence();
       else
-        if (IsChanged(ssConvergent,false))
-          ssEvent               = NewDivergence;
-        else
-          ssEvent               = NewReversal;
-
-    if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
-      if (IsEqual(session[Daily].Fractal(ftTerm).High,session[Asia].Fractal(ftTerm).High,NoUpdate)||
-          IsEqual(session[Daily].Fractal(ftTerm).Low,session[Asia].Fractal(ftTerm).Low,NoUpdate))
-        if (IsChanged(ssConvergent,true))
-          ssEvent               = NewFractal;
+        ssStrategy              = TrendDivergence();
+    else
+      if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
+        ssStrategy              = TermConvergence();
+      else
+        ssStrategy              = TermDivergence();
         
+    UpdateStrategy(ssStrategy);
 
-    switch (ssEvent)
-    {
-      case NewReversal:     if (session[Asia].IsOpen())
-                              UpdateStrategy(Torpedo);
-                            else
-                            if (lead.Type()==Europe)
-                              UpdateStrategy(UTurn);
-                            else
-                              UpdateStrategy(Check);
-                            break;
-
-      case NewBreakout:     if (session[Asia].IsOpen())
-                              UpdateStrategy(Kamikaze);
-                            else
-                            if (lead.Type()==Europe)
-                              UpdateStrategy(TeaBreak);
-                            else
-                              UpdateStrategy(YanksGrab);
-                            break;
-                            
-      case NewConvergence:  if (session[Asia].IsOpen())
-                              UpdateStrategy(Reversi);
-                            else
-                              UpdateStrategy(Slant);
-                            break;
-      case NewDivergence:   UpdateStrategy(AsianScrew);
-                            break;
-
-      case NewFractal:      if (session[Asia].IsOpen())
-                              if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
-                                UpdateStrategy(Torpedo);
-                              else
-                                UpdateStrategy(Kamikaze);
-                            else
-                              UpdateStrategy(TeaBreak);
-                            break;
-
-      default:              UpdateStrategy(NoStrategy);
-                            break;
-                            
-    }
+//    if (session[Daily].Event(NewTerm))
+//      if (session[Asia].Event(NewTerm))
+//        ssEvent                 = NewReversal;
+//      else
+//        ssEvent                 = NewBreakout;
+//    else
+//    if (session[Asia].Event(NewTerm))
+//      if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
+//        ssEvent                 = NewConvergence;
+//      else
+//        if (IsChanged(ssConvergent,false))
+//          ssEvent               = NewDivergence;
+//        else
+//          ssEvent               = NewReversal;
+//
+//    if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
+//        if (IsChanged(ssConvergent,true))
+//          ssEvent               = NewFractal;
+//        
+//
+//    switch (ssEvent)
+//    {
+//      case NewReversal:     if (session[Asia].IsOpen())
+//                              UpdateStrategy(Torpedo);
+//                            else
+//                            if (lead.Type()==Europe)
+//                              UpdateStrategy(UTurn);
+//                            else
+//                              UpdateStrategy(Check);
+//                            break;
+//
+//      case NewBreakout:     if (session[Asia].IsOpen())
+//                              UpdateStrategy(Kamikaze);
+//                            else
+//                            if (lead.Type()==Europe)
+//                              UpdateStrategy(TeaBreak);
+//                            else
+//                              UpdateStrategy(YanksGrab);
+//                            break;
+//                            
+//      case NewConvergence:  if (session[Asia].IsOpen())
+//                              UpdateStrategy(Reversi);
+//                            else
+//                              UpdateStrategy(Slant);
+//                            break;
+//      case NewDivergence:   UpdateStrategy(AsianScrew);
+//                            break;
+//
+//      case NewFractal:      if (session[Asia].IsOpen())
+//                              if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
+//                                UpdateStrategy(Torpedo);
+//                              else
+//                                UpdateStrategy(Kamikaze);
+//                            else
+//                              UpdateStrategy(TeaBreak);
+//                            break;
+//
+//      default:              UpdateStrategy(NoStrategy);
+//                            break;
+//                            
+//    }
   }  
   
 //+------------------------------------------------------------------+

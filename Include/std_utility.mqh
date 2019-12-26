@@ -578,6 +578,7 @@ void UpdateBarNote(string LabelName, double Price=0.00, int Color=clrWhite)
       
     ObjectSetInteger(0,LabelName,OBJPROP_COLOR,Color);
     ObjectSetDouble(0,LabelName,OBJPROP_PRICE,Price);
+    ObjectSet(LabelName,OBJPROP_TIME1,Time[0]);
   }
 
 //+------------------------------------------------------------------+
