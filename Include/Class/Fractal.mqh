@@ -65,12 +65,12 @@ private:
        
        void          CalcRetrace(void);                                             //--- calculates retraces on the tick
        void          UpdateRetrace(RetraceType Type, int Bar, double Price=0.00);   //--- Updates interior fractal changes
-       void          BarUpdate(void);                                               //--- handles buffer period shifts
 
        void          CalcOrigin(void);      //--- calculates origin derivatives on the tick
        
        //--- Fractal leg properties
        int           fDirection;            //--- Current fractal leg direction
+       int           fBars;                 //--- Count of bars in the chart
        int           fBarNow;               //--- Currently executing bar id fractal leg direction
        int           fBarHigh;              //--- Fractal top
        int           fBarLow;               //--- Fractal bottom
@@ -138,26 +138,6 @@ public:
   };
 
 
-//+------------------------------------------------------------------+
-//| BarUpdate - updates bar pointers                                 |
-//+------------------------------------------------------------------+
-void CFractal::BarUpdate(void)
-  {
-    fBarHigh++;
-    fBarLow++;
-    
-    for (RetraceType type=Trend;type<RetraceTypes;type++)
-      if (f[type].Bar>NoValue)
-        f[type].Bar++;
-              
-    if (fOrigin.Bar>NoValue)
-      fOrigin.Bar++;
-
-    dOrigin.Bar++;
-    
-    fBuffer.Insert(0,0.00);
-  }
-  
 //+------------------------------------------------------------------+
 //| Origin - returns integer measures for the Origin                 |
 //+------------------------------------------------------------------+
@@ -642,6 +622,7 @@ CFractal::CFractal(int Range, int MinRange)
     
     fBarHigh                = Bars-1;
     fBarLow                 = Bars-1;
+    fBars                   = Bars;
 
     fEvents                 = new CEvent();
     fBuffer                 = new CArrayDouble(Bars);
@@ -678,8 +659,22 @@ CFractal::~CFractal(void)
 //+------------------------------------------------------------------+
 void CFractal::Update(void)
   {
-    if (NewBar())
-      BarUpdate();
+    for (fBars=fBars;fBars<Bars;fBars++)
+    {
+      fBarHigh++;
+      fBarLow++;
+    
+      for (RetraceType type=Trend;type<RetraceTypes;type++)
+        if (f[type].Bar>NoValue)
+          f[type].Bar++;
+              
+      if (fOrigin.Bar>NoValue)
+        fOrigin.Bar++;
+
+      dOrigin.Bar++;
+    
+      fBuffer.Insert(0,0.00);
+    }
     
     CalcFractal();
   }

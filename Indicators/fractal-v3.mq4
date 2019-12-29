@@ -192,16 +192,12 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    if (prev_calculated>0)
-    {
-      fractal.UpdateBuffer(indFractalBuffer);
-          
-      SetBuffer(indDivergentBuffer,Expansion,Divergent);
-      SetBuffer(indConvergentBuffer,Divergent,Convergent);
-       
+    fractal.UpdateBuffer(indFractalBuffer);
 
-      RefreshScreen();
-    }
+    SetBuffer(indDivergentBuffer,Expansion,Divergent);
+    SetBuffer(indConvergentBuffer,Divergent,Convergent);
+
+    RefreshScreen();
     
     return(rates_total);
   }
