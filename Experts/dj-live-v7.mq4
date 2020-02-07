@@ -233,6 +233,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   int                 rsSegment           = NoValue;
     
   bool                PauseOn             = true;
+  bool                PauseOnHistory      = false;
   int                 PauseOnHour         = NoValue;
   double              PauseOnPrice        = 0.00;
   bool                LoggingOn           = false;
@@ -307,7 +308,10 @@ bool IsChanged(StrategyType &Compare, StrategyType Value)
 void CallPause(string Message, bool Force=false)
   {
     static string cpMessage   = "";
-    
+
+    if (PauseOnHistory)
+      return;
+
     if (PauseOn||Force)
       if (IsChanged(cpMessage,Message)||Force)
         Pause(Message,AccountCompany()+" Event Trapper");
@@ -698,12 +702,26 @@ void RefreshScreen(void)
 
     ShowLines();
     
-    UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrRed);
+    UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrYellow);
     UpdatePriceLabel("plbInterlaceLow",omInterlace[ArraySize(omInterlace)-1],clrYellow);
     
-    if (omAction!=OP_NO_ACTION)
-      UpdatePriceLabel("plbInterlacePivot",omInterlacePivot[omAction],clrWhite);
-
+    if (omAction==OP_NO_ACTION)
+    {
+      UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrDarkGray);
+      UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrDarkGray);
+    }
+    else
+    if (omAction==OP_BUY)
+    {
+      UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrLawnGreen);
+      UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrMaroon);
+    }
+    else
+    {
+      UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrForestGreen);
+      UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrRed);
+    }
+    
     if (SourceAlerts[indPipMA])
       for (EventType type=1;type<EventTypes;type++)
         if (Alerts[type]&&pfractal.Event(type))
@@ -992,13 +1010,19 @@ void ProcessPipMA(void)
 
     if (IsEqual(Close[0],omInterlace[0]))
       if (NewDirection(omInterlaceBrkDir,DirectionUp))
-        omInterlacePivot[OP_BUY] = Close[0];
+      {
+        omAction                   = OP_BUY;
+        omInterlacePivot[omAction] = Close[0];
+      }
 
     if (IsEqual(Close[0],omInterlace[ArraySize(omInterlace)-1]))
       if (NewDirection(omInterlaceBrkDir,DirectionDown))
-        omInterlacePivot[OP_SELL] = Close[0];
+      {
+        omAction                   = OP_SELL;
+        omInterlacePivot[omAction] = Close[0];
+      }
 
-//    pfractal.DrawStateLines();
+    pfractal.DrawStateLines();
 //    pfractal.ShowFiboArrow();
   }
 
@@ -1538,83 +1562,6 @@ void SetStrategy(void)
   }  
   
 //+------------------------------------------------------------------+
-//| PilotTradeExecuted - Opens with the first trade daily            |
-//+------------------------------------------------------------------+
-bool PilotTradeExecuted(void)
-  {
-    static OrderRequest  pteRequest        = {0,OP_NO_ACTION,"Bellwether",0,0,0,0,"",0,NoStatus};
-    static bool          pteBreak          = false;
-    static bool          pteOuter          = false;
-
-    if (LotCount()>0.00)
-      return (true);
-      
-    if (!pfractal.HistoryLoaded())
-      return (false);
-
-    if (session[Daily].Event(NewDay))
-    {
-      pteRequest.Action                    = OP_NO_ACTION;
-      pteBreak                             = false;
-      pteOuter                             = false;
-    }
-  
-    if (pteRequest.Action==OP_NO_ACTION)
-    {
-      if (session[Asia].IsOpen())
-      {
-        if (session[Asia].Event(NewHigh))
-          if (detail[Asia].HighHour>6)
-            pteRequest.Action        = OP_BUY;
-
-        if (session[Asia].Event(NewLow))
-          if (detail[Asia].LowHour>6)
-            pteRequest.Action        = OP_SELL;
-      }
-      else
-      {
-      }
-    }
-    else
-    if (pteBreak)
-    {
-      if (session[Asia].Event(NewHigh))
-        if (IsChanged(pteRequest.Action,OP_BUY))
-          pteOuter                   = true;
-          
-      if (session[Asia].Event(NewLow))
-        if (IsChanged(pteRequest.Action,OP_SELL))
-          pteOuter                   = true;
-    }
-    else
-    {
-      pteBreak                       = true;
-
-      pteRequest.Memo                = "A-Break ("+(string)ServerHour()+")";
-      pteRequest.Lots                = LotSize();
-      pteRequest.Expiry              = Time[0]+(Period()*60);
-
-      if (pteRequest.Action==OP_BUY)
-      {
-        pteRequest.Price             = High[1];
-        pteRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].High,session[Asia][ActiveSession].Low,Expansion);
-        pteRequest.Stop              = session[Asia][ActiveSession].Low;
-      }
-
-      if (pteRequest.Action==OP_SELL)
-      {
-        pteRequest.Price             = Low[1];
-        pteRequest.Target            = FiboPrice(Fibo161,session[Asia][ActiveSession].Low,session[Asia][ActiveSession].High,Expansion);
-        pteRequest.Stop              = session[Asia][ActiveSession].High;
-      }
-        
-      OrderSubmit(pteRequest);
-    }
-    
-    return (false);
-  }
-
-//+------------------------------------------------------------------+
 //| ShortManagement - Manages short order positions, profit and risk |
 //+------------------------------------------------------------------+
 void ShortManagement(void)
@@ -1666,6 +1613,13 @@ void AssignActionManager(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+    if (PauseOnHistory)
+      if (pfractal.HistoryLoaded())
+      {
+        PauseOnHistory        = false;
+        CallPause("PipMA History is now loaded",Always);
+      }
+
     if (PauseOnHour>NoValue)
       if (sEvent[NewHour])
         if (ServerHour()==PauseOnHour)
@@ -1682,13 +1636,9 @@ void Execute(void)
 
     AssignActionManager();
     
-    if (PilotTradeExecuted())
-    {
-    }
-
-      LongManagement();
-      ShortManagement();
-      OrderManagement();
+    LongManagement();
+    ShortManagement();
+    OrderManagement();
   }
 
 //+------------------------------------------------------------------+
@@ -1705,7 +1655,7 @@ EventType AlertKey(string Event)
       if (StringToUpper(akType))
         if (akType==Event)
           return (type);
-    }    
+    }
     
     return(EventTypes);
   }
@@ -1753,6 +1703,9 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="PAUSE")
     {
       PauseOn                          = true;
+      if (Command[1]=="HISTORY")
+        PauseOnHistory                 = true;
+      else
       if (Command[1]=="PRICE")
         PauseOnPrice                   = StringToDouble(Command[2]);
       else
@@ -1967,7 +1920,8 @@ int OnInit()
     
     NewPriceLabel("plbInterlaceHigh");
     NewPriceLabel("plbInterlaceLow");
-    NewPriceLabel("plbInterlacePivot");
+    NewPriceLabel("plbInterlacePivotActive");
+    NewPriceLabel("plbInterlacePivotInactive");
 
     NewLine("lnOpen");
     NewLine("lnHigh");
