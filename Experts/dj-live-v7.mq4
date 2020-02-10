@@ -126,7 +126,8 @@ input int       inpGMTOffset         = 0;     // GMT Offset
          Torpedo,       //-- Reliable reversal detection, occurs on converging reversing Terms that had strong retraces
          Slant,         //-- Slant Reversal occurs on an outside Asian reversal
          Reversi,       //-- Slant Reversal occurs on an open session Asian reversal
-         YanksGrab,     //-- Occurs on converging Asian/Daily reversing sessions while the Asian market is closed and US is the lead session
+         YanksGrab,     //-- Occurs on converging Asian/Daily Term reversing sessions while the Asian market is closed and US is the lead session
+         Revolution,    //-- Occurs on converging Asian/Daily Trend reversing sessions while the US is the lead session
          TeaBreak,      //-- Occurs on converging Asian/Daily reversing sessions while the Asian market is closed and EU is the lead session
          Kamikaze,      //-- Occurs on converging Asian/Daily reversing sessions while the Asian market is open
          StrategyTypes
@@ -149,13 +150,14 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                       {
                         "No Strategy",
                         "Check",
-                        "(d) Asian Screw",
+                        "(ad) Asian Screw",
                         "(acr) U-Turn",
-                        "(acr) Torpedo",
-                        "(cr) Slant",
-                        "(cr) Reversi",
-                        "(cr) Yanks Grab",
-                        "(cr) Tea Break",
+                        "(atc) Torpedo",
+                        "(acr) Slant",
+                        "(acr) Reversi",
+                        "(ucr) Yanks Grab",
+                        "(utc) Revolution",
+                        "(bcr) Tea Break",
                         "(acr) Kamikaze"
                       };
                        
@@ -175,6 +177,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         double         Ceiling;                //-- Last session trading high
                         double         Floor;                  //-- Last session trading low
                         double         Pivot;                  //-- Last session pivot
+                        double         Pitch;                  //-- On new fractal, track the pitch, static retention
                         bool           IsValid;                //-- Are the open v. bias measures align?
                         bool           Alerts;                 //-- Noise reduction filter for alerts
                       };
@@ -192,15 +195,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         datetime        Expiry;
                         OrderStatus     Status;
                       };
-                      
-  struct              ActiveMatrixRec
-                      {
-                        int             Action;
-                        double          Price;
-                        ReasonType      Reason;
-                        SourceType      Source;
-                      };
-                      
+                                            
   struct              FractalAnalysis
                       {
                         SessionType     Session;               //--- the session fibo data was collected from
@@ -684,6 +679,22 @@ void ShowLines(void)
   }
 
 //+------------------------------------------------------------------+
+//| RefreshPitchLabels - sets the session type pitch labels          |
+//+------------------------------------------------------------------+
+void RefreshPitchLabels(void)
+  {
+    const color SessionColor[SessionTypes] =  {C'64,64,0',C'0,32,0',C'48,0,0',C'0,0,56'};
+  
+    if (sEvent[NewFractal]||sEvent[NewHour])
+      for (SessionType type=0;type<SessionTypes;type++)
+      {
+        ObjectSet("plb"+EnumToString(type),OBJPROP_COLOR,SessionColor[type]);
+        ObjectSet("plb"+EnumToString(type),OBJPROP_PRICE1,detail[type].Pitch);
+        ObjectSet("plb"+EnumToString(type),OBJPROP_TIME1,Time[Bar]+(Period()*600));
+      }
+  }
+  
+//+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
@@ -701,6 +712,7 @@ void RefreshScreen(void)
                            +"\n\n";
 
     ShowLines();
+    RefreshPitchLabels();
     
     UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrYellow);
     UpdatePriceLabel("plbInterlaceLow",omInterlace[ArraySize(omInterlace)-1],clrYellow);
@@ -906,6 +918,8 @@ void ProcessSession(void)
       if (session[type].Event(NewFractal))
       {
         detail[type].NewFractal       = true;
+        detail[type].FractalHour      = ServerHour();
+        detail[type].Pitch            = fdiv(session[type][ActiveSession].High+session[type][ActiveSession].Low,2);
 
         if (type==Daily)
           sEvent.SetEvent(NewFractal,Major);
@@ -958,8 +972,6 @@ void ProcessSession(void)
             cseIsValid             = true;
 
       detail[type].IsValid         = cseIsValid;
-//      if (IsChanged(detail[type].IsValid,cseIsValid))
-//        sEvent.SetEvent(NewAction,Major);
     }
   }
 
@@ -1335,7 +1347,7 @@ void UpdateStrategy(StrategyType Strategy)
           usBarNote                      = "";
           usLiveEventDir                 = DirectionNone;
         }
-    }
+    } 
     else
     {
       if (IsChanged(anStrategy,Strategy))
@@ -1364,7 +1376,7 @@ void UpdateStrategy(StrategyType Strategy)
 //+------------------------------------------------------------------+
 bool CheckConvergence(bool &Check)
   {
-    if (sEvent[NewTerm])
+    if (session[Daily].Event(NewTerm)||session[Asia].Event(NewTerm))
       Check                   = false;
       
     if (session[Asia].Fractal(ftTerm).Direction==DirectionUp)
@@ -1392,7 +1404,7 @@ StrategyType TermConvergence(void)
       //-- Handle new convergence
       switch (lead.Type())
       {
-        case Asia:    return (Torpedo);
+        case Asia:    
         case Europe:  if (session[Asia].IsOpen())
                         return (Kamikaze);
                       return (Slant);
@@ -1443,9 +1455,11 @@ StrategyType TrendConvergence(void)
       //-- Handle new convergence
       switch (lead.Type())
       {
-        case Asia:    return (Kamikaze);
-        case Europe:  return (TeaBreak);
-        case US:      return (YanksGrab);
+        case Asia:    
+        case Europe:  if (session[Asia].IsOpen())
+                        return (Torpedo);
+                      return (TeaBreak);
+        case US:      return (Revolution);
       }        
     }
     else
@@ -1497,68 +1511,6 @@ void SetStrategy(void)
         ssStrategy              = TermDivergence();
         
     UpdateStrategy(ssStrategy);
-
-//    if (session[Daily].Event(NewTerm))
-//      if (session[Asia].Event(NewTerm))
-//        ssEvent                 = NewReversal;
-//      else
-//        ssEvent                 = NewBreakout;
-//    else
-//    if (session[Asia].Event(NewTerm))
-//      if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
-//        ssEvent                 = NewConvergence;
-//      else
-//        if (IsChanged(ssConvergent,false))
-//          ssEvent               = NewDivergence;
-//        else
-//          ssEvent               = NewReversal;
-//
-//    if (session[Daily].Fractal(ftTerm).Direction==session[Asia].Fractal(ftTerm).Direction)
-//        if (IsChanged(ssConvergent,true))
-//          ssEvent               = NewFractal;
-//        
-//
-//    switch (ssEvent)
-//    {
-//      case NewReversal:     if (session[Asia].IsOpen())
-//                              UpdateStrategy(Torpedo);
-//                            else
-//                            if (lead.Type()==Europe)
-//                              UpdateStrategy(UTurn);
-//                            else
-//                              UpdateStrategy(Check);
-//                            break;
-//
-//      case NewBreakout:     if (session[Asia].IsOpen())
-//                              UpdateStrategy(Kamikaze);
-//                            else
-//                            if (lead.Type()==Europe)
-//                              UpdateStrategy(TeaBreak);
-//                            else
-//                              UpdateStrategy(YanksGrab);
-//                            break;
-//                            
-//      case NewConvergence:  if (session[Asia].IsOpen())
-//                              UpdateStrategy(Reversi);
-//                            else
-//                              UpdateStrategy(Slant);
-//                            break;
-//      case NewDivergence:   UpdateStrategy(AsianScrew);
-//                            break;
-//
-//      case NewFractal:      if (session[Asia].IsOpen())
-//                              if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
-//                                UpdateStrategy(Torpedo);
-//                              else
-//                                UpdateStrategy(Kamikaze);
-//                            else
-//                              UpdateStrategy(TeaBreak);
-//                            break;
-//
-//      default:              UpdateStrategy(NoStrategy);
-//                            break;
-//                            
-//    }
   }  
   
 //+------------------------------------------------------------------+
@@ -1922,6 +1874,9 @@ int OnInit()
     NewPriceLabel("plbInterlaceLow");
     NewPriceLabel("plbInterlacePivotActive");
     NewPriceLabel("plbInterlacePivotInactive");
+
+    for (SessionType type=0;type<SessionTypes;type++)
+      NewPriceLabel("plb"+EnumToString(type));
 
     NewLine("lnOpen");
     NewLine("lnHigh");
