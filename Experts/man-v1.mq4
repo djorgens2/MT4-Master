@@ -70,7 +70,6 @@ int OnInit()
   {
     ManualInit();
     
-
     return(INIT_SUCCEEDED);
   }
 

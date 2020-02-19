@@ -397,10 +397,10 @@ double FiboPercent(int Level, int Format=InPoints, bool Signed=true)
 //+------------------------------------------------------------------+
 //| Pip - returns the normalized pip value in integer+1 form         |
 //+------------------------------------------------------------------+
-double Pip(double Value, int Type=InPips)
+double Pip(double Value, int Format=InPips)
   {
     //--- Convert points into pips
-    if (Type==InPips)
+    if (Format==InPips)
       return (NormalizeDouble(Value*pow(10, Digits-1),1));
 
     //--- Convert pips into points
@@ -796,10 +796,10 @@ int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
                           else
                             Value       *= dContrarian;
                           break;
-      case InAction:      if (Value==OP_BUY)
+      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
                             Value        = DirectionUp*dContrarian;
                           else
-                          if (Value==OP_SELL)
+                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
                             Value        = DirectionDown*dContrarian;
                           else
                             Value        = DirectionNone;

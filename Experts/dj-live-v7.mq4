@@ -19,9 +19,16 @@
 #include <Class\Fractal.mqh>
 #include <Class\ArrayInteger.mqh>
 
-  
+  enum          MarginModel
+                {
+                  Discount,
+                  Premium,
+                  FIFO
+                };
+ 
 input string    AppHeader            = "";    //+---- Application Options -------+
 input YesNoType inpDisplayEvents     = Yes;   // Display event bar notes
+input MarginModel inpMarginModel     = Discount; //-- Account type margin handling
 
 input string    FractalHeader        = "";    //+------ Fractal Options ---------+
 input int       inpRangeMin          = 60;    // Minimum fractal pip range
@@ -1183,13 +1190,69 @@ int OrderBias(int Measure=InDirection)
 //+------------------------------------------------------------------+
 bool OrderApproved(OrderRequest &Order)
   {
+    double oaMargin          = 0.00;
+    double oaMarginReq       = BoolToDouble(Symbol()=="USDJPY",(ordAcctLotSize*ordAcctMinLot)/AccountLeverage(),
+                                               ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage())*100;
+    double oaBuyPending      = 0.00;
+    double oaSellPending     = 0.00;
+    double oaBuyOpen         = LotCount(OP_BUY);
+    double oaSellOpen        = LotCount(OP_SELL);
+    double oaLotsOpen        = oaBuyOpen+oaSellOpen;
+    double oaBuyLots         = 0.00;
+    double oaSellLots        = 0.00;
+    
     if (TradingOn)
     {
-      Order.Status      = Approved;
-      return (true);
+      for (int ord=0;ord<ArraySize(omQueue);ord++)
+        if (omQueue[ord].Status==Pending)
+          if (Direction(omQueue[ord].Action,IN_ACTION)==DirectionUp)
+            oaBuyPending    += omQueue[ord].Lots;
+          else
+            oaSellPending   += omQueue[ord].Lots;
+            
+      switch (inpMarginModel)
+      {
+        case Discount:       //-- FX Choice
+                             if (Direction(Order.Action,IN_ACTION)==DirectionUp)
+                             {
+                               oaBuyLots   = oaBuyOpen+oaBuyPending+Order.Lots;
+                               oaSellLots  = oaSellOpen;
+                             }
+                             if (Direction(Order.Action,IN_ACTION)==DirectionDown)
+                             {
+                               oaSellLots  = oaSellOpen+oaSellPending+Order.Lots;
+                               oaBuyLots   = oaBuyOpen;
+                             }
+                             oaMargin      = (((fdiv(fmin(oaBuyLots,oaSellLots),2,ordLotPrecision)+fabs(oaBuyLots-oaSellLots)+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                             break;
+        case Premium:        //-- FXCM
+                             if (Direction(Order.Action,IN_ACTION)==DirectionUp)
+                               oaMargin = (((oaLotsOpen+oaBuyPending+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                             if (Direction(Order.Action,IN_ACTION)==DirectionDown)
+                               oaMargin = (((oaLotsOpen+oaSellPending+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                             break;
+        case FIFO:           //-- Forex.com
+                             break;        
+      }
+
+      if (oaMargin<=ordEQMaxRisk)
+      {
+        Order.Status         = Approved;
+        return (true);
+      }
+      else
+      {
+        Order.Status         = Declined;
+        Order.Memo           = "Margin limit exceeded.";
+      }
+    }
+    else
+    {
+      Order.Status           = Declined;
+      Order.Memo             = "Trading is not enabled.";
     }
 
-    Order.Status        = Declined;
+    Order.Status             = Declined;
     return (false);
   }
 
@@ -1221,12 +1284,14 @@ void OrderCancel(int Action, string Reason="")
     for (int request=0;request<ArraySize(omQueue);request++)
       if (omQueue[request].Status==Pending)
         if (Action(omQueue[request].Action,InAction)==Action)
-        {
-          omQueue[request].Status   = Canceled;
+          if (omQueue[request].Status!=Canceled)
+          {
+            omQueue[request].Status   = Canceled;
+            omQueue[request].Expiry   = Time[0]+(Period()*60);
           
-          if (Reason!="")
-            omQueue[request].Memo   = Reason;
-        }
+            if (Reason!="")
+              omQueue[request].Memo   = Reason;
+          }
           
     RefreshOrders();
   }
@@ -1234,28 +1299,30 @@ void OrderCancel(int Action, string Reason="")
 //+------------------------------------------------------------------+
 //| OrderSubmit - Manages short order positions, profit and risk     |
 //+------------------------------------------------------------------+
-void OrderSubmit(OrderRequest &Order)
+void OrderSubmit(OrderRequest &Order, bool QueueOrders)
   {
-    Order.Key                = omOrderKey.Count;
-    Order.Status             = Pending;
-
-    if (!TradingOn)
+    while (OrderApproved(Order))
     {
-      Order.Status           = Declined;
-      Order.Memo             = "Trading is not enabled.";
-    }
+      Order.Key                = omOrderKey.Count;
+      Order.Status             = Pending;
+      Order.Lots               = LotSize(Order.Lots);
     
-    omOrderKey.Add(ArraySize(omQueue));
-    ArrayResize(omQueue,omOrderKey[Order.Key]+1);
-    omQueue[Order.Key]       = Order;
+      omOrderKey.Add(ArraySize(omQueue));
+      ArrayResize(omQueue,omOrderKey[Order.Key]+1);
+      omQueue[Order.Key]     = Order;
+      
+      if (QueueOrders)
+        Order.Price         += Pip(ordEQLotFactor,InDecimal)*Direction(Order.Action,IN_ACTION,Order.Action==OP_BUYLIMIT||Order.Action==OP_SELLLIMIT);
+      else break;
+    }
 
     RefreshOrders();
   }
    
 //+------------------------------------------------------------------+
-//| OrderManagement - Manages the order cycle                        |
+//| OrderProcessing - Manages the order cycle                        |
 //+------------------------------------------------------------------+
-void OrderManagement(void)
+void OrderProcessing(void)
   {
     OrderStatus  omState                  = NoStatus;
     bool         omRefreshQueue           = false;
@@ -1590,7 +1657,7 @@ void Execute(void)
     
     LongManagement();
     ShortManagement();
-    OrderManagement();
+    OrderProcessing();
   }
 
 //+------------------------------------------------------------------+
@@ -1624,24 +1691,37 @@ void LoadManualOrder(string &Order[])
       RefreshOrders();
       return;
     }
+    
     if (ActionCode(Order[1])==OP_NO_ACTION)
     {
       Print("Error: Bad Action Type on order request");
       return;
-    }
+    }+-
     
-    if (Order[2]=="MARKET")
-      Order[2]                    = "";
-      
-    lmoRequest.Action             = ActionCode(Order[1]+Order[2]);
-    lmoRequest.Price              = StringToDouble(Order[3]);
-    lmoRequest.Lots               = LotSize(StringToDouble(Order[4]));
-    lmoRequest.Target             = StringToDouble(Order[5]);
-    lmoRequest.Stop               = StringToDouble(Order[6]);
-    lmoRequest.Expiry             = Time[0]+(Period()*StrToInteger(Order[7])*60);
-    lmoRequest.Memo               = Order[8];
+    if (Order[2]=="CANCEL")
+      OrderCancel(ActionCode(Order[1]),Order[3]);
+    else
+    {
+      if (Order[2]=="MARKET")
+        lmoRequest.Action           = ActionCode(Order[1]);
+      else
+      if (Order[2]=="QUEUE")
+        if (Direction(StringToDouble(Order[3])-Close[0])==DirectionUp)
+          lmoRequest.Action         = ActionCode(Order[1]+BoolToStr(ActionCode(Order[1])==OP_BUY,"STOP","LIMIT"));
+        else
+          lmoRequest.Action         = ActionCode(Order[1]+BoolToStr(ActionCode(Order[1])==OP_BUY,"LIMIT","STOP"));
+      else
+        lmoRequest.Action           = ActionCode(Order[1]+Order[2]);
+            
+      lmoRequest.Price              = StringToDouble(Order[3]);
+      lmoRequest.Lots               = LotSize(StringToDouble(Order[4]));
+      lmoRequest.Target             = StringToDouble(Order[5]);
+      lmoRequest.Stop               = StringToDouble(Order[6]);
+      lmoRequest.Expiry             = Time[0]+(Period()*StrToInteger(Order[7])*60);
+      lmoRequest.Memo               = Order[8];
 
-    OrderSubmit(lmoRequest);
+      OrderSubmit(lmoRequest,Order[2]=="QUEUE");
+    }
   }
 
 //+------------------------------------------------------------------+
