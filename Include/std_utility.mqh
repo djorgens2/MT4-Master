@@ -80,9 +80,9 @@ void ArrayInitializeStr(string &Array[], int Count)
 //+------------------------------------------------------------------+
 //| InStr - Returns true if pattern is found in source string        |
 //+------------------------------------------------------------------+
-bool InStr(string Source, string Pattern)
+bool InStr(string Source, string Search)
   {
-    if (StringSubstr(Source,StringFind(Source,Pattern),StringLen(Pattern))==Pattern)
+    if (StringSubstr(Source,StringFind(Source,Search),StringLen(Search))==Search)
       return (true);
      
     return (false);

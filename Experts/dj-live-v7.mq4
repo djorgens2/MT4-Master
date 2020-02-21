@@ -19,37 +19,37 @@
 #include <Class\Fractal.mqh>
 #include <Class\ArrayInteger.mqh>
 
-  enum          MarginModel
-                {
-                  Discount,
-                  Premium,
-                  FIFO
-                };
+  enum            MarginModel
+                  {
+                    Discount,
+                    Premium,
+                    FIFO
+                  };
  
-input string    AppHeader            = "";    //+---- Application Options -------+
-input YesNoType inpDisplayEvents     = Yes;   // Display event bar notes
+input string      AppHeader            = "";    //+---- Application Options -------+
+input YesNoType   inpDisplayEvents     = Yes;   // Display event bar notes
 input MarginModel inpMarginModel     = Discount; //-- Account type margin handling
 
-input string    FractalHeader        = "";    //+------ Fractal Options ---------+
-input int       inpRangeMin          = 60;    // Minimum fractal pip range
-input int       inpRangeMax          = 120;   // Maximum fractal pip range
-input int       inpPeriodsLT         = 240;   // Long term regression periods
+input string      FractalHeader        = "";    //+------ Fractal Options ---------+
+input int         inpRangeMin          = 60;    // Minimum fractal pip range
+input int         inpRangeMax          = 120;   // Maximum fractal pip range
+input int         inpPeriodsLT         = 240;   // Long term regression periods
 
-input string    RegressionHeader     = "";    //+------ Regression Options ------+
-input int       inpDegree            = 6;     // Degree of poly regression
-input int       inpSmoothFactor      = 3;     // MA Smoothing factor
-input double    inpTolerance         = 0.5;   // Directional sensitivity
-input int       inpPipPeriods        = 200;   // Trade analysis periods (PipMA)
-input int       inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
+input string      RegressionHeader     = "";    //+------ Regression Options ------+
+input int         inpDegree            = 6;     // Degree of poly regression
+input int         inpSmoothFactor      = 3;     // MA Smoothing factor
+input double      inpTolerance         = 0.5;   // Directional sensitivity
+input int         inpPipPeriods        = 200;   // Trade analysis periods (PipMA)
+input int         inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
 
-input string    SessionHeader        = "";    //+---- Session Hours -------+
-input int       inpAsiaOpen          = 1;     // Asian market open hour
-input int       inpAsiaClose         = 10;    // Asian market close hour
-input int       inpEuropeOpen        = 8;     // Europe market open hour`
-input int       inpEuropeClose       = 18;    // Europe market close hour
-input int       inpUSOpen            = 14;    // US market open hour
-input int       inpUSClose           = 23;    // US market close hour
-input int       inpGMTOffset         = 0;     // GMT Offset
+input string      SessionHeader        = "";    //+---- Session Hours -------+
+input int         inpAsiaOpen          = 1;     // Asian market open hour
+input int         inpAsiaClose         = 10;    // Asian market close hour
+input int         inpEuropeOpen        = 8;     // Europe market open hour`
+input int         inpEuropeClose       = 18;    // Europe market close hour
+input int         inpUSOpen            = 14;    // US market open hour
+input int         inpUSClose           = 23;    // US market close hour
+input int         inpGMTOffset         = 0;     // GMT Offset
 
 
   //--- Class Objects
@@ -60,23 +60,6 @@ input int       inpGMTOffset         = 0;     // GMT Offset
   CEvent             *sEvent         = new CEvent();
   CEvent             *rsEvents       = new CEvent();
   
-  //--- Recommendation Alerts
-  enum                ReasonType
-                      {
-                        BalancePoint,         //-- Lot balancing at the Asian bellwether midpoint                      
-                        DivergencePoint,      //-- Indicator divergence point; rally/pullback pattern confirmed on divergence                        
-                        FractalBalance,       //-- Major retrace/reversal point approaching at the bre 50/61 Fibo
-                        FractalMajor,         //-- Major target/reversal point approaching at the bre 161
-                        FractalCorrection,    //-- Fractal Expansion <= 23 Fibo
-                        CheckPoint,           //-- Fractal 100% Check Point Price (**Important: High reversal potential at PipMA 261 check)
-                        SlantReversal,        //-- High probability of reversal; occurs between the 9th and 10th hour
-                        YanksReversal,        //-- High probability of reversal; occurs between the 14th (Yanks) and 15th hour
-                        AsianDriver,          //-- When Asian session is driving fractal expansion; instructs managers to hold 'til Asian close
-                        MercyBounce,          //-- Recovering 50% fibo found in micro wave pattern management
-                        SecondChance,         //-- Better than a mercy bounce; indicates the strong probability of reversal
-                        ReasonTypes
-                      };
-                      
   //--- Fractal Sources
   enum                ViewPoint
                       {
@@ -84,6 +67,15 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         Meso,
                         Micro,
                         ViewPoints
+                      };
+                      
+  //--- Technical Fractal Patterns
+  enum                Pattern
+                      {
+                        TrendConvergent,
+                        TrendDivergent,
+                        TermConvergent,
+                        TermDivergent
                       };
                       
   //--- Order Statuses
@@ -141,19 +133,7 @@ input int       inpGMTOffset         = 0;     // GMT Offset
        };
        
   //--- Strategy Action
-  enum                StrategyAction
-                      {
-                        NonFractalRecovery,
-                        NonFractalCapture,
-                        FFE,
-                        Spot,
-//                        Build,
-//                        Hold,
-//                        Halt,
-                        StrategyActions
-                      };
-
-    const string StrategyText[StrategyTypes] =
+  const string StrategyText[StrategyTypes] =
                       {
                         "No Strategy",
                         "Check",
@@ -166,6 +146,15 @@ input int       inpGMTOffset         = 0;     // GMT Offset
                         "(utc) Revolution",
                         "(bcr) Tea Break",
                         "(acr) Kamikaze"
+                      };
+                      
+  //-- Pattern Text
+  const string PatternText[4] =
+                      {
+                        "Trend Convergent",
+                        "Trend Divergent",
+                        "Term Convergent",
+                        "Term Divergent"
                       };
                        
   //--- Collection Objects
@@ -266,6 +255,8 @@ input int       inpGMTOffset         = 0;     // GMT Offset
 
   //--- Analyst operationals
   StrategyType        anStrategy;
+  int                 anPattern;
+  ViewPoint           anState[ViewPoints];
   double              anFractal[ViewPoints][FractalPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
 
@@ -442,6 +433,7 @@ void RefreshControlPanel(void)
       UpdateDirection("lbState",OrderBias(),DirColor(OrderBias()),24);
 
     UpdateLabel("lbAN-Strategy",StrategyText[anStrategy],clrDarkGray);
+    UpdateLabel("lbAN:State",PatternText[anPattern]);
     
     if (pfractal.Event(NewWaveReversal))
     {
@@ -1463,8 +1455,8 @@ bool CheckConvergence(bool &Check)
 StrategyType TermConvergence(void)
   {
     static bool tcConvergent   = false;
-    
-    UpdateLabel("lbAN:State","Term Convergent");
+
+    anPattern     = TermConvergent;
     
     if (IsChanged(tcConvergent,CheckConvergence(tcConvergent)))
     {
@@ -1493,7 +1485,7 @@ StrategyType TermDivergence(void)
   {
     static bool tdDivergent    = false;
 
-    UpdateLabel("lbAN:State","Term Divergent");
+    anPattern     = TermDivergent;
         
     if (IsChanged(tdDivergent,CheckConvergence(tdDivergent)))
     {
@@ -1515,7 +1507,7 @@ StrategyType TrendConvergence(void)
   {
     static bool tcConvergent   = false;
     
-    UpdateLabel("lbAN:State","Trend Convergent");
+    anPattern     = TrendConvergent;
     
     if (IsChanged(tcConvergent,CheckConvergence(tcConvergent)))
     {
@@ -1544,7 +1536,7 @@ StrategyType TrendDivergence(void)
   {
     static bool tdDivergent    = false;
 
-    UpdateLabel("lbAN:State","Trend Divergent");
+    anPattern     = TrendDivergent;
 
     if (IsChanged(tdDivergent,CheckConvergence(tdDivergent)))
     {
@@ -1696,7 +1688,7 @@ void LoadManualOrder(string &Order[])
     {
       Print("Error: Bad Action Type on order request");
       return;
-    }+-
+    }
     
     if (Order[2]=="CANCEL")
       OrderCancel(ActionCode(Order[1]),Order[3]);
