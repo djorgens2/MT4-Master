@@ -223,29 +223,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Actual,             //--- Lead retrace - retrace on the major leg
                   RetraceTypes        //--- DO NOT REPOSITION -- used to report total count of enums
                 };
-  
-//+------------------------------------------------------------------+
-//| NewBar - detects a new bar                                       |
-//+------------------------------------------------------------------+
-bool NewBar(void)
-  {
-    static int    lastBars   = Bars;
-    static double lastClose  = 0.00;
-
-    if (Bars != lastBars)
-    {
-      if (lastClose == 0.00)
-      {
-        lastClose = Close[0];
-        return (true);
-      }
-      
-      lastBars++;
-      lastClose = 0.00;
-    }
-    
-    return (false);
-  }
 
 //+------------------------------------------------------------------+
 //| FiboExt - Converts signed fibos to extended                      |

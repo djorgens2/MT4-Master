@@ -45,6 +45,7 @@
 #define IN_PROXIMITY          10
 #define IN_DARK_DIR           11
 #define IN_CHART_DIR          12
+#define IN_CHART_ACTION       13
 
 
 //---- Screen Locations
@@ -52,6 +53,8 @@
 #define SCREEN_UR              1
 #define SCREEN_LL              2
 #define SCREEN_LR              3
+
+#include <stdutil.mqh>
 
 //+------------------------------------------------------------------+
 //| Pause - pauses execution and waits for user input                |
@@ -342,23 +345,24 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
   
   switch (Style)
   {
-    case IN_DIRECTION:   if (Value<0.00) return (clrRed);
-                         if (Value>0.00) return (clrLawnGreen);
-                         return (clrDarkGray);
-    case IN_PROXIMITY:   if (Close[0]>Value+point(6))  return(clrLawnGreen);
-                         if (Close[0]>Value+point(3))  return(clrYellowGreen);
-                         if (Close[0]>Value+point(0.2)) return(clrMediumSeaGreen);
-                         if (Close[0]>Value-point(0.2)) return(clrYellow);
-                         if (Close[0]>Value-point(3))   return(clrGoldenrod);
-                         if (Close[0]>Value-point(6))   return(clrChocolate);
-                         return (clrRed);
-    case IN_DARK_DIR:    if (Value<0.00) return (clrMaroon);
-                         if (Value>0.00) return (clrDarkGreen);
-                         return (clrDarkGray);
-    case IN_CHART_DIR:   if (Value<0.00) return (clrRed);
-                         if (Value>0.00) return (clrYellow);
-                         return (clrDarkGray);
+    case IN_DIRECTION:     if (Value<0.00) return (clrRed);
+                           if (Value>0.00) return (clrLawnGreen);
+    case IN_PROXIMITY:     if (Close[0]>Value+point(6))   return(clrLawnGreen);
+                           if (Close[0]>Value+point(3))   return(clrYellowGreen);
+                           if (Close[0]>Value+point(0.2)) return(clrMediumSeaGreen);
+                           if (Close[0]>Value-point(0.2)) return(clrYellow);
+                           if (Close[0]>Value-point(3))   return(clrGoldenrod);
+                           if (Close[0]>Value-point(6))   return(clrChocolate);
+                           return (clrRed);
+    case IN_DARK_DIR:      if (Value<0.00) return (clrMaroon);
+                           if (Value>0.00) return (clrDarkGreen);
+    case IN_CHART_DIR:     if (Value<0.00) return (clrRed);
+                           if (Value>0.00) return (clrYellow);
+                           return (clrDarkGray);
+    case IN_CHART_ACTION:  if (Action(Value,InAction)==OP_BUY)  return (clrYellow);
+                           if (Action(Value,InAction)==OP_SELL) return (clrRed);                        
   }
+  
   return (clrDarkGray);
 }
 
@@ -609,7 +613,7 @@ void UpdatePriceTag(string PriceTagName, int Bar, int Direction)
 //+------------------------------------------------------------------+
 void NewPriceTag(string PriceTagName, string Text, int Color=clrWhite, int Size=8, string Font="Tahoma")
   {
-    if (ObjectCreate(PriceTagName,OBJ_TEXT,0,0,0))      
+    if (ObjectCreate(PriceTagName,OBJ_TEXT,0,0,0))
       ObjectSetText(PriceTagName,Text,Size,Font,Color);
   }
 

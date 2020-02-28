@@ -26,9 +26,11 @@
                     FIFO
                   };
  
-input string      AppHeader            = "";    //+---- Application Options -------+
-input YesNoType   inpDisplayEvents     = Yes;   // Display event bar notes
-input MarginModel inpMarginModel     = Discount; //-- Account type margin handling
+input string      AppHeader            = "";       //+---- Application Options -------+
+input double      inpMarginTolerance   = 12.5;     // Margin drawdown factor 
+input MarginModel inpMarginModel       = Discount; // Account type margin handling
+input YesNoType   inpDisplayEvents     = Yes;      // Display event bar notes
+input YesNoType   inpShowWaveSegs      = Yes;      // Display wave segment overlays
 
 input string      FractalHeader        = "";    //+------ Fractal Options ---------+
 input int         inpRangeMin          = 60;    // Minimum fractal pip range
@@ -191,7 +193,26 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         datetime        Expiry;
                         OrderStatus     Status;
                       };
-                                            
+
+  struct              PositionDetail
+                      {
+                        int              Action;
+                        double           Margin;
+                      };
+                      
+  struct              OrderActivity
+                      {
+                        int             Action;
+                        double          Lots;
+                        double          Profit;
+                        double          Loss;
+                        double          Net;
+                        double          Stop;
+                        string          Memo;
+                        datetime        Expiry;
+                        OrderStatus     Status;
+                      };
+
   struct              FractalAnalysis
                       {
                         SessionType     Session;               //--- the session fibo data was collected from
@@ -255,7 +276,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
 
   //--- Analyst operationals
   StrategyType        anStrategy;
-  int                 anPattern;
+  Pattern             anPattern;
   ViewPoint           anState[ViewPoints];
   double              anFractal[ViewPoints][FractalPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
@@ -369,7 +390,7 @@ void RepaintOrder(OrderRequest &Order, int Col, int Row)
     UpdateLabel(roLabel+"Status",EnumToString(Order.Status),clrDarkGray);
     UpdateLabel(roLabel+"Requestor",Order.Requestor,clrDarkGray);
     UpdateLabel(roLabel+"Price",DoubleToStr(Order.Price,Digits),clrDarkGray);
-    UpdateLabel(roLabel+"Lots",DoubleToStr(Order.Lots,2),clrDarkGray);
+    UpdateLabel(roLabel+"Lots",DoubleToStr(LotSize(Order.Lots),ordLotPrecision),clrDarkGray);
     UpdateLabel(roLabel+"Target",DoubleToStr(Order.Target,Digits),clrDarkGray);
     UpdateLabel(roLabel+"Stop",DoubleToStr(Order.Stop,Digits),clrDarkGray);
     UpdateLabel(roLabel+"Expiry",TimeToStr(Order.Expiry),clrDarkGray);
@@ -700,7 +721,7 @@ void RefreshScreen(void)
   { 
     string rsComment   = "";
     string rsEvent     = "";
-        
+
     for (SessionType type=Daily;type<SessionTypes;type++)
         rsComment       += BoolToStr(lead.Type()==type,"-->")+EnumToString(type)
                            +BoolToStr(session[type].IsOpen()," ("+IntegerToString(session[type].SessionHour())+")"," Closed")
@@ -1033,7 +1054,8 @@ void ProcessPipMA(void)
         omInterlacePivot[omAction] = Close[0];
       }
 
-    pfractal.DrawStateLines();
+    if (inpShowWaveSegs==Yes)
+      pfractal.DrawStateLines();
 //    pfractal.ShowFiboArrow();
   }
 
@@ -1198,36 +1220,36 @@ bool OrderApproved(OrderRequest &Order)
       for (int ord=0;ord<ArraySize(omQueue);ord++)
         if (omQueue[ord].Status==Pending)
           if (Direction(omQueue[ord].Action,IN_ACTION)==DirectionUp)
-            oaBuyPending    += omQueue[ord].Lots;
+            oaBuyPending    += LotSize(omQueue[ord].Lots);
           else
-            oaSellPending   += omQueue[ord].Lots;
+            oaSellPending   += LotSize(omQueue[ord].Lots);
             
       switch (inpMarginModel)
       {
         case Discount:       //-- FX Choice
                              if (Direction(Order.Action,IN_ACTION)==DirectionUp)
                              {
-                               oaBuyLots   = oaBuyOpen+oaBuyPending+Order.Lots;
+                               oaBuyLots   = oaBuyOpen+oaBuyPending+LotSize(Order.Lots);
                                oaSellLots  = oaSellOpen;
                              }
                              if (Direction(Order.Action,IN_ACTION)==DirectionDown)
                              {
-                               oaSellLots  = oaSellOpen+oaSellPending+Order.Lots;
+                               oaSellLots  = oaSellOpen+oaSellPending+LotSize(Order.Lots);
                                oaBuyLots   = oaBuyOpen;
                              }
-                             oaMargin      = (((fdiv(fmin(oaBuyLots,oaSellLots),2,ordLotPrecision)+fabs(oaBuyLots-oaSellLots)+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                             oaMargin      = (((fdiv(fmin(oaBuyLots,oaSellLots),2,ordLotPrecision)+fabs(oaBuyLots-oaSellLots))*oaMarginReq)/AccountEquity())*100;
                              break;
         case Premium:        //-- FXCM
                              if (Direction(Order.Action,IN_ACTION)==DirectionUp)
-                               oaMargin = (((oaLotsOpen+oaBuyPending+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                               oaMargin = (((oaLotsOpen+oaBuyPending+LotSize(Order.Lots))*oaMarginReq)/AccountEquity())*100;
                              if (Direction(Order.Action,IN_ACTION)==DirectionDown)
-                               oaMargin = (((oaLotsOpen+oaSellPending+Order.Lots)*oaMarginReq)/AccountEquity())*100;
+                               oaMargin = (((oaLotsOpen+oaSellPending+LotSize(Order.Lots))*oaMarginReq)/AccountEquity())*100;
                              break;
         case FIFO:           //-- Forex.com
                              break;        
       }
 
-      if (oaMargin<=ordEQMaxRisk)
+      if (oaMargin<=(ordEQMaxRisk+inpMarginTolerance))
       {
         Order.Status         = Approved;
         return (true);
@@ -1235,7 +1257,7 @@ bool OrderApproved(OrderRequest &Order)
       else
       {
         Order.Status         = Declined;
-        Order.Memo           = "Margin limit exceeded.";
+        Order.Memo           = "Margin limit exceeded. ("+DoubleToStr(oaMargin,1)+")";
       }
     }
     else
@@ -1253,13 +1275,14 @@ bool OrderApproved(OrderRequest &Order)
 //+------------------------------------------------------------------+
 bool OrderProcessed(OrderRequest &Order)
   {
-    if (OpenOrder(Order.Action,Order.Requestor+":"+Order.Memo,Order.Lots))
+    if (OpenOrder(Action(Order.Action,InAction),Order.Requestor+":"+Order.Memo,LotSize(Order.Lots)))
     {
       UpdateTicket(ordOpen.Ticket,Order.Target,Order.Stop);
 
       Order.Key              = ordOpen.Ticket;
       Order.Price            = ordOpen.Price;
-
+      Order.Lots             = LotSize(Order.Lots);
+      
       return (true);
     }
     
@@ -1275,17 +1298,33 @@ void OrderCancel(int Action, string Reason="")
   {
     for (int request=0;request<ArraySize(omQueue);request++)
       if (omQueue[request].Status==Pending)
-        if (Action(omQueue[request].Action,InAction)==Action)
-          if (omQueue[request].Status!=Canceled)
-          {
-            omQueue[request].Status   = Canceled;
-            omQueue[request].Expiry   = Time[0]+(Period()*60);
-          
-            if (Reason!="")
-              omQueue[request].Memo   = Reason;
-          }
-          
-    RefreshOrders();
+        if (omQueue[request].Action==Action||((Action==OP_BUY||Action==OP_SELL)&&(Action(omQueue[request].Action,InAction)==Action)))
+        {
+          omQueue[request].Status   = Canceled;
+          omQueue[request].Expiry   = Time[0]+(Period()*60);
+
+          if (Reason!="")
+            omQueue[request].Memo        = Reason;
+              
+          RefreshOrders();
+        }
+  }
+
+//+------------------------------------------------------------------+
+//| OrderCancel - Cancels pending orders by Request                  |
+//+------------------------------------------------------------------+
+void OrderCancel(OrderRequest &Order, string Reason="")
+  {
+    if (Order.Status==Pending)
+    {
+      Order.Status            = Canceled;
+      Order.Expiry            = Time[0]+(Period()*60);
+      
+      if (Reason!="")
+        Order.Memo            = Reason;
+              
+      RefreshOrders();
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -1297,7 +1336,6 @@ void OrderSubmit(OrderRequest &Order, bool QueueOrders)
     {
       Order.Key                = omOrderKey.Count;
       Order.Status             = Pending;
-      Order.Lots               = LotSize(Order.Lots);
     
       omOrderKey.Add(ArraySize(omQueue));
       ArrayResize(omQueue,omOrderKey[Order.Key]+1);
@@ -1335,30 +1373,18 @@ void OrderProcessing(void)
           case OP_BUY:          omQueue[request].Status      = Immediate;
                                 break;
           case OP_BUYSTOP:      if (Ask>=omQueue[request].Price)
-                                {
-                                  omQueue[request].Action    = OP_BUY;
                                   omQueue[request].Status    = Immediate;
-                                }
                                 break;
           case OP_BUYLIMIT:     if (Ask<=omQueue[request].Price)
-                                {
-                                  omQueue[request].Action    = OP_BUY;
                                   omQueue[request].Status    = Immediate;
-                                }
                                 break;
           case OP_SELL:         omQueue[request].Status      = Immediate;
                                 break;
           case OP_SELLSTOP:     if (Bid<=omQueue[request].Price)
-                                {
-                                  omQueue[request].Action    = OP_SELL;
                                   omQueue[request].Status    = Immediate;
-                                }
                                 break;
           case OP_SELLLIMIT:    if (Bid>=omQueue[request].Price)
-                                {
-                                  omQueue[request].Action    = OP_SELL;
                                   omQueue[request].Status    = Immediate;
-                                }
                                 break;
         }
         
@@ -1374,7 +1400,10 @@ void OrderProcessing(void)
             omQueue[request].Status      = Rejected;
 
       if (IsChanged(omState,omQueue[request].Status))
+      {
         omRefreshQueue                   = true;
+        omQueue[request].Expiry          = Time[0]+(Period()*60);
+      }
     }
 
     if (omRefreshQueue)
@@ -1541,6 +1570,7 @@ StrategyType TrendDivergence(void)
     if (IsChanged(tdDivergent,CheckConvergence(tdDivergent)))
     {
       //-- Handle new divergence
+      
     }
     else
     {
@@ -1575,8 +1605,25 @@ void SetStrategy(void)
 //+------------------------------------------------------------------+
 //| ShortManagement - Manages short order positions, profit and risk |
 //+------------------------------------------------------------------+
+void Balance(EventType Type)
+  {
+    switch (Type)
+    {
+      case NewWaveReversal:  NewBarNote("Reversal(w)",Color(pfAction,IN_CHART_ACTION));
+    };
+  }
+
+//+------------------------------------------------------------------+
+//| ShortManagement - Manages short order positions, profit and risk |
+//+------------------------------------------------------------------+
 void ShortManagement(void)
   {
+    //--- First: Check for balancing events
+    if (pfractal.Event(NewWaveReversal))
+      Balance(NewWaveReversal);
+      
+    if (sEvent[NewBias])
+      Balance(NewBias);
 
   }
 
@@ -1586,37 +1633,6 @@ void ShortManagement(void)
 void LongManagement(void)
   {
 
-  }
-
-//+------------------------------------------------------------------+
-//| AssignActionManager - Assigns Action Manager and sets bounds     |
-//+------------------------------------------------------------------+
-void AssignActionManager(void)
-  {
-    static int aamManager    = OP_NO_ACTION;
-
-  //--- Strategy Action
-  //enum                StrategyAction
-  //                    {
-  //                      Capture,
-  //                      FFE,
-  //                      Spot,
-  //                      Build,
-  //                      Hold,
-  //                      Halt,
-  //                      StrategyActions
-  //                    };
-
-    if (IsChanged(aamManager,pfAction))
-      switch (aamManager)
-      {
-        case OP_BUY:   
-                       break;
-        case OP_SELL:  
-                       break;
-        default:       
-                       break;
-      }
   }
 
 //+------------------------------------------------------------------+
@@ -1645,8 +1661,6 @@ void Execute(void)
        
     SetStrategy();
 
-    AssignActionManager();
-    
     LongManagement();
     ShortManagement();
     OrderProcessing();
@@ -1683,36 +1697,27 @@ void LoadManualOrder(string &Order[])
       RefreshOrders();
       return;
     }
-    
-    if (ActionCode(Order[1])==OP_NO_ACTION)
+
+    if (ActionCode(Order[2])==OP_NO_ACTION)
     {
       Print("Error: Bad Action Type on order request");
       return;
     }
-    
-    if (Order[2]=="CANCEL")
-      OrderCancel(ActionCode(Order[1]),Order[3]);
-    else
-    {
-      if (Order[2]=="MARKET")
-        lmoRequest.Action           = ActionCode(Order[1]);
-      else
-      if (Order[2]=="QUEUE")
-        if (Direction(StringToDouble(Order[3])-Close[0])==DirectionUp)
-          lmoRequest.Action         = ActionCode(Order[1]+BoolToStr(ActionCode(Order[1])==OP_BUY,"STOP","LIMIT"));
-        else
-          lmoRequest.Action         = ActionCode(Order[1]+BoolToStr(ActionCode(Order[1])==OP_BUY,"LIMIT","STOP"));
-      else
-        lmoRequest.Action           = ActionCode(Order[1]+Order[2]);
-            
-      lmoRequest.Price              = StringToDouble(Order[3]);
-      lmoRequest.Lots               = LotSize(StringToDouble(Order[4]));
-      lmoRequest.Target             = StringToDouble(Order[5]);
-      lmoRequest.Stop               = StringToDouble(Order[6]);
-      lmoRequest.Expiry             = Time[0]+(Period()*StrToInteger(Order[7])*60);
-      lmoRequest.Memo               = Order[8];
 
-      OrderSubmit(lmoRequest,Order[2]=="QUEUE");
+    if (Order[1]=="CANCEL")
+      OrderCancel(ActionCode(Order[2]),Order[3]);
+    else
+    if (Order[1]=="OPEN"||Order[1]=="QUEUE")
+    {
+      lmoRequest.Action           = ActionCode(Order[2]);
+      lmoRequest.Price            = StringToDouble(Order[3]);
+      lmoRequest.Lots             = StringToDouble(Order[4]);
+      lmoRequest.Target           = StringToDouble(Order[5]);
+      lmoRequest.Stop             = StringToDouble(Order[6]);
+      lmoRequest.Expiry           = Time[0]+(Period()*StrToInteger(Order[7])*60);
+      lmoRequest.Memo             = Order[8];
+
+      OrderSubmit(lmoRequest,Order[1]=="QUEUE");
     }
   }
 
@@ -1992,6 +1997,8 @@ int OnInit()
       detail[type].Alerts       = true;
     }
 
+    ArrayInitialize(omInterlacePivot,Close[0]);
+    
     //--- Initialize Fibo Management
     for (FractalType type=ftOrigin;type<FractalTypes;type++)
       anFiboDetail[type].Session = Daily;
