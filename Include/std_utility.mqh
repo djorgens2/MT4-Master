@@ -359,8 +359,10 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
     case IN_CHART_DIR:     if (Value<0.00) return (clrRed);
                            if (Value>0.00) return (clrYellow);
                            return (clrDarkGray);
+    case IN_ACTION:        if (Action(Value,InAction)==OP_BUY)  return (clrLawnGreen);
+                           if (Action(Value,InAction)==OP_SELL) return (clrRed);
     case IN_CHART_ACTION:  if (Action(Value,InAction)==OP_BUY)  return (clrYellow);
-                           if (Action(Value,InAction)==OP_SELL) return (clrRed);                        
+                           if (Action(Value,InAction)==OP_SELL) return (clrRed);
   }
   
   return (clrDarkGray);

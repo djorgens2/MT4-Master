@@ -105,6 +105,7 @@ public:
              
              SessionRec       operator[](const PeriodType Type) {return(srec[Type]);}
              SessionRec       Fractal(const FractalType Type)   {return(sfractal[Type]);}
+             int              Age(void)                         {return(sBarFE);}   //--- Number of periods since the last fractal event
              
                                  
 private:
@@ -930,7 +931,7 @@ CSession::~CSession()
 void CSession::Update(void)
   {
     UpdateBuffers();
-    
+
     //--- Clear events
     sEvent.ClearEvents();
 
@@ -1130,7 +1131,9 @@ void CSession::RefreshScreen(void)
                        " (e) "+DoubleToStr(Expansion(ftTrend,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftTrend,Max,InPercent),1)+"%\n"+
         "Origin State:  "+EnumToString(sfractal[ftOrigin].State)+" Direction: "+DirText(sfractal[ftOrigin].Direction)+"/"+DirText(sfractal[ftOrigin].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftOrigin,Max,InPercent),1)+"%"+
-                       " (e) "+DoubleToStr(Expansion(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftOrigin,Max,InPercent),1)+"%\n");
+                       " (e) "+DoubleToStr(Expansion(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftOrigin,Max,InPercent),1)+"%\n"+
+        "\n"+EnumToString(sType)+" Active "+ActiveEventText());
+                       
   }
 
 //+------------------------------------------------------------------+

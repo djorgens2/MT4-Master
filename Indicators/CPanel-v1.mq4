@@ -15,6 +15,16 @@
 int       IndWinId = -1;
 string    ShortName             = "CPanel-v1";    
 
+    //-- Session Types
+    enum        SessionType
+                {
+                  Daily,
+                  Asia,
+                  Europe,
+                  US,
+                  SessionTypes
+                };
+
     enum        FractalPoint
                 {
                   fpTarget,
@@ -209,9 +219,35 @@ int OnInit()
         }
       }
 
+    string f1Head[7]  = {"Age","Bias","Long","Short"};
+    string f2Val;
+
+    for (SessionType type=0;type<SessionTypes;type++)
+    {
+      DrawBox("hdF"+EnumToString(type),(90*type)+70,186,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
+      NewLabel("lhF:"+EnumToString(type),EnumToString(type),100+(90*type),189,clrWhite,SCREEN_UL,IndWinId);
+      
+      for (int row=0;row<4;row++)
+      {
+        f2Val         = "lbF-"+f1Head[row]+":"+EnumToString(type);
+        
+        if (row==0)
+        {
+          NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,212,clrWhite,SCREEN_UL,IndWinId);
+          NewLabel(f2Val,"99",105+(90*type),212,clrWhite,SCREEN_UL,IndWinId);
+        }
+        else
+        {
+          NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,205+(row*40),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel(f2Val+"-Diff","-999.9",74+(90*type),190+(row*40),clrWhite,SCREEN_UL,IndWinId);
+          UpdateLabel(f2Val+"-Diff","-999.9",clrWhite,16,"Consolas");
+          NewLabel(f2Val+"-Pivot","9.99999",92+(90*type),210+(row*40),clrWhite,SCREEN_UL,IndWinId);
+        }
+      }
+    }
+
     DrawBox("hdAnalyst",5,32,330,140,clrNONE,BORDER_FLAT,IndWinId);
-//    DrawBox("hdActionLong",405,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
-//    DrawBox("hdActionShort",495,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
+    DrawBox("hdFractal",5,210,424,140,clrNONE,BORDER_FLAT,IndWinId);
     
     DrawBox("hdActionState",345,32,235,140,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdActionLong",405,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
