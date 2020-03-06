@@ -784,21 +784,22 @@ void RefreshScreen(void)
 
     rsEvents.ClearEvents();
     
-    for (SessionType show=Daily;show<SessionTypes;show++)
-      if (detail[show].Alerts)
-        for (EventType type=1;type<EventTypes;type++)
-          if (Alerts[type]&&session[show].Event(type))
-          {
-            if (type==NewFractal)
+    if (SourceAlerts[indSession])
+      for (SessionType show=Daily;show<SessionTypes;show++)
+        if (detail[show].Alerts)
+          for (EventType type=1;type<EventTypes;type++)
+            if (Alerts[type]&&session[show].Event(type))
             {
-              if (detail[show].NewFractal)
-                rsEvents.SetEvent(type);
+              if (type==NewFractal)
+              {
+                if (detail[show].NewFractal)
+                  rsEvents.SetEvent(type);
                 
-              detail[show].FractalHour = ServerHour();
+                detail[show].FractalHour = ServerHour();
+              }
+              else
+                rsEvents.SetEvent(type);
             }
-            else
-              rsEvents.SetEvent(type);
-          }
 
     if (rsEvents.ActiveEvent())
     {
@@ -1418,6 +1419,7 @@ bool CheckConvergence(bool &Check)
 //+------------------------------------------------------------------+
 StrategyType TermConvergence(void)
   {
+    //-- Short term rally/pullback -- look for contrarian openings
     static bool tcConvergent   = false;
 
     anPattern     = TermConvergent;
@@ -1562,6 +1564,10 @@ void Balance(EventType Type)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
+    static ActionState smState  = Halt;
+    
+//    if (IsChanged(smState,pfractal.ActionState(OP_SELL)))
+//      Pause("Action State changed to "+EnumToString(smState),"Short Manager Action Change");
 //    //--- First: Check for balancing events
 //    if (pfractal.Event(NewWaveReversal))
 //      Balance(NewWaveReversal);
@@ -1782,8 +1788,15 @@ void ExecAppCommands(string &Command[])
       if (StringSubstr(Command[1],0,4)=="TRAD")
         TradingOn                      = false;
       else
+      if (Command[1]=="ALERTS")
+        ArrayInitialize(Alerts,false);
+      else
       if (Command[1]=="ALL")  
       {
+        SourceAlerts[indPipMA]         = false;
+        SourceAlerts[indFractal]       = false;
+        SourceAlerts[indSession]       = false;
+      
         ArrayInitialize(Alerts,false);
 
         for (int alert=Daily;alert<SessionTypes;alert++)
@@ -1826,8 +1839,15 @@ void ExecAppCommands(string &Command[])
       if (StringSubstr(Command[1],0,4)=="TRAD")
         TradingOn                      = true;
       else
+      if (Command[1]=="ALERTS")
+        ArrayInitialize(Alerts,true);
+      else
       if (Command[1]=="ALL")
       {
+        SourceAlerts[indPipMA]         = true;
+        SourceAlerts[indFractal]       = true;
+        SourceAlerts[indSession]       = true;
+      
         ArrayInitialize(Alerts,true);
 
         for (int alert=Daily;alert<SessionTypes;alert++)

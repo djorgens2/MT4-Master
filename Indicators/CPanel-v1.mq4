@@ -238,16 +238,16 @@ int OnInit()
         }
         else
         {
-          NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,205+(row*40),clrWhite,SCREEN_UL,IndWinId);
-          NewLabel(f2Val+"-Diff","-999.9",74+(90*type),190+(row*40),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,204+(row*32),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel(f2Val+"-Diff","-999.9",74+(90*type),192+(row*32),clrWhite,SCREEN_UL,IndWinId);
           UpdateLabel(f2Val+"-Diff","-999.9",clrWhite,16,"Consolas");
-          NewLabel(f2Val+"-Pivot","9.99999",92+(90*type),210+(row*40),clrWhite,SCREEN_UL,IndWinId);
+          NewLabel(f2Val+"-Pivot","9.99999",92+(90*type),210+(row*32),clrWhite,SCREEN_UL,IndWinId);
         }
       }
     }
 
     DrawBox("hdAnalyst",5,32,330,140,clrNONE,BORDER_FLAT,IndWinId);
-    DrawBox("hdFractal",5,210,424,140,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("hdFractal",5,210,424,116,clrNONE,BORDER_FLAT,IndWinId);
     
     DrawBox("hdActionState",345,32,235,140,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdActionLong",405,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);

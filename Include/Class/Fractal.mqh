@@ -181,15 +181,15 @@ void CFractal::CalcOrigin(void)
       };
 
     //--- New Origin?
-    if (fStateMajor==Expansion)
+    if (fStateNow==Expansion)
       if (Event(NewFractal))
         if (f[Expansion].Price>fmax(dOrigin.Top,dOrigin.Price) || f[Expansion].Price<fmin(dOrigin.Bottom,dOrigin.Price))
           fEvents.SetEvent(NewOrigin,Major);
         else
         if (f[Expansion].Direction==DirectionUp)
-          fEvents.SetEvent(NewRally,Minor);
+          fEvents.SetEvent(NewRally,Major);
         else
-          fEvents.SetEvent(NewPullback,Minor);
+          fEvents.SetEvent(NewPullback,Major);
       else
       if (f[Expansion].Direction!=dOrigin.Direction)
       {
@@ -389,7 +389,8 @@ void CFractal::CalcRetrace(void)
 
       if (f[type].Bar == fBarNow||type == Actual)
       {
-        fStateNow               = type;
+        if (IsChanged(fStateNow,type))
+          fEvents.SetEvent(NewFractal,Nominal);
         
         if (this.Direction(fStateNow) == DirectionUp)
           fRetracePrice         = fmin(fRetracePrice,Close[fBarNow]);
@@ -401,7 +402,7 @@ void CFractal::CalcRetrace(void)
       }     
 
       if (type>Expansion)
-        if (IsHigher(fabs(f[Previous(type)].Price-f[type].Price),fRange,false))
+        if (IsHigher(fabs(f[Previous(type)].Price-f[type].Price),fRange,NoUpdate))
           f[Previous(type)].Peg = true;
     }
 
@@ -458,8 +459,6 @@ void CFractal::UpdateFractal(int Direction)
 
       fEvents.SetEvent(NewBreakout,Major);
     }
-
-    fEvents.SetEvent(NewFractal,Nominal);  //--- set new fractal alert
   }
 
 //+------------------------------------------------------------------+
