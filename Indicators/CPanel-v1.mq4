@@ -239,8 +239,8 @@ int OnInit()
         else
         {
           NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,204+(row*32),clrWhite,SCREEN_UL,IndWinId);
-          NewLabel(f2Val+"-Diff","-999.9",74+(90*type),192+(row*32),clrWhite,SCREEN_UL,IndWinId);
-          UpdateLabel(f2Val+"-Diff","-999.9",clrWhite,16,"Consolas");
+          NewLabel(f2Val+"-Diff","-999.9",74+(90*type),195+(row*32),clrWhite,SCREEN_UL,IndWinId);
+          UpdateLabel(f2Val+"-Diff","-999.9",clrWhite,12,"Consolas");
           NewLabel(f2Val+"-Pivot","9.99999",92+(90*type),210+(row*32),clrWhite,SCREEN_UL,IndWinId);
         }
       }

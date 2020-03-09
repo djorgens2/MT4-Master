@@ -129,7 +129,8 @@ public:
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
        bool          EventAlert(EventType Event, AlertLevelType AlertLevel)
-                                                     { return (fEvents.EventAlert(Event,AlertLevel));}       
+                                                     { return (fEvents.EventAlert(Event,AlertLevel));}              
+       AlertLevelType HighAlert(void)                { return (fEvents.HighAlert()); }                  //-- returns the max alert level for the tick                                              
        bool          ActiveEvent(void)               { return (fEvents.ActiveEvent()); }
        string        ActiveEventText(const bool WithHeader=true)
                                                      { return  (fEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events

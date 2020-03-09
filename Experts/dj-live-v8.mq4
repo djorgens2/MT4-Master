@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                   dj-live-v7.mq4 |
+//|                                                   dj-live-v8.mq4 |
 //|                                                 Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -12,6 +12,7 @@
 #define   clrBoxOff      C'60,60,60'
 #define   clrBoxRedOff   C'42,0,0'
 #define   clrBoxGreenOff C'0,42,0'
+#define   NoQueue        false
 
 #include <manual.mqh>
 #include <Class\Session.mqh>
@@ -95,7 +96,8 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         Closed,
                         OrderStates
                       };
-                      
+
+  //--- Major session fractal points                      
   enum                FractalPoint
                       {
                         fpTarget,
@@ -108,6 +110,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                       };
 
                       
+  //--- Indicator (Data Source) types
   enum                SourceType
                       {
                         NoSource,
@@ -134,7 +137,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
          StrategyTypes
        };
        
-  //--- Strategy Action
+  //--- Strategy text translations
   const string StrategyText[StrategyTypes] =
                       {
                         "No Strategy",
@@ -169,7 +172,6 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         int            FractalDir;             //-- Used to identify breakout and reversal direction
                         bool           NewFractal;             //-- Noise reduction filter on fractal expansion
                         bool           NewBias;                //-- Noise reduction filter for change in bias
-                        bool           NewPivot;               //-- Flags on pivot change cause by price movement
                         int            FractalHour;            //-- Last fractal hour within a day (NoValue==No Fractal)
                         int            FractalAge;             //-- Fractal age by session after a new fractal
                         double         BiasPivot[2];           //-- Most recent fractal pivot by Action
@@ -191,25 +193,6 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         double          Price;
                         double          Lots;
                         double          Target;
-                        double          Stop;
-                        string          Memo;
-                        datetime        Expiry;
-                        OrderStatus     Status;
-                      };
-
-  struct              PositionDetail
-                      {
-                        int              Action;
-                        double           Margin;
-                      };
-                      
-  struct              OrderActivity
-                      {
-                        int             Action;
-                        double          Lots;
-                        double          Profit;
-                        double          Loss;
-                        double          Net;
                         double          Stop;
                         string          Memo;
                         datetime        Expiry;
@@ -261,7 +244,6 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   SessionDetail       detail[SessionTypes];
   
   //--- Trade operationals
-  int                 SessionHour;
   
   //--- Order Manager operationals
   int                 omAction;
@@ -272,6 +254,8 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   double              omInterlacePivot[2];
   int                 omInterlaceDir;
   int                 omInterlaceBrkDir;
+  double              omFractalPivot;
+  AlertLevelType      omFractalAlert;
   CArrayDouble       *omWork;
   
   double              pfExpansion[10];
@@ -280,7 +264,6 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   //--- Analyst operationals
   StrategyType        anStrategy;
   Pattern             anPattern;
-  ViewPoint           anState[ViewPoints];
   double              anFractal[ViewPoints][FractalPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
 
@@ -608,13 +591,13 @@ void RefreshControlPanel(void)
         else
           switch (row)
           {
-            case 1:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].BiasPivot[session[type].Bias()]),1),Color(Close[0]-detail[type].BiasPivot[session[type].Bias()]),16,"Consolas");
+            case 1:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].BiasPivot[session[type].Bias()]),1),Color(Close[0]-detail[type].BiasPivot[session[type].Bias()]),12,"Consolas");
                      UpdateLabel(f2Val+"-Pivot",DoubleToStr(detail[type].BiasPivot[session[type].Bias()],Digits),Color(Close[0]-detail[type].BiasPivot[session[type].Bias()]));
                      break;
-            case 2:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].FractalPivot[OP_BUY]),1),Color(Close[0]-detail[type].FractalPivot[OP_BUY]),16,"Consolas");
+            case 2:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].FractalPivot[OP_BUY]),1),Color(Close[0]-detail[type].FractalPivot[OP_BUY]),12,"Consolas");
                      UpdateLabel(f2Val+"-Pivot",DoubleToStr(detail[type].FractalPivot[OP_BUY],Digits),Color(Close[0]-detail[type].FractalPivot[OP_BUY]));
                      break;
-            case 3:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].FractalPivot[OP_SELL]),1),Color(Close[0]-detail[type].FractalPivot[OP_SELL]),16,"Consolas");
+            case 3:  UpdateLabel(f2Val+"-Diff",NegLPad(Pip(Close[0]-detail[type].FractalPivot[OP_SELL]),1),Color(Close[0]-detail[type].FractalPivot[OP_SELL]),12,"Consolas");
                      UpdateLabel(f2Val+"-Pivot",DoubleToStr(detail[type].FractalPivot[OP_SELL],Digits),Color(Close[0]-detail[type].FractalPivot[OP_SELL]));
                      break;
           }
@@ -744,7 +727,7 @@ void RefreshScreen(void)
     string rsEvent     = "";
 
     ShowLines();
-    RefreshPitchLabels();
+//    RefreshPitchLabels();
     
     UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrYellow);
     UpdatePriceLabel("plbInterlaceLow",omInterlace[ArraySize(omInterlace)-1],clrYellow);
@@ -921,7 +904,6 @@ void UpdateSession(void)
       //-- Clear event flags
       detail[type].NewFractal         = false;
       detail[type].FractalAge         = session[type].Age();
-      detail[type].NewPivot           = false;
       detail[type].NewBias            = false;
 
       //-- Set Session Notification Events
@@ -987,9 +969,8 @@ void UpdateSession(void)
 
       if (NewDirection(detail[type].ActiveDir,Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession))))
       {
-        sEvent.SetEvent(NewPivot,Major);
+        sEvent.SetEvent(NewPivot,Critical);
         detail[type].ActivePivot    = Close[0];
-        detail[type].NewPivot       = true;
       }
 
       if (NewBias(detail[type].ActiveBias,session[type].Bias()))
@@ -1072,6 +1053,12 @@ void UpdatePipMA(void)
 void UpdateFractal(void)
   {
     fractal.Update();
+    
+    if (fractal.Event(NewFractal))
+    {
+      omFractalPivot                     = Close[0];
+      omFractalAlert                     = fractal.HighAlert() ; 
+    }
 
     //--- Process Session Fractal data
     for (FractalType type=ftOrigin;type<FractalTypes;type++)
@@ -1361,10 +1348,10 @@ void UpdateStrategy(StrategyType Strategy)
         if (session[Asia].IsOpen())
         {
           if (session[Asia].Event(NewHigh)&&usLiveEventDir==DirectionUp)
-            UpdateBarNote(usBarNote,session[Asia].Fractal(ftTerm).High,clrWhite);
+            UpdateBarNote(usBarNote,session[Asia][ActiveSession].High,clrWhite);
           
           if (session[Asia].Event(NewLow)&&usLiveEventDir==DirectionDown)
-            UpdateBarNote(usBarNote,session[Asia].Fractal(ftTerm).Low,clrWhite);
+            UpdateBarNote(usBarNote,session[Asia][ActiveSession].Low,clrWhite);
         }
         else
         {
@@ -1564,9 +1551,19 @@ void Balance(EventType Type)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static ActionState smState  = Halt;
+    static OrderRequest smRequest = {0,OP_NO_ACTION,"Manager",0,0,0,0,"",0,NoStatus};
+    static ActionState  smState  = Halt;
+    static bool         smOpTrig = false;
     
-//    if (IsChanged(smState,pfractal.ActionState(OP_SELL)))
+    if (IsChanged(smState,pfractal.ActionState(OP_SELL)))
+      switch (smState)
+      {
+        case Opportunity: smRequest.Action    = OP_SELL;
+                          smRequest.Memo      = "Opportunity";
+                          smRequest.Expiry    = Time[0]+(Period()*60);
+                          OrderSubmit(smRequest,NoQueue);
+      }
+      
 //      Pause("Action State changed to "+EnumToString(smState),"Short Manager Action Change");
 //    //--- First: Check for balancing events
 //    if (pfractal.Event(NewWaveReversal))
@@ -1578,8 +1575,11 @@ void ShortManagement(void)
 //    if (detail[Daily].NewFractal)
 //      Balance(NewFractal);
 //
-    if (session[Daily].Event(NewOrigin))
-      Balance(NewOrigin);
+//    if (session[Daily].Event(NewOrigin))
+//      Balance(NewOrigin);
+    
+      if (fractal.Event(NewFractal));
+      
   }
 
 //+------------------------------------------------------------------+
