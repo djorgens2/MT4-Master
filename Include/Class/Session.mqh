@@ -66,6 +66,7 @@ public:
              {
                int            Direction;
                int            BreakoutDir;     //--- Direction of the last breakout or reversal
+               int            Bias;            //--- Current session Bias in action
                ReservedWords  State;
                double         High;            //--- High/Low store daily/session high & low
                double         Low;
@@ -91,7 +92,7 @@ public:
              datetime         ServerTime(int Bar=0);
              
              double           Pivot(const PeriodType Type);
-             int              Bias(void);
+             int              Bias(double Price);
              
              FiboDetail       Fibonacci(FractalType Type);
              double           Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
@@ -149,9 +150,11 @@ private:
 
              void             LoadHistory(void);
              
+             bool             NewBias(int &Now, int New);
              bool             NewDirection(int &Direction, int NewDirection, bool Update=true);
              bool             NewState(ReservedWords &State, ReservedWords NewState, EventType EventTrigger);
 
+             void             UpdateBias(void);
              void             UpdateTerm(void);
              void             UpdateTrend(void);
              void             UpdateOrigin(void);
@@ -167,6 +170,20 @@ datetime CSession::ServerTime(int Bar=0)
     
     return(Time[Bar]+(PERIOD_H1*60*sHourOffset));
   };
+
+//+------------------------------------------------------------------+
+//| NewBias - Updates Trade Bias based on an actual change           |
+//+------------------------------------------------------------------+
+bool CSession::NewBias(int &Now, int New)
+  {    
+    if (New==OP_NO_ACTION)
+      return (false);
+      
+    if (IsChanged(Now,New))
+      return (true);
+      
+    return (false);
+  }
 
 //+------------------------------------------------------------------+
 //| NewDirection - Tests for new direction events                    |
@@ -307,6 +324,29 @@ void CSession::UpdateFractalBuffer(int Direction, double Value)
       sDirFE                       = Direction;
       sBarFE                       = sBar;
     }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateBias - Updates the fractal & session trade biases          |
+//+------------------------------------------------------------------+
+void CSession::UpdateBias(void)
+  {  
+    if (NewBias(srec[ActiveSession].Bias,this.Bias(BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
+      sEvent.SetEvent(NewBias,Minor);
+      
+    if (NewBias(sfractal[ftTerm].Bias,this.Bias(fdiv(Pivot(OffSession)+Pivot(PriorSession),2,Digits))))
+      sEvent.SetEvent(NewBias,Minor);
+      
+    if (NewBias(sfractal[ftTrend].Bias,this.Bias(Pivot(PriorSession))))
+      sEvent.SetEvent(NewBias,Major);
+
+    if (sfractal[ftOrigin].Direction==DirectionUp)
+      if (NewBias(sfractal[ftOrigin].Bias,this.Bias(FiboPrice(Fibo23,fmax(sfractal[ftOrigin].High,sfractal[ftOrigin].Resistance),sfractal[ftOrigin].Support,Retrace))))
+        sEvent.SetEvent(NewBias,Critical);
+
+    if (sfractal[ftOrigin].Direction==DirectionDown)
+      if (NewBias(sfractal[ftOrigin].Bias,this.Bias(FiboPrice(Fibo23,sfractal[ftOrigin].Support,fmax(sfractal[ftOrigin].High,sfractal[ftOrigin].Resistance),Retrace))))
+        sEvent.SetEvent(NewBias,Critical);       
   }
 
 //+------------------------------------------------------------------+
@@ -955,6 +995,7 @@ void CSession::Update(void)
         CloseSession();
 
     UpdateSession();
+    UpdateBias();
     UpdateTerm();
     UpdateTrend();
     UpdateOrigin();
@@ -996,25 +1037,14 @@ double CSession::Pivot(const PeriodType Type)
 //+------------------------------------------------------------------+
 //| Bias - returns the order action relative to the root             |
 //+------------------------------------------------------------------+
-int CSession::Bias(void)
+int CSession::Bias(double Price)
   {
-    if (IsOpen())
-    {
-      if (Pivot(ActiveSession)>Pivot(OffSession))
-        return (OP_BUY);
+    if (Pivot(ActiveSession)>Price)
+      return (OP_BUY);
 
-      if (Pivot(ActiveSession)<Pivot(OffSession))
-        return (OP_SELL);
-    }      
-    else
-    {
-      if (Pivot(ActiveSession)>Pivot(PriorSession))
-        return (OP_BUY);
-
-      if (Pivot(ActiveSession)<Pivot(PriorSession))
-        return (OP_SELL);
-    }
-      
+    if (Pivot(ActiveSession)<Price)
+      return (OP_SELL);
+  
     return (Action(srec[ActiveSession].Direction,InDirection));
   }
 

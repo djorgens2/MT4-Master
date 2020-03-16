@@ -93,7 +93,7 @@ public:
        double           MA(int Measure);
        double           Poly(int Measure);
        
-       void             DrawStateLines(void);
+       void             DrawWaveOverlays(void);
        ReservedWords    PolyState(void) { return(prPolyState); }
        ActionState      ActionState(const int Action) {return (prWave.ActionState[Action]); }
        double           ActionLine(const int Action, const ActionState Line) {return (prLine[Action][Line]); }
@@ -1420,9 +1420,9 @@ WaveSegment CPolyRegression::WaveSegment(const int Segment)
   }
 
 //+------------------------------------------------------------------+
-//| DrawStateLines - Paint Crest/Trough lines                        |
+//| DrawWaveOverlays - Paint Crest/Trough lines                      |
 //+------------------------------------------------------------------+
-void CPolyRegression::DrawStateLines(void)
+void CPolyRegression::DrawWaveOverlays(void)
   {
     static int           dsBarIndex  = 0;
     static int           dsEventIdx  = 0;
