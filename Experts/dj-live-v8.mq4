@@ -1551,7 +1551,7 @@ void Balance(EventType Event, SessionType Session=Daily)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static OrderRequest smRequest = {0,OP_NO_ACTION,"Manager",0,0,0,0,"",0,NoStatus};
+    static OrderRequest smRequest = {0,OP_NO_ACTION,"ShortMGR",0,0,0,0,"",0,NoStatus};
     static ActionState  smState   = Halt;
     static bool         smOpTrig  = false;
     
