@@ -28,7 +28,7 @@
                   };
  
 input string      AppHeader            = "";       //+---- Application Options -------+
-input double      inpMarginTolerance   = 12.5;     // Margin drawdown factor 
+input double      inpMarginTolerance   = 6.5;      // Margin drawdown factor 
 input MarginModel inpMarginModel       = Discount; // Account type margin handling
 input YesNoType   inpDisplayEvents     = Yes;      // Display event bar notes
 input YesNoType   inpShowWaveSegs      = Yes;      // Display wave segment overlays
@@ -183,11 +183,23 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         bool           Alerts;                 //-- Noise reduction filter for alerts
                       };
 
+  struct              OrderFiboData 
+                      {
+                        double         Lots;                   //-- Most recent open price
+                        double         Margin;                 //-- Most recent profit price by Action
+                        double         PivotDCA;               //-- Most recent DCA price by Action
+                        double         NetValue;               //-- Net value in dollar
+                      };
+                        
   struct              OrderDetail 
                       {
-                        double         OpenPivot;               //-- Most recent open price
-                        double         ProfitPivot;             //-- Most recent profit price by Action
-
+                        double         PivotOpen;            //-- Most recent open price
+                        double         PivotProfit;          //-- Most recent profit price by Action
+                        double         PivotDCA;             //-- Most recent DCA price by Action
+                        int            FiboLevelMin;         //-- Lowest fibo sequence off pivot
+                        int            FiboLevelMax;         //-- Highest fibo sequence off pivot
+                        OrderFiboData  ProfitDetail[10];     //-- Detail orders in Profit by Fibo Level
+                        OrderFiboData  LossDetail[10];       //-- Detail orders in Loss by Fibo Level
                       };
                         
   struct              OrderRequest
@@ -885,8 +897,37 @@ int PriceRating(double Price, double Max=6.0, double Min=3.0, double Mean=0.2)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    for (int ord=0;ord<ArraySize(ordClose);ord++) 
-      order[ordClose[ord].Action].ProfitPivot  = ordClose[ord].Price;
+
+/*  
+  struct              OrderFiboData 
+                      {
+                        double         Lots;                   //-- Most recent open price 
+                        double         Margin;                 //-- Most recent profit price by Action
+                        double         PivotDCA;               //-- Most recent DCA price by Action
+                        double         NetValue;               //-- Net value in dollar
+                      };
+
+  struct              OrderDetail 
+                      {
+                        double         PivotOpen;            //-- Most recent open price
+                        double         PivotProfit;          //-- Most recent profit price by Action
+                        double         PivotDCA;             //-- Most recent DCA price by Action
+                        int            FiboLevelMin;         //-- Lowest fibo sequence off pivot
+                        int            FiboLevelMax;         //-- Highest fibo sequence off pivot
+                        OrderFiboData  ProfitDetail[10];     //-- Detail orders in Profit by Fibo Level
+                        OrderFiboData  LossDetail[10];       //-- Detail orders in Loss by Fibo Level
+                      };
+*/
+   
+    for (int ord=0;ord<ArraySize(ordClose);ord++)
+      order[ordClose[ord].Action].PivotProfit  = ordClose[ord].Price;
+      
+    for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
+    {
+    
+    
+    }
+      
   }
 
 //+------------------------------------------------------------------+
@@ -1202,14 +1243,16 @@ bool OrderProcessed(OrderRequest &Order)
     {
       UpdateTicket(ordOpen.Ticket,Order.Target,Order.Stop);
 
-      Order.Key              = ordOpen.Ticket;
-      Order.Price            = ordOpen.Price;
-      Order.Lots             = LotSize(Order.Lots);
+      Order.Key                      = ordOpen.Ticket;
+      Order.Price                    = ordOpen.Price;
+      Order.Lots                     = LotSize(Order.Lots);
+      
+      order[Order.Action].PivotOpen  = Order.Price;
       
       return (true);
     }
     
-    Order.Memo               = ordOpen.Reason;
+    Order.Memo                       = ordOpen.Reason;
     
     return (false);
   }
@@ -1551,7 +1594,7 @@ void Balance(EventType Event, SessionType Session=Daily)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static OrderRequest smRequest = {0,OP_NO_ACTION,"ShortMGR",0,0,0,0,"",0,NoStatus};
+    static OrderRequest smRequest = {0,OP_NO_ACTION,"Mgr:Short",0,0,0,0,"",0,NoStatus};
     static ActionState  smState   = Halt;
     static bool         smOpTrig  = false;
     
