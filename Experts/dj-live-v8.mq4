@@ -198,8 +198,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         double         PivotDCA;             //-- Most recent DCA price by Action
                         int            FiboLevelMin;         //-- Lowest fibo sequence off pivot
                         int            FiboLevelMax;         //-- Highest fibo sequence off pivot
-                        OrderFiboData  ProfitDetail[10];     //-- Detail orders in Profit by Fibo Level
-                        OrderFiboData  LossDetail[10];       //-- Detail orders in Loss by Fibo Level
+                        OrderFiboData  FiboDetail[20];       //-- Detail order value by Fibo Level
                       };
                         
   struct              OrderRequest
