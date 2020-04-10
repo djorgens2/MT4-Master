@@ -185,10 +185,12 @@ input int         inpGMTOffset         = 0;     // GMT Offset
 
   struct              OrderFiboData 
                       {
-                        double         Lots;                   //-- Most recent open price
-                        double         Margin;                 //-- Most recent profit price by Action
-                        double         PivotDCA;               //-- Most recent DCA price by Action
-                        double         NetValue;               //-- Net value in dollar
+                        double         Price;                //-- Fibo pivot
+                        double         Lots;                 //-- Most recent open price
+                        double         Margin;               //-- Most recent profit price by Action
+                        double         PivotDCA;             //-- Most recent DCA price by Action
+                        double         NetValue;             //-- Position net value
+                        bool           Trigger;              //-- Triggered fractal
                       };
                         
   struct              OrderDetail 
@@ -196,6 +198,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         double         PivotOpen;            //-- Most recent open price
                         double         PivotProfit;          //-- Most recent profit price by Action
                         double         PivotDCA;             //-- Most recent DCA price by Action
+                        double         PivotExit;            //-- Top of wane; Bottom of rise;
                         int            FiboLevelMin;         //-- Lowest fibo sequence off pivot
                         int            FiboLevelMax;         //-- Highest fibo sequence off pivot
                         OrderFiboData  FiboDetail[20];       //-- Detail order value by Fibo Level
@@ -258,7 +261,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   
   //--- Session operationals
   SessionDetail       detail[SessionTypes];
-  OrderDetail         order[2];
+  OrderDetail         fdetail[2];
   
   //--- Trade operationals
   
@@ -900,33 +903,38 @@ void UpdateOrders(void)
 /*  
   struct              OrderFiboData 
                       {
-                        double         Lots;                   //-- Most recent open price 
-                        double         Margin;                 //-- Most recent profit price by Action
-                        double         PivotDCA;               //-- Most recent DCA price by Action
-                        double         NetValue;               //-- Net value in dollar
+                        double         Price;                //-- Fibo pivot
+                        double         Lots;                 //-- Most recent open price
+                        double         Margin;               //-- Most recent profit price by Action
+                        double         PivotDCA;             //-- Most recent DCA price by Action
+                        double         NetValue;             //-- Position net value
+                        bool           Trigger;              //-- Triggered fractal
                       };
-
+                        
   struct              OrderDetail 
                       {
                         double         PivotOpen;            //-- Most recent open price
                         double         PivotProfit;          //-- Most recent profit price by Action
                         double         PivotDCA;             //-- Most recent DCA price by Action
-                        int            FiboLevelMin;         //-- Lowest fibo sequence off pivot
-                        int            FiboLevelMax;         //-- Highest fibo sequence off pivot
-                        OrderFiboData  ProfitDetail[10];     //-- Detail orders in Profit by Fibo Level
-                        OrderFiboData  LossDetail[10];       //-- Detail orders in Loss by Fibo Level
+                        double         PivotExit;            //-- Top of wane; Bottom of rise;
+                        OrderFiboData  FiboDetail[20];       //-- Detail order value by Fibo Level
                       };
 */
-   
+    int uoAction                       = OP_NO_ACTION;
+    
     for (int ord=0;ord<ArraySize(ordClose);ord++)
-      order[ordClose[ord].Action].PivotProfit  = ordClose[ord].Price;
+      fdetail[ordClose[ord].Action].PivotProfit  = ordClose[ord].Price;
       
-    for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
+    if (detail[Daily].NewFractal)
     {
-    
-    
-    }
+      uoAction                         = Action(detail[Daily].FractalDir,InDirection,InContrarian);
       
+      for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
+        fdetail[uoAction].FiboDetail[FiboLevel(FiboExt(fibo))].Price
+                                       = detail[Daily].FractalPivot[uoAction]+Pip(FiboLevels[fibo]*100,InPoints);
+                                       
+        Print ((string)FiboExt(fibo)+":"+DoubleToStr(fdetail[uoAction].FiboDetail[FiboLevel(FiboExt(fibo))].Price,Digits));
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -1246,7 +1254,7 @@ bool OrderProcessed(OrderRequest &Order)
       Order.Price                    = ordOpen.Price;
       Order.Lots                     = LotSize(Order.Lots);
       
-      order[Order.Action].PivotOpen  = Order.Price;
+      fdetail[Order.Action].PivotOpen  = Order.Price;
       
       return (true);
     }
