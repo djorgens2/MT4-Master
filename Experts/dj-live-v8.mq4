@@ -929,12 +929,14 @@ void UpdateOrders(void)
     {
       uoAction                         = Action(detail[Daily].FractalDir,InDirection,InContrarian);
       
-      for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
+      for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
+      {
         fdetail[uoAction].FiboDetail[FiboLevel(FiboExt(fibo))].Price
-                                       = detail[Daily].FractalPivot[uoAction]+Pip(FiboLevels[fibo]*100,InPoints);
+                                       = detail[Daily].FractalPivot[uoAction]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
                                        
         Print ((string)FiboExt(fibo)+":"+DoubleToStr(fdetail[uoAction].FiboDetail[FiboLevel(FiboExt(fibo))].Price,Digits));
       }
+    }
   }
 
 //+------------------------------------------------------------------+
