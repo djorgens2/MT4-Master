@@ -893,6 +893,32 @@ int PriceRating(double Price, double Max=6.0, double Min=3.0, double Mean=0.2)
   }
 
 //+------------------------------------------------------------------+
+//| OrderMargin                                                      |
+//+------------------------------------------------------------------+
+double OrderMargin(double Lots, int Format=InPercent)
+  {
+    double omMarginPerLot     = (ordAcctLotSize*ordAcctMinLot)/AccountLeverage();   //--- Initialize for JPY
+    double omMarginRqmt       = 0.00;
+
+    if (IsEqual(AccountEquity(),0.00,2))
+      return (omMarginRqmt);
+
+    if (Symbol()!="USDJPY")
+      omMarginPerLot          = ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage();
+       
+    omMarginRqmt              = (Lots/ordAcctMinLot)*omMarginPerLot;
+  
+    switch (Format)
+    {
+      case InPercent: return (NormalizeDouble(omMarginRqmt/AccountEquity()*100,1));
+      case InDollar:  return (NormalizeDouble(omMarginRqmt,2));
+      default:        Print("Order Margin: Invalid format code supplied");
+    }
+      
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateOrders - Updates order detail stats by action              |
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
@@ -913,10 +939,10 @@ void UpdateOrders(void)
     if (detail[Daily].NewFractal)
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboLevel(FiboExt(fibo))].Price   = 
+        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price   = 
               detail[Daily].FractalPivot[Action(detail[Daily].FractalDir,InDirection)]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboLevel(FiboExt(fibo))].Trigger = false;
-        Print ((string)FiboExt(fibo)+":"+DoubleToStr(fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboLevel(FiboExt(fibo))].Price,Digits));
+        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Trigger = false;
+        Print ((string)FiboExt(fibo)+":"+DoubleToStr(fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price,Digits));
       }
     
     //-- Setup margin calc measures
@@ -926,28 +952,37 @@ void UpdateOrders(void)
     switch (inpMarginModel)
     {
        case Discount:     uoMBurden      = fabs(uoMLots[OP_BUY]-uoMLots[OP_SELL])+fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),2);
-                          uoMMinority    = 1-fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]));
-                          uoMDominant    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]));
+       
+                          if (IsEqual(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),0.00))
+                            uoMDominant  = 1;
+                          else
+                          {
+                            uoMDominant    = fdiv(fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),(uoMLots[OP_BUY]+uoMLots[OP_SELL]),2);
+                            uoMMinority    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),(uoMLots[OP_BUY]+uoMLots[OP_SELL]),2);;
+                          }
                           break;
-       case Premium:
-       case FIFO:         uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
+                          
+       case Premium:      uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
                           uoMMinority    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),2);
                           uoMDominant    = fabs(uoMLots[OP_BUY]-uoMLots[OP_SELL])+uoMMinority;
                           break;
+     
+       case FIFO:         uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
+                          uoMDominant    = uoMBurden;
     }
 
     //-- Calculate zone values and margins
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
-      for (int action=OP_BUY;action<OP_SELL;action++)
+      for (int action=OP_BUY;action<=OP_SELL;action++)
       {
-        fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots      =  0.00;
-        fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Value     =  0.00;
-        fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Margin    =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Lots      =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Value     =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Margin    =  0.00;
         
         if (Close[0]>uoPriceBase[action])
-          if (Close[0]<=fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Price)
-            if (IsChanged(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Trigger,true))
+          if (Close[0]<=fdetail[action].Zone[FiboExt(fibo)].Price)
+            if (IsChanged(fdetail[action].Zone[FiboExt(fibo)].Trigger,true))
               omNewZone                                          = true;
             
 
@@ -955,42 +990,46 @@ void UpdateOrders(void)
           if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
             if (OrderType()==action)
               if (OrderOpenPrice()>uoPriceBase[action])
-                if (OrderOpenPrice()<=fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Price)
+                if (OrderOpenPrice()<=fdetail[action].Zone[FiboExt(fibo)].Price)
                 {
-                  fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots  +=  OrderLots();
-                  fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Value +=  OrderProfit();
+                  fdetail[action].Zone[FiboExt(fibo)].Lots  +=  OrderLots();
+                  fdetail[action].Zone[FiboExt(fibo)].Value +=  OrderProfit();
                 }
                 
-        if (fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots>0.00)
+        if (fdetail[action].Zone[FiboExt(fibo)].Lots>0.00)
         {
           switch (inpMarginModel)
           {
             case Discount:  if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
-                              fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Margin  = 
-                                fdiv(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,uoMLots[action],ordLotPrecision)*(uoMDominant*uoMBurden);
+                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMDominant*uoMBurden));
                             else
-                              fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Margin  = 
-                                fdiv(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,uoMLots[action],ordLotPrecision)*(uoMMinority*uoMBurden);
+                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMMinority*uoMBurden));
                             break;
-            case Premium:
-            case FIFO:      if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
-                              fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Margin  = 
-                                fdiv(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,uoMLots[action],ordLotPrecision)*uoMDominant;
+            
+            case Premium:   if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
+                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*uoMDominant);
                             else
-                              fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Margin  = 
-                                fdiv(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,uoMLots[action],ordLotPrecision)*uoMMinority;
+                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*uoMMinority);
+                            break;
+                            
+            case FIFO:      OrderMargin(fdetail[action].Zone[FiboExt(fibo)].Margin  = uoMLots[action]);
                             break;
           }
-          Print((string)FiboExt(fibo)+")"+DoubleToStr(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Price,Digits)+ActionText(action)+":"+
-                                      " Lots/Open:"+DoubleToStr(uoMLots[action],ordLotPrecision)+
-                                      " Lots/Zone:"+DoubleToStr(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,ordLotPrecision)+
-                                      " Zone/Value:"+DoubleToStr(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Value,2)+
-                                      " Zone/Margin:"+DoubleToStr(fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Lots,ordLotPrecision)+
-                                      " Burden:"+DoubleToStr(uoMBurden,ordLotPrecision)+
-                                      " Dominant:"+DoubleToStr(uoMDominant,3)+
-                                      " Minority:"+DoubleToStr(uoMMinority,3));
+          
+          Print(ActionText(action)+" Zone-"+(string)FiboExt(fibo)+") "+DoubleToStr(fdetail[action].Zone[FiboExt(fibo)].Price,Digits)+
+                                   " Lots/Open:"+DoubleToStr(uoMLots[action],ordLotPrecision)+
+                                   " Lots/Zone:"+DoubleToStr(fdetail[action].Zone[FiboExt(fibo)].Lots,ordLotPrecision)+
+                                   " Zone/Value:"+DoubleToStr(fdetail[action].Zone[FiboExt(fibo)].Value,2)+
+                                   " Zone/Margin:"+DoubleToStr(fdetail[action].Zone[FiboExt(fibo)].Margin,ordLotPrecision)+
+                                   " Burden:"+DoubleToStr(uoMBurden,ordLotPrecision)+
+                                   " Dominant:"+DoubleToStr(uoMDominant,3)+
+                                   " Minority:"+DoubleToStr(uoMMinority,3));
         }
-        uoPriceBase[action]       = fdetail[action].Zone[FiboLevel(FiboExt(fibo))].Price;
+        uoPriceBase[action]       = fdetail[action].Zone[FiboExt(fibo)].Price;
       }
     }
   }
@@ -2097,17 +2136,15 @@ int OnInit()
 
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
-      fdetail[OP_BUY].Zone[FiboLevel(FiboExt(fibo))].Price    = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      fdetail[OP_BUY].Zone[FiboLevel(FiboExt(fibo))].Trigger  = false;
-Print(DoubleToStr(fdetail[OP_BUY].Zone[FiboLevel(FiboExt(fibo))].Price,Digits));
-      fdetail[OP_SELL].Zone[FiboLevel(FiboExt(fibo))].Price   = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      fdetail[OP_SELL].Zone[FiboLevel(FiboExt(fibo))].Trigger = false;
-//      Print(DoubleToStr(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints),Digits));
+      fdetail[OP_BUY].Zone[FiboExt(fibo)].Price    = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      fdetail[OP_BUY].Zone[FiboExt(fibo)].Trigger  = false;
+      fdetail[OP_SELL].Zone[FiboExt(fibo)].Price   = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      fdetail[OP_SELL].Zone[FiboExt(fibo)].Trigger = false;
     }
       
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
-//      for (int action=OP_BUY;action<=OP_SELL;action++)
-        Print (ActionText(OP_BUY)+" "+(string)FiboExt(fibo)+":"+DoubleToStr(fdetail[OP_BUY].Zone[FiboLevel(FiboExt(fibo))].Price,Digits));
+      for (int action=OP_BUY;action<=OP_SELL;action++)
+        Print (ActionText(action)+" "+(string)FiboExt(fibo)+":"+DoubleToStr(fdetail[action].Zone[FiboExt(fibo)].Price,Digits));
             
     return(INIT_SUCCEEDED);
   }
