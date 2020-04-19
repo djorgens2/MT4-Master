@@ -963,8 +963,8 @@ void UpdateOrders(void)
                           break;
                           
        case Premium:      uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
-                          uoMMinority    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),2);
-                          uoMDominant    = fabs(uoMLots[OP_BUY]-uoMLots[OP_SELL])+uoMMinority;
+                          uoMDominant    = 1;
+                          uoMMinority    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),uoMBurden);
                           break;
      
        case FIFO:         uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
@@ -1010,10 +1010,10 @@ void UpdateOrders(void)
             
             case Premium:   if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
                               fdetail[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*uoMDominant);
+                                OrderMargin(uoMLots[action]*uoMDominant);
                             else
                               fdetail[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*uoMMinority);
+                                OrderMargin(uoMLots[action]*uoMMinority);
                             break;
                             
             case FIFO:      OrderMargin(fdetail[action].Zone[FiboExt(fibo)].Margin  = uoMLots[action]);
