@@ -198,6 +198,9 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         double         PivotProfit;          //-- Most recent profit price by Action
                         double         PivotDCA;             //-- Most recent DCA price by Action
                         double         PivotExit;            //-- Top of wane; Bottom of rise;
+                        int            Fibo;                 //-- The current Fibo Level
+                        bool           ZoneNew;              //-- for new zone transversals by action
+                        bool           ZoneChange;           //-- for any zone transversal by action
                         OrderFiboData  Zone[20];             //-- Detail order value by Fibo Level
                       };
                         
@@ -264,7 +267,6 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   
   //--- Order Manager operationals
   int                 omAction;
-  bool                omNewZone;
   OrderRequest        omQueue[];
   CArrayInteger      *omOrderKey;
   double              omMatrix[5][5];
@@ -931,8 +933,6 @@ void UpdateOrders(void)
     double uoMDominant                   = 0.00;             //-- Dominant margin calc factor
     double uoMMinority                   = 0.00;             //-- Minority margin calc factor
     
-    omNewZone                            = false;
-
     for (int ord=0;ord<ArraySize(ordClose);ord++)
       fdetail[ordClose[ord].Action].PivotProfit  = ordClose[ord].Price;
       
@@ -971,19 +971,33 @@ void UpdateOrders(void)
                           uoMDominant    = uoMBurden;
     }
 
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      fdetail[action].ZoneNew                          = false;
+      fdetail[action].ZoneChange                       = false;
+    }  
+
     //-- Calculate zone values and margins
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
       for (int action=OP_BUY;action<=OP_SELL;action++)
       {
-        fdetail[action].Zone[FiboExt(fibo)].Lots      =  0.00;
-        fdetail[action].Zone[FiboExt(fibo)].Value     =  0.00;
-        fdetail[action].Zone[FiboExt(fibo)].Margin    =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Lots       =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Value      =  0.00;
+        fdetail[action].Zone[FiboExt(fibo)].Margin     =  0.00;
         
         if (Close[0]>uoPriceBase[action])
           if (Close[0]<=fdetail[action].Zone[FiboExt(fibo)].Price)
+          {
             if (IsChanged(fdetail[action].Zone[FiboExt(fibo)].Trigger,true))
-              omNewZone                                          = true;
+            {
+              fdetail[action].ZoneNew                  = true;
+              fdetail[action].Fibo                     = fibo;
+            }
+
+            if (IsChanged(fdetail[action].Fibo,fibo))
+              fdetail[action].ZoneChange               = true;
+          }
             
 
         for (int ord=0;ord<OrdersTotal();ord++)
@@ -1023,6 +1037,18 @@ void UpdateOrders(void)
 
         uoPriceBase[action]       = fdetail[action].Zone[FiboExt(fibo)].Price;
       }
+    }
+    
+    string ouRemark="";
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      if (fdetail[action].ZoneChange)
+        ouRemark       += "\n"+ActionText(action)+"\n------------------\n"+
+                          "  Zone Change:"+string(FiboLevels[fabs(fdetail[action].Fibo)]*Direction(fdetail[action].Fibo))+"\n"+
+                          "  New Zone?   "+BoolToStr(fdetail[action].ZoneNew,InYesNo)+"\n";
+                         
+      if (ouRemark!="")
+        Pause(ouRemark,"Zone Change Alert!");
     }
   }
 
