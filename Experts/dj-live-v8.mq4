@@ -986,6 +986,7 @@ void UpdateOrders(void)
         fdetail[action].Zone[FiboExt(fibo)].Value      =  0.00;
         fdetail[action].Zone[FiboExt(fibo)].Margin     =  0.00;
         
+        //-- Calculate fibo price and zone
         if (Close[0]>uoPriceBase[action])
           if (Close[0]<=fdetail[action].Zone[FiboExt(fibo)].Price)
           {
@@ -998,8 +999,8 @@ void UpdateOrders(void)
             if (IsChanged(fdetail[action].Fibo,fibo))
               fdetail[action].ZoneChange               = true;
           }
-            
 
+        //-- Aggregate order distribution across zone
         for (int ord=0;ord<OrdersTotal();ord++)
           if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
             if (OrderType()==action)
@@ -1009,7 +1010,8 @@ void UpdateOrders(void)
                   fdetail[action].Zone[FiboExt(fibo)].Lots  +=  OrderLots();
                   fdetail[action].Zone[FiboExt(fibo)].Value +=  OrderProfit();
                 }
-                
+
+        //-- Compute zone margin                
         if (fdetail[action].Zone[FiboExt(fibo)].Lots>0.00)
         {
           switch (inpMarginModel)
