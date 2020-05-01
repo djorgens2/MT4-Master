@@ -186,6 +186,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   struct              OrderFiboData 
                       {
                         double         Price;                //-- Fibo pivot
+                        int            Orders;               //-- Order count
                         double         Lots;                 //-- Most recent open price
                         double         Margin;               //-- Most recent profit price by Action
                         double         Value;                //-- Position net value
@@ -982,6 +983,7 @@ void UpdateOrders(void)
     {
       for (int action=OP_BUY;action<=OP_SELL;action++)
       {
+        fdetail[action].Zone[FiboExt(fibo)].Orders     =  0;
         fdetail[action].Zone[FiboExt(fibo)].Lots       =  0.00;
         fdetail[action].Zone[FiboExt(fibo)].Value      =  0.00;
         fdetail[action].Zone[FiboExt(fibo)].Margin     =  0.00;
@@ -1007,12 +1009,13 @@ void UpdateOrders(void)
               if (OrderOpenPrice()>uoPriceBase[action])
                 if (OrderOpenPrice()<=fdetail[action].Zone[FiboExt(fibo)].Price)
                 {
+                  fdetail[action].Zone[FiboExt(fibo)].Orders++;
                   fdetail[action].Zone[FiboExt(fibo)].Lots  +=  OrderLots();
                   fdetail[action].Zone[FiboExt(fibo)].Value +=  OrderProfit();
                 }
 
         //-- Compute zone margin                
-        if (fdetail[action].Zone[FiboExt(fibo)].Lots>0.00)
+        if (fdetail[action].Zone[FiboExt(fibo)].Orders>0)
         {
           switch (inpMarginModel)
           {
