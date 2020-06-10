@@ -91,14 +91,14 @@ int OnInit()
   
     NewLabel("lbState","",20,130,clrNONE,SCREEN_UL,IndWinId);
     
-    NewLabel("lbh-0A","Order Management",1650,4,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbAN-Strategy","Strategy",1750,4,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-0A","Order Management",1650,2,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbAN-Strategy","Strategy",1750,2,clrWhite,SCREEN_UL,IndWinId);
     
-    NewLabel("lbh-OML1A","Long:",1200,16,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbh-OML2A","Short:",1830,16,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-OML1A","Long:",1200,20,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-OML2A","Short:",1830,20,clrWhite,SCREEN_UL,IndWinId);
 
-    NewLabel("lbLongPlan","No Plan",1240,16,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbShortPlan","No Plan",1870,16,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbPlanBUY","Waiting...",1240,20,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbPlanSELL","Waiting...",1870,20,clrDarkGray,SCREEN_UL,IndWinId);
     
     for (int row=0;row<25;row++)
       for (int col=0;col<2;col++)
@@ -118,16 +118,16 @@ int OnInit()
 
       for (int col=0;col<2;col++)
       {
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Key","Order No.",1200+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Status","Status",1260+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Requestor","Requestor",1312+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Type","Type",1376+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Price","Price",1427+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Lots","Lots",1475+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Target","Target",1515+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Stop","Stop",1572+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Expiry","Expiration",1625+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
-        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Memo","Order Comments",1705+(col*630),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Key","Order No.",1200+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Status","Status",1260+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Requestor","Requestor",1312+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Type","Type",1376+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Price","Price",1427+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Lots","Lots",1475+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Target","Target",1515+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Stop","Stop",1572+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Expiry","Expiration",1625+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
+        NewLabel("lh-OM"+StringSubstr(ActionText(col),0,1)+"-Memo","Order Comments",1705+(col*630),32,clrGoldenrod,SCREEN_UL,IndWinId);
       }
       
 
@@ -186,7 +186,7 @@ int OnInit()
         NewLabel("lb"+colHead[col]+(string)row,"0.0000",660+(90*col),56+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
     
     for (int row=0;row<25;row++)
-      NewLabel("lbInterlace"+(string)row,"0.0000",1110,30+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbInterlace"+(string)row,"0.0000",1116,34+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
 
     for (ActionState row=Bank;row<Hold;row++)
       for (int col=OP_NO_ACTION;col<=OP_SELL;col++)
@@ -234,7 +234,7 @@ int OnInit()
         if (row==0)
         {
           NewLabel("lhF:"+f1Head[row],f1Head[row]+":",12,212,clrWhite,SCREEN_UL,IndWinId);
-          NewLabel(f2Val,"99",105+(90*type),212,clrWhite,SCREEN_UL,IndWinId);
+          NewLabel(f2Val,"99/ACTION",90+(90*type),212,clrWhite,SCREEN_UL,IndWinId);
         }
         else
         {
@@ -245,6 +245,57 @@ int OnInit()
         }
       }
     }
+    
+    DrawBox("hdLSOrder",434,178,136,148,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("hdLOrder",575,178,250,148,C'0,42,0',BORDER_FLAT,IndWinId);
+    DrawBox("hdSOrder",827,178,253,148,C'42,0,0',BORDER_FLAT,IndWinId);
+
+    NewLabel("lhSum-Bal","Balance/Equity",470,180,clrGoldenrod,SCREEN_UL,IndWinId);    
+    NewLabel("lbSum-Bal","",442,195,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbSum-Eq","",442,213,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbSum-EqBal","",442,231,clrDarkGray,SCREEN_UL,IndWinId);
+
+    NewLabel("lhSum-NetMarg","Margin %",450,256,clrGoldenrod,SCREEN_UL,IndWinId);    
+    NewLabel("lhSum-NetLots","Net Lots",520,256,clrGoldenrod,SCREEN_UL,IndWinId);    
+    NewLabel("lbSum-NetMarg","",446,265,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbSum-NetLots","",502,265,clrDarkGray,SCREEN_UL,IndWinId);
+
+    UpdateLabel("lbSum-Bal","$ 999999999",clrDarkGray,15,"Consolas");
+    UpdateLabel("lbSum-Eq","$-999999999",clrDarkGray,15,"Consolas");
+    UpdateLabel("lbSum-EqBal","$ 999999999",clrDarkGray,15,"Consolas");
+    UpdateLabel("lbSum-NetMarg","99.9%",clrDarkGray,13,"Consolas");
+    UpdateLabel("lbSum-NetLots","-999.99",clrDarkGray,13,"Consolas");
+    
+    NewLabel("lhSum-Eq%","Equity %",452,286,clrGoldenrod,SCREEN_UL,IndWinId);    
+    NewLabel("lhSum-Spread","Spread",524,286,clrGoldenrod,SCREEN_UL,IndWinId);    
+    NewLabel("lbSum-Eq%","",438,296,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lbSum-Spread","",516,296,clrNONE,SCREEN_UL,IndWinId);
+    UpdateLabel("lbSum-Eq%","-99.9%",clrDarkGray,13,"Consolas");
+    UpdateLabel("lbSum-Spread","999.9",clrDarkGray,13,"Consolas");
+
+    //NewLabel("lhSum-Loss","Loss",440,270,clrGoldenrod,SCREEN_UL,IndWinId);
+    //NewLabel("lhSum-Net","Net",440,288,clrGoldenrod,SCREEN_UL,IndWinId);
+    //NewLabel("lhSum-Gain","Gain",440,306,clrGoldenrod,SCREEN_UL,IndWinId);
+
+    for (int row=0;row<12;row++)
+      for (int col=0;col<=OP_SELL;col++)
+      {
+        if (row==0)
+        {
+          NewLabel("lhO-"+ActionText(col)+"F","Fibo%",590+(col*254),180,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhO-"+ActionText(col)+"#","#",632+(col*254),180,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhO-"+ActionText(col)+"L","Lots",660+(col*254),180,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhO-"+ActionText(col)+"V","---- Value ----",710+(col*254),180,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lhO-"+ActionText(col)+"M","Mrg%",792+(col*254),180,clrGoldenrod,SCREEN_UL,IndWinId);
+        }
+
+        NewLabel("lbO-"+ActionText(col)+(string)row+"F","-999.9%",580+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbO-"+ActionText(col)+(string)row+"#","99",630+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbO-"+ActionText(col)+(string)row+"L","000.00",645+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbO-"+ActionText(col)+(string)row+"V","-0000000",700+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbO-"+ActionText(col)+(string)row+"M","00.0%",770+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+      }
+//    ObjectDelete("hd0Summary");
 
     DrawBox("hdAnalyst",5,32,330,140,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdFractal",5,210,424,116,clrNONE,BORDER_FLAT,IndWinId);
@@ -256,12 +307,16 @@ int OnInit()
     DrawBox("hdSegment",590,32,490,85,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdWave",590,120,350,52,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdIntDetail",945,120,135,52,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("hdIntFrame",1086,32,98,294,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdLong",635,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdShort",725,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdCrest",815,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdTrough",905,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdDecay",995,9,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
     DrawBox("hdInterlace",1090,9,90,20,C'60,60,60',BORDER_RAISED,IndWinId);
+
+    DrawBox("hdOrdLong",1190,18,624,308,C'0,42,0',BORDER_FLAT,IndWinId);
+    DrawBox("hdOrdShort",1820,18,624,308,C'42,0,0',BORDER_FLAT,IndWinId);
 
     return(INIT_SUCCEEDED);
   }

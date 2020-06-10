@@ -114,8 +114,6 @@ void RefreshScreen(void)
         expand[fibo]++;
       }
     }   
-      UpdateLine("fOriginTop",fractal.Price(Origin,Top),STYLE_SOLID,DirColor(fractal.Origin(Direction)));
-      UpdateLine("fOriginBottom",fractal.Price(Origin,Bottom),STYLE_DOT,DirColor(fractal.Origin(Direction)));
       
     if (inpShowComment)
       fractal.RefreshScreen();
@@ -219,8 +217,6 @@ int OnInit()
     SetIndexEmptyValue(2,0.00);
     ArrayInitialize(indConvergentBuffer,0.00);
 
-      NewLine("fOriginTop");
-      NewLine("fOriginBottom");
     if (inpShowLines)
     {
       NewLine("fOriginTop");

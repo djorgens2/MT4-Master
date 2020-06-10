@@ -81,6 +81,16 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         TermDivergent
                       };
                       
+  //--- Order Values
+  enum                OrderValue
+                      {
+                        Lots,
+                        Margin,
+                        Equity,
+                        Value,
+                        OrderValues
+                      };
+
   //--- Order Statuses
   enum                OrderStatus
                       {
@@ -176,6 +186,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         double         FractalPivot[2];        //-- Most recent fractal pivot by Action
                         int            HighHour;               //-- Daily high hour
                         int            LowHour;                //-- Daily low hour
+                        int            Zone;                   //-- Action relative to prior session
                         double         Ceiling;                //-- Last session trading high
                         double         Floor;                  //-- Last session trading low
                         double         Pivot;                  //-- Last session pivot
@@ -183,26 +194,41 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         bool           Alerts;                 //-- Noise reduction filter for alerts
                       };
 
-  struct              OrderFiboData 
+  struct              ValueDetail 
                       {
-                        double         Price;                //-- Fibo pivot
-                        int            Orders;               //-- Order count
-                        double         Lots;                 //-- Most recent open price
-                        double         Margin;               //-- Most recent profit price by Action
-                        double         Value;                //-- Position net value
-                        bool           Trigger;              //-- Triggered fractal
+                        double         Lots;                 //-- Lots by Pos, Neg, Net
+                        double         Margin;               //-- Margin by Pos, Neg, Net
+                        double         Equity;               //-- Equity by Pos, Neg, Net
+                        double         Value;                //-- Order value by Pos, Neg, Net
                       };
-                        
+
   struct              OrderDetail 
                       {
-                        double         PivotOpen;            //-- Most recent open price
-                        double         PivotProfit;          //-- Most recent profit price by Action
-                        double         PivotDCA;             //-- Most recent DCA price by Action
-                        double         PivotExit;            //-- Top of wane; Bottom of rise;
+                        int            Ticket;               //-- Order Ticket# (Non-Aggregate)/Count (Aggregate);
+                        double         Price;                //-- Order Open Price/Fibo pivot
+                        double         Lots;                 //-- Order Lots/Zone Lots
+                        double         Margin;               //-- Order Margin (Raw)/Zone Margin (Aggregate);
+                        double         Value;                //-- Order net value/Zone Value (Aggregate);
+                        bool           Trigger;              //-- Action Flag/Triggered fractal
+                      };
+                        
+  struct              OrderMaster
+                      {
+                        bool           Trigger;              //-- Conditional order trigger
+                        double         OrderOpen;            //-- Most recent open price
+                        double         OrderClose;           //-- Most recent close price
+                        double         DCA;                  //-- Most recent DCA price
+                        double         Entry;                //-- Manager entry pivot
+                        double         Exit;                 //-- Manager exit pivot
+                        double         Support;              //-- Manager entry pivot
+                        double         Resistance;           //-- Manager exit pivot
+                        double         Target;               //-- Order Take Profit target pivot
                         int            Fibo;                 //-- The current Fibo Level
                         bool           ZoneNew;              //-- for new zone transversals by action
                         bool           ZoneChange;           //-- for any zone transversal by action
-                        OrderFiboData  Zone[20];             //-- Detail order value by Fibo Level
+                        OrderDetail    Zone[20];             //-- Aggregate order detail by zone
+                        OrderDetail    Line[];               //-- Line item order detail by action
+                        ValueDetail    Position[OrderValues];//-- Positional value by Pos, Neg, Net
                       };
                         
   struct              OrderRequest
@@ -249,6 +275,7 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   SessionType         rsSession           = SessionTypes;
   int                 rsAction            = OP_BUY;
   int                 rsSegment           = NoValue;
+  int                 rsZone              = OP_NO_ACTION;
     
   bool                PauseOn             = true;
   bool                PauseOnHistory      = false;
@@ -262,29 +289,31 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   
   //--- Session operationals
   SessionDetail       detail[SessionTypes];
-  OrderDetail         fdetail[2];
   
-  //--- Trade operationals
-  
-  //--- Order Manager operationals
-  int                 omAction;
-  OrderRequest        omQueue[];
-  CArrayInteger      *omOrderKey;
-  double              omMatrix[5][5];
-  double              omInterlace[];
-  double              omInterlacePivot[2];
-  int                 omInterlaceDir;
-  int                 omInterlaceBrkDir;
-  double              omFractalPivot;
-  AlertLevelType      omFractalAlert;
-  CArrayDouble       *omWork;
-  
+  //--- PipFractal operationals
   double              pfExpansion[10];
   int                 pfAction            = OP_NO_ACTION;
-
+  
+  //--- Order Manager operationals
+  OrderRequest        omQueue[];
+  CArrayInteger      *omOrderKey;
+  OrderMaster         omMaster[2];
+  ValueDetail         omTotal;
+  
   //--- Analyst operationals
   StrategyType        anStrategy;
   Pattern             anPattern;
+
+  int                 anAction;
+  double              anMatrix[5][5];
+  double              anInterlace[];
+  double              anInterlacePivot[2];
+  int                 anInterlaceDir;
+  int                 anInterlaceBrkDir;
+  double              anFractalPivot;
+  AlertLevelType      anFractalAlert;
+  CArrayDouble       *anWork;
+    
   double              anFractal[ViewPoints][FractalPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
 
@@ -448,6 +477,9 @@ void RefreshControlPanel(void)
     UpdateLabel("lbAN-Strategy",StrategyText[anStrategy],clrDarkGray);
     UpdateLabel("lbAN:State",PatternText[anPattern]);
     
+    UpdateLabel("lbPlanBUY",EnumToString(pfractal.Wave().State),BoolToInt(omMaster[OP_BUY].Trigger,clrYellow,clrDarkGray));
+    UpdateLabel("lbPlanSELL",EnumToString(pfractal.Wave().State),BoolToInt(omMaster[OP_SELL].Trigger,clrYellow,clrDarkGray));
+        
     if (pfractal.Event(NewWaveReversal))
     {
       UpdateLabel("lbh-1L","Long",clrDarkGray);
@@ -505,19 +537,16 @@ void RefreshControlPanel(void)
                       +BoolToStr(pfractal.ActiveSegment().Type==Decay,"Decay ")
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));
                       
-    UpdateLabel("lbIntDev",NegLPad(Pip(Close[0]-omInterlacePivot[Action(omInterlaceBrkDir,InDirection)]),1),
-                            Color(Close[0]-omInterlacePivot[Action(omInterlaceBrkDir,InDirection)]),20);
+    UpdateLabel("lbIntDev",NegLPad(Pip(Close[0]-anInterlacePivot[Action(anInterlaceBrkDir,InDirection)]),1),
+                            Color(Close[0]-anInterlacePivot[Action(anInterlaceBrkDir,InDirection)]),20);
     
-    UpdateLabel("lbIntPivot",DoubleToStr(omInterlacePivot[Action(omInterlaceBrkDir,InDirection)],Digits),clrDarkGray);
-    UpdateDirection("lbIntBrkDir",omInterlaceBrkDir,Color(omInterlaceBrkDir),28);
-    UpdateDirection("lbIntDir",omInterlaceDir,Color(omInterlaceDir),12);
+    UpdateLabel("lbIntPivot",DoubleToStr(anInterlacePivot[Action(anInterlaceBrkDir,InDirection)],Digits),clrDarkGray);
+    UpdateDirection("lbIntBrkDir",anInterlaceBrkDir,Color(anInterlaceBrkDir),28);
+    UpdateDirection("lbIntDir",anInterlaceDir,Color(anInterlaceDir),12);
 
     UpdateLabel("lbLongState",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));                     
     UpdateLabel("lbShortState",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
-    
-    UpdateLabel("lbLongPlan","Waiting...",clrDarkGray);
-    UpdateLabel("lbShortPlan","Waiting...",clrDarkGray);
-   
+        
     UpdateLabel("lbRetrace","Retrace",BoolToInt(pfractal.Wave().Retrace,clrYellow,clrDarkGray));
     UpdateLabel("lbBreakout","Breakout",BoolToInt(pfractal.Wave().Breakout,clrYellow,clrDarkGray));
     UpdateLabel("lbReversal","Reversal",BoolToInt(pfractal.Wave().Reversal,clrYellow,clrDarkGray));
@@ -534,11 +563,11 @@ void RefreshControlPanel(void)
 
     for (int row=0;row<5;row++)
       for (int col=0;col<5;col++)
-        UpdateLabel("lb"+colHead[col]+(string)row,DoubleToStr(omMatrix[col][row],Digits),Color(omMatrix[col][row],IN_PROXIMITY));
+        UpdateLabel("lb"+colHead[col]+(string)row,DoubleToStr(anMatrix[col][row],Digits),Color(anMatrix[col][row],IN_PROXIMITY));
 
     for (int row=0;row<25;row++)
-      if (row<ArraySize(omInterlace))
-        UpdateLabel("lbInterlace"+(string)row,DoubleToStr(omInterlace[row],Digits),Color(omInterlace[row],IN_PROXIMITY));
+      if (row<ArraySize(anInterlace))
+        UpdateLabel("lbInterlace"+(string)row,DoubleToStr(anInterlace[row],Digits),Color(anInterlace[row],IN_PROXIMITY));
       else
         UpdateLabel("lbInterlace"+(string)row,"");
 
@@ -546,7 +575,7 @@ void RefreshControlPanel(void)
       for (int col=OP_BUY;col<=OP_SELL;col++)
         UpdateLabel("lbPL"+(string)col+":"+(string)row,DoubleToStr(pfractal.ActionLine(col,row),Digits),Color(pfractal.ActionLine(col,row),IN_PROXIMITY));
 
-    UpdateBox("hdInterlace",Color(omInterlaceDir,IN_DARK_DIR));
+    UpdateBox("hdInterlace",Color(anInterlaceDir,IN_DARK_DIR));
     UpdateLabel("lbLongNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_BUY).Retrace-pfractal.WaveSegment(OP_BUY).High),1),clrRed);    
     UpdateLabel("lbShortNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(OP_SELL).Low-pfractal.WaveSegment(OP_SELL).Retrace),1),clrLawnGreen);    
     UpdateLabel("lbCrestNetRetrace",DoubleToStr(Pip(pfractal.WaveSegment(Crest).Retrace-pfractal.WaveSegment(Crest).High),1),clrRed);
@@ -608,7 +637,7 @@ void RefreshControlPanel(void)
         f2Val         = "lbF-"+f1Head[row]+":"+EnumToString(type);
         
         if (row==0)
-          UpdateLabel(f2Val,(string)detail[type].FractalAge,clrDarkGray);
+          UpdateLabel(f2Val,(string)detail[type].FractalAge+"/"+ActionText(detail[type].Zone),clrDarkGray);
         else
           switch (row)
           {
@@ -624,6 +653,62 @@ void RefreshControlPanel(void)
           }
       }
     }
+    
+    int    fibo[2]   = {-Fibo823,-Fibo823};
+    string field     = "";
+    string keys[5]   = {"F","#","L","V","M"};
+    
+    UpdateLabel("lbSum-Bal","$"+LPad(DoubleToStr(AccountBalance()+AccountCredit(),0)," ",10),Color(omTotal.Equity),15,"Consolas");
+    UpdateLabel("lbSum-Eq","$"+LPad(NegLPad(omTotal.Value,0)," ",10),Color(omTotal.Equity),15,"Consolas");
+    UpdateLabel("lbSum-EqBal","$"+LPad(DoubleToStr(AccountEquity(),0)," ",10),Color(omTotal.Equity),15,"Consolas");
+    UpdateLabel("lbSum-NetMarg",LPad(DoubleToStr(omTotal.Margin*100,1)," ",5)+"%",Color(omTotal.Equity),13,"Consolas");
+    UpdateLabel("lbSum-NetLots",LPad(DoubleToStr(omTotal.Lots,ordLotPrecision)," ",7),Color(omTotal.Lots),13,"Consolas");
+     
+    UpdateLabel("lbSum-Eq%",LPad(NegLPad(omTotal.Equity*100,1)," ",6)+"%",Color(omTotal.Equity),13,"Consolas");
+    UpdateLabel("lbSum-Spread",LPad(DoubleToStr(Pip(Ask-Bid),1)," ",5),Color(omTotal.Equity),13,"Consolas");
+    
+    for (int row=0;row<12;row++)
+      for (int col=0;col<=OP_SELL;col++)
+      {
+        field  = "lbO-"+ActionText(col)+(string)row;
+        
+        for (int cols=0;cols<5;cols++)
+          UpdateLabel(field+keys[cols],"");
+
+        while (fibo[col]<=Fibo823 && omMaster[col].Zone[FiboExt(fibo[col])].Ticket==0)
+          fibo[col]++;
+      
+        if (fibo[col]<=Fibo823)
+        {
+          color val = Color(omMaster[col].Zone[FiboExt(fibo[col])].Value);
+          
+          UpdateLabel(field+keys[0],LPad(DoubleToStr(FiboLevels[fabs(fibo[col])]*Direction(fibo[col])*100,1)+"%"," ",7),val);
+          UpdateLabel(field+keys[1],LPad((string)omMaster[col].Zone[FiboExt(fibo[col])].Ticket," ",2),val,9,"Consolas");
+          UpdateLabel(field+keys[2],LPad(DoubleToStr(omMaster[col].Zone[FiboExt(fibo[col])].Lots,ordLotPrecision)," ",6),val,9,"Consolas");
+          UpdateLabel(field+keys[3],"$"+LPad(DoubleToStr(omMaster[col].Zone[FiboExt(fibo[col])].Value,0)," ",11),val,9,"Consolas");
+          UpdateLabel(field+keys[4],LPad(DoubleToStr(omMaster[col].Zone[FiboExt(fibo[col])].Margin,1)," ",7),val,9,"Consolas");
+
+          fibo[col]++;
+        }
+      }
+  }
+
+//+------------------------------------------------------------------+
+//| ShowZoneLines - Diaplay zone lines                               |
+//+------------------------------------------------------------------+
+void ShowZoneLines(void)
+  {
+    static int szlZone       = OP_NO_ACTION;
+      
+    if (IsChanged(szlZone,rsZone)||detail[Daily].NewFractal)
+      for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
+        UpdateLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1),
+          omMaster[rsZone].Zone[FiboExt(fibo)].Price,
+          BoolToInt(fibo==0,STYLE_DOT,STYLE_SOLID),
+          BoolToInt(fibo==0,clrYellow,Color(fibo,IN_DARK_DIR)));
+          
+    UpdatePriceLabel("lbSEntry",omMaster[szlZone].Entry);
+    UpdatePriceLabel("lbSExit",omMaster[szlZone].Exit);
   }
 
 //+------------------------------------------------------------------+
@@ -632,6 +717,7 @@ void RefreshControlPanel(void)
 void ZeroLines(void)
   {
     static int zlAction       = OP_NO_ACTION;
+    static int zlZone         = OP_NO_ACTION;
     
     if (rsSession!=SessionTypes)
     {
@@ -646,7 +732,7 @@ void ZeroLines(void)
     }
 
     if (IsChanged(zlAction,rsAction)||pfractal.Event(NewWaveReversal))
-    {    
+    {
       UpdateLine("lnOpen",0.00);
       UpdateLine("lnHigh",0.00);
       UpdateLine("lnLow",0.00);
@@ -665,6 +751,20 @@ void ZeroLines(void)
       UpdateLine("lnOpportunity",0.00);
       UpdateLine("lnHalt",0.00);
       UpdateLine("lnKill",0.00);
+      
+      UpdateLine("plbInterlaceHigh",0.00);
+      UpdateLine("plbInterlaceLow",0.00);
+      UpdateLine("plbInterlacePivotActive",0.00);
+      UpdateLine("plbInterlacePivotInactive",0.00);
+    }
+    
+    if (IsChanged(zlZone,rsZone))
+    {
+      for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
+        UpdateLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1),0.00);
+
+      UpdatePriceLabel("lbSEntry",0.00);
+      UpdatePriceLabel("lbSExit",0.0);
     }
   }
 
@@ -689,54 +789,63 @@ void ShowLines(void)
     }
     
     if (rsAction==OP_NO_ACTION)
-      return;
-
-    if (rsSegment>NoValue)
-    {
-      UpdateLine("lnOpen",pfractal.WaveSegment(SegmentType[rsSegment]).Open,STYLE_SOLID,clrYellow);
-      UpdateLine("lnHigh",pfractal.WaveSegment(SegmentType[rsSegment]).High,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnLow",pfractal.WaveSegment(SegmentType[rsSegment]).Low,STYLE_SOLID,clrRed);
-      UpdateLine("lnClose",pfractal.WaveSegment(SegmentType[rsSegment]).Close,STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnRetrace",pfractal.WaveSegment(SegmentType[rsSegment]).Retrace,STYLE_DOT,clrSteelBlue);
-    }
-    else
-    if (pfractal.Wave().Action==rsAction)
-    {
-      UpdateLine("lnBank",pfractal.ActionLine(rsAction,Bank),STYLE_DOT,clrGoldenrod);
-      UpdateLine("lnGoal",pfractal.ActionLine(rsAction,Goal),STYLE_DOT,clrLawnGreen);
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
-      UpdateLine("lnChance",pfractal.ActionLine(rsAction,Chance),STYLE_DOT,clrSteelBlue);
-      UpdateLine("lnYield",pfractal.ActionLine(rsAction,Yield),STYLE_SOLID,clrGoldenrod);
-      UpdateLine("lnBuild",pfractal.ActionLine(rsAction,Build),STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
-    }
+      if (rsZone==OP_NO_ACTION)
+        return;
+      else
+        ShowZoneLines();
     else
     {
-      UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
-      UpdateLine("lnMercy",pfractal.ActionLine(rsAction,Mercy),STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction,Opportunity),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnHalt",pfractal.ActionLine(rsAction,Halt),STYLE_DOT,clrOrangeRed);
-      UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
-      UpdateLine("lnKill",pfractal.ActionLine(rsAction,Kill),STYLE_DOT,clrMaroon);
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| RefreshPitchLabels - sets the session type pitch labels          |
-//+------------------------------------------------------------------+
-void RefreshPitchLabels(void)
-  {
-    const color SessionColor[SessionTypes] =  {C'64,64,0',C'0,32,0',C'48,0,0',C'0,0,56'};
-  
-    if (sEvent[NewFractal]||sEvent[NewHour])
-      for (SessionType type=0;type<SessionTypes;type++)
+      UpdatePriceLabel("plbInterlaceHigh",anInterlace[0],clrYellow);
+      UpdatePriceLabel("plbInterlaceLow",anInterlace[ArraySize(anInterlace)-1],clrYellow);
+    
+      if (anAction==OP_NO_ACTION)
       {
-        ObjectSet("plb"+EnumToString(type),OBJPROP_COLOR,SessionColor[type]);
-        ObjectSet("plb"+EnumToString(type),OBJPROP_PRICE1,detail[type].Pitch);
-        ObjectSet("plb"+EnumToString(type),OBJPROP_TIME1,Time[Bar]+(Period()*600));
+        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrDarkGray);
+        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrDarkGray);
       }
+      else
+      if (anAction==OP_BUY)
+      {
+        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrLawnGreen);
+        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrMaroon);
+      }
+      else
+      {
+        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrForestGreen);
+        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrRed);
+      }
+    
+      if (rsSegment>NoValue)
+      {
+        UpdateLine("lnOpen",pfractal.WaveSegment(SegmentType[rsSegment]).Open,STYLE_SOLID,clrYellow);
+        UpdateLine("lnHigh",pfractal.WaveSegment(SegmentType[rsSegment]).High,STYLE_SOLID,clrLawnGreen);
+        UpdateLine("lnLow",pfractal.WaveSegment(SegmentType[rsSegment]).Low,STYLE_SOLID,clrRed);
+        UpdateLine("lnClose",pfractal.WaveSegment(SegmentType[rsSegment]).Close,STYLE_SOLID,clrSteelBlue);
+        UpdateLine("lnRetrace",pfractal.WaveSegment(SegmentType[rsSegment]).Retrace,STYLE_DOT,clrSteelBlue);
+      }
+      else
+      if (pfractal.Wave().Action==rsAction)
+      {
+        UpdateLine("lnBank",pfractal.ActionLine(rsAction,Bank),STYLE_DOT,clrGoldenrod);
+        UpdateLine("lnGoal",pfractal.ActionLine(rsAction,Goal),STYLE_DOT,clrLawnGreen);
+        UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
+        UpdateLine("lnChance",pfractal.ActionLine(rsAction,Chance),STYLE_DOT,clrSteelBlue);
+        UpdateLine("lnYield",pfractal.ActionLine(rsAction,Yield),STYLE_SOLID,clrGoldenrod);
+        UpdateLine("lnBuild",pfractal.ActionLine(rsAction,Build),STYLE_SOLID,clrLawnGreen);
+        UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
+        UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
+      }
+      else
+      {
+        UpdateLine("lnGo",pfractal.ActionLine(rsAction,Go),STYLE_SOLID,clrYellow);
+        UpdateLine("lnMercy",pfractal.ActionLine(rsAction,Mercy),STYLE_DOT,clrSteelBlue);      
+        UpdateLine("lnOpportunity",pfractal.ActionLine(rsAction,Opportunity),STYLE_SOLID,clrSteelBlue);
+        UpdateLine("lnRisk",pfractal.ActionLine(rsAction,Risk),STYLE_DOT,clrOrangeRed);
+        UpdateLine("lnHalt",pfractal.ActionLine(rsAction,Halt),STYLE_DOT,clrOrangeRed);
+        UpdateLine("lnStop",pfractal.ActionLine(rsAction,Stop),STYLE_SOLID,clrRed);
+        UpdateLine("lnKill",pfractal.ActionLine(rsAction,Kill),STYLE_DOT,clrMaroon);
+      }
+    }
   }
   
 //+------------------------------------------------------------------+
@@ -748,39 +857,17 @@ void RefreshScreen(void)
     string rsEvent     = "";
 
     ShowLines();
-//    RefreshPitchLabels();
-    
+
     rsComment          = "--BIAS--\n"+
                          "  Origin:  "+ActionText(session[Daily].Fractal(ftOrigin).Bias)+"\n"+
                          "  Trend:   "+ActionText(session[Daily].Fractal(ftTrend).Bias)+"\n"+
                          "  Term:    "+ActionText(session[Daily].Fractal(ftTerm).Bias)+"\n"+
                          "  Active:  "+ActionText(session[Daily][ActiveSession].Bias);
-    if (inpShowWaveSegs==Yes)
-    {
-      pfractal.DrawWaveOverlays();
-     
-      UpdatePriceLabel("plbInterlaceHigh",omInterlace[0],clrYellow);
-      UpdatePriceLabel("plbInterlaceLow",omInterlace[ArraySize(omInterlace)-1],clrYellow);
-    
-      if (omAction==OP_NO_ACTION)
-      {
-        UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrDarkGray);
-        UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrDarkGray);
-      }
-      else
-      if (omAction==OP_BUY)
-      {
-        UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrLawnGreen);
-        UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrMaroon);
-      }
-      else
-      {
-        UpdatePriceLabel("plbInterlacePivotActive",omInterlacePivot[OP_BUY],clrForestGreen);
-        UpdatePriceLabel("plbInterlacePivotInactive",omInterlacePivot[OP_SELL],clrRed);
-      }
-    }
 
-    if (SourceAlerts[indPipMA])
+    if (inpShowWaveSegs==Yes)
+      pfractal.DrawWaveOverlays();
+
+    if (SourceAlerts[indPipMA] && !PauseOnHistory)
       for (EventType type=1;type<EventTypes;type++)
         if (Alerts[type]&&pfractal.Event(type))
         {
@@ -926,36 +1013,41 @@ double OrderMargin(double Lots, int Format=InPercent)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    double uoPriceBase[2]                = {0.00,0.00};
+    double uoPriceBase[2]                  = {0.00,0.00};
 
     //-- Margin calculation measures
-    double uoMLots[2]                    = {0.00,0.00};      //-- Total Open Lots {OP_BUY/OP_SELL}
-    double uoMBurden                     = 0.00;             //-- Lots Basis for Margin Req. Calculation
-    double uoMDominant                   = 0.00;             //-- Dominant margin calc factor
-    double uoMMinority                   = 0.00;             //-- Minority margin calc factor
+    double uoMLots[2]                      = {0.00,0.00};   //-- Total Open Lots {OP_BUY/OP_SELL}
+    double uoMBurden                       = 0.00;          //-- Lots Basis for Margin Req. Calculation
+    double uoMDominant                     = 0.00;          //-- Dominant margin calc factor
+    double uoMMinority                     = 0.00;          //-- Minority margin calc factor
     
     for (int ord=0;ord<ArraySize(ordClose);ord++)
-      fdetail[ordClose[ord].Action].PivotProfit  = ordClose[ord].Price;
+      omMaster[ordClose[ord].Action].OrderClose = ordClose[ord].Price;
       
+    //-- Update zone details on NewFractal
     if (detail[Daily].NewFractal)
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price   = 
+        omMaster[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price   = 
               detail[Daily].FractalPivot[Action(detail[Daily].FractalDir,InDirection)]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-        fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Trigger = false;
-        Print ((string)FiboExt(fibo)+":"+DoubleToStr(fdetail[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price,Digits));
+
+        omMaster[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Trigger = false;
       }
     
+    //-- Update zone details on NewFractal
+    ArrayResize(omMaster[OP_BUY].Line,0);
+    ArrayResize(omMaster[OP_SELL].Line,0);
+
     //-- Setup margin calc measures
-    uoMLots[OP_BUY]                      = LotCount(OP_BUY);
-    uoMLots[OP_SELL]                     = LotCount(OP_SELL);
-    
+    uoMLots[OP_BUY]                        = LotCount(OP_BUY);
+    uoMLots[OP_SELL]                       = LotCount(OP_SELL);
+
     switch (inpMarginModel)
     {
-       case Discount:     uoMBurden      = fabs(uoMLots[OP_BUY]-uoMLots[OP_SELL])+fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),2);
+       case Discount:     uoMBurden        = fabs(uoMLots[OP_BUY]-uoMLots[OP_SELL])+fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),2);
        
                           if (IsEqual(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),0.00))
-                            uoMDominant  = 1;
+                            uoMDominant    = 1;
                           else
                           {
                             uoMDominant    = fdiv(fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),(uoMLots[OP_BUY]+uoMLots[OP_SELL]),2);
@@ -963,19 +1055,33 @@ void UpdateOrders(void)
                           }
                           break;
                           
-       case Premium:      uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
-                          uoMDominant    = 1;
-                          uoMMinority    = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),uoMBurden);
+       case Premium:      uoMBurden        = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
+                          uoMDominant      = 1;
+                          uoMMinority      = fdiv(fmin(uoMLots[OP_BUY],uoMLots[OP_SELL]),uoMBurden);
                           break;
-     
-       case FIFO:         uoMBurden      = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
-                          uoMDominant    = uoMBurden;
+
+       case FIFO:         uoMBurden        = fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]);
+                          uoMDominant      = uoMBurden;
     }
+
+    //-- Calc order summary
+    omTotal.Lots                           = uoMLots[OP_BUY]-uoMLots[OP_SELL];
+    omTotal.Value                          = AccountEquity()-(AccountBalance()+AccountCredit());
+    omTotal.Equity                         = fdiv(omTotal.Value,(AccountBalance()+AccountCredit()),3);
+    omTotal.Margin                         = fdiv(AccountMargin(),AccountEquity(),3);
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      fdetail[action].ZoneNew                          = false;
-      fdetail[action].ZoneChange                       = false;
+      omMaster[action].ZoneNew             = false;
+      omMaster[action].ZoneChange          = false;
+      
+      for (int pos=0;pos<OrderValues;pos++)
+      {
+        omMaster[action].Position[pos].Lots    = 0.00;
+        omMaster[action].Position[pos].Margin  = 0.00;
+        omMaster[action].Position[pos].Equity  = 0.00;
+        omMaster[action].Position[pos].Value   = 0.00;
+      }
     }  
 
     //-- Calculate zone values and margins
@@ -983,77 +1089,98 @@ void UpdateOrders(void)
     {
       for (int action=OP_BUY;action<=OP_SELL;action++)
       {
-        fdetail[action].Zone[FiboExt(fibo)].Orders     =  0;
-        fdetail[action].Zone[FiboExt(fibo)].Lots       =  0.00;
-        fdetail[action].Zone[FiboExt(fibo)].Value      =  0.00;
-        fdetail[action].Zone[FiboExt(fibo)].Margin     =  0.00;
+        omMaster[action].Zone[FiboExt(fibo)].Ticket     =  0;
+        omMaster[action].Zone[FiboExt(fibo)].Lots       =  0.00;
+        omMaster[action].Zone[FiboExt(fibo)].Value      =  0.00;
+        omMaster[action].Zone[FiboExt(fibo)].Margin     =  0.00;
         
         //-- Calculate fibo price and zone
         if (Close[0]>uoPriceBase[action])
-          if (Close[0]<=fdetail[action].Zone[FiboExt(fibo)].Price)
+          if (Close[0]<=omMaster[action].Zone[FiboExt(fibo)].Price)
           {
-            if (IsChanged(fdetail[action].Zone[FiboExt(fibo)].Trigger,true))
+            if (IsChanged(omMaster[action].Zone[FiboExt(fibo)].Trigger,true))
             {
-              fdetail[action].ZoneNew                  = true;
-              fdetail[action].Fibo                     = fibo;
+              omMaster[action].ZoneNew     = true;
+              omMaster[action].Fibo        = fibo;
             }
 
-            if (IsChanged(fdetail[action].Fibo,fibo))
-              fdetail[action].ZoneChange               = true;
+            if (IsChanged(omMaster[action].Fibo,fibo))
+              omMaster[action].ZoneChange  = true;
           }
 
-        //-- Aggregate order distribution across zone
+        //-- Order analysis and aggregation
         for (int ord=0;ord<OrdersTotal();ord++)
           if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
             if (OrderType()==action)
+            {
+              //-- Aggregate order position Pos, Neg, Net
+              ArrayResize(omMaster[action].Line,ArraySize(omMaster[action].Line)+1);
+
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Ticket  = OrderTicket();
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Price   = OrderOpenPrice();
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Lots    = OrderLots();
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Margin  = OrderMargin(OrderLots());
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Value   = OrderProfit();
+              omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Trigger = false;
+              
+              if (IsLower(0.00,omMaster[action].Line[ArraySize(omMaster[action].Line)-1].Value,NoUpdate))
+              {
+                omMaster[action].Position[0].Lots         += OrderLots();
+                omMaster[action].Position[0].Margin       += OrderMargin(OrderLots());
+                omMaster[action].Position[0].Value        += OrderProfit();
+
+                omMaster[action].Position[1].Lots         -= OrderLots();
+              }
+              else
+              {
+                omMaster[action].Position[2].Lots         += OrderLots();
+                omMaster[action].Position[2].Margin       += OrderMargin(OrderLots());
+                omMaster[action].Position[2].Value        += OrderProfit();
+                
+                omMaster[action].Position[1].Lots         += OrderLots();
+              }
+
+              omMaster[action].Position[1].Margin         += OrderMargin(omMaster[action].Position[0].Lots);
+              omMaster[action].Position[1].Value          += OrderProfit();
+
+              //-- Aggregate order distribution across zone          
               if (OrderOpenPrice()>uoPriceBase[action])
-                if (OrderOpenPrice()<=fdetail[action].Zone[FiboExt(fibo)].Price)
+                if (OrderOpenPrice()<=omMaster[action].Zone[FiboExt(fibo)].Price)
                 {
-                  fdetail[action].Zone[FiboExt(fibo)].Orders++;
-                  fdetail[action].Zone[FiboExt(fibo)].Lots  +=  OrderLots();
-                  fdetail[action].Zone[FiboExt(fibo)].Value +=  OrderProfit();
+                  omMaster[action].Zone[FiboExt(fibo)].Ticket++;
+                  omMaster[action].Zone[FiboExt(fibo)].Lots  +=  OrderLots();
+                  omMaster[action].Zone[FiboExt(fibo)].Value +=  OrderProfit();
                 }
+            }
 
         //-- Compute zone margin                
-        if (fdetail[action].Zone[FiboExt(fibo)].Orders>0)
+        if (omMaster[action].Zone[FiboExt(fibo)].Ticket>0)
         {
           switch (inpMarginModel)
           {
             case Discount:  if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
-                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMDominant*uoMBurden));
+                              omMaster[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(omMaster[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMDominant*uoMBurden));
                             else
-                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(fdetail[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMMinority*uoMBurden));
+                              omMaster[action].Zone[FiboExt(fibo)].Margin  = 
+                                OrderMargin(fdiv(omMaster[action].Zone[FiboExt(fibo)].Lots,uoMLots[action],ordLotPrecision)*(uoMMinority*uoMBurden));
                             break;
             
             case Premium:   if (IsEqual(uoMLots[action],fmax(uoMLots[OP_BUY],uoMLots[OP_SELL]),ordLotPrecision))
-                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                              omMaster[action].Zone[FiboExt(fibo)].Margin  = 
                                 OrderMargin(uoMLots[action]*uoMDominant);
                             else
-                              fdetail[action].Zone[FiboExt(fibo)].Margin  = 
+                              omMaster[action].Zone[FiboExt(fibo)].Margin  = 
                                 OrderMargin(uoMLots[action]*uoMMinority);
                             break;
                             
-            case FIFO:      OrderMargin(fdetail[action].Zone[FiboExt(fibo)].Margin  = uoMLots[action]);
+            case FIFO:      OrderMargin(omMaster[action].Zone[FiboExt(fibo)].Margin  = uoMLots[action]);
                             break;
           }
         }
 
-        uoPriceBase[action]       = fdetail[action].Zone[FiboExt(fibo)].Price;
+        uoPriceBase[action]       = omMaster[action].Zone[FiboExt(fibo)].Price;
       }
-    }
-    
-    string ouRemark="";
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-      if (fdetail[action].ZoneChange)
-        ouRemark       += "\n"+ActionText(action)+"\n------------------\n"+
-                          "  Zone Change:"+string(FiboLevels[fabs(fdetail[action].Fibo)]*Direction(fdetail[action].Fibo))+"\n"+
-                          "  New Zone?   "+BoolToStr(fdetail[action].ZoneNew,InYesNo)+"\n";
-                         
-      if (ouRemark!="")
-        Pause(ouRemark,"Zone Change Alert!");
     }
   }
 
@@ -1066,9 +1193,12 @@ void UpdateSession(void)
     {
       session[type].Update();
       
-      if (session[type].IsOpen())
-        lead             = session[type];
+      //-- Set tick level details and event flags
+      detail[type].ActiveDir         = Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession));
+      detail[type].NewFractal        = false;
+      detail[type].FractalAge        = session[type].Age();
 
+      //-- Set Session NewDay details
       if (session[type].Event(NewDay))
       {
         detail[type].FractalDir      = DirectionNone;
@@ -1079,13 +1209,14 @@ void UpdateSession(void)
 
         sEvent.SetEvent(NewDay);    
       }
-    
-      //-- Clear event flags
-      detail[type].ActiveDir         = Direction(session[type].Pivot(ActiveSession)-session[type].Pivot(PriorSession));
-      detail[type].NewFractal        = false;
-      detail[type].FractalAge        = session[type].Age();
 
-      //-- Set Session Notification Events
+      if (session[type].Event(NewHour))
+        sEvent.SetEvent(NewHour);
+
+      //-- Set Session open details
+      if (session[type].IsOpen())
+        lead                         = session[type];
+
       if (session[type].Event(SessionOpen))
       {          
         detail[type].Ceiling         = session[type][PriorSession].High;
@@ -1094,11 +1225,8 @@ void UpdateSession(void)
         
         sEvent.SetEvent(SessionOpen);
       }
-        
-      if (session[type].Event(NewHour))
-        sEvent.SetEvent(NewHour);
 
-      //-- Evaluate and Set Session Fractal Events
+      //-- Set Session details and Fractal events
       if (session[type].Event(NewFractal))
       {
         detail[type].Pitch           = fdiv(session[type][ActiveSession].High+session[type][ActiveSession].Low,2);
@@ -1118,6 +1246,25 @@ void UpdateSession(void)
           sEvent.SetEvent(NewFractal,Minor);
       }
 
+      if (IsHigher(Close[0],session[type][PriorSession].High,NoUpdate))
+        detail[type].Zone            = OP_BUY;
+      else
+      if (IsLower(Close[0],session[type][PriorSession].Low,NoUpdate))
+        detail[type].Zone            = OP_SELL;
+      else
+      {
+        detail[type].Zone            = OP_RISK;
+
+        if (session[type].Fractal(ftTerm).Direction==DirectionUp)
+          if (IsHigher(Close[0],detail[type].Pitch,NoUpdate))
+            detail[type].Zone        = OP_HEDGE;
+
+        if (session[type].Fractal(ftTerm).Direction==DirectionDown)
+          if (IsLower(Close[0],detail[type].Pitch,NoUpdate))
+            detail[type].Zone        = OP_HEDGE;
+      }
+
+      //-- Set Session Fractal events
       if (session[type].Event(NewOriginState))
         sEvent.SetEvent(NewOriginState,session[type].AlertLevel(NewOriginState));
 
@@ -1175,7 +1322,7 @@ void UpdatePipMA(void)
       pfExpansion[fibo]       = FiboPrice(fibo,pfractal[Term].Base,pfractal[Term].Root,Expansion);
  
     //--- Extract and Process tick interlace data
-    omWork.Clear();
+    anWork.Clear();
     
     //-- Extract the equalization matrix
     for (int seg=0;seg<5;seg++)
@@ -1190,26 +1337,26 @@ void UpdatePipMA(void)
       
       for (int copy=0;copy<5;copy++)
       {
-        omMatrix[seg][copy]   = ppmaPrice[copy];
-        omWork.Add(ppmaPrice[copy]);
+        anMatrix[seg][copy]   = ppmaPrice[copy];
+        anWork.Add(ppmaPrice[copy]);
       }
     }
     
-    omWork.CopyFiltered(omInterlace,false,false,MODE_DESCEND);
-    omInterlaceDir      = BoolToInt(fdiv(omInterlace[0]+omInterlace[ArraySize(omInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
+    anWork.CopyFiltered(anInterlace,false,false,MODE_DESCEND);
+    anInterlaceDir      = BoolToInt(fdiv(anInterlace[0]+anInterlace[ArraySize(anInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
 
-    if (IsEqual(Close[0],omInterlace[0]))
-      if (NewDirection(omInterlaceBrkDir,DirectionUp))
+    if (IsEqual(Close[0],anInterlace[0]))
+      if (NewDirection(anInterlaceBrkDir,DirectionUp))
       {
-        omAction                   = OP_BUY;
-        omInterlacePivot[omAction] = Close[0];
+        anAction                   = OP_BUY;
+        anInterlacePivot[anAction] = Close[0];
       }
 
-    if (IsEqual(Close[0],omInterlace[ArraySize(omInterlace)-1]))
-      if (NewDirection(omInterlaceBrkDir,DirectionDown))
+    if (IsEqual(Close[0],anInterlace[ArraySize(anInterlace)-1]))
+      if (NewDirection(anInterlaceBrkDir,DirectionDown))
       {
-        omAction                   = OP_SELL;
-        omInterlacePivot[omAction] = Close[0];
+        anAction                   = OP_SELL;
+        anInterlacePivot[anAction] = Close[0];
       }
 
 //    pfractal.ShowFiboArrow();
@@ -1224,8 +1371,8 @@ void UpdateFractal(void)
     
     if (fractal.Event(NewFractal))
     {
-      omFractalPivot                     = Close[0];
-      omFractalAlert                     = fractal.HighAlert() ; 
+      anFractalPivot                     = Close[0];
+      anFractalAlert                     = fractal.HighAlert() ; 
     }
 
     //--- Process Session Fractal data
@@ -1352,10 +1499,10 @@ bool OrderApproved(OrderRequest &Order)
         return (true);
       }
       else
-        Order.Memo           = "Margin limit exceeded. ("+DoubleToStr(oaMargin,1)+")";
+        Order.Memo           = "Margin ("+DoubleToStr(oaMargin,1)+")";
     }
     else
-      Order.Memo             = "Trading is not enabled.";
+      Order.Memo             = "Trade disabled.";
 
     Order.Status             = Declined;
     return (false);
@@ -1370,16 +1517,17 @@ bool OrderProcessed(OrderRequest &Order)
     {
       UpdateTicket(ordOpen.Ticket,Order.Target,Order.Stop);
 
-      Order.Key                      = ordOpen.Ticket;
-      Order.Price                    = ordOpen.Price;
-      Order.Lots                     = LotSize(Order.Lots);
+      Order.Action                     = ordOpen.Action;
+      Order.Key                        = ordOpen.Ticket;
+      Order.Price                      = ordOpen.Price;
+      Order.Lots                       = ordOpen.Lots;
       
-      fdetail[Order.Action].PivotOpen  = Order.Price;
+      omMaster[Order.Action].OrderOpen = Order.Price;
       
       return (true);
     }
     
-    Order.Memo                       = ordOpen.Reason;
+    Order.Memo                         = ordOpen.Reason;
     
     return (false);
   }
@@ -1418,6 +1566,68 @@ void OrderCancel(OrderRequest &Order, string Reason="")
               
       RefreshOrders();
     }
+  }
+
+//+------------------------------------------------------------------+
+//| OrderLotSize - Computes Order lot size for the action zone       |
+//+------------------------------------------------------------------+
+double OrderLotSize(int Action)
+  {
+    return(NormalizeDouble(LotSize(),ordLotPrecision));
+  }
+
+//+------------------------------------------------------------------+
+//| OrderClose - Closes orders based on closure strategy             |
+//+------------------------------------------------------------------+
+bool OrderClose(int Action, CloseOptions Option)
+  {
+    int       ocTicket        = NoValue;
+    double    ocValue         = 0.00;
+/*
+    for (int ord=0;ord<ocOrders;ord++)
+      if (OrderSelect(ticket[ord],SELECT_BY_TICKET,MODE_TRADES))
+        if (Action=OrderType())
+          switch (Option)
+          {
+            case CloseMin:    if (ocTicket==NoValue)
+                              { 
+                                ocTicket   = OrderTicket();
+                                ocValue    = OrderProfit();
+                              }
+                              else
+                              if (IsLower(OrderProfit(),ocValue))
+                                ocTicket   = OrderTicket();
+                                
+                              break;
+                              
+            case CloseMax:    if (ocTicket==NoValue)
+                              { 
+                                ocTicket   = OrderTicket();
+                                ocValue    = OrderProfit();
+                              }
+                              else
+                              if (IsHigher(OrderProfit(),ocValue))
+                                ocTicket   = OrderTicket();
+                              
+                              break;
+            
+            case CloseAll:    CloseOrder(ticket[ord],true);
+                              break;
+
+            case CloseHalf:   CloseOrder(ticket[ord],true,HalfLot(OrderLots()));
+                              break;
+
+            case CloseProfit: if (OrderProfit()>0.00)
+                                CloseOrder(ticket[ord],true);
+                              break;
+
+            case CloseLoss:   if (OrderProfit()<0.00)
+                                CloseOrder(ticket[ord],true);
+                              break;
+          }
+*/          
+    return(false);
+
   }
 
 //+------------------------------------------------------------------+
@@ -1713,7 +1923,7 @@ void Balance(EventType Event, SessionType Session=Daily)
                              break;
       case NewOrigin:        NewBarNote("Origin ("+EnumToString(Session)+")",Color(detail[Daily].FractalDir,IN_CHART_DIR));
                              break;
-    };
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -1721,32 +1931,112 @@ void Balance(EventType Event, SessionType Session=Daily)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static OrderRequest smRequest = {0,OP_NO_ACTION,"Mgr:Short",0,0,0,0,"",0,NoStatus};
     static ActionState  smState   = Halt;
-    static bool         smOpTrig  = false;
+    static bool         smProfit  = false;
+    static bool         smLoss    = false;
+    OrderRequest        smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
+    
+    //-- Manage Locks
+    if (anFiboDetail[ftTrend].Direction==DirectionDown)
+      if (IsHigher(FiboLevels[Fibo50],anFiboDetail[Trend].RetraceMax,NoUpdate))
+        SetEquityHold(OP_SELL);
+      else
+      if (anFiboDetail[ftTerm].Direction==DirectionDown)
+        SetEquityHold(OP_SELL);
+      else
+        SetEquityHold(OP_NO_ACTION);
     
     if (pfractal.Event(NewWaveOpen))
-      smOpTrig                                = true;
-
-    if (IsChanged(smState,pfractal.ActionState(OP_SELL)))
-      switch (smState)
+    {
+      switch (pfractal.ActiveSegment().Type)
       {
-        case Opportunity: if (IsChanged(smOpTrig,false))
-                          {
-                            smRequest.Action    = OP_SELL;
-                            smRequest.Memo      = "Opportunity";
-                            smRequest.Expiry    = Time[0]+(Period()*60);
-                            OrderSubmit(smRequest,NoQueue);
-                          }
+        case Crest:  if (IsChanged(omMaster[OP_SELL].Trigger,false))
+                     {
+                       //-- May require defensive action
+                     }
+
+                     smLoss         = true;
+                     break;
+
+        case Trough: //if (IsChanged(omMaster[OP_SELL].Trigger,false)) //-- FFE?
+                     {
+                       //-- Position management
+                     }
+                     smProfit        = true;
+                     break;
+
+        case Decay:  switch (pfractal.WaveSegment(Last).Type)
+                     {
+                       case Crest:  switch (pfractal.WaveSegment(Last).Direction)
+                                    {
+                                      case DirectionUp:
+                                                     omMaster[OP_SELL].Resistance = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
+                                                     omMaster[OP_SELL].Entry      = fmax(pfractal.WaveSegment(Last).Open,pfractal.WaveSegment(Last).Close);
+                                                     break;
+
+                                      case DirectionDown:
+                                                     smRequest.Memo               = "Rally";
+
+                                                     omMaster[OP_SELL].Entry      = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
+                                                     omMaster[OP_SELL].Trigger    = true;
+                                                     break;
+                                    }
+                                    break;
+
+                       case Trough: switch (pfractal.WaveSegment(Last).Direction)
+                                    {
+                                      case DirectionUp:
+                                                     omMaster[OP_SELL].Exit       = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
+                                                     break;
+                                      case DirectionDown:
+                                                     omMaster[OP_SELL].Support    = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
+                                                     omMaster[OP_SELL].Target     = fmin(pfractal.WaveSegment(Last).Open,pfractal.WaveSegment(Last).Close);
+                                                     break;
+                                    }
+                                    break;
+                     }
       }
-      
+    }
+
+    //-- Entry Triggers
+    if (IsHigher(Close[0],omMaster[OP_SELL].Entry,NoUpdate))
+      if (pfractal.Direction(Tick)==DirectionDown)
+        if (IsChanged(omMaster[OP_SELL].Trigger,false))
+        {
+          smRequest.Expiry    = Time[0]+(Period()*60);
+          OrderSubmit(smRequest,NoQueue);
+        }
+
+    //-- Profit Triggers
+    if (IsLower(Close[0],omMaster[OP_SELL].Target,NoUpdate))
+      if (smProfit)
+        if (pfractal.ActiveSegment().Type == Decay)
+          if (pfractal.Direction(Tick)==DirectionUp)
+          {
+            Pause("Profit","Trigger");
+            smProfit = false;
+          }
+
+       // IsChanged(smProfit,false)
+          //CloseOrders(OP_SELL
+       // }
+
+
+    //-- Loss Triggers
+//    if (IsLower(Close[0],omMaster[OP_SELL].Target,NoUpdate))
+//      if (pfractal.Direction(Tick)==DirectionUp)
+//        if (IsChanged(smProfit,false))
+//        {
+          //CloseOrders(OP_SELL
+//        }
+
 //      Pause("Action State changed to "+EnumToString(smState),"Short Manager Action Change");
 //    //--- First: Check for balancing events
 //    if (pfractal.Event(NewWaveReversal))
 //      Balance(NewWaveReversal);
 //      
-    if (session[Daily].Event(NewBias))
-      Balance(NewBias);
+//    if (session[Daily].Event(NewBias))
+//      Balance(NewBias);
 
 //    if (detail[Asia].NewBias)
 //      Balance(NewBias,Asia);
@@ -1888,6 +2178,7 @@ void ExecAppCommands(string &Command[])
       if (Command[1]=="LINES")
       {
          rsSession                     = SessionTypes;
+         rsZone                        = OP_NO_ACTION;
          
          if (Command[2]=="DAILY")
            rsSession                   = Daily;
@@ -1920,6 +2211,11 @@ void ExecAppCommands(string &Command[])
              rsSegment                 = OP_BUY;
              rsAction                  = OP_CLOSE;
            }
+           if (Command[3]=="ZONE")
+           {   
+             rsZone                    = OP_BUY;
+             rsAction                  = OP_NO_ACTION;
+           }
          }
          else
          if (Command[2]=="SELL"||Command[2]=="SHORT")
@@ -1932,11 +2228,17 @@ void ExecAppCommands(string &Command[])
              rsSegment                 = OP_SELL;
              rsAction                  = OP_CLOSE;
            }
+           if (Command[3]=="ZONE")
+           {
+             rsZone                    = OP_SELL;
+             rsAction                  = OP_NO_ACTION;
+           }
          }
          else
          {
            rsSegment                   = NoValue;
            rsAction                    = OP_NO_ACTION;
+           rsZone                      = OP_NO_ACTION;
          }
        }
      else
@@ -2082,11 +2384,11 @@ int OnInit()
   {
     ManualInit();
     
-    omWork                = new CArrayDouble(0);
-    omWork.Truncate       = false;
-    omWork.AutoExpand     = true;    
-    omWork.SetPrecision(Digits);
-    omWork.Initialize(0.00);
+    anWork                = new CArrayDouble(0);
+    anWork.Truncate       = false;
+    anWork.AutoExpand     = true;    
+    anWork.SetPrecision(Digits);
+    anWork.Initialize(0.00);
     
     omOrderKey            = new CArrayInteger(0);
     omOrderKey.Truncate   = false;
@@ -2102,9 +2404,9 @@ int OnInit()
     NewPriceLabel("plbInterlaceLow");
     NewPriceLabel("plbInterlacePivotActive");
     NewPriceLabel("plbInterlacePivotInactive");
-
-    for (SessionType type=0;type<SessionTypes;type++)
-      NewPriceLabel("plb"+EnumToString(type));
+    
+    NewPriceLabel("lbSEntry");
+    NewPriceLabel("lbSExit");
 
     NewLine("lnOpen");
     NewLine("lnHigh");
@@ -2151,7 +2453,10 @@ int OnInit()
       detail[type].Alerts                 = true;
     }
 
-    ArrayInitialize(omInterlacePivot,Close[0]);
+    detail[Daily].FractalPivot[OP_BUY]    = fmax(session[Daily].Fractal(ftTerm).Resistance,session[Daily].Fractal(ftTerm).High);
+    detail[Daily].FractalPivot[OP_SELL]   = fmin(session[Daily].Fractal(ftTerm).Support,session[Daily].Fractal(ftTerm).Low);
+
+    ArrayInitialize(anInterlacePivot,Close[0]);
     
     //--- Initialize Fibo Management
     for (FractalType type=ftOrigin;type<FractalTypes;type++)
@@ -2159,10 +2464,11 @@ int OnInit()
 
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
-      fdetail[OP_BUY].Zone[FiboExt(fibo)].Price    = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      fdetail[OP_BUY].Zone[FiboExt(fibo)].Trigger  = false;
-      fdetail[OP_SELL].Zone[FiboExt(fibo)].Price   = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      fdetail[OP_SELL].Zone[FiboExt(fibo)].Trigger = false;
+      NewLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1));
+      omMaster[OP_BUY].Zone[FiboExt(fibo)].Price    = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster[OP_BUY].Zone[FiboExt(fibo)].Trigger  = false;
+      omMaster[OP_SELL].Zone[FiboExt(fibo)].Price   = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster[OP_SELL].Zone[FiboExt(fibo)].Trigger = false;
     }
 
     return(INIT_SUCCEEDED);
@@ -2180,6 +2486,6 @@ void OnDeinit(const int reason)
     delete pfractal;
     delete sEvent;
     delete rsEvents;
-    delete omWork;
+    delete anWork;
     delete omOrderKey;
   }
