@@ -82,7 +82,7 @@ public:
              bool             IsOpen(void);
              
              bool             Event(EventType Type,AlertLevelType AlertLevel)
-                                                               {return (sEvent.EventAlert(Type,AlertLevel));}
+                                                               {return (sEvent.Event(Type,AlertLevel));}
              bool             Event(EventType Type)            {return (sEvent[Type]);}
              AlertLevelType   AlertLevel(EventType Type)       {return (sEvent.AlertLevel(Type));}
              bool             ActiveEvent(void)                {return (sEvent.ActiveEvent());}
@@ -332,7 +332,7 @@ void CSession::UpdateFractalBuffer(int Direction, double Value)
 void CSession::UpdateBias(void)
   {  
     if (NewBias(srec[ActiveSession].Bias,this.Bias(BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
-      sEvent.SetEvent(NewBias,Minor);
+      sEvent.SetEvent(NewBias,Nominal);
       
     if (NewBias(sfractal[ftTerm].Bias,this.Bias(fdiv(Pivot(OffSession)+Pivot(PriorSession),2,Digits))))
       sEvent.SetEvent(NewBias,Minor);
@@ -1201,3 +1201,16 @@ int CSession::SessionHour(int Measure=Now)
     
     return (NoValue);
   }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Compares SessionType to detect if a change occurred  |
+//+------------------------------------------------------------------+
+bool IsChanged(SessionType &Compare, SessionType Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
+

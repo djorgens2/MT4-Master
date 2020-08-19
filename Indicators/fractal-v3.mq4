@@ -21,6 +21,7 @@ input bool   inpShowComment    = false;  // Display data
 input bool   inpShowLines      = false;  // Display fractal price lines
 input bool   inpShowFibo       = false;  // Display Fibonacci lines
 input bool   inpShowPoints     = false;  // Display Fractal points
+input bool   inpShowFlags      = false;  // Display Fibo Flags
 
 
 #property indicator_buffers   3
@@ -86,34 +87,37 @@ void RefreshFibo(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    static FibonacciLevel expand[3]  = {Fibo161,Fibo161,Fibo61};
-    static int expdir[3]  = {DirectionNone,DirectionNone,DirectionNone};
+    if (inpShowFlags)
+    {
+      static FibonacciLevel expand[4]  = {Fibo161,Fibo161,Fibo161,Fibo161};
     
-    if (IsChanged(expdir[2],fractal.Direction(Base)))
-      expand[2]                 = Fibo161;
-      
-    if (FiboLevels[expand[2]]<fractal.Fibonacci(Base,Expansion,Now))
-    {
-      Flag(EnumToString(expand[2]),clrWhite);
-      expand[2]++;
-    }
+      if (fractal.IsDivergent())
+        ArrayInitialize(expand,Fibo161);
+      else
+      {
+        //--Origin Fibo Flags
+        if (FiboLevels[expand[3]]<fractal.Fibonacci(Origin,Expansion,Now))
+        {
+          Flag("Origin "+EnumToString(expand[3]),clrRed);
+          expand[3]++;
+        }
 
-    for (RetraceType fibo=Trend;fibo<=Term;fibo++)
-    {
-      if (IsChanged(expdir[fibo],fractal.Direction(fibo)))
-      {
-        expand[fibo]            = Fibo161;
-        
-        if (fibo==Trend)
-          NewArrow(BoolToInt(fractal.Direction(Trend)==DirectionUp,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(fractal.Direction(Trend),IN_CHART_DIR));
+        //-- Base Fibo Flags
+        if (FiboLevels[expand[2]]<fractal.Fibonacci(Base,Expansion,Now))
+        {
+          Flag("Base "+EnumToString(expand[2]),clrGray);
+          expand[2]++;
+        }
+
+        //-- Trend/Term Fibo Flags
+        for (RetraceType fibo=Trend;fibo<=Term;fibo++)
+          if (FiboLevels[expand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
+          {
+            Flag(EnumToString(fibo)+" "+EnumToString(expand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
+            expand[fibo]++;
+          }
       }
-        
-      if (FiboLevels[expand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
-      {
-        Flag(EnumToString(expand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
-        expand[fibo]++;
-      }
-    }   
+    }
       
     if (inpShowComment)
       fractal.RefreshScreen();

@@ -91,8 +91,10 @@ int OnInit()
   
     NewLabel("lbState","",20,130,clrNONE,SCREEN_UL,IndWinId);
     
-    NewLabel("lbh-0A","Order Management",1650,2,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbAN-Strategy","Strategy",1750,2,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-0A","Options",1200,2,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbh-0B","Order Management",1650,2,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbAN-Options","Options",1245,2,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbAN-Strategy","Strategy",1750,2,clrDarkGray,SCREEN_UL,IndWinId);
     
     NewLabel("lbh-OML1A","Long:",1200,20,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbh-OML2A","Short:",1830,20,clrWhite,SCREEN_UL,IndWinId);
@@ -225,6 +227,7 @@ int OnInit()
     for (SessionType type=0;type<SessionTypes;type++)
     {
       DrawBox("hdF"+EnumToString(type),(90*type)+70,186,85,20,C'60,60,60',BORDER_RAISED,IndWinId);
+      DrawBox("hdB"+EnumToString(type),(90*type)+74,190,12,12,C'60,60,60',BORDER_RAISED,IndWinId);
       NewLabel("lhF:"+EnumToString(type),EnumToString(type),100+(90*type),189,clrWhite,SCREEN_UL,IndWinId);
       
       for (int row=0;row<4;row++)
@@ -273,10 +276,6 @@ int OnInit()
     UpdateLabel("lbSum-Eq%","-99.9%",clrDarkGray,13,"Consolas");
     UpdateLabel("lbSum-Spread","999.9",clrDarkGray,13,"Consolas");
 
-    //NewLabel("lhSum-Loss","Loss",440,270,clrGoldenrod,SCREEN_UL,IndWinId);
-    //NewLabel("lhSum-Net","Net",440,288,clrGoldenrod,SCREEN_UL,IndWinId);
-    //NewLabel("lhSum-Gain","Gain",440,306,clrGoldenrod,SCREEN_UL,IndWinId);
-
     for (int row=0;row<12;row++)
       for (int col=0;col<=OP_SELL;col++)
       {
@@ -295,7 +294,6 @@ int OnInit()
         NewLabel("lbO-"+ActionText(col)+(string)row+"V","-0000000",700+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lbO-"+ActionText(col)+(string)row+"M","00.0%",770+(col*254),191+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
       }
-//    ObjectDelete("hd0Summary");
 
     DrawBox("hdAnalyst",5,32,330,140,clrNONE,BORDER_FLAT,IndWinId);
     DrawBox("hdFractal",5,210,424,116,clrNONE,BORDER_FLAT,IndWinId);

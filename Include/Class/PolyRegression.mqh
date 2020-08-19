@@ -83,7 +83,7 @@ public:
        //--- Event methods
        bool     Event(EventType Event)      { return (prEvents[Event]); }         //-- returns the event signal for the specified event
        bool     EventAlert(EventType Event, AlertLevelType AlertLevel)            //-- returns the event signal for the specified event & alert level
-                                            { return (prEvents.EventAlert(Event,AlertLevel)); }
+                                            { return (prEvents.Event(Event,AlertLevel)); }
        bool     ActiveEvent(void)           { return (prEvents.ActiveEvent()); }  //-- returns true on active event
        string   ActiveEventText(const bool WithHeader=true)
                                             { return  (prEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events

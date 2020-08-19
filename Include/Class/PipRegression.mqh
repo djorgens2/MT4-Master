@@ -27,7 +27,7 @@ public:
                    ActiveContraction   = -3,
                    Contracting         = -2,
                    IdleContraction     = -1,
-                   Idle                =  0,
+                   IdleFlat            =  0,
                    IdleExpansion       =  1,
                    Expanding           =  2,
                    ActiveExpansion     =  3,
@@ -130,7 +130,7 @@ RangeStateType CPipRegression::CalcState(double Last, double Current)
         return (ptrRangeState);
         
       //--- validate expansion state
-      if (ptrRangeState>Idle)
+      if (ptrRangeState>IdleFlat)
       { 
         Tolerance = fabs(Pip(trTrendlineTolerance,InPoints)*ptrRangeState);
 
@@ -158,10 +158,10 @@ RangeStateType CPipRegression::CalcState(double Last, double Current)
       }
       
       //--- validate contraction state
-      if (ptrRangeState<Idle)
+      if (ptrRangeState<IdleFlat)
       {
         if (FOCDirection()!=ptrRangeDir)
-          return (Idle);
+          return (IdleFlat);
         
         if (fabs(trFOCNow)>Tolerance)
           return (fmax(ptrRangeState,Contracting));

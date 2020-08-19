@@ -98,7 +98,7 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
 
-      bool           EventAlert(EventType Event, AlertLevelType AlertLevel)
+      bool           Event(EventType Event, AlertLevelType AlertLevel)
                                                  {return (eAlerts[Event]==AlertLevel);}
       AlertLevelType AlertLevel(EventType Event) {return (eAlerts[Event]);}
       AlertLevelType HighAlert(void)             {return (eMaxAlert);}

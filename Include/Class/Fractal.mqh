@@ -36,13 +36,12 @@ private:
        
        struct OriginRec
        {
-         int           Direction;
-         int           Bar;
-         double        Price;
-         double        Top;
-         double        Bottom;
-         ReservedWords State;
-         datetime      Updated;
+         int           Direction;           //--- Origin Direction
+         int           Age;                 //--- Origin Age
+         double        High;                //--- Origin Short Root Price
+         double        Low;                 //--- Origin Long Root Price
+         ReservedWords State;               //--- Origin State
+         datetime      Updated;             //--- Origin Last Updated
        };
 
        FractalRec    f[RetraceTypes];
@@ -128,8 +127,8 @@ public:
        bool          IsBreakout(RetraceType Type)    { if (this[Type].Breakout) return (true); return (false); }
 
        bool          Event(const EventType Type)     { return (fEvents[Type]); }
-       bool          EventAlert(EventType Event, AlertLevelType AlertLevel)
-                                                     { return (fEvents.EventAlert(Event,AlertLevel));}              
+       bool          Event(EventType Event, AlertLevelType AlertLevel)
+                                                     { return (fEvents.Event(Event,AlertLevel));}              
        AlertLevelType HighAlert(void)                { return (fEvents.HighAlert()); }                  //-- returns the max alert level for the tick                                              
        bool          ActiveEvent(void)               { return (fEvents.ActiveEvent()); }
        string        ActiveEventText(const bool WithHeader=true)
@@ -146,7 +145,7 @@ int CFractal::Origin(const ReservedWords Measure)
   {
     switch (Measure)
     {
-      case Age:          return (dOrigin.Bar);
+      case Age:          return (dOrigin.Age);
       case Bar:          return (fOrigin.Bar);
       case Direction:    return (dOrigin.Direction);
       case State:        return (dOrigin.State);
@@ -160,130 +159,50 @@ int CFractal::Origin(const ReservedWords Measure)
 //+------------------------------------------------------------------+
 void CFractal::CalcOrigin(void)
   {
-    //--- Boundary calc vars
-    int         coState        = dOrigin.State;
-    RetraceType coTopLeg       = Trend;
-    RetraceType coBottomLeg    = Trend;
+    ReservedWords coState   = dOrigin.State;
     
-    //--- Compute Origin Boundaries
-    for (RetraceType leg=Trend;leg<=Expansion;leg++)
-      if (f[leg].Bar==NoValue)
-      {
-        coTopLeg               = this.Next(leg);
-        coBottomLeg            = this.Next(leg);
-      }
+    if (this.IsDivergent())
+      if (Direction(Divergent)==DirectionUp)
+        dOrigin.Low         = BoolToDouble(this.Price(Trend,Bottom)>0.00,fmin(this.Price(Trend,Bottom),Price(Expansion)),Price(Expansion));
       else
-      {
-        if (this.Price(leg)>=this.Price(coTopLeg,Top))
-          coTopLeg                  = leg;
-
-        if (this.Price(leg)<=this.Price(coBottomLeg,Bottom))
-          coBottomLeg               = leg;
-      };
-
-    //--- New Origin?
-    if (fStateNow==Expansion)
-      if (Event(NewFractal))
-        if (f[Expansion].Price>fmax(dOrigin.Top,dOrigin.Price) || f[Expansion].Price<fmin(dOrigin.Bottom,dOrigin.Price))
-          fEvents.SetEvent(NewOrigin,Major);
-        else
-        if (f[Expansion].Direction==DirectionUp)
-          fEvents.SetEvent(NewRally,Major);
-        else
-          fEvents.SetEvent(NewPullback,Major);
-      else
-      if (f[Expansion].Direction!=dOrigin.Direction)
-      {
-        if (f[Expansion].Direction==DirectionUp && f[Expansion].Price>dOrigin.Price)
-          fEvents.SetEvent(NewOrigin,Major);
-    
-        if (f[Expansion].Direction==DirectionDown && f[Expansion].Price<dOrigin.Price)
-          fEvents.SetEvent(NewOrigin,Major);
-      }
-
-    if (Event(NewRally)||Event(NewPullback))
+        dOrigin.High        = fmax(this.Price(Trend,Top),Price(Expansion));
+         
+    if (IsBetween(f[Expansion].Price,dOrigin.High,dOrigin.Low))
     {
-      if (dOrigin.State == Retrace)
-        dOrigin.State            = Trap;
-      else
-        if (f[Expansion].Direction == dOrigin.Direction)
-          dOrigin.State          = Resume;
-        else
-          dOrigin.State          = Reversal;
+      if (fEvents.Event(NewFractal,Major))
+        switch (fStateMajor)
+        {
+          case Divergent:  if (f[Expansion].Direction == dOrigin.Direction)
+                             dOrigin.State  = Retrace;
+                           else
+                             dOrigin.State  = Recovery;
+                           break;
+
+          case Convergent: if (f[Expansion].Direction == dOrigin.Direction)
+                             dOrigin.State  = Resume;
+                           else
+                             dOrigin.State  = Retrace;      
+        }
     }
     else
-    
-    if (Event(NewOrigin))
+    if (IsChanged(dOrigin.Direction,f[Expansion].Direction))
     {
-      if (IsChanged(dOrigin.Direction,fDirection))
-      {
-        dOrigin.State            = Reversal;
+      dOrigin.Age           = f[Expansion].Bar;
+      dOrigin.State         = Reversal;
       
-        if (f[Expansion].Direction == DirectionUp)
-        {
-          dOrigin.Bar            = f[coBottomLeg].Bar;
-          dOrigin.Price          = f[coBottomLeg].Price;
-        }
-
-        if (f[Expansion].Direction == DirectionDown)
-        {
-          dOrigin.Bar            = f[coTopLeg].Bar;
-          dOrigin.Price          = f[coTopLeg].Price;
-        }
-      }
-      else
-        dOrigin.State            = Breakout;
+      fEvents.SetEvent(NewOrigin,Major);
+      fEvents.SetEvent(NewReversal,Critical);
     }
-
-    if (Event(NewFractal))
-      if (f[Expansion].Reversal)
-      {
-        dOrigin.Top              = fmax(f[Base].Price,f[Root].Price);
-        dOrigin.Bottom           = fmin(f[Base].Price,f[Root].Price);
-      }
-      else
-      {
-        if (f[Expansion].Direction == DirectionUp)
-          dOrigin.Top            = f[Base].Price;
-        
-        if (f[Expansion].Direction == DirectionDown)
-          dOrigin.Bottom         = f[Base].Price;
-      }
     else
-        
-    if (fEvents.EventAlert(NewFractal,Major))
-    {
-      if (fStateMajor==Divergent)
+    if (dOrigin.State!=Reversal)
+      if (IsChanged(dOrigin.State,Breakout))
       {
-        if (f[Expansion].Direction == dOrigin.Direction)
-          dOrigin.State          = Retrace;
-        else
-          dOrigin.State          = Recovery;
-          
-        if (f[Expansion].Direction == DirectionUp)
-          dOrigin.Top            = f[Expansion].Price;
-        
-        if (f[Expansion].Direction == DirectionDown)
-          dOrigin.Bottom         = f[Expansion].Price;
+        fEvents.SetEvent(NewOrigin,Major);
+        fEvents.SetEvent(NewBreakout,Critical);
       }
       
-      if (fStateMajor==Convergent)
-      {
-        if (f[Expansion].Direction == dOrigin.Direction)
-          dOrigin.State          = Resume;
-        else
-          dOrigin.State          = Retrace;      
-      }
-    }
-    
-    if (dOrigin.State == Trap)
-    {
-      if (this.Fibonacci(Base,Expansion,Max)>FiboPercent(Fibo23)+1)
-        dOrigin.State            = Reversal;
-    }
-    
     if (IsChanged(coState,dOrigin.State))
-      fEvents.SetEvent(NewOriginState,Major);
+      fEvents.SetEvent(NewOriginState,fEvents.HighAlert());
   }
         
 //+------------------------------------------------------------------+
@@ -479,15 +398,13 @@ void CFractal::InitFractal(void)
         f[Expansion].Bar      = fBarHigh;
         f[Expansion].Price    = High[fBarHigh];
 
-        dOrigin.Bar           = fBarLow;
-        dOrigin.Price         = Low[fBarLow];
-        dOrigin.Top           = dOrigin.Price+fRange;
-        dOrigin.Bottom        = dOrigin.Price;
+        dOrigin.Low           = Low[fBarLow];
+        dOrigin.High          = dOrigin.Low+fRange;
       }
     
       if (fBarHigh>fBarLow)
       {
-        fDirection            = DirectionDown; 
+        fDirection            = DirectionDown;
 
         f[Root].Bar           = fBarHigh;
         f[Root].Price         = High[fBarHigh];
@@ -495,12 +412,11 @@ void CFractal::InitFractal(void)
         f[Expansion].Bar      = fBarLow;
         f[Expansion].Price    = Low[fBarLow];
 
-        dOrigin.Bar           = fBarHigh;
-        dOrigin.Price         = High[fBarHigh];
-        dOrigin.Top           = dOrigin.Price;
-        dOrigin.Bottom        = dOrigin.Price-fRange;
+        dOrigin.High          = High[fBarHigh];
+        dOrigin.Low           = dOrigin.High-fRange;
       }
     
+      dOrigin.Age             = 0;
       dOrigin.Direction       = fDirection;
       dOrigin.State           = Breakout;
       dOrigin.Updated         = Time[fBarNow];
@@ -635,7 +551,7 @@ CFractal::CFractal(int Range, int MinRange)
     f[Expansion].Retrace    = false;
     f[Expansion].Correction = false;
 
-    dOrigin.Bar             = NoValue;
+    dOrigin.Age             = NoValue;
     dOrigin.Direction       = DirectionNone;
 
     for (RetraceType Type=Trend;Type<RetraceTypes;Type++)
@@ -671,7 +587,7 @@ void CFractal::Update(void)
       if (fOrigin.Bar>NoValue)
         fOrigin.Bar++;
 
-      dOrigin.Bar++;
+      dOrigin.Age++;
     
       fBuffer.Insert(0,0.00);
     }
@@ -744,11 +660,17 @@ double CFractal::Price(ReservedWords Type, ReservedWords Measure=Now)
     {
       switch (Measure)
       {
-        case Now:       return (NormalizeDouble(dOrigin.Price,Digits));
-        case Top:       return (NormalizeDouble(dOrigin.Top,Digits));
-        case Bottom:    return (NormalizeDouble(dOrigin.Bottom,Digits));
-        case Max:       return (NormalizeDouble(fmax(fmax(dOrigin.Top,f[Expansion].Price),dOrigin.Price),Digits));
-        case Min:       return (NormalizeDouble(fmin(fmin(dOrigin.Bottom,f[Expansion].Price),dOrigin.Price),Digits));
+        case Now:       if (dOrigin.Direction==DirectionUp)
+                          return (NormalizeDouble(dOrigin.Low,Digits));
+                        return (NormalizeDouble(dOrigin.High,Digits));
+        case Top:       return (NormalizeDouble(dOrigin.High,Digits));
+        case Bottom:    return (NormalizeDouble(dOrigin.Low,Digits));
+        case Max:       return (NormalizeDouble(fmax(dOrigin.High,f[Expansion].Price),Digits));
+        case Min:       return (NormalizeDouble(fmin(dOrigin.Low,f[Expansion].Price),Digits));
+        case Advance:   if (dOrigin.Direction==f[fStateMajor].Direction)
+                          return (NormalizeDouble(this.Price(fStateMajor),Digits));
+                        else
+                          return (NormalizeDouble(this.Price(Next(fStateMajor)),Digits));
         case Retrace:   if (dOrigin.Direction==f[fStateMajor].Direction)
                           if (fStateNow == fStateMajor)
                             return (NormalizeDouble(fRetracePrice,Digits));
@@ -866,30 +788,30 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
       switch (Measure)
       {
         case Now:      //-- Actual range now from origin start to current close
-                       range   = fabs(Close[fBarNow]-dOrigin.Price);
+                       range   = fabs(Close[fBarNow]-this.Price(Origin));
                        break;
 
-        case Max:      //-- Base-Root range where root is the origin start
+        case Active:   //-- Base-Root range where root is the origin start
+                       range   = this.Price(Origin,Top)-this.Price(Origin,Bottom);
+                       break;
+
+        case Max:      //-- Expansion range 
+                       range   = this.Price(Origin,Max)-Price(Origin,Min);
+                       break;
+
+        case Advance:  //-- Root-Advance range computes max advance whether int/ext fractal
                        switch (dOrigin.Direction)
                        {
-                         case DirectionUp:   range = this.Price(Origin,Top)-dOrigin.Price;
+                         case DirectionUp:   range = this.Price(Origin,Advance)-this.Price(Origin,Bottom);
                                              break;
 
-                         case DirectionDown: range = dOrigin.Price-this.Price(Origin,Bottom);
+                         case DirectionDown: range = this.Price(Origin,Top)-this.Price(Origin,Advance);
                                              break;
                        }                         
-                       break;
-
-        case Maxest:   //-- Maximum range based on Major Fractal
-                       if (dOrigin.Direction==f[fStateMajor].Direction)
-                         range = fabs(this.Price(Origin)-this.Price(fStateMajor,Now));
-                       else
-                         range = fabs(this.Price(Origin)-this.Price(Next(fStateMajor),Now));
-        
-                       break;
+                       break;                       
       }
     }
-
+    else
     if (Type==Retrace)
     {
       switch (Measure)
@@ -897,34 +819,18 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
         case Now:      //-- Base-Current price
                        switch (dOrigin.Direction)
                        {
-                         case DirectionUp:   range = this.Price(Origin,Top)-Close[fBarNow];
+                         case DirectionUp:   range = this.Price(Origin,Max)-Close[fBarNow];
                                              break;
 
-                         case DirectionDown: range = Close[fBarNow]-this.Price(Origin,Bottom);
+                         case DirectionDown: range = Close[fBarNow]-this.Price(Origin,Min);
                                              break;
                        }                         
                        break;
 
         case Max:      //-- Actual range now from origin expansion to retrace (linear retrace)
-                       switch (dOrigin.Direction)
-                       {
-                         case DirectionUp:   range = this.Price(Origin,Max)-this.Price(Origin,Retrace);
-                                             break;
-
-                         case DirectionDown: range = this.Price(Origin,Retrace)-this.Price(Origin,Max);
-                                             break;
-                       }                         
+                       range   = fabs(this.Price(Origin,Max)-this.Price(Origin,Retrace));
                        break;
 
-        case Maxest:   //-- Actual range now from origin base to retrace (geometric retrace)
-                       switch (dOrigin.Direction)
-                       {
-                         case DirectionUp:   range = this.Price(Origin,Top)-this.Price(Origin,Retrace);
-                                             break;
-
-                         case DirectionDown: range = this.Price(Origin,Retrace)-this.Price(Origin,Bottom);
-                                             break;
-                       }                         
                        break;
       }
     }
@@ -999,7 +905,7 @@ bool CFractal::IsMinor(RetraceType Type)
     
     return (false);
   }
-  
+
 //+------------------------------------------------------------------+
 //| Fibonacci - Calcuates fibo % for the Origin Type and Method      |
 //+------------------------------------------------------------------+
@@ -1007,7 +913,7 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
   {
     double fibonacci     = 0.00;
 
-    if (dOrigin.Bar == NoValue)
+    if (dOrigin.Age == NoValue)
       return (0.00);
 
     if (Type == Origin)
@@ -1018,17 +924,27 @@ double CFractal::Fibonacci(ReservedWords Type, int Method, int Measure, int Form
                           case Now: fibonacci = fdiv(this.Range(Retrace,Now),this.Range(Origin,Max));
                                     break;
                           
-                          case Max: fibonacci = fdiv(this.Range(Retrace,Maxest),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Retrace,Max),this.Range(Origin,Max));
                                     break;
                         }
                         break;
 
         case Expansion: switch (Measure)
                         {
-                          case Now: fibonacci = fdiv(this.Range(Origin,Now),this.Range(Origin,Max));
+                          case Now: fibonacci = fdiv(this.Range(Origin,Now),this.Range(Origin,Active));
                                     break;
                             
-                          case Max: fibonacci = fdiv(this.Range(Origin,Maxest),this.Range(Origin,Max));
+                          case Max: fibonacci = fdiv(this.Range(Origin,Max),this.Range(Origin,Active));
+                                    break;
+                        }
+                        break;
+
+        case Advance:   switch (Measure)
+                        {
+                          case Now: fibonacci = fdiv(this.Range(Origin,Now),this.Range(Origin,Active));
+                                    break;
+                            
+                          case Max: fibonacci = fdiv(this.Range(Origin,Advance),this.Range(Origin,Active));
                                     break;
                         }
                         break;
@@ -1249,7 +1165,7 @@ void CFractal::RefreshScreen(bool WithEvents=false)
     string           rsReport    = "";
     const  string    rsSeg[RetraceTypes] = {"tr","tm","p","b","r","e","d","c","iv","cv","a"};
     
-    if (dOrigin.Bar == NoValue)
+    if (dOrigin.Age == NoValue)
       rsReport   += "\n  Origin: No Long Term Data\n";
      
     else
@@ -1259,7 +1175,7 @@ void CFractal::RefreshScreen(bool WithEvents=false)
 
       Append(rsReport,EnumToString(dOrigin.State));
 
-      rsReport  +="  Bar: "+IntegerToString(dOrigin.Bar)
+      rsReport  +="  Bar: "+IntegerToString(dOrigin.Age)
                  +"  Top: "+DoubleToStr(this.Price(Origin,Top),Digits)
                  +"  Bottom: "+DoubleToStr(this.Price(Origin,Bottom),Digits)
                  +"  Price: "+DoubleToStr(this.Price(Origin),Digits)+"\n";
@@ -1267,13 +1183,13 @@ void CFractal::RefreshScreen(bool WithEvents=false)
       rsReport  +="             Retrace: "+DoubleToString(this.Fibonacci(Origin,Retrace,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Retrace,Maxest,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Retrace,Max,InPips),1)+"\n";
 
-      rsReport  +="             Expansion: " +DoubleToString(this.Fibonacci(Origin,Expansion,Now,InPercent),1)+"%"
-                 +" "+DoubleToString(this.Fibonacci(Origin,Expansion,Max,InPercent),1)+"%"
+      rsReport  +="             Expansion: " +DoubleToString(this.Fibonacci(Origin,Advance,Now,InPercent),1)+"%"
+                 +" "+DoubleToString(this.Fibonacci(Origin,Advance,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Origin,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Origin,Maxest,InPips),1)
+                 +" (a) "+DoubleToString(this.Range(Origin,Active,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Origin,Max,InPips),1)+"\n";
     }
       
@@ -1300,10 +1216,10 @@ void CFractal::RefreshScreen(bool WithEvents=false)
 
         if (type==Trend)
         {
-          rsReport   +="  Bar: "+BoolToStr(fOrigin.Bar==NoValue,IntegerToString(dOrigin.Bar),IntegerToString(fOrigin.Bar));
+          rsReport   +="  Bar: "+BoolToStr(fOrigin.Bar==NoValue,IntegerToString(dOrigin.Age),IntegerToString(fOrigin.Bar));
           rsReport   +="  Top: "+DoubleToStr(this.Price(type,Top),Digits)
                       +"  Bottom: "+DoubleToStr(this.Price(type,Bottom),Digits)
-                      +"  Price: "+BoolToStr(type==Trend,DoubleToStr(dOrigin.Price,Digits),DoubleToStr(fOrigin.Price,Digits))+"\n";
+                      +"  Price: "+DoubleToStr(Price(Trend,Previous),Digits)+"\n";
         }
         else
         {

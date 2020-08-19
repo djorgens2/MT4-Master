@@ -109,10 +109,10 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
        //--- Quantitative measure types
        enum     MeasureType
                 { 
-                  Net,
-                  Total,                
-                  Profit,
-                  Loss,
+                  Loss,     //--
+                  Net,      //-- Hard Sequence
+                  Profit,   //-- ** DO NOT MODIFY
+                  Total,    //--            
                   Lowest,
                   Highest,
                   Smallest,
@@ -156,7 +156,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Tick,   //--- Mandatory sequence
                   Min,    //--- Tick, Min, Max,
                   Max,    //
-                  Maxest,
                   All,
                   Next,
                   Last,
@@ -193,6 +192,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Active,
                   State,
                   NoState,
+                  Advance,
                   Retrace,
                   Reversal,
                   Breakout,
