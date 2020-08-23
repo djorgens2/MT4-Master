@@ -21,7 +21,7 @@ input bool   inpShowComment    = false;  // Display data
 input bool   inpShowLines      = false;  // Display fractal price lines
 input bool   inpShowFibo       = false;  // Display Fibonacci lines
 input bool   inpShowPoints     = false;  // Display Fractal points
-input bool   inpShowFlags      = false;  // Display Fibo Flags
+input bool   inpShowFlags      = false;  // Display Fibonacci Events
 
 
 #property indicator_buffers   3

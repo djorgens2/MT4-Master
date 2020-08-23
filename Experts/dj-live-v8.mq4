@@ -72,15 +72,33 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         ActionTypes
                       };
 
-  //--- Fractal Sources
-  enum                ViewPoint
+  //--- Major session fractal points
+  enum                FibonacciPoint
                       {
-                        Macro,
-                        Meso,
-                        Micro,
-                        ViewPoints
+                        fpTarget,
+                        fpYield,
+                        fpLoad,
+                        fpBalance,
+                        fpRisk,
+                        fpHalt,
+                        FibonacciPoints
                       };
-                      
+
+  enum                FractalElement
+                      {
+                        feOrigin,
+                        feTrend,
+                        feTerm,
+                        fePrior,
+                        feRoot,
+                        feBase,
+                        feExpansion,
+                        feMajor,
+                        feMinor,
+                        feRetrace,
+                        FractalElements
+                      };                      
+
   //--- Technical Fractal Patterns
   enum                Pattern
                       {
@@ -106,23 +124,9 @@ input int         inpGMTOffset         = 0;     // GMT Offset
                         OrderStates
                       };
 
-  //--- Major session fractal points                      
-  enum                FractalPoint
-                      {
-                        fpTarget,
-                        fpYield,
-                        fpLoad,
-                        fpBalance,
-                        fpRisk,
-                        fpHalt,
-                        FractalPoints
-                      };
-
-                      
   //--- Indicator (Data Source) types
   enum                SourceType
                       {
-                        NoSource,
                         indFractal,
                         indPipMA,
                         indSession,
@@ -284,16 +288,14 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   OrderDetail         omTotal;
   
   //--- Analyst operationals
-  int                 anAction;
   double              anMatrix[5][5];
   double              anInterlace[];
   double              anInterlacePivot[2];
   int                 anInterlaceDir;
   int                 anInterlaceBrkDir;
-  double              anFractalPivot;
   CArrayDouble       *anWork;
     
-  double              anFractal[ViewPoints][FractalPoints];
+  double              anFractal[3][FibonacciPoints];
   FractalAnalysis     anFiboDetail[FractalTypes];
 
 //+------------------------------------------------------------------+
@@ -572,7 +574,7 @@ void RefreshControlPanel(void)
     
     string colFiboHead   = "";
     
-    for (FractalPoint row=0;row<FractalPoints;row++)
+    for (FibonacciPoint row=0;row<FibonacciPoints;row++)
       for (FractalType col=ftOrigin;col<ftPrior;col++)
       {
         UpdateLabel("lbAN"+(string)col+":"+(string)row,BoolToStr(IsEqual(anFractal[col][row],0.00),"  Viable",DoubleToStr(anFractal[col][row],Digits)),Color(anFractal[col][row],IN_PROXIMITY));
@@ -815,22 +817,23 @@ void ShowLines(void)
       UpdatePriceLabel("plbInterlaceHigh",anInterlace[0],clrYellow);
       UpdatePriceLabel("plbInterlaceLow",anInterlace[ArraySize(anInterlace)-1],clrYellow);
     
-      if (anAction==OP_NO_ACTION)
+      if (anInterlaceBrkDir==DirectionUp)
       {
-        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrDarkGray);
+        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrLawnGreen);
         UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrDarkGray);
       }
       else
-      if (anAction==OP_BUY)
+      if (anInterlaceBrkDir==DirectionDown)
       {
-        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrLawnGreen);
-        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrMaroon);
+        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_SELL],clrRed);
+        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_BUY],clrDarkGray);
       }
       else
       {
-        UpdatePriceLabel("plbInterlacePivotActive",anInterlacePivot[OP_BUY],clrForestGreen);
-        UpdatePriceLabel("plbInterlacePivotInactive",anInterlacePivot[OP_SELL],clrRed);
+        UpdatePriceLabel("plbInterlacePivotActive",0.00,clrDarkGray);
+        UpdatePriceLabel("plbInterlacePivotInactive",0.00,clrDarkGray);
       }
+
     
       if (rsSegment>NoValue)
       {
@@ -1349,11 +1352,11 @@ void UpdatePipMA(void)
     
     if (pfractal.HistoryLoaded())
       if (pfractal.Event(NewWaveReversal))
-        pfAction              = pfractal.Wave().Action;
+        pfAction                       = pfractal.Wave().Action;
         
     //--- Load fibo matrix
     for (FibonacciLevel fibo=0;fibo<=Fibo823;fibo++)
-      pfExpansion[fibo]       = FiboPrice(fibo,pfractal[Term].Base,pfractal[Term].Root,Expansion);
+      pfExpansion[fibo]                = FiboPrice(fibo,pfractal[Term].Base,pfractal[Term].Root,Expansion);
  
     //--- Extract and Process tick interlace data
     anWork.Clear();
@@ -1361,51 +1364,77 @@ void UpdatePipMA(void)
     //-- Extract the equalization matrix
     for (int seg=0;seg<5;seg++)
     {
-      ppmaPrice[0]            = pfractal.WaveSegment(SegmentType[seg]).Open;
-      ppmaPrice[1]            = pfractal.WaveSegment(SegmentType[seg]).High;
-      ppmaPrice[2]            = pfractal.WaveSegment(SegmentType[seg]).Low;
-      ppmaPrice[3]            = pfractal.WaveSegment(SegmentType[seg]).Close;
-      ppmaPrice[4]            = pfractal.WaveSegment(SegmentType[seg]).Retrace;
+      ppmaPrice[0]                     = pfractal.WaveSegment(SegmentType[seg]).Open;
+      ppmaPrice[1]                     = pfractal.WaveSegment(SegmentType[seg]).High;
+      ppmaPrice[2]                     = pfractal.WaveSegment(SegmentType[seg]).Low;
+      ppmaPrice[3]                     = pfractal.WaveSegment(SegmentType[seg]).Close;
+      ppmaPrice[4]                     = pfractal.WaveSegment(SegmentType[seg]).Retrace;
       
       ArraySort(ppmaPrice,WHOLE_ARRAY,0,MODE_DESCEND);
       
       for (int copy=0;copy<5;copy++)
       {
-        anMatrix[seg][copy]   = ppmaPrice[copy];
+        anMatrix[seg][copy]            = ppmaPrice[copy];
         anWork.Add(ppmaPrice[copy]);
       }
     }
     
     anWork.CopyFiltered(anInterlace,false,false,MODE_DESCEND);
-    anInterlaceDir      = BoolToInt(fdiv(anInterlace[0]+anInterlace[ArraySize(anInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
+    anInterlaceDir                     = BoolToInt(fdiv(anInterlace[0]+anInterlace[ArraySize(anInterlace)-1],2,Digits)<Close[0],DirectionUp,DirectionDown);
 
     if (IsEqual(Close[0],anInterlace[0]))
       if (NewDirection(anInterlaceBrkDir,DirectionUp))
-      {
-        anAction                   = OP_BUY;
-        anInterlacePivot[anAction] = Close[0];
-      }
+        anInterlacePivot[OP_BUY]       = Close[0];
 
     if (IsEqual(Close[0],anInterlace[ArraySize(anInterlace)-1]))
       if (NewDirection(anInterlaceBrkDir,DirectionDown))
-      {
-        anAction                   = OP_SELL;
-        anInterlacePivot[anAction] = Close[0];
-      }
+        anInterlacePivot[OP_SELL]      = Close[0];
 
 //    pfractal.ShowFiboArrow();
   }
 
 //+------------------------------------------------------------------+
-//| UpdateFractal - Process and prepare fractal data                 |
+//| UpdateFractal - Update Main Fractal data                         |
 //+------------------------------------------------------------------+
 void UpdateFractal(void)
-  {
+  {    
+    static FibonacciLevel ufExpand[4]  = {Fibo161,Fibo161,Fibo161,Fibo161};
+
     fractal.Update();
     
-    if (fractal.Event(NewFractal))
-      anFractalPivot                     = Close[0];
+    if (fractal.IsDivergent())
+      ArrayInitialize(ufExpand,Fibo161);
+    else
+    {
+      //--Origin Fibo Flags
+      if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,Expansion,Now))
+      {
+        Flag("Origin "+EnumToString(ufExpand[3]),clrRed);
+        ufExpand[3]++;
+      }
 
+      //-- Base Fibo Flags
+      if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,Expansion,Now))
+      {
+        Flag("Base "+EnumToString(ufExpand[2]),clrGray);
+        ufExpand[2]++;
+      }
+
+      //-- Trend/Term Fibo Flags
+      for (RetraceType fibo=Trend;fibo<=Term;fibo++)
+        if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
+        {
+          Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
+          ufExpand[fibo]++;
+        }
+    }
+  }
+  
+//+------------------------------------------------------------------+
+//| CalcFractal - Process and prepare fractal data                   |
+//+------------------------------------------------------------------+
+void CalcFractal(void)
+  {    
     //--- Process Session Fractal data
     for (FractalType type=ftOrigin;type<FractalTypes;type++)
     {
@@ -2024,9 +2053,9 @@ void ExecAppCommands(string &Command[])
     if (Command[0]=="SHOW")
       if (Command[1]=="LINES")
       {
-        rsSession                     = SessionTypes;
-        rsFractal                     = FractalTypes;
-        rsZone                        = OP_NO_ACTION;
+        rsSession                      = SessionTypes;
+        rsFractal                      = FractalTypes;
+        rsZone                         = OP_NO_ACTION;
          
         if (GetSessionType(Command[2])==SessionTypes)
         {
@@ -2209,8 +2238,9 @@ void OnTick()
 
     //--- Update, analyze & prepare data
     UpdateSession();
+    UpdateFractal();
     UpdatePipMA();
-    UpdateFractal();    
+    CalcFractal();    
     UpdateOrders();
 
     RefreshScreen();

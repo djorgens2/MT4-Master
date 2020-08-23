@@ -828,9 +828,14 @@ double CFractal::Range(ReservedWords Type, ReservedWords Measure=Max, int Format
                        break;
 
         case Max:      //-- Actual range now from origin expansion to retrace (linear retrace)
-                       range   = fabs(this.Price(Origin,Max)-this.Price(Origin,Retrace));
-                       break;
+                       switch (dOrigin.Direction)
+                       {
+                         case DirectionUp:   range = fabs(this.Price(Origin,Max)-this.Price(Origin,Retrace));
+                                             break;
 
+                         case DirectionDown: range = this.Price(Origin,Retrace)-this.Price(Origin,Min);
+                                             break;
+                       }                         
                        break;
       }
     }
@@ -1175,7 +1180,7 @@ void CFractal::RefreshScreen(bool WithEvents=false)
 
       Append(rsReport,EnumToString(dOrigin.State));
 
-      rsReport  +="  Bar: "+IntegerToString(dOrigin.Age)
+      rsReport  +="  Age: "+IntegerToString(dOrigin.Age)
                  +"  Top: "+DoubleToStr(this.Price(Origin,Top),Digits)
                  +"  Bottom: "+DoubleToStr(this.Price(Origin,Bottom),Digits)
                  +"  Price: "+DoubleToStr(this.Price(Origin),Digits)+"\n";
@@ -1183,7 +1188,6 @@ void CFractal::RefreshScreen(bool WithEvents=false)
       rsReport  +="             Retrace: "+DoubleToString(this.Fibonacci(Origin,Retrace,Now,InPercent),1)+"%"
                  +" "+DoubleToString(this.Fibonacci(Origin,Retrace,Max,InPercent),1)+"%"
                  +"  Leg: (c) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
-                 +" (a) "+DoubleToString(this.Range(Retrace,Now,InPips),1)
                  +" (m) "+DoubleToString(this.Range(Retrace,Max,InPips),1)+"\n";
 
       rsReport  +="             Expansion: " +DoubleToString(this.Fibonacci(Origin,Advance,Now,InPercent),1)+"%"
