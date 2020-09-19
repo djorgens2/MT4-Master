@@ -53,6 +53,7 @@ input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
 input YesNoType      inpShowSRLines  = No;           // Display Support/Resistance Lines
 input YesNoType      inpShowMidLines = No;           // Display Mid-Price Lines
+input SessionType    inpShowSession  = SessionTypes; // Display session data
 
 const color          AsiaColor       = C'0,32,0';    // Asia session box color
 const color          EuropeColor     = C'48,0,0';    // Europe session box color
@@ -175,8 +176,8 @@ void RefreshScreen(int Bar=0)
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       UpdateLabel("lbSessionType"+EnumToString(type),EnumToString(type)+
-                  " "+proper(ActionText(session[type].Bias()))+
-                  " "+BoolToStr(session[type].Bias()==Action(session[type][ActiveSession].Direction,InDirection),"Hold","Hedge"),
+                  " "+proper(ActionText(session[type][ActiveSession].Bias))+
+                  " "+BoolToStr(session[type][ActiveSession].Bias==Action(session[type][ActiveSession].Direction,InDirection),"Hold","Hedge"),
                   BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
 
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
@@ -214,6 +215,9 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnPriorMid",session[Daily].Pivot(PriorSession),STYLE_SOLID,clrGoldenrod);
       UpdateLine("lnOffMid",session[Daily].Pivot(OffSession),STYLE_SOLID,clrSteelBlue);
     }
+    
+    if (inpShowSession!=SessionTypes)
+      session[inpShowSession].RefreshScreen();
   }
  
 //+------------------------------------------------------------------+

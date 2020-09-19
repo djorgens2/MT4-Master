@@ -13,6 +13,7 @@
 
 //--- logical defines
 #define CONTRARIAN          true
+#define Always              true
 
 //--- directional values
 #define DIR_LCORR              4  //--- Long Correction
@@ -688,14 +689,17 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
 //+------------------------------------------------------------------+
 //| Flag - creates a right price label object                        |
 //+------------------------------------------------------------------+
-void Flag(string Name, int Color)
+void Flag(string Name, int Color, bool ShowFlag=Always)
   {
     static int fIdx  = 0;
 
-    fIdx++;
+    if (ShowFlag)
+    {
+      fIdx++;
             
-    ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
-    ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+      ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
+      ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+    }
   }
 
 //+------------------------------------------------------------------+

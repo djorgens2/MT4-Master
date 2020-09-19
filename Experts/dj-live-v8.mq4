@@ -5,10 +5,9 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "7.00"
+#property version   "8.00"
 #property strict
 
-#define   Always         true
 #define   clrBoxOff      C'60,60,60'
 #define   clrBoxRedOff   C'42,0,0'
 #define   clrBoxGreenOff C'0,42,0'
@@ -31,6 +30,7 @@ input string      AppHeader            = "";       //+---- Application Options -
 input double      inpMarginTolerance   = 6.5;      // Margin drawdown factor 
 input MarginModel inpMarginModel       = Discount; // Account type margin handling
 input YesNoType   inpShowWaveSegs      = Yes;      // Display wave segment overlays
+input YesNoType   inpShowFiboFlags     = Yes;      // Display Fractal Fibo Events
 
 input string      FractalHeader        = "";    //+------ Fractal Options ---------+
 input int         inpRangeMin          = 60;    // Minimum fractal pip range
@@ -258,7 +258,9 @@ input int         inpGMTOffset         = 0;     // GMT Offset
   int                 rsWaveAction        = OP_BUY;
   int                 rsSegment           = NoValue;
   int                 rsZone              = OP_NO_ACTION;
+  bool                rsShowFlags         = false;
     
+  //--- Operational config elements
   bool                PauseOn             = true;
   bool                PauseOnHistory      = false;
   int                 PauseOnHour         = NoValue;
@@ -982,13 +984,13 @@ bool NewDirection(int &Now, int New)
   {    
     if (New==DirectionNone)
       return (false);
-      
+
     if (Now==DirectionNone)
       Now             = New;
-      
+
     if (IsChanged(Now,New))
       return (true);
-      
+
     return (false);
   }
 
@@ -1402,21 +1404,26 @@ void UpdateFractal(void)
 
     fractal.Update();
     
-    if (fractal.IsDivergent())
-      ArrayInitialize(ufExpand,Fibo161);
+    if (fractal.Event(NewFractal,Major))
+    {
+      Flag("Major",clrWhite,rsShowFlags);
+      
+      if (fractal.IsDivergent())
+        ArrayInitialize(ufExpand,Fibo161);
+    }
     else
     {
       //--Origin Fibo Flags
       if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,Expansion,Now))
       {
-        Flag("Origin "+EnumToString(ufExpand[3]),clrRed);
+        Flag("Origin "+EnumToString(ufExpand[3]),clrRed,rsShowFlags);
         ufExpand[3]++;
       }
 
       //-- Base Fibo Flags
       if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,Expansion,Now))
       {
-        Flag("Base "+EnumToString(ufExpand[2]),clrGray);
+        Flag("Base "+EnumToString(ufExpand[2]),clrGray,rsShowFlags);
         ufExpand[2]++;
       }
 
@@ -1424,7 +1431,7 @@ void UpdateFractal(void)
       for (RetraceType fibo=Trend;fibo<=Term;fibo++)
         if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
         {
-          Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
+          Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod),rsShowFlags);
           ufExpand[fibo]++;
         }
     }
@@ -2115,6 +2122,18 @@ void ExecAppCommands(string &Command[])
         }
       }
       else
+      if (StringSubstr(Command[1],0,4)=="FLAG")
+        
+//        if (Command[1]=="PIPMA")
+//          SourceAlerts[indPipMA]         = false;
+//        else
+//        if (Command[1]=="SESSION")
+//          SourceAlerts[indSession]       = false;
+       if (Command[2]=="FRACTAL")
+          rsShowFlags                      = Always;
+        else
+          rsShowFlags                      = false;      
+      else
         rsShow                         = Command[1];
 
     if (Command[0]=="DISABLE")
@@ -2313,6 +2332,9 @@ int OnInit()
     NewLine("lnCorrectionHi");
     NewLine("lnCorrectionLo");
 
+    if (inpShowFiboFlags==Yes)
+      rsShowFlags                         = Always;
+      
     ArrayInitialize(Alerts,true);
     ArrayInitialize(SourceAlerts,true);
 
