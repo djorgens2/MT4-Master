@@ -43,6 +43,8 @@ input int    inpIdleTime        = 50;    // Market idle time in Pips
 input bool   inpShowFibo        = true;  // Display lines and fibonacci points
 input bool   inpShowComment     = false; // Display fibonacci data in Comment
 input bool   inpShowBounds      = true;  // Display trade boundary lines
+input bool   inpShowWaveSegs    = false; // Display wave segment overlays
+
 
 //--- Class defs
   CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime);
@@ -217,6 +219,9 @@ void RefreshScreen()
     
     if (inpShowFibo)
       pfractal.ShowFiboArrow();
+      
+    if (inpShowWaveSegs)
+      pfractal.DrawWaveOverlays();
     
     if (inpShowComment)
       pfractal.RefreshScreen();
