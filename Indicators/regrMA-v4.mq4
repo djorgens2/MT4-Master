@@ -13,28 +13,29 @@
 #include <std_utility.mqh>
 
 //--- Input params
-input int    inpDegree        = 6;        // Degree of the regression
-input int    inpPeriods       = 24;       // Number of periods
-input int    inpSmoothFactor  = 3;        // Moving Average smoothing factor
-input double inpTolerance     = 0.5;      // Trend tolerance
-input bool   inpShowData      = false;    // Shows computed metrics
+input int    inpDegree          = 6;        // Degree of the regression
+input int    inpPeriods         = 24;       // Number of periods
+input int    inpSmoothFactor    = 3;        // Moving Average smoothing factor
+input double inpTolerance       = 0.5;      // Trend tolerance
+input bool   inpShowData        = false;    // Show computed metrics
+input bool   inpShowRangeLines  = false;   // Show Trend Lines
 
-#property indicator_buffers   2
-#property indicator_plots     2
+#property indicator_buffers     2
+#property indicator_plots       2
 
 //--- plot poly
-#property indicator_label1    "indPoly"
-#property indicator_type1     DRAW_LINE
-#property indicator_color1    clrFireBrick
-#property indicator_style1    STYLE_SOLID
-#property indicator_width1    1
+#property indicator_label1      "indPoly"
+#property indicator_type1       DRAW_LINE
+#property indicator_color1      clrFireBrick
+#property indicator_style1      STYLE_SOLID
+#property indicator_width1      1
 
 //--- plot trend
-#property indicator_label2    "indTrend"
-#property indicator_type2     DRAW_LINE
-#property indicator_color2    clrFireBrick
-#property indicator_style2    STYLE_SOLID
-#property indicator_width2    1
+#property indicator_label2      "indTrend"
+#property indicator_type2       DRAW_LINE
+#property indicator_color2      clrFireBrick
+#property indicator_style2      STYLE_SOLID
+#property indicator_width2      1
 
 double    indPolyBuffer[];
 double    indTrendBuffer[];
@@ -49,6 +50,14 @@ CTrendRegression *tregr = new CTrendRegression(inpDegree,inpPeriods,inpSmoothFac
 //+------------------------------------------------------------------+
 void RefreshScreen()
   {
+    if (inpShowRangeLines)
+    {
+      UpdateLine("rgTLHead",tregr.Trendline(Head));
+      UpdateLine("rgTLTail",tregr.Trendline(Tail));
+      UpdateLine("rgTLMean",tregr.Trendline(Mean),STYLE_DOT);
+      UpdateLine("rgPLMean",tregr.Poly(Mean));
+    }
+    
     if (inpShowData)
     {
       UpdateLabel("rgFOCCur",NegLPad(tregr.FOC(Now),1),DirColor(tregr.FOCDirection()),15);
@@ -62,8 +71,6 @@ void RefreshScreen()
       UpdateLabel("rgFOCPivPrice",DoubleToStr(tregr.Pivot(Price),Digits),DirColor(tregr.Direction(Pivot)));
       UpdateLabel("rgFOCTrendLow",DoubleToStr(tregr.Trendline(Bottom),Digits),DirColor(tregr.Direction(Trendline)));
       UpdateLabel("rgFOCTrendHigh",DoubleToStr(tregr.Trendline(Top),Digits),DirColor(tregr.Direction(Trendline)));
-      UpdateLabel("rgFOCAmpDir",proper(DirText(tregr.Direction(FOCAmplitude)))
-                 +"  Retrace: "+DoubleToStr(tregr.FOC(Retrace)*100,1)+"%",DirColor(tregr.FOCDirection()));
       
       UpdateDirection("rgStdDevDir",tregr.Direction(StdDev),DirColor(tregr.Direction(StdDev)),9);
             
@@ -167,17 +174,24 @@ void OnDeinit(const int reason)
     ObjectDelete("rgFOC10");
     ObjectDelete("rgFOC11");
     ObjectDelete("rgFOC12");
-    ObjectDelete("rgFOCAmpDir");
     ObjectDelete("rgFOCTrendDir");
     ObjectDelete("rgStdDevDir");
     ObjectDelete("rgStdDevData");
   }
-  
+
 //+------------------------------------------------------------------+
 //| InitScreenObjects - sets up screen labels and trend lines        |
 //+------------------------------------------------------------------+
 void InitScreenObjects()
   {
+    if (inpShowRangeLines)
+    {
+      NewLine("rgTLHead");
+      NewLine("rgTLTail");
+      NewLine("rgTLMean");
+      NewLine("rgPLMean");
+    }
+
     if (inpShowData)
     {
       NewLabel("rgFOC0","Factor of Change",10,78,clrGoldenrod,SCREEN_LL);
@@ -186,7 +200,7 @@ void InitScreenObjects()
 
       NewLabel("rgFOC2","Current",20,65,clrWhite,SCREEN_LL);
       NewLabel("rgFOC3","Dev",113,65,clrWhite,SCREEN_LL);
-    
+
       NewLabel("rgFOCCur","",18,43,clrLightGray,SCREEN_LL);
       NewLabel("rgFOCPivDev","",95,43,clrLightGray,SCREEN_LL);
       NewLabel("rgFOCPivDir","",170,39,clrLightGray,SCREEN_LL);
@@ -199,7 +213,7 @@ void InitScreenObjects()
       NewLabel("rgFOCPivPrice","",160,32,clrNONE,SCREEN_LL);
       NewLabel("rgFOCTrendLow","",215,32,clrNONE,SCREEN_LL);
       NewLabel("rgFOCTrendHigh","",260,32,clrNONE,SCREEN_LL);
-      
+
       NewLabel("rgFOC5","Dev",12,22,clrWhite,SCREEN_LL);
       NewLabel("rgFOC6","Max",51,22,clrWhite,SCREEN_LL);
       NewLabel("rgFOC7","Min",92,22,clrWhite,SCREEN_LL);
@@ -208,7 +222,6 @@ void InitScreenObjects()
       NewLabel("rgFOC10","Low",228,22,clrWhite,SCREEN_LL);
       NewLabel("rgFOC11","High",270,22,clrWhite,SCREEN_LL);
       
-      NewLabel("rgFOCAmpDir","",15,12,clrNONE,SCREEN_LL);
       NewLabel("rgStdDevDir","",5,0,clrLightGray,SCREEN_LL);
       NewLabel("rgStdDevData","",18,1,clrLightGray,SCREEN_LL);
     }

@@ -159,7 +159,7 @@ private:
              void             UpdateTrend(void);
              void             UpdateOrigin(void);
              void             SetCorrectionState(void);
-};
+  };
 
 //+------------------------------------------------------------------+
 //| ServerTime - Returns the adjusted time based on server offset    |

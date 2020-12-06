@@ -24,7 +24,7 @@ public:
      //--- Action States
      enum       ActionState
                 {
-                  Bank,         //--- Profit management slider         
+                  Bank,         //--- Profit management slider
                   Goal,         //--- Out-of-Band indcator
                   Yield,        //--- line of the last hard crest or trough
                   Go,           //--- Where it started, the first OOB line
@@ -1341,7 +1341,6 @@ double CPolyRegression::Poly(int Measure)
        case Head:       return (NormalizeDouble(prPolyHead,Digits));
        case Tail:       return (NormalizeDouble(prPolyTail,Digits));
        case Range:      return (NormalizeDouble(prPolyTop-prPolyBottom,Digits));
-       case Strength:   return (fdiv(maData[0]-prPolyBottom,this.Poly(Range)));
        case Deviation:  return (Pip(prPricePolyDev));
     }
     

@@ -37,7 +37,6 @@
 #define OP_RESUME             -7  //--- Resume trading
 #define OP_RISK               -8  //--- Technical indicating trades are at risk
 #define OP_HEDGE              -9  //--- Contrarian action opportunity
-#define OP_TARGET             -10 //--- Target price indicator
 
 
 //---- Format Constants
@@ -347,8 +346,6 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
   
   switch (Style)
   {
-    case IN_DIRECTION:     if (Value<0.00) return (clrRed);
-                           if (Value>0.00) return (clrLawnGreen);
     case IN_PROXIMITY:     if (Close[0]>Value+point(6))   return(clrLawnGreen);
                            if (Close[0]>Value+point(3))   return(clrYellowGreen);
                            if (Close[0]>Value+point(0.2)) return(clrMediumSeaGreen);
@@ -356,6 +353,8 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
                            if (Close[0]>Value-point(3))   return(clrGoldenrod);
                            if (Close[0]>Value-point(6))   return(clrChocolate);
                            return (clrRed);
+    case IN_DIRECTION:     if (Value<0.00) return (clrRed);
+                           if (Value>0.00) return (clrLawnGreen);
     case IN_DARK_DIR:      if (Value<0.00) return (clrMaroon);
                            if (Value>0.00) return (clrDarkGreen);
     case IN_CHART_DIR:     if (Value<0.00) return (clrRed);
@@ -525,9 +524,6 @@ void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10)
     if (Color == 0)
       Color = (int)ObjectGet(LabelName,OBJPROP_COLOR);
               
-    if (Direction==OP_TARGET)
-      ObjectSetText(LabelName,CharToStr(176),Size,"Wingdings",Color);    
-    else
     if (Direction==OP_HALT)
       ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
     else

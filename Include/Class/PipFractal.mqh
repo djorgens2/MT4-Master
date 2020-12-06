@@ -432,7 +432,7 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
     else
     {
       CalcMA();
-      CalcWave();      
+      CalcWave();
     }
 
     CalcPipFractal();          

@@ -51,9 +51,9 @@ input int            inpEuropeClose  = 18;           // Europe Session Closing H
 input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
-input YesNoType      inpShowSRLines  = No;           // Display Support/Resistance Lines
-input YesNoType      inpShowMidLines = No;           // Display Mid-Price Lines
-input SessionType    inpShowSession  = SessionTypes; // Display session data
+input PeriodType     inpShowMidLines = PeriodTypes;  // Display Mid-Price Lines
+input SessionType    inpShowSession  = SessionTypes; // Display Session Comment
+input YesNoType      inpShowData     = No;           // Display Session Data Labels
 
 const color          AsiaColor       = C'0,32,0';    // Asia session box color
 const color          EuropeColor     = C'48,0,0';    // Europe session box color
@@ -183,6 +183,9 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,DirColor(session[type][ActiveSession].BreakoutDir));
       
+      if (inpShowMidLines!=PeriodTypes)
+        UpdateLine("lnMid"+EnumToString(type),session[type].Pivot(inpShowMidLines),STYLE_SOLID,SessionColor(type));
+      
       if (session[type].IsOpen())
         if (TimeHour(session[type].ServerTime(Bar))>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
@@ -201,19 +204,6 @@ void RefreshScreen(int Bar=0)
         UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrYellow);
       else
         UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrDarkGray);
-    }
-
-    if (inpShowSRLines==Yes)
-    {
-      UpdateLine("lnSupport",session[Daily][ActiveSession].Support,STYLE_SOLID,clrFireBrick);
-      UpdateLine("lnResistance",session[Daily][ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
-    }
-
-    if (inpShowMidLines==Yes)
-    {
-      UpdateLine("lnActiveMid",session[Daily].Pivot(ActiveSession),STYLE_DOT,clrSteelBlue);
-      UpdateLine("lnPriorMid",session[Daily].Pivot(PriorSession),STYLE_SOLID,clrGoldenrod);
-      UpdateLine("lnOffMid",session[Daily].Pivot(OffSession),STYLE_SOLID,clrSteelBlue);
     }
     
     if (inpShowSession!=SessionTypes)
@@ -263,13 +253,6 @@ int OnInit()
     SetIndexEmptyValue(2, 0.00);
     SetIndexStyle(2,DRAW_SECTION);
 
-    NewLine("lnActiveMid");
-    NewLine("lnPriorMid");
-    NewLine("lnOffMid");
-    
-    NewLine("lnSupport");
-    NewLine("lnResistance");
-
     session[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
     session[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     session[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
@@ -277,20 +260,25 @@ int OnInit()
     
     DeleteRanges();
     
-    NewLabel("lbhSession","Session",120,240,clrGoldenrod,SCREEN_UR,0);
-    NewLabel("lbhState","State",30,240,clrGoldenrod,SCREEN_UR,0);
-      
-    for (SessionType type=Daily;type<SessionTypes;type++)
+    if (inpShowData==Yes)
     {
-      data[type].IsOpen   = false;
-      data[type].Range    = 0;
-      dataDate[type]      = TimeToStr(session[type].ServerTime(Bars-1),TIME_DATE);
+      NewLabel("lbhSession","Session",120,240,clrGoldenrod,SCREEN_UR,0);
+      NewLabel("lbhState","State",30,240,clrGoldenrod,SCREEN_UR,0);
       
-      NewLabel("lbSessionType"+EnumToString(type),"",100,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveDir"+EnumToString(type),"",30,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveBrkDir"+EnumToString(type),"",20,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-      NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+      for (SessionType type=Daily;type<SessionTypes;type++)
+      {
+        data[type].IsOpen   = false;
+        data[type].Range    = 0;
+        dataDate[type]      = TimeToStr(session[type].ServerTime(Bars-1),TIME_DATE);
+      
+        NewLabel("lbSessionType"+EnumToString(type),"",100,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+        NewLabel("lbActiveDir"+EnumToString(type),"",30,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+        NewLabel("lbActiveBrkDir"+EnumToString(type),"",20,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+        NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+        NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
+
+        NewLine("lnMid"+EnumToString(type));
+      }
     }
           
     for (int bar=Bars-1;bar>0;bar--)

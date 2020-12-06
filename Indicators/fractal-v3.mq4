@@ -13,15 +13,31 @@
 #include <stdutil.mqh>
 #include <Class\Fractal.mqh>
 
+enum FTL {
+           ftlTrend,
+           ftlTerm,
+           ftlPrior,
+           ftlBase,
+           ftlRoot,
+           ftlExpansion,
+           ftlDivergent,
+           ftlConvergent,
+           ftlInversion,
+           ftlConversion,
+           ftlActual,
+           ftlOrigin,
+           ftlNone
+         };
 //--- Input params
-input string fractalHeader     = "";     //+----- Fractal inputs -----+
-input int    inpRange          = 120;    // Maximum fractal pip range
-input int    inpRangeMin       = 60;     // Minimum fractal pip range
-input bool   inpShowComment    = false;  // Display data
-input bool   inpShowLines      = false;  // Display fractal price lines
-input bool   inpShowFibo       = false;  // Display Fibonacci lines
-input bool   inpShowPoints     = false;  // Display Fractal points
-input bool   inpShowFlags      = false;  // Display Fibonacci Events
+input string fractalHeader     = "";       //+----- Fractal inputs -----+
+input int    inpRange          = 120;      // Maximum fractal pip range
+input int    inpRangeMin       = 60;       // Minimum fractal pip range
+input bool   inpShowComment    = false;    // Show data in comment
+input bool   inpShowLines      = false;    // Show active fractal lines
+input bool   inpShowFibo       = false;    // Show Fibonacci Indicators
+input bool   inpShowPoints     = false;    // Show Fractal points
+input bool   inpShowFlags      = false;    // Show Fibonacci Events
+input FTL    inpShowTypeLines  = ftlNone;  // Show Fibonacci Lines by Type
 
 
 #property indicator_buffers   3
@@ -148,7 +164,7 @@ void RefreshScreen(void)
       UpdateLine("fConvergent",fractal[Convergent].Price,STYLE_DOT,clrGoldenrod);
       UpdateLine("fInversion",fractal[Inversion].Price,STYLE_DOT,clrSteelBlue);
       UpdateLine("fConversion",fractal[Conversion].Price,STYLE_DOT,clrDarkGray);
-      UpdateLine("fRetrace",fractal.Price(fractal.State(),Next),STYLE_SOLID,clrWhite);
+      UpdateLine("fRetrace",fractal.Price(fractal.Leg(),Next),STYLE_SOLID,clrWhite);
     }
     
     if (inpShowPoints)
@@ -159,11 +175,23 @@ void RefreshScreen(void)
       UpdatePriceTag("ptPrior",fractal[Prior].Bar,fractal[Prior].Direction);
       UpdatePriceTag("ptTerm",fractal[Term].Bar,fractal[Term].Direction);
       UpdatePriceTag("ptTrend",fractal[Trend].Bar,fractal[Trend].Direction);
-      UpdatePriceTag("ptOrigin",fractal.Origin(Bar),fractal[Expansion].Direction);
+      UpdatePriceTag("ptOrigin",fractal.Origin().Bar,fractal[Expansion].Direction);
     }
     
     if (inpShowFibo)
       RefreshFibo();
+      
+    if (inpShowTypeLines==ftlNone)
+      return;
+    else
+    if (inpShowTypeLines==ftlOrigin)
+    {
+      
+    }
+    else
+    {
+//      UpdateLine("ftlBase",fractal.Price(FTL,
+    }    
   }
   
 //+------------------------------------------------------------------+
@@ -254,6 +282,14 @@ int OnInit()
       ObjectSet("fFiboExpansion",OBJPROP_LEVELCOLOR,clrForestGreen);
     }
 
+    if (inpShowTypeLines!=ftlNone)
+    {
+      NewLine("ftlBase");
+      NewLine("ftlRoot");
+      NewLine("ftlExpansion");
+      NewLine("ftlRetrace");
+    }
+
     return(INIT_SUCCEEDED);
   }
 
@@ -274,6 +310,11 @@ void OnDeinit(const int reason)
     ObjectDelete("fConversion");
     ObjectDelete("fRetrace");
     
+    ObjectDelete("ftlBase");
+    ObjectDelete("ftlRoot");
+    ObjectDelete("ftlExpansion");
+    ObjectDelete("ftlRetrace");
+
     ObjectDelete("ptExpansion");
     ObjectDelete("ptRoot");
     ObjectDelete("ptBase");
