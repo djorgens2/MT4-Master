@@ -191,7 +191,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Active,
                   State,
                   NoState,
-                  Advance,
                   Retrace,
                   Reversal,
                   Breakout,
@@ -219,7 +218,7 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Convergent,         //--- Current Root expansion after retrace
                   Inversion,          //--- Current Convergent retrace
                   Conversion,         //--- Current reversal retrace; trend resumption
-                  Actual,             //--- Lead retrace - retrace on the major leg
+                  Lead,               //--- Lead retrace - retrace on the major leg
                   RetraceTypes        //--- DO NOT REPOSITION -- used to report total count of enums
                 };
 
@@ -702,12 +701,12 @@ int BoolToInt(bool IsTrue, int TrueValue, int FalseValue=0)
 //+------------------------------------------------------------------+
 //| BoolToDouble - returns user defined double for supplied value    |
 //+------------------------------------------------------------------+
-double BoolToDouble(bool IsTrue, double TrueValue, double FalseValue=0.00)
+double BoolToDouble(bool IsTrue, double TrueValue, double FalseValue=0.00, int Precision=12)
   {
     if (IsTrue)
-      return (TrueValue);
+      return (NormalizeDouble(TrueValue,Precision));
 
-    return (FalseValue);
+    return (NormalizeDouble(FalseValue,Precision));
   }
 
 //+------------------------------------------------------------------+

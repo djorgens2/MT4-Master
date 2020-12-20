@@ -28,6 +28,7 @@ enum FTL {
            ftlOrigin,
            ftlNone
          };
+         
 //--- Input params
 input string fractalHeader     = "";       //+----- Fractal inputs -----+
 input int    inpRange          = 120;      // Maximum fractal pip range
@@ -82,7 +83,7 @@ void RefreshFibo(void)
     ObjectSet("fFiboRetrace",OBJPROP_TIME2,Time[fractal[Expansion].Bar]);
     ObjectSet("fFiboRetrace",OBJPROP_PRICE2,fractal[Expansion].Price);
 
-    if (fractal.IsMajor(Divergent))
+    if (fractal.IsLeg(Divergent,Trend))
     {
       ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[fractal[Expansion].Bar]);
       ObjectSet("fFiboExpansion",OBJPROP_PRICE1,fractal[Expansion].Price);
@@ -107,7 +108,7 @@ void RefreshScreen(void)
     {
       static FibonacciLevel expand[4]  = {Fibo161,Fibo161,Fibo161,Fibo161};
     
-      if (fractal.IsDivergent())
+      if (fractal.IsDivergent(Retrace))
         ArrayInitialize(expand,Fibo161);
       else
       {
@@ -138,33 +139,30 @@ void RefreshScreen(void)
     if (inpShowComment)
       fractal.RefreshScreen();
     
-    if (fractal.IsMajor(Divergent))
+    if (fractal.IsLeg(Divergent,Trend))
       SetIndexStyle(1,DRAW_SECTION,STYLE_SOLID);
     else
-    if (fractal.IsMinor(Divergent))
+    if (fractal.IsLeg(Divergent,Term))
       SetIndexStyle(1,DRAW_SECTION,STYLE_DASHDOTDOT);
     else
       SetIndexStyle(1,DRAW_SECTION,STYLE_DOT);
       
-    if (fractal.IsMajor(Convergent))
+    if (fractal.IsLeg(Convergent,Trend))
       SetIndexStyle(2,DRAW_SECTION,STYLE_SOLID);      
     else
-    if (fractal.IsMinor(Convergent))
+    if (fractal.IsLeg(Convergent,Term))
       SetIndexStyle(2,DRAW_SECTION,STYLE_DASHDOTDOT);      
     else
       SetIndexStyle(2,DRAW_SECTION,STYLE_DOT);
                 
     if (inpShowLines)
     {
-      UpdateLine("fOriginTop",fractal.Price(Origin,Top),STYLE_SOLID,clrWhite);
-      UpdateLine("fOriginBottom",fractal.Price(Origin,Bottom),STYLE_DOT,clrWhite);
-
       UpdateLine("fExpansion",fractal[Expansion].Price,STYLE_SOLID,clrMaroon);
       UpdateLine("fDivergent",fractal[Divergent].Price,STYLE_DOT,clrMaroon);
       UpdateLine("fConvergent",fractal[Convergent].Price,STYLE_DOT,clrGoldenrod);
       UpdateLine("fInversion",fractal[Inversion].Price,STYLE_DOT,clrSteelBlue);
       UpdateLine("fConversion",fractal[Conversion].Price,STYLE_DOT,clrDarkGray);
-      UpdateLine("fRetrace",fractal.Price(fractal.Leg(),Next),STYLE_SOLID,clrWhite);
+      UpdateLine("fRetrace",fractal.Price(fractal.Leg(),fpRetrace),STYLE_SOLID,clrWhite);
     }
     
     if (inpShowPoints)
@@ -184,14 +182,26 @@ void RefreshScreen(void)
     if (inpShowTypeLines==ftlNone)
       return;
     else
-    if (inpShowTypeLines==ftlOrigin)
-    {
-      
-    }
-    else
-    {
-//      UpdateLine("ftlBase",fractal.Price(FTL,
-    }    
+      if (inpShowTypeLines==ftlOrigin)
+      {
+        ReservedWords Type = Origin;
+
+        UpdateLine("ftlBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
+        UpdateLine("ftlRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
+        UpdateLine("ftlExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
+        UpdateLine("ftlRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
+        UpdateLine("ftlRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
+      }
+      else
+      {
+        RetraceType Type   = (RetraceType)inpShowTypeLines;
+
+        UpdateLine("ftlBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
+        UpdateLine("ftlRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
+        UpdateLine("ftlExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
+        UpdateLine("ftlRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
+        UpdateLine("ftlRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);        
+      }
   }
   
 //+------------------------------------------------------------------+
@@ -228,7 +238,7 @@ int OnCalculate(const int rates_total,
     SetBuffer(indConvergentBuffer,Divergent,Convergent);
 
     RefreshScreen();
-    
+
     return(rates_total);
   }
 
@@ -236,7 +246,9 @@ int OnCalculate(const int rates_total,
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
 int OnInit()
-  {    
+  {
+    fractal.Update();
+    
     SetIndexBuffer(0,indFractalBuffer);
     SetIndexEmptyValue(0,0.00);
     ArrayInitialize(indFractalBuffer,0.00);
@@ -251,9 +263,6 @@ int OnInit()
 
     if (inpShowLines)
     {
-      NewLine("fOriginTop");
-      NewLine("fOriginBottom");
-
       NewLine("fExpansion");
       NewLine("fDivergent");
       NewLine("fConvergent");
@@ -288,10 +297,55 @@ int OnInit()
       NewLine("ftlRoot");
       NewLine("ftlExpansion");
       NewLine("ftlRetrace");
+      NewLine("ftlRecovery");
     }
 
-    return(INIT_SUCCEEDED);
+//    DrawBox("bxbClear",402,5,20,20,C'90,90,90',BORDER_SUNKEN);
+//    DrawBox("bxbOrigin",424,5,60,20,C'90,90,90',BORDER_RAISED);
+//    
+//    ObjectDelete("bxfFractalInfo");
+//    DrawBox("bxfFractalInfo",400,28,400,200,C'0,0,60',BORDER_FLAT);
+//    ObjectSet("bxfFractalInfo",OBJPROP_BACK,false);
+//    ObjectSet("bxfFractalInfo",OBJPROP_ZORDER,0);
+//    ObjectSet("bxfFractalInfo",OBJ_RECTANGLE_LABEL,0);
+//
+//    NewLabel("lbbFOrigin","",440,7);
+//    ObjectSet("lbbFOrigin",OBJPROP_ZORDER,1);
+//    ObjectSet("lbbFOrigin",OBJPROP_,false);
+//    UpdateLabel("lbbFOrigin","Origin",clrWhite);
+    return(INIT_SUCCEEDED);    
   }
+
+
+//+------------------------------------------------------------------+
+//| ChartEvent                                                       |
+//+------------------------------------------------------------------+
+//void OnChartEvent(const int id, const long& lparam, const double& dparam, const string& sparam)
+//  {
+//    static string oceOption   = "bxbClear";
+//    
+//    if (id==CHARTEVENT_OBJECT_CLICK)
+//    {
+//      if (sparam=="bxbClear")
+//      {
+//        ObjectSet("bxfFractalInfo",OBJPROP_TIMEFRAMES,OBJ_NO_PERIODS);
+//        ObjectSet(sparam,OBJPROP_BORDER_TYPE,BORDER_SUNKEN);
+//        ObjectSet(oceOption,OBJPROP_BORDER_TYPE,BORDER_RAISED);
+//        
+//        oceOption   = sparam;
+//      }
+//
+//      if (StringSubstr(sparam,3)=="Origin")
+//      {
+//      Print(sparam+":"+StringSubstr(sparam,3));
+//        ObjectSet("bxfFractalInfo",OBJPROP_TIMEFRAMES,OBJ_ALL_PERIODS);
+//        ObjectSet(sparam,OBJPROP_BORDER_TYPE,BORDER_SUNKEN);
+//        ObjectSet(oceOption,OBJPROP_BORDER_TYPE,BORDER_RAISED);
+//        
+//        oceOption   = sparam;
+//      }
+//    }
+//  }
 
 //+------------------------------------------------------------------+
 //| Custom indicator deinitialization function                       |
@@ -300,9 +354,6 @@ void OnDeinit(const int reason)
   {    
     delete fractal;
     
-    ObjectDelete("fOriginTop");
-    ObjectDelete("fOriginBottom");
-
     ObjectDelete("fExpansion");
     ObjectDelete("fConvergent");
     ObjectDelete("fDivergent");
@@ -314,6 +365,7 @@ void OnDeinit(const int reason)
     ObjectDelete("ftlRoot");
     ObjectDelete("ftlExpansion");
     ObjectDelete("ftlRetrace");
+    ObjectDelete("ftlRecovery");
 
     ObjectDelete("ptExpansion");
     ObjectDelete("ptRoot");

@@ -685,7 +685,7 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
 //+------------------------------------------------------------------+
 //| Flag - creates a right price label object                        |
 //+------------------------------------------------------------------+
-void Flag(string Name, int Color, bool ShowFlag=Always)
+void Flag(string Name, int Color, bool ShowFlag=Always, int Bar=0)
   {
     static int fIdx  = 0;
 
@@ -693,7 +693,7 @@ void Flag(string Name, int Color, bool ShowFlag=Always)
     {
       fIdx++;
             
-      ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[0],Close[0]);
+      ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[Bar],Close[Bar]);
       ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
     }
   }

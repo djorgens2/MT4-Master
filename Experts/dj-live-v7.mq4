@@ -1387,7 +1387,7 @@ void UpdateFractal(void)
     {
       Flag("Major",clrWhite,rsShowFlags);
       
-      if (fractal.IsDivergent())
+      if (fractal.IsDivergent(Retrace))
         ArrayInitialize(ufExpand,Fibo161);
     }
     else

@@ -28,7 +28,7 @@ enum                  MarginModel
                       };
  
 input string          AppHeader            = "";       //+---- Application Options -------+
-input double          inpMarginTolerance   = 6.5;      // Margin drawdown factor 
+input double          inpMarginTolerance   = 25.0;     // Margin drawdown factor 
 input MarginModel     inpMarginModel       = Discount; // Account type margin handling
 input YesNoType       inpShowWaveSegs      = Yes;      // Display wave segment overlays
 input YesNoType       inpShowFiboFlags     = Yes;      // Display Fractal Fibo Events
@@ -67,6 +67,24 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   CEvent             *rsEvents             = new CEvent();
   
   //--- Enums and Structs
+  enum                AccountMetric
+                      {
+                        eqPctOpen,
+                        eqPctClosed,
+                        eqPctVar,
+                        eqBal,
+                        acBal,
+                        acSpread,
+                        acMargin,
+                        acMarginLong,
+                        acMarginShort,
+                        acEquity,
+                        lotMarginRqmt,
+                        lotSizeMin,
+                        lotSizeMax,
+                        lotPrecision
+                      };
+                      
   enum                ManagerState
                       {
                         msWait,
@@ -199,7 +217,6 @@ const color           DailyColor           = clrDarkGray;       // US session bo
 
   struct              OrderDetail 
                       {
-                        double         Price;                //-- Relative Price (Fibo zone);
                         int            Count;                //-- Open Order Count
                         double         Lots;                 //-- Lots by Pos, Neg, Net
                         double         Value;                //-- Order value by Pos, Neg, Net
@@ -209,6 +226,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   
   struct              FiboZone
                       {
+                        double         Price[20];            //-- Relative Price (Fibo zone);
                         OrderDetail    Zone[20];
                       };
 
@@ -227,9 +245,9 @@ const color           DailyColor           = clrDarkGray;       // US session bo
                       {
                         ManagerState   State[2];                  //-- Trade State by Action
                         TriggerType    Trigger[2][TriggerStates]; //-- Conditional order trigger
-                        int            FiboLevel[2];              //-- The current Fibo Level
+                        double         MarginTolerance[2];        //-- Max Margin by Action
                         FiboZone       Fibo[2];                   //-- Aggregate order detail by fibo zone
-                        OrderDetail    Profit[Total];             //-- Positional value by Loss, Net, Profit
+                        OrderDetail    Order[Total];              //-- Positional value by Loss, Net, Profit
                         OrderDetail    Action[2];                 //-- Positional value by Action
                       };
                         
@@ -463,12 +481,37 @@ void RefreshControlPanel(void)
       }
     }
 
-    UpdateLabel("lbvAI-Bal","$"+LPad(DoubleToStr(AccountBalance()+AccountCredit(),0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-Eq","$"+LPad(NegLPad(omMaster.Profit[Net].Value,0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-EqBal","$"+LPad(DoubleToStr(AccountEquity(),0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-Bal","$"+LPad(DoubleToStr(Account(acBal),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-Eq","$"+LPad(NegLPad(Account(acEquity),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-EqBal","$"+LPad(DoubleToStr(Account(eqBal),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
      
-    UpdateLabel("lbvAI-Eq%",LPad(NegLPad(omMaster.Profit[Net].Equity*100,1)," ",5)+"%",Color(omMaster.Profit[Net].Equity),16);
-    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(Pip(Ask-Bid),1)," ",5),Color(omMaster.Profit[Net].Equity),16);
+    UpdateLabel("lbvAI-Eq%",LPad(NegLPad(Account(eqPctClosed,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),16);
+    UpdateLabel("lbvAI-EqOpen%",LPad(NegLPad(Account(eqPctOpen,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),12);
+    UpdateLabel("lbvAI-EqVar%",LPad(NegLPad(Account(eqPctVar,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),12);
+    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(Account(acSpread,InPips),1)," ",5),Color(omMaster.Order[Net].Equity),14);
+    UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account(acMargin,InPercent),1)+"%"," ",6),Color(omMaster.Order[Net].Equity),14);
+    
+    UpdateDirection("lbvAI-OrderBias",Direction(omMaster.Order[Net].Lots),Color(omMaster.Order[Net].Lots),30);
+    
+    for (int action=0;action<=2;action++)
+      if (action<=OP_SELL)
+      {
+//      UpdateLabel("lbhAI-"+proper(ActionText(action))+"Action",rcpKey,clrDarkGray,10);
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"#",LPad((string)omMaster.Action[action].Count," ",2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",LPad(DoubleToStr(omMaster.Action[action].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",LPad(DoubleToStr(omMaster.Action[action].Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",LPad(DoubleToStr(omMaster.Action[action].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",LPad(DoubleToStr(omMaster.Action[action].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
+      else
+      {
+//      UpdateLabel("lbhAI-NetAction",rcpKey,clrDarkGray,10);
+        UpdateLabel("lbvAI-Net#",LPad((string)omMaster.Order[Net].Count," ",2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetL",LPad(DoubleToStr(omMaster.Order[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetV",LPad(DoubleToStr(omMaster.Order[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetM",LPad(DoubleToStr(omMaster.Order[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetE",LPad(DoubleToStr(omMaster.Order[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
 
     //-- App Config (AC) --
     string rcpOptions   = "";
@@ -518,9 +561,6 @@ void RefreshControlPanel(void)
 
     UpdateLabel("lbvOQ-BPlan",ManagerStateText(omMaster.State[OP_BUY]),BoolToInt(omMaster.Trigger[OP_BUY][tsOpen].Fired,clrYellow,clrDarkGray));
     UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL]),BoolToInt(omMaster.Trigger[OP_SELL][tsOpen].Fired,clrYellow,clrDarkGray));
-    //UpdateLabel("lbvAI-NetMarg",LPad(DoubleToStr(omTotal.Margin*100,1)," ",5)+"%",Color(omTotal.Equity),13,"Consolas");
-    //UpdateLabel("lbvAI-NetLots",LPad(DoubleToStr(omTotal.Lots,ordLotPrecision)," ",7),Color(omTotal.Lots),13,"Consolas");
-//    UpdateLabel("lbvOM-Strategy",PatternText[sFractalPattern]+" ("+EnumToString(sFractalSession)+")  "+(string)sFractalBias+":"+(string)sFractalChange,clrDarkGray);
 
     //-- Wave Action (WA) --
     if (ObjectGet("bxhWA-Long",OBJPROP_BGCOLOR)==clrBoxOff||pfractal.Event(NewWaveReversal))
@@ -644,7 +684,7 @@ void ShowZoneLines(void)
     if (IsChanged(szlZone,rsFiboAction)||detail[Daily].NewFractal)
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
         UpdateLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1),
-          omMaster.Fibo[rsFiboAction].Zone[FiboExt(fibo)].Price,STYLE_SOLID,
+          omMaster.Fibo[rsFiboAction].Price[FiboExt(fibo)],STYLE_SOLID,
           BoolToInt(fibo==0,clrYellow,Color(fibo,IN_DARK_DIR)));
   }
   
@@ -964,12 +1004,12 @@ int FindZone(int Action, FiboZone &Fibo, double Price)
     switch (Action)
     {
       case OP_BUY:     for (int fibo=Fibo823;fibo>-Fibo823;fibo--)
-                         if (IsLower(Fibo.Zone[FiboExt(fibo)].Price,Price,NoUpdate))
+                         if (IsLower(Fibo.Price[FiboExt(fibo)],Price,NoUpdate))
                            return FiboExt(fibo);
                        break;
    
       case OP_SELL:    for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
-                         if (IsHigher(Fibo.Zone[FiboExt(fibo)].Price,Price,NoUpdate))
+                         if (IsHigher(Fibo.Price[FiboExt(fibo)],Price,NoUpdate))
                            return FiboExt(fibo);
                        break;   
     }
@@ -978,27 +1018,95 @@ int FindZone(int Action, FiboZone &Fibo, double Price)
   }
 
 //+------------------------------------------------------------------+
-//| OrderMargin                                                      |
+//| Account - returns the value for the requested metric             |
 //+------------------------------------------------------------------+
-double OrderMargin(double Lots, int Format=InPercent)
+double Account(AccountMetric Metric, int Format=InDecimal)
   {
-    double omMarginPerLot     = (ordAcctLotSize*ordAcctMinLot)/AccountLeverage();   //--- Initialize for JPY
-    double omMarginRqmt       = 0.00;
+    int    aPrecision      = 0;
+    double aMetric         = 0.00;
+    
+    switch (Metric)
+    {
+      case eqPctOpen:      aMetric = (AccountEquity()-(AccountBalance()+AccountCredit()))/AccountEquity();
+                                     aPrecision       = 3;
+                                     break;
+      case eqPctClosed:    aMetric = (AccountEquity()-(AccountBalance()+AccountCredit()))/(AccountBalance()+AccountCredit());
+                                     aPrecision       = 3;
+                                     break;
+      case eqPctVar:       aMetric = Account(eqPctOpen)-Account(eqPctClosed);
+                                     aPrecision       = 3;
+                                     break;
+      case eqBal:          aMetric = AccountEquity();
+                                     break;
+      case acBal:          aMetric = AccountBalance()+AccountCredit();
+                                     break;
+      case acSpread:       aMetric = Ask-Bid;
+                                     aPrecision       = Digits;
+                                     
+                                     if (Format==InPips)
+                                     {
+                                       aMetric = Pip(aMetric);
+                                       aPrecision     = 1;
+                                     }
+                                     break;
+      case acEquity:       aMetric = Account(eqBal)-Account(acBal);
+                                     break;
+      case acMargin:       aMetric = AccountMargin()/AccountEquity();
+                                     aPrecision       = 1;
+                                     break;
+      case lotMarginRqmt:  aMetric = BoolToDouble(Symbol()=="USDJPY",(MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)),
+                                      (MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)*Close[0]))/AccountLeverage();
+                                     aPrecision       = 2;
+                                     break;
+      case lotSizeMin:     aMetric = MarketInfo(Symbol(),MODE_MINLOT);
+                                     aPrecision       = 2;
+                                     break;
+      case lotSizeMax:     aMetric = MarketInfo(Symbol(),MODE_MINLOT);
+                                     break;
+      case lotPrecision:   aMetric = BoolToInt(ordAcctMinLot==0.01,2,1);
+    }
 
-    if (IsEqual(AccountEquity(),0.00,2))
-      return (omMarginRqmt);
-
-    if (Symbol()!="USDJPY")
-      omMarginPerLot          = ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage();
-       
-    omMarginRqmt              = (Lots/ordAcctMinLot)*omMarginPerLot;
-  
     switch (Format)
     {
-      case InPercent: return (NormalizeDouble(omMarginRqmt/AccountEquity()*100,1));
-      case InDollar:  return (NormalizeDouble(omMarginRqmt,2));
-      default:        Print("Order Margin: Invalid format code supplied");
+      case InDecimal:     break;
+      case InPercent:     aMetric*=100;
     }
+    
+    return (NormalizeDouble(aMetric,aPrecision));
+  }
+
+//+------------------------------------------------------------------+
+//| OrderMargin                                                      |
+//+------------------------------------------------------------------+
+double Order(double Value, AccountMetric Metric, int Format=InPercent)
+  {
+    switch (Metric)
+    {
+      case acMargin:       switch (Format)
+                           {
+                             case InDecimal: return (NormalizeDouble(fdiv(Value,Account(lotSizeMin))*Account(lotMarginRqmt)/Account(eqBal),3));
+                             case InPercent: return (NormalizeDouble(fdiv(Value,Account(lotSizeMin))*Account(lotMarginRqmt)/Account(eqBal)*100,1));
+                             case InDollar:  return (NormalizeDouble(Value*Account(lotMarginRqmt),2));
+                           }
+                           break;
+      case acMarginLong:   if (inpMarginModel==Discount) //-- Shared burden on trunk; majority burden on excess variance
+                             return (Order(BoolToDouble(omMaster.Order[Net].Lots>0,omMaster.Order[Net].Lots)+
+                               fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),4),acMargin,Format));
+                           return (Order(omMaster.Action[OP_BUY].Lots,acMargin,Format));
+                           break;
+      case acMarginShort:  if (inpMarginModel==Discount) //-- Shared burden on trunk; majority burden on excess variance
+                             return (Order(BoolToDouble(omMaster.Order[Net].Lots<0,fabs(omMaster.Order[Net].Lots))+
+                               fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),4),acMargin,Format));
+                           return (Order(omMaster.Action[OP_SELL].Lots,acMargin,Format));
+                           break;
+      case acEquity:       switch (Format)
+                           {
+                             case InDecimal: return (NormalizeDouble(fdiv(Value,Account(eqBal)),3));
+                             case InPercent: return (NormalizeDouble(fdiv(Value,Account(eqBal)),3)*100);
+                             case InDollar:  return (NormalizeDouble(Value,2));
+                           }
+                           break;
+    };
       
     return (0.00);
   }
@@ -1008,41 +1116,36 @@ double OrderMargin(double Lots, int Format=InPercent)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    double uoPriceBase[2]                                  = {0.00,0.00};
-
-    //-- Margin calculation measures
-    double uoMBurden                                       = 0.00;     //-- Lots Basis for Margin Req. Calculation
-    double uoMDominant                                     = 0.00;     //-- Dominant margin calc factor
-    double uoMMinority                                     = 0.00;     //-- Minority margin calc factor
-      
+    AccountMetric uoAccountMetric                        = acMarginLong;
+    
     //-- Set zone details on NewFractal
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      omMaster.Action[action].Count                        = 0;
-      omMaster.Action[action].Lots                         = 0.00;
-      omMaster.Action[action].Value                        = 0.00;
-      omMaster.Action[action].Margin                       = 0.00;
-      omMaster.Action[action].Equity                       = 0.00;     
+      omMaster.Action[action].Count                      = 0;
+      omMaster.Action[action].Lots                       = 0.00;
+      omMaster.Action[action].Value                      = 0.00;
+      omMaster.Action[action].Margin                     = 0.00;
+      omMaster.Action[action].Equity                     = 0.00;     
       
       for (int pos=0;pos<Total;pos++)
       {
-        omMaster.Profit[pos].Count                         = 0;
-        omMaster.Profit[pos].Lots                          = 0.00;
-        omMaster.Profit[pos].Value                         = 0.00;
-        omMaster.Profit[pos].Margin                        = 0.00;
-        omMaster.Profit[pos].Equity                        = 0.00;
+        omMaster.Order[pos].Count                        = 0;
+        omMaster.Order[pos].Lots                         = 0.00;
+        omMaster.Order[pos].Value                        = 0.00;
+        omMaster.Order[pos].Margin                       = 0.00;
+        omMaster.Order[pos].Equity                       = 0.00;
       }
     
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Count    = 0;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots     = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Value    = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin   = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity   = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Count  = 0;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots   = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Value  = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = 0.00;
   
         if (detail[Daily].NewFractal)
-          omMaster.Fibo[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price   = 
+          omMaster.Fibo[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Price[FiboExt(fibo)]   = 
             detail[Daily].FractalPivot[Action(detail[Daily].FractalDir,InDirection)]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
       }
     }
@@ -1055,100 +1158,60 @@ void UpdateOrders(void)
           {
             //-- Agg By Action
             omMaster.Action[action].Count++;
-            omMaster.Action[action].Lots      += OrderLots();
-            omMaster.Action[action].Value     += OrderProfit();
-            
+            omMaster.Action[action].Lots         += OrderLots();
+            omMaster.Action[action].Value        += OrderProfit();
+
             //-- Agg By P/L
             if (NormalizeDouble(OrderProfit(),2)<0.00)
             {
-              omMaster.Profit[Loss].Count++;
-              omMaster.Profit[Loss].Lots      += OrderLots();
-              omMaster.Profit[Loss].Value     += OrderProfit();
+              omMaster.Order[Loss].Count++;
+              omMaster.Order[Loss].Lots          += OrderLots();
+              omMaster.Order[Loss].Value         += OrderProfit();
             }
             else
             {
-              omMaster.Profit[Profit].Count++;
-              omMaster.Profit[Profit].Lots    += OrderLots();
-              omMaster.Profit[Profit].Value   += OrderProfit();
+              omMaster.Order[Profit].Count++;
+              omMaster.Order[Profit].Lots        += OrderLots();
+              omMaster.Order[Profit].Value       += OrderProfit();
             }
             
             //-- Agg By Fibo
             omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Count++;
             omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Lots    += OrderLots();
-            omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Value   += OrderProfit();
+            omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Value   += OrderProfit();            
           }
 
-    switch (inpMarginModel)
-    {
-       case Discount:     uoMBurden          = fabs(omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots) +
-                                                 fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),2);
-       
-                          if (IsEqual(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),0.00))
-                            uoMDominant      = 1;
-                          else
-                          {
-                            uoMDominant      = fdiv(fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),omMaster.Action[OP_BUY].Lots+omMaster.Action[OP_SELL].Lots,2);
-                            uoMMinority      = fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),omMaster.Action[OP_BUY].Lots+omMaster.Action[OP_SELL].Lots,2);;
-                          }
-                          break;
-                          
-       case Premium:      uoMBurden          = fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots);
-                          uoMDominant        = 1;
-                          uoMMinority        = fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),uoMBurden);
-                          break;
-
-       case FIFO:         uoMBurden          = fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots);
-                          uoMDominant        = uoMBurden;
-    }
-
-    omMaster.Profit[Profit].Equity                      = fdiv(omMaster.Profit[Profit].Value,AccountEquity(),3);
-//    omMaster.Profit[Profit].Margin                      = fdiv(AccountMargin(),AccountEquity(),3);
-
-    omMaster.Profit[Loss].Equity                        = fdiv(omMaster.Profit[Loss].Value,AccountEquity(),3);
-//    omMaster.Profit[Loss].Margin                        = fdiv(AccountMargin(),AccountEquity(),3);
-
-    //-- Calc order summary
-    omMaster.Profit[Net].Lots                           = omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots;
-    omMaster.Profit[Net].Value                          = AccountEquity()-(AccountBalance()+AccountCredit());
-    omMaster.Profit[Net].Equity                         = fdiv(omMaster.Profit[Net].Value,(AccountEquity()),3);
-    omMaster.Profit[Net].Margin                         = fdiv(AccountMargin(),AccountEquity(),3);
+    //-- Compute interim Net Values req'd by Equity/Margin calcs
+    omMaster.Order[Net].Lots                     = omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots;
+    omMaster.Order[Net].Value                    = omMaster.Action[OP_BUY].Value+omMaster.Action[OP_SELL].Value;
 
     //-- Calculate zone values and margins
     for (int action=OP_BUY;action<=OP_SELL;action++)
-    {        
+    {
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        //-- Compute zone margin
-        if (omMaster.Fibo[action].Zone[FiboExt(fibo)].Count>0)
-        {
-          switch (inpMarginModel)
-          {
-            case Discount:  if (IsEqual(omMaster.Action[action].Lots,fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),ordLotPrecision))
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,ordLotPrecision)*(uoMDominant*uoMBurden));
-                            else
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,ordLotPrecision)*(uoMMinority*uoMBurden));
-                            break;
-            
-            case Premium:   if (IsEqual(omMaster.Action[action].Lots,fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),ordLotPrecision))
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots*uoMDominant);
-                            else
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots*uoMMinority);
-                            break;
-                            
-            case FIFO:      omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  =
-                              OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots);
-                            break;
-          }
-          
-          //-- Compute zone equity
-          omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Value,AccountEquity(),3)*100;
-        }
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin = Order(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,uoAccountMetric,InPercent)*
+                                                    fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,1);
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = Order(omMaster.Fibo[action].Zone[FiboExt(fibo)].Value,acEquity,InPercent);
       }
-    }    
+      
+      //-- Calc Action Aggregates
+      omMaster.Action[action].Equity             = Order(omMaster.Action[action].Value,acEquity,InPercent);
+      omMaster.Action[action].Margin             = Order(omMaster.Action[action].Lots,uoAccountMetric,InPercent);
+      
+      uoAccountMetric                            = acMarginShort;
+    }
+
+    //-- Calc P/L Aggregates
+    omMaster.Order[Profit].Equity                = Order(omMaster.Order[Profit].Value,acEquity,InPercent);
+    omMaster.Order[Profit].Margin                = Order(omMaster.Order[Profit].Lots,acMargin,InPercent);
+
+    omMaster.Order[Loss].Equity                  = Order(omMaster.Order[Loss].Value,acEquity,InPercent);
+    omMaster.Order[Loss].Margin                  = Order(omMaster.Order[Loss].Lots,acMargin,InPercent);
+
+    //-- Calc Net Aggregates
+    omMaster.Order[Net].Equity                   = Order(omMaster.Order[Net].Value,acEquity,InPercent);
+    omMaster.Order[Net].Margin                   = Order(omMaster.Order[Net].Lots,acMargin,InPercent);
   }
 
 //+------------------------------------------------------------------+
@@ -1387,7 +1450,7 @@ void UpdateFractal(void)
     {
       Flag("Major",clrWhite,rsShowFlags);
       
-      if (fractal.IsDivergent())
+      if (fractal.IsDivergent(Retrace))
         ArrayInitialize(ufExpand,Fibo161);
     }
     else
@@ -1485,9 +1548,6 @@ void UpdateBar(void)
 bool OrderApproved(OrderRequest &Order)
   {
     double oaLots[6]                           = {0.00,0.00,0.00,0.00,0.00,0.00};
-    double oaMargin                            = 0.00;
-    double oaMarginReq                         = BoolToDouble(Symbol()=="USDJPY",(ordAcctLotSize*ordAcctMinLot)/AccountLeverage(),
-                                                              ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage())*100;
     
     if (TradingOn)
     {      
@@ -1504,26 +1564,13 @@ bool OrderApproved(OrderRequest &Order)
         oaLots[Action(Order.Action,InAction)] += oaLots[Order.Action];
       }
       
-      switch (inpMarginModel)
-      {
-        case Discount:       //-- FX Choice                             
-                             oaMargin = (((fdiv(fmin(oaLots[OP_BUY],oaLots[OP_SELL]),2,ordLotPrecision)+fabs(oaLots[OP_BUY]-oaLots[OP_SELL]))*oaMarginReq)/AccountEquity())*100;
-                             break;
-        case Premium:        //-- FXCM
-                             oaMargin = ((fmax(oaLots[OP_BUY],oaLots[OP_SELL])*oaMarginReq)/AccountEquity())*100;
-                             break;
-        case FIFO:           //-- Forex.com
-                             oaMargin = ((oaLots[Action(Order.Action,InAction)]*oaMarginReq)/AccountEquity())*100;
-                             break;        
-      }
-
-      if (oaMargin<=(ordEQMaxRisk+inpMarginTolerance))
+      if (IsLower(Order(oaLots[Action(Order.Action,InAction)],acMargin,InPercent),omMaster.MarginTolerance[Action(Order.Action,InAction)],NoUpdate))
       {
         Order.Status         = Approved;
         return (true);
       }
       else
-        Order.Memo           = "Margin ("+DoubleToStr(oaMargin,1)+")";
+        Order.Memo           = "Margin-"+DoubleToStr(Order(oaLots[Action(Order.Action,InAction)],acMargin,InPercent),1)+"%";
     }
     else
       Order.Memo             = "Trade disabled.";
@@ -2330,10 +2377,16 @@ int OnInit()
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
       NewLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1));
-      omMaster.Fibo[OP_BUY].Zone[FiboExt(fibo)].Price      = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      omMaster.Fibo[OP_SELL].Zone[FiboExt(fibo)].Price     = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster.Fibo[OP_BUY].Price[FiboExt(fibo)]      = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster.Fibo[OP_SELL].Price[FiboExt(fibo)]     = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
     }
-
+    
+    //--- Initialize Order Directives
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      omMaster.MarginTolerance[action]   = inpMarginTolerance;
+    }
+    
     UpdateOrders();
     RefreshOrders();
 

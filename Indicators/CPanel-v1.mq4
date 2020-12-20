@@ -79,7 +79,6 @@ int OnInit()
     IndWinId = ChartWindowFind(0,ShortName);
   
     //-- Account Information Box
-//    NewLabel("lbState","",20,130,clrNONE,SCREEN_UL,IndWinId);
     DrawBox("bxfAI",5,28,352,144,clrNONE,BORDER_FLAT,IndWinId);
 
     for (SessionType type=0;type<SessionTypes;type++)
@@ -95,21 +94,65 @@ int OnInit()
     NewLabel("lbvAC-Trading","Trade",408,7,clrDarkGray,SCREEN_UL,IndWinId);
     NewLabel("lbvAC-Options","Options",490,7,clrDarkGray,SCREEN_UL,IndWinId);
 
-    NewLabel("lbhAI-Bal","----- Balance/Equity -----",145,30,clrGoldenrod,SCREEN_UL,IndWinId);
-    NewLabel("lbvAI-Bal","",130,42,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbvAI-Eq","",130,60,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbvAI-EqBal","",130,78,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-Bal","----- Balance/Equity -----",155,30,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-Bal","",140,42,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-Eq","",140,60,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-EqBal","",140,78,clrDarkGray,SCREEN_UL,IndWinId);
 
     UpdateLabel("lbvAI-Bal","$ 999999999",clrDarkGray,16,"Consolas");
     UpdateLabel("lbvAI-Eq","$-999999999",clrDarkGray,16,"Consolas");
     UpdateLabel("lbvAI-EqBal","$ 999999999",clrDarkGray,16,"Consolas");
 
-    NewLabel("lbhAI-Eq%","Equity %",50,74,clrGoldenrod,SCREEN_UL,IndWinId);
-    NewLabel("lbhAI-Spread","Spread",290,74,clrGoldenrod,SCREEN_UL,IndWinId);
-    NewLabel("lbvAI-Eq%","",36,48,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lbvAI-Spread","",280,48,clrNONE,SCREEN_UL,IndWinId);
-    UpdateLabel("lbvAI-Eq%","-99.9%",clrDarkGray,16);
-    UpdateLabel("lbvAI-Spread","999.9",clrDarkGray,16);
+    NewLabel("lbhAI-Eq%","------  Equity % ------",24,30,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-EqOpen%","Open",38,86,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-EqVar%","Var",98,86,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-Eq%","",36,42,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-EqOpen%","",16,68,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-EqVar%","",75,68,clrNONE,SCREEN_UL,IndWinId);
+    UpdateLabel("lbvAI-Eq%","-999.9%",clrDarkGray,16);
+    UpdateLabel("lbvAI-EqOpen%","-99.9%",clrDarkGray,12);
+    UpdateLabel("lbvAI-EqVar%","-99.9%",clrDarkGray,12);
+
+    NewLabel("lbhAI-Spread","-- Spread --",290,30,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-Spread","",290,42,clrNONE,SCREEN_UL,IndWinId);
+    UpdateLabel("lbvAI-Spread","999.9",clrDarkGray,14);
+
+    NewLabel("lbhAI-Margin","-- Margin --",290,66,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-Margin","",284,78,clrNONE,SCREEN_UL,IndWinId);
+    UpdateLabel("lbvAI-Margin","999.9%",clrDarkGray,14);
+
+    NewLabel("lbhAI-OrderBias","Bias",27,153,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbvAI-OrderBias","",20,116,clrDarkGray,SCREEN_UL,IndWinId);
+    UpdateDirection("lbvAI-OrderBias",DirectionNone,clrDarkGray,30);
+    
+    NewLabel("lbhAI-Orders","----------------------  Order Aggregates ----------------------",70,104,clrGoldenrod,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-"+"#","#",108,116,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-"+"L","Lots",144,116,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-"+"V","----  Value ----",188,116,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-"+"M","Mrg%",274,116,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAI-"+"E","Eq%",320,116,clrWhite,SCREEN_UL,IndWinId);
+
+    string key;
+    
+    for (int row=0;row<=2;row++)
+    {
+      key = BoolToStr(row==2,"Net",proper(ActionText(row)));
+      NewLabel("lbhAI-"+key+"Action","",70,128+(row*12),clrDarkGray,SCREEN_UL,IndWinId);
+
+      NewLabel("lbvAI-"+key+"#","",104,128+(12*row),clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvAI-"+key+"L","",130,128+(12*row),clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvAI-"+key+"V","",186,128+(12*row),clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvAI-"+key+"M","",266,128+(12*row),clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvAI-"+key+"E","",310,128+(12*row),clrDarkGray,SCREEN_UL,IndWinId);
+
+      UpdateLabel("lbhAI-"+key+"Action",key,clrDarkGray,10);
+
+      UpdateLabel("lbvAI-"+key+"#","99",clrDarkGray,10,"Consolas");
+      UpdateLabel("lbvAI-"+key+"L","000.00",clrDarkGray,10,"Consolas");
+      UpdateLabel("lbvAI-"+key+"V","-000000000",clrDarkGray,10,"Consolas");
+      UpdateLabel("lbvAI-"+key+"M","-00.0",clrDarkGray,10,"Consolas");
+      UpdateLabel("lbvAI-"+key+"E","999.9",clrDarkGray,10,"Consolas");
+    }
 
     //-- Order Management
     DrawBox("bxf-OM",663,28,294,144,clrNONE,BORDER_FLAT,IndWinId);
@@ -129,7 +172,7 @@ int OnInit()
           NewLabel("lbhOD-"+ActionText(col)+"#","#",418+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
           NewLabel("lbhOD-"+ActionText(col)+"L","Lots",444+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
           NewLabel("lbhOD-"+ActionText(col)+"V","------ Value -------",482+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
-          NewLabel("lbhOD-"+ActionText(col)+"M","Mrg%",574+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"M","Mrg%",578+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
           NewLabel("lbhOD-"+ActionText(col)+"E","Eq%",625+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
         }
 
@@ -137,7 +180,7 @@ int OnInit()
         NewLabel("lbvOD-"+ActionText(col)+(string)row+"#","99",412+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lbvOD-"+ActionText(col)+(string)row+"L","000.00",427+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lbvOD-"+ActionText(col)+(string)row+"V","-0000000",482+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
-        NewLabel("lbvOD-"+ActionText(col)+(string)row+"M","00.0",552+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"M","00.0",556+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
         NewLabel("lbvOD-"+ActionText(col)+(string)row+"E","999.9",613+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
       }
 
