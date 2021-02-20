@@ -21,67 +21,69 @@ class CPipFractal : public CPipRegression
           struct     PipFractalRec
                      {
                        //--- Fractal term working elements
-                       int        Direction;            //--- Current fractal direction
-                       double     PriceHigh;            //--- Highest active price
-                       double     PriceLow;             //--- Lowest active price
+                       int        Direction;                //--- Current fractal direction
+                       double     PriceHigh;                //--- Highest active price
+                       double     PriceLow;                 //--- Lowest active price
                        
                        //--- Fractal time points
-                       datetime   RootTime;             //--- Time stamp of the active root
-                       datetime   ExpansionTime;        //--- Time stamp of the active expansion
+                       datetime   RootTime;                 //--- Time stamp of the active root
+                       datetime   ExpansionTime;            //--- Time stamp of the active expansion
                           
                        //--- Fractal price points
-                       double     Prior;                //--- Historical base
-                       double     Base;                 //--- Current base
-                       double     Root;                 //--- Current root
-                       double     Expansion;            //--- Current expansion
-                       double     Retrace;              //--- Current retrace
-                       double     Recovery;             //--- Current recovery
+                       double     Prior;                    //--- Historical base
+                       double     Base;                     //--- Current base
+                       double     Root;                     //--- Current root
+                       double     Expansion;                //--- Current expansion
+                       double     Retrace;                  //--- Current retrace
+                       double     Recovery;                 //--- Current recovery
                        
-                       int        Count;                //--- Total consecutive states
+                       int        Count;                    //--- Total consecutive states
                      };
     
           //--- Operational variables
-          int            pfOriginDir;                   //--- Direction of Origin computed from last root reversal
-          double         pfOrigin;                      //--- Fractal origin at trend start
-          double         pfPrior;                       //--- Maximum inversion at trend start          
-          bool           pfPeg;                         //--- Pegs on trend/term divergence
-          double         pfPegMax;                      //--- Max price after peg
-          double         pfPegMin;                      //--- Min price after peg
-          double         pfPegExpansion;                //--- Expansion price at peg      
-          ReservedWords  pfState;                       //--- Current state of the fractal
+          int            pfOriginDir;                       //--- Direction of Origin computed from last root reversal
+          double         pfOrigin;                          //--- Fractal origin at trend start
+          double         pfPrior;                           //--- Maximum inversion at trend start          
+          bool           pfPeg;                             //--- Pegs on trend/term divergence
+          double         pfPegMax;                          //--- Max price after peg
+          double         pfPegMin;                          //--- Min price after peg
+          double         pfPegExpansion;                    //--- Expansion price at peg      
+          ReservedWords  pfState;                           //--- Current state of the fractal
                      
-          double     NewFractalRoot(RetraceType Type);  //--- Updates fractal price points
-          void       UpdateFractal(RetraceType Type, int Direction);
-          void       CalcPipFractal(void);
-          void       CalcFiboChange(void);
-          void       CalcState(void);
+          double         NewFractalRoot(RetraceType Type);  //--- Updates fractal price points
+          void           UpdateFractal(RetraceType Type, int Direction);
+
+          void           CalcPipFractal(void);
+          void           CalcFiboChange(void);
+          void           CalcState(void);
           
 
     public:
-                     CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime);
-                    ~CPipFractal();
+                         CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime);
+                        ~CPipFractal();
                              
        virtual
-          void       UpdateBuffer(double &MA[], double &PolyBuffer[], double &TrendBuffer[]);
+          void           UpdateBuffer(double &MA[], double &PolyBuffer[], double &TrendBuffer[]);
        
        virtual
-          void       Update(void);                                              //--- Update method; updates fractal data
+          void           Update(void);                      //--- Update method; updates fractal data
           
           //--- Fractal Properties
        virtual
-          int        Direction(int Type=Term, bool Contrarian=false);
+          int            Direction(int Type=Term, bool Contrarian=false);
 
        virtual   
-          int        Count(int Counter);
-          ReservedWords State(void) { return (pfState); };
-          double     Price(int TimeRange, int Measure=Expansion);
-          double     Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
-          bool       IsPegged(void)                           {return (pfPeg); };
+          int            Count(int Counter);
+
+          double         Price(int TimeRange, int Measure=Expansion);
+          double         Fibonacci(int Type, int Method, int Measure, int Format=InDecimal);                                        
+          ReservedWords  State(void) {return (pfState);};
+          bool           IsPegged(void) {return (pfPeg);};
           
-          void       RefreshScreen(void);
-          void       ShowFiboArrow(void);
+          void           RefreshScreen(void);
+          void           ShowFiboArrow(void);
    
-          PipFractalRec operator[](const RetraceType Type) const { return(pf[Type]); };
+          PipFractalRec  operator[](const RetraceType Type) const {return(pf[Type]);};
              
     protected:
     
@@ -342,27 +344,28 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime
   {
     int    pfPoint     = 0;
     int    pfBar       = 0;
-    int    pfSeed      = 3;
+    int    pfSeed      = 14;
     int    pfDir       = DirectionChange;
 
     int    pfHiBar;
     int    pfLoBar;
 
     double pfLoVal     = Close[0];    
-    double pfHiVal     = Close[0];    
+    double pfHiVal     = Close[0];
 
-    double pfPoints[6];
+    double pfPoints[];
 
+    ArrayResize(pfPoints,Bars);
     ArrayInitialize(pfPoints,Close[0]);
     
-    while (pfPoint<6)
+    while (pfBar<Bars)
     {
       pfHiBar     = iHighest(Symbol(),Period(),MODE_HIGH,pfSeed,pfBar);
       pfLoBar     = iLowest(Symbol(),Period(),MODE_LOW,pfSeed,pfBar);
       
       pfHiVal     = fmax(pfHiVal,High[pfHiBar]);
       pfLoVal     = fmin(pfLoVal,Low[pfLoBar]);
-      
+        
       if (NewDirection(pfDir,Direction(pfHiBar-pfLoBar,InDirection,false)))
       {
         if (pfDir==DirectionUp)

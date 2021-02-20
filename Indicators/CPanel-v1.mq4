@@ -310,7 +310,7 @@ int OnInit()
       NewLabel("lbvIQ"+(string)row,"0.00000",1294,203+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
 
     //-- Fractal Area
-    string faHead[6]   = {"Origin","Trend","Term","Base","Expansion","Retrace"};
+    string faHead[6]   = {"Origin","Trend","Term","Max","Now","Lead"};
     string faVar[6]    = {"o","tr","tm","b","e","rt"};
 
     DrawBox("bxfFA-Fractal",1362,176,30,89,clrNONE,BORDER_FLAT,IndWinId);

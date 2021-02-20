@@ -46,6 +46,7 @@
 #define IN_DARK_DIR           11
 #define IN_CHART_DIR          12
 #define IN_CHART_ACTION       13
+#define IN_DARK_PANEL         14
 
 
 //---- Screen Locations
@@ -359,6 +360,9 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
                            if (Value>0.00) return (clrDarkGreen);
     case IN_CHART_DIR:     if (Value<0.00) return (clrRed);
                            if (Value>0.00) return (clrYellow);
+                           return (clrDarkGray);
+    case IN_DARK_PANEL:    if (Value<0.00) return (C'42,0,0');
+                           if (Value>0.00) return (C'0,42,0');
                            return (clrDarkGray);
     case IN_ACTION:        if (Action(Value,InAction)==OP_BUY)  return (clrLawnGreen);
                            if (Action(Value,InAction)==OP_SELL) return (clrRed);

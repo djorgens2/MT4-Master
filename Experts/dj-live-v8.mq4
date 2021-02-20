@@ -28,7 +28,8 @@ enum                  MarginModel
                       };
  
 input string          AppHeader            = "";       //+---- Application Options -------+
-input double          inpMarginTolerance   = 25.0;     // Margin drawdown factor 
+input double          inpMarginTolerance   = 25.0;     // Margin drawdown factor
+input double          inpAgingThreshold    = 5;        // Aging threshold in periods
 input MarginModel     inpMarginModel       = Discount; // Account type margin handling
 input YesNoType       inpShowWaveSegs      = Yes;      // Display wave segment overlays
 input YesNoType       inpShowFiboFlags     = Yes;      // Display Fractal Fibo Events
@@ -188,7 +189,8 @@ const color           DailyColor           = clrDarkGray;       // US session bo
                         string         Heading;
                         string         SubHead;
                         string         State;
-                        color          Color[3];       
+                        color          HeadColor[3];
+                        color          FiboColor[3];
                         int            ActiveDir;
                         int            BreakoutDir;
                         double         Expansion[3];
@@ -661,13 +663,14 @@ void RefreshControlPanel(void)
     {
       for (int col=0;col<3;col++)
       {
+        UpdateBox("bxfFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row,fdetail[row].FiboColor[col]);
         UpdateLabel("lbvFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row+"e",LPad(DoubleToStr(fdetail[row].Expansion[col]*100,1)," ",8),clrDarkGray,12,"Consolas");
         UpdateLabel("lbvFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row+"rt",LPad(DoubleToStr(fdetail[row].Retrace[col]*100,1)," ",8),clrDarkGray,12,"Consolas");
       }
 
-      UpdateLabel("lbvFA-H1:"+(string)row,fdetail[row].Heading,fdetail[row].Color[0],14);
-      UpdateLabel("lbvFA-H2:"+(string)row,fdetail[row].SubHead,fdetail[row].Color[1],10);
-      UpdateLabel("lbvFA-State:"+(string)row,fdetail[row].State,fdetail[row].Color[2],14);
+      UpdateLabel("lbvFA-H1:"+(string)row,fdetail[row].Heading,fdetail[row].HeadColor[0],14);
+      UpdateLabel("lbvFA-H2:"+(string)row,fdetail[row].SubHead,fdetail[row].HeadColor[1],10);
+      UpdateLabel("lbvFA-State:"+(string)row,fdetail[row].State,fdetail[row].HeadColor[2],14);
 
       UpdateDirection("lbvFA-ADir:"+(string)row,fdetail[row].ActiveDir,Color(fdetail[row].ActiveDir),28);
       UpdateDirection("lbvFA-BDir:"+(string)row,fdetail[row].BreakoutDir,Color(fdetail[row].BreakoutDir),12);
@@ -1318,49 +1321,50 @@ void UpdateSession(void)
       //-- Fractal Detail Update
       int faType       = type+2;
       
-      ArrayInitialize(fdetail[faType].Color,clrDarkGray);
+      ArrayInitialize(fdetail[faType].HeadColor,clrDarkGray);
       
       fdetail[faType].Heading = EnumToString(type)+" "+proper(ActionText(session[type][ActiveSession].Bias))+
                   " "+BoolToStr(session[type][ActiveSession].Bias==Action(session[type][ActiveSession].Direction,InDirection),"Hold","Hedge");
 
-      fdetail[faType].ActiveDir      = session[type][ActiveSession].Direction;
-      fdetail[faType].BreakoutDir    = session[type][ActiveSession].BreakoutDir;
-      fdetail[faType].State          = EnumToString(session[type][ActiveSession].State);
+      fdetail[faType].ActiveDir        = session[type][ActiveSession].Direction;
+      fdetail[faType].BreakoutDir      = session[type][ActiveSession].BreakoutDir;
+      fdetail[faType].State            = EnumToString(session[type][ActiveSession].State);
       
       if (session[type].IsOpen())
       {
-        fdetail[faType].Color[0]     = clrWhite;
+        fdetail[faType].HeadColor[0]   = clrWhite;
         
         if (ServerHour()>session[type].SessionHour(SessionClose)-3)
         {
-          fdetail[faType].SubHead    = "Late Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrRed;
+          fdetail[faType].SubHead      = "Late Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrRed;
         }
         else
         if (session[type].SessionHour()>3)
         {
-          fdetail[faType].SubHead    = "Mid Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrYellow;
+          fdetail[faType].SubHead      = "Mid Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrYellow;
         }
         else
         {
-          fdetail[faType].SubHead    = "Early Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrLawnGreen;
+          fdetail[faType].SubHead      = "Early Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrLawnGreen;
         }
       }
       else
-        fdetail[faType].SubHead      = "Session Is Closed";
+        fdetail[faType].SubHead        = "Session Is Closed";
 
       if (session[type].Event(NewBreakout) || session[type].Event(NewReversal))
-        fdetail[faType].Color[2]     = clrWhite;
+        fdetail[faType].HeadColor[2]   = clrWhite;
       else
       if (session[type].Event(NewRally) || session[type].Event(NewPullback))
-        fdetail[faType].Color[2]     = clrYellow;
+        fdetail[faType].HeadColor[2]   = clrYellow;
 
       for (FractalType fibo=ftOrigin;fibo<ftPrior;fibo++)
       {
-        fdetail[faType].Expansion[fibo]    = session[type].Expansion(fibo,Now,InDecimal);
-        fdetail[faType].Retrace[fibo]      = session[type].Retrace(fibo,Now,InDecimal);
+        fdetail[faType].Expansion[fibo] = session[type].Expansion(fibo,Now,InDecimal);
+        fdetail[faType].Retrace[fibo]   = session[type].Retrace(fibo,Now,InDecimal);
+        fdetail[faType].FiboColor[fibo] = (color)BoolToInt(session[type].Fractal(fibo).Direction==DirectionUp,C'0,42,0',C'42,0,0');
       }
 
       //--- Session detail operational checks
@@ -1420,7 +1424,7 @@ void UpdatePipMA(void)
       pfractal.ShowFiboArrow();
 
     //-- Update Fractal Matrix
-    ArrayInitialize(fdetail[fatPipMA].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatPipMA].HeadColor,clrDarkGray);
     
     fdetail[fatPipMA].Heading          = "PipMA (Micro)";
     fdetail[fatPipMA].State            = EnumToString(pfractal.State());
@@ -1431,6 +1435,10 @@ void UpdatePipMA(void)
     fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(Origin,Expansion,Now);
     fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(Trend,Expansion,Now);
     fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(Term,Expansion,Now);
+    
+    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(Origin),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(Trend),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(Term),IN_DARK_PANEL);
 
     fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(Origin,Retrace,Now);
     fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(Trend,Retrace,Now);
@@ -1450,20 +1458,20 @@ void UpdateFractal(void)
     {
       Flag("Major",clrWhite,rsShowFlags);
       
-      if (fractal.IsDivergent(Retrace))
+      if (fractal.IsRange(Divergent))
         ArrayInitialize(ufExpand,Fibo161);
     }
     else
     {
       //--Origin Fibo Flags
-      if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,Expansion,Now))
+      if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,fpExpansion,Now))
       {
         Flag("Origin "+EnumToString(ufExpand[3]),clrRed,rsShowFlags);
         ufExpand[3]++;
       }
 
       //-- Base Fibo Flags
-      if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,Expansion,Now))
+      if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,fpExpansion,Now))
       {
         Flag("Base "+EnumToString(ufExpand[2]),clrGray,rsShowFlags);
         ufExpand[2]++;
@@ -1471,7 +1479,7 @@ void UpdateFractal(void)
 
       //-- Trend/Term Fibo Flags
       for (RetraceType fibo=Trend;fibo<=Term;fibo++)
-        if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
+        if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,fpExpansion,Now))
         {
           Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod),rsShowFlags);
           ufExpand[fibo]++;
@@ -1485,61 +1493,70 @@ void UpdateFractal(void)
 void CalcFractal(void)
   {    
     //-- Update Fractal Matrix (Meso)
-    ArrayInitialize(fdetail[fatMeso].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatMeso].HeadColor,Color(fractal.Direction(Expansion)));
+    ArrayInitialize(fdetail[fatMeso].FiboColor,BoolToInt(fractal.Direction(Expansion)==DirectionUp,C'0,42,0',C'42,0,0'));
     
-    fdetail[fatMeso].Heading          = "Meso "+EnumToString((RetraceType)fractal.Leg(Trend));
-    fdetail[fatMeso].State            = "State Undefined";
+    for (RetraceType type=fractal.Leg(Active);type>Root;type--)
+      if (fractal[type].Bar>inpAgingThreshold)
+      {
+        fdetail[fatMeso].SubHead        = EnumToString(type)+" ("+(string)fractal[type].Bar+")";
 
-    fdetail[fatMeso].ActiveDir        = fractal.Direction(fractal.Leg(Trend));
+        if (fractal.Direction(type)==fractal.Direction(Expansion))
+          fdetail[fatMeso].HeadColor[1] = clrYellow;
+        break;
+      }
+    
+    fdetail[fatMeso].Heading          = proper(DirText(fractal.Direction(Base)))+" "+BoolToStr(fractal.BarDir()==DirectionUp,"Rally","Pullback");
+    fdetail[fatMeso].State            = EnumToString(fractal.State(Active));
+
+    if (fractal.State(Active)==Correction)
+      fdetail[fatMeso].HeadColor[2]       = Color(fractal.Direction(Expansion),IN_DIRECTION,Contrarian);
+      
+    if (fractal.State(Active)==Retrace)
+      fdetail[fatMeso].HeadColor[2]       = clrYellow;
+
+    fdetail[fatMeso].ActiveDir        = fractal.Direction(Base);
     fdetail[fatMeso].BreakoutDir      = fractal.Origin().Direction;
+    fdetail[fatMeso].FiboColor[2]     = (color)BoolToInt(fractal.Direction(fractal.Leg(Min))==DirectionUp,C'0,42,0',C'42,0,0');
 
-    fdetail[fatMeso].Expansion[0]     = fractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatMeso].Expansion[1]     = fractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatMeso].Expansion[2]     = fractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatMeso].Expansion[0]     = fractal.Fibonacci(Base,fpExpansion,Max);
+    fdetail[fatMeso].Expansion[1]     = fractal.Fibonacci(Base,fpExpansion,Now);
+    fdetail[fatMeso].Expansion[2]     = fractal.Fibonacci(fractal.Previous(fractal.Leg(Min),Convergent),fpExpansion,Now);
 
-    fdetail[fatMeso].Retrace[0]       = fractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatMeso].Retrace[1]       = fractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatMeso].Retrace[2]       = fractal.Fibonacci(Term,Retrace,Now);
+    fdetail[fatMeso].Retrace[0]       = fractal.Fibonacci(Base,fpRetrace,Max);
+    fdetail[fatMeso].Retrace[1]       = fractal.Fibonacci(Base,fpRetrace,Now);
+    fdetail[fatMeso].Retrace[2]       = fractal.Fibonacci(fractal.Previous(fractal.Leg(Min),Convergent),fpRetrace,Now);
 
     //-- Update Fractal Matrix (Macro)
-    ArrayInitialize(fdetail[fatMacro].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatMacro].HeadColor,Color(fractal.Origin().Direction));
+    ArrayInitialize(fdetail[fatMacro].FiboColor,BoolToInt(fractal.Direction(Expansion)==DirectionUp,C'0,42,0',C'42,0,0'));    
     
     fdetail[fatMacro].Heading         = BoolToStr(fractal.Origin().Direction==DirectionUp,"Long","Short")+" "+EnumToString(fractal.Origin().State);
     Append(fdetail[fatMacro].Heading,BoolToStr(fractal.Origin().Correction,"Correction"));
+    fdetail[fatMacro].SubHead         = BoolToStr(fractal.IsRange(Divergent,Origin),"Divergent","Convergent");
+    
+    if (fractal.IsRange(Divergent))
+      fdetail[fatMacro].HeadColor[1]  = clrYellow;
 
-    fdetail[fatMacro].State           = "State Undefined";
+    fdetail[fatMacro].State           = EnumToString(fractal.State(Origin));
+
+    if (fractal.State(Origin)==Correction)
+      fdetail[fatMacro].HeadColor[2]  = Color(fractal.Origin().Direction,IN_DIRECTION,Contrarian);
+      
+    if (fractal.State(Origin)==Retrace)
+      fdetail[fatMacro].HeadColor[2]  = clrYellow;
 
     fdetail[fatMacro].ActiveDir       = fractal.Direction();
     fdetail[fatMacro].BreakoutDir     = fractal.Origin().Direction;
+    fdetail[fatMacro].FiboColor[0]    = (color)BoolToInt(fractal.Origin().Direction==DirectionUp,C'0,42,0',C'42,0,0');
 
-    fdetail[fatMacro].Expansion[0]    = fractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatMacro].Expansion[1]    = fractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatMacro].Expansion[2]    = fractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatMacro].Expansion[0]    = fractal.Fibonacci(Origin,fpExpansion,Now);
+    fdetail[fatMacro].Expansion[1]    = fractal.Fibonacci(Trend,fpExpansion,Now);
+    fdetail[fatMacro].Expansion[2]    = fractal.Fibonacci(Term,fpExpansion,Now);
 
-    fdetail[fatMacro].Retrace[0]      = fractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatMacro].Retrace[1]      = fractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatMacro].Retrace[2]      = fractal.Fibonacci(Term,Retrace,Now);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateBar - Analyze bar dynamics and pocket traversals           |
-//+------------------------------------------------------------------+
-void UpdateBar(void)
-  {
-    static int usBarDir             = DirectionNone;
-    
-    //-- Set Pocket value
-//    if (Close[0]<Low[1])
-//    if (NewDirection(usBarDir,DirectionDown))
-//    {
-//      Pause("Going Down","Bar Direction");
-//    }
-//    
-//    if (Close[0]>High[1])
-//    if (NewDirection(usBarDir,DirectionUp))
-//    {
-//      Pause("Going Up","Bar Direction");
-//    }    
+    fdetail[fatMacro].Retrace[0]      = fractal.Fibonacci(Origin,fpRetrace,Now);
+    fdetail[fatMacro].Retrace[1]      = fractal.Fibonacci(Trend,fpRetrace,Now);
+    fdetail[fatMacro].Retrace[2]      = fractal.Fibonacci(Term,fpRetrace,Now);
   }
 
 //+------------------------------------------------------------------+
@@ -2259,7 +2276,6 @@ void OnTick()
     UpdateFractal();
     UpdatePipMA();
     CalcFractal();
-    UpdateBar();
     UpdateOrders();
 
     RefreshScreen();
