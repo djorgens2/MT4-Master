@@ -1429,20 +1429,20 @@ void UpdatePipMA(void)
     fdetail[fatPipMA].Heading          = "PipMA (Micro)";
     fdetail[fatPipMA].State            = EnumToString(pfractal.State());
 
-    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(Term);
-    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(Trend);
+    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(pftTerm);
+    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(pftTrend);
 
-    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(pftOrigin,Expansion,Now);
+    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(pftTrend,Expansion,Now);
+    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(pftTerm,Expansion,Now);
     
-    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(Origin),IN_DARK_PANEL);
-    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(Trend),IN_DARK_PANEL);
-    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(Term),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(pftOrigin),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(pftTrend),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(pftTerm),IN_DARK_PANEL);
 
-    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(Term,Retrace,Now);
+    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(pftOrigin,Retrace,Now);
+    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(pftTrend,Retrace,Now);
+    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(pftTerm,Retrace,Now);
   }
 
 //+------------------------------------------------------------------+

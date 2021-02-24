@@ -493,7 +493,7 @@ string NewArrow(int ArrowCode, int Color, string Text="", double Price=0.00, int
     if (StringLen(Text)>0)
       Text      = ":"+Text;
       
-    string name = StringConcatenate("arrow_", TimeToStr(Time[Bar]),Text);
+    string name = StringConcatenate("arrow_",TimeToStr(Time[Bar]),Text);
     
     if (Price==0.00)
       Price = Close[Bar];

@@ -21,8 +21,8 @@
 #property indicator_width1  1
 
 //--- plot indTLine
-#property indicator_label2  "indTLine"
 #property indicator_type2   DRAW_LINE
+#property indicator_label2  "indTLine"
 #property indicator_color2  clrGoldenrod
 #property indicator_style2  STYLE_SOLID
 #property indicator_width2  1
@@ -35,15 +35,17 @@
 #property indicator_width3  1
 
 //--- Input params
-input string PipMAHeader        = "";    //+------ PipMA inputs ------+
-input int    inpDegree          = 6;     // Degree of poly regression
-input int    inpPeriods         = 200;   // Number of poly regression periods
-input double inpTolerance       = 0.5;   // Trend change tolerance (sensitivity)
-input int    inpIdleTime        = 50;    // Market idle time in Pips
-input bool   inpShowFibo        = true;  // Display lines and fibonacci points
-input bool   inpShowComment     = false; // Display fibonacci data in Comment
-input bool   inpShowBounds      = true;  // Display trade boundary lines
-input bool   inpShowWaveSegs    = false; // Display wave segment overlays
+input string         PipMAHeader          = "";                //+------ PipMA inputs ------+
+input int            inpDegree            = 6;                 // Degree of poly regression
+input int            inpPeriods           = 200;               // Number of poly regression periods
+input double         inpTolerance         = 0.5;               // Trend change tolerance (sensitivity)
+input int            inpIdleTime          = 50;                // Market idle time in Pips
+input bool           inpShowFibo          = true;              // Show fibonacci points
+input bool           inpShowComment       = false;             // Display fibonacci data in Comment
+input bool           inpShowBounds        = true;              // Display active trade range bounds
+input bool           inpShowWaveSegs      = false;             // Display wave segment overlays
+input bool           inpShowWaveBounds    = false;             // Display Crest/Trough wave bounds
+input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal lines by type
 
 
 //--- Class defs
@@ -58,7 +60,6 @@ double    indPLineBuffer[];
 
 const string pmFiboPeriod[3]    = {"tm","tr","o"};
 const string pmFiboType[5]      = {"b","r","e","rt","rc"};
-const int    pmFiboPeriodId[3]  = {Term,Trend,Origin};
 const int    pmFiboTypeId[5]    = {Base,Root,Expansion,Retrace,Recovery};
 
 //+------------------------------------------------------------------+
@@ -163,47 +164,52 @@ void RefreshScreen()
                +" "+DoubleToStr(Pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
                
     //---Fibonacci data
-    UpdateLabel("lrFibo tm(e)",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Term)),16);
-    UpdateLabel("lrFibo tm(e)x",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tm(e)n",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tr(e)",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Trend)),16);
-    UpdateLabel("lrFibo tr(e)x",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo tr(e)n",DoubleToStr(pfractal.Fibonacci(Trend,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo o(e)",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(Origin)),16);
-    UpdateLabel("lrFibo o(e)x",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
-    UpdateLabel("lrFibo o(e)n",DoubleToStr(pfractal.Fibonacci(Origin,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
+    UpdateLabel("lrFibo tm(e)",DoubleToStr(pfractal.Fibonacci(pftTerm,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(pftTerm)),16);
+    UpdateLabel("lrFibo tm(e)x",DoubleToStr(pfractal.Fibonacci(pftTerm,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(pftTerm)),8);
+    UpdateLabel("lrFibo tm(e)n",DoubleToStr(pfractal.Fibonacci(pftTerm,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(pftTerm)),8);
+    UpdateLabel("lrFibo tr(e)",DoubleToStr(pfractal.Fibonacci(pftTrend,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(pftTrend)),16);
+    UpdateLabel("lrFibo tr(e)x",DoubleToStr(pfractal.Fibonacci(pftTrend,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(pftTrend)),8);
+    UpdateLabel("lrFibo tr(e)n",DoubleToStr(pfractal.Fibonacci(pftTrend,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(pftTrend)),8);
+    UpdateLabel("lrFibo o(e)",DoubleToStr(pfractal.Fibonacci(pftOrigin,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),16);
+    UpdateLabel("lrFibo o(e)x",DoubleToStr(pfractal.Fibonacci(pftOrigin,Expansion,Max,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),8);
+    UpdateLabel("lrFibo o(e)n",DoubleToStr(pfractal.Fibonacci(pftOrigin,Expansion,Min,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),8);
                
-    UpdateLabel("lrFibo tm(rt)",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Term)),16);
-    UpdateLabel("lrFibo tm(rt)x",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tm(rt)n",DoubleToStr(pfractal.Fibonacci(Term,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Term)),8);
-    UpdateLabel("lrFibo tr(rt)",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Trend)),16);
-    UpdateLabel("lrFibo tr(rt)x",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo tr(rt)n",DoubleToStr(pfractal.Fibonacci(Trend,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Trend)),8);
-    UpdateLabel("lrFibo o(rt)",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(Origin)),16);
-    UpdateLabel("lrFibo o(rt)x",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
-    UpdateLabel("lrFibo o(rt)n",DoubleToStr(pfractal.Fibonacci(Origin,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(Origin)),8);
+    UpdateLabel("lrFibo tm(rt)",DoubleToStr(pfractal.Fibonacci(pftTerm,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(pftTerm)),16);
+    UpdateLabel("lrFibo tm(rt)x",DoubleToStr(pfractal.Fibonacci(pftTerm,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(pftTerm)),8);
+    UpdateLabel("lrFibo tm(rt)n",DoubleToStr(pfractal.Fibonacci(pftTerm,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(pftTerm)),8);
+    UpdateLabel("lrFibo tr(rt)",DoubleToStr(pfractal.Fibonacci(pftTrend,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(pftTrend)),16);
+    UpdateLabel("lrFibo tr(rt)x",DoubleToStr(pfractal.Fibonacci(pftTrend,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(pftTrend)),8);
+    UpdateLabel("lrFibo tr(rt)n",DoubleToStr(pfractal.Fibonacci(pftTrend,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(pftTrend)),8);
+    UpdateLabel("lrFibo o(rt)",DoubleToStr(pfractal.Fibonacci(pftOrigin,Retrace,Now,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),16);
+    UpdateLabel("lrFibo o(rt)x",DoubleToStr(pfractal.Fibonacci(pftOrigin,Retrace,Max,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),8);
+    UpdateLabel("lrFibo o(rt)n",DoubleToStr(pfractal.Fibonacci(pftOrigin,Retrace,Min,InPercent),1),DirColor(pfractal.Direction(pftOrigin)),8);
 
     for (int ftype=0;ftype<5;ftype++)
-      for (int fperiod=0;fperiod<3;fperiod++)
-        UpdateLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(pmFiboPeriodId[fperiod],pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
+      for (PipFractalType type=pftOrigin;type<PipFractalTypes;type++)
+        UpdateLabel("lrFibo "+pmFiboPeriod[type]+"("+pmFiboType[ftype]+")p",lpad(DoubleToStr(pfractal.Price(type,pmFiboTypeId[ftype]),Digits)," ",Digits+2),clrDarkGray);
+
+    color pfColor[5] = {clrSteelBlue,clrGoldenrod,clrFireBrick,clrDarkGray,clrDarkGray};
+    if (inpShowFractal!=PipFractalTypes)
+      for (int ftype=0;ftype<5;ftype++)
+        UpdateLine("piprFractal("+pmFiboType[ftype]+")",pfractal.Price(inpShowFractal,pmFiboTypeId[ftype]),BoolToInt(ftype==4,STYLE_DOT,STYLE_SOLID),pfColor[ftype]);
 
     if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
     else
     if (pfractal.Event(NewDirection))
-      UpdateEvent("New Direction",DirColor(pfractal.Direction(Term)));
+      UpdateEvent("New Direction",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.EventAlert(NewFractal,Major))
-      UpdateEvent("New Major",DirColor(pfractal.Direction(Term)));
+      UpdateEvent("New Major",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.EventAlert(NewFractal,Minor))
-      UpdateEvent("New Minor",DirColor(pfractal.Direction(Term)));
+      UpdateEvent("New Minor",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.Event(NewWane))
-      UpdateEvent("Trend Wane",DirColor(pfractal.Direction(Term)));
+      UpdateEvent("Trend Wane",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.Event(NewResume))
-      UpdateEvent("Trend Resume",DirColor(pfractal.Direction(Term)));
+      UpdateEvent("Trend Resume",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.Event(NewBoundary))
     {
@@ -239,8 +245,11 @@ void RefreshScreen()
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,DirColor(pfractal.Direction(RangeHigh)));
     }
 
-    UpdateLine("piprWaveLong",pfractal.ActionLine(OP_BUY,Opportunity),STYLE_SOLID,clrDodgerBlue);
-    UpdateLine("piprWaveShort",pfractal.ActionLine(OP_SELL,Opportunity),STYLE_DOT,clrDodgerBlue);
+    if (inpShowWaveBounds)
+    {
+      UpdateLine("piprWaveLong",pfractal.ActionLine(OP_BUY,Opportunity),STYLE_SOLID,clrDodgerBlue);
+      UpdateLine("piprWaveShort",pfractal.ActionLine(OP_SELL,Opportunity),STYLE_DOT,clrDodgerBlue);
+    }
 
     if (inpShowFibo)
       pfractal.ShowFiboArrow();
@@ -269,7 +278,7 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {    
     pfractal.UpdateBuffer(indHistoryBuffer,indPLineBuffer,indTLineBuffer);
-    
+
     if (Bars>inpPeriods)
       indHistoryBuffer[inpPeriods]=0.00;
 
@@ -387,9 +396,9 @@ void InitScreenObjects()
     NewLabel("lrFibo23","Retrace",190,266,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFibo24","Recovery",190,278,clrWhite,SCREEN_UL,IndWinId);
     
-    for (int fperiod=0;fperiod<3;fperiod++)
+    for (PipFractalType type=pftOrigin;type<PipFractalTypes;type++)
       for (int ftype=0;ftype<5;ftype++)
-        NewLabel("lrFibo "+pmFiboPeriod[fperiod]+"("+pmFiboType[ftype]+")p","0.00000",250+(fperiod*80),230+(ftype*12),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lrFibo "+pmFiboPeriod[type]+"("+pmFiboType[ftype]+")p","0.00000",410-(type*80),230+(ftype*12),clrDarkGray,SCREEN_UL,IndWinId);
 
     //--- Price bubbles
     ObjectCreate("piprMean",OBJ_ARROW,IndWinId,0,0);
@@ -411,6 +420,9 @@ void InitScreenObjects()
 
     NewLine("piprWaveLong");
     NewLine("piprWaveShort");
+    
+    for (int ftype=0;ftype<5;ftype++)
+      NewLine("piprFractal("+pmFiboType[ftype]+")");
   }
 
 //+------------------------------------------------------------------+
@@ -448,4 +460,11 @@ void OnDeinit(const int reason)
     ObjectDelete("piprRngLow");
     ObjectDelete("piprRngMid");
     ObjectDelete("piprRngHigh");
+    
+    ObjectDelete("piprWaveLong");
+    ObjectDelete("piprWaveShort");
+    
+    for (int ftype=0;ftype<5;ftype++)
+      ObjectDelete("piprFractal("+pmFiboType[ftype]+")");
+
   }

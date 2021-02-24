@@ -52,7 +52,8 @@ public:
        int      Direction(int Direction, bool Contrarian=false);
        int      Age(int Measure);
        double   Range(int Measure);
-       bool     HistoryLoaded(void) {return (pipHistory.Count == prPeriods+prDegree); }
+       int      History(void)  {return (pipHistory.Count);};
+       bool     HistoryLoaded(void) {return (pipHistory.Count == prPeriods+prDegree);};
 
 protected:
     
