@@ -256,7 +256,7 @@ void CPipRegression::CalcMA(void)
         if (Event(NewLow))
           ptrRangeAgeLow  = 0;
 
-        SetEvent(NewBoundary);        
+        SetEvent(NewBoundary);
       }
         
       ptrRangeAgeHigh++;

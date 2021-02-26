@@ -199,11 +199,14 @@ void RefreshScreen()
     if (pfractal.Event(NewDirection))
       UpdateEvent("New Direction",DirColor(pfractal.Direction(pftTerm)));
     else
-    if (pfractal.EventAlert(NewFractal,Major))
-      UpdateEvent("New Major",DirColor(pfractal.Direction(pftTerm)));
+    if (pfractal.Event(NewOrigin))
+      UpdateEvent("New Origin",DirColor(pfractal.Direction(pftOrigin)));
     else
-    if (pfractal.EventAlert(NewFractal,Minor))
-      UpdateEvent("New Minor",DirColor(pfractal.Direction(pftTerm)));
+    if (pfractal.Event(NewTrend))
+      UpdateEvent("New Trend",DirColor(pfractal.Direction(pftTrend)));
+    else
+    if (pfractal.Event(NewTerm))
+      UpdateEvent("New Term",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.Event(NewWane))
       UpdateEvent("Trend Wane",DirColor(pfractal.Direction(pftTerm)));
