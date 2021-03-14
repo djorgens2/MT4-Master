@@ -594,17 +594,15 @@ void UpdateBarNote(string LabelName, double Price=0.00, int Color=clrWhite)
 //+------------------------------------------------------------------+
 void UpdatePriceTag(string PriceTagName, int Bar, int Direction)
   {
-    double uptOffset  = point(5);
-    
     if (Bar<0 || Bar>Bars)
       return;
       
     if (Direction == DIR_UP)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+(uptOffset*2));
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+Pip(12.0,InDecimal));
     else
     
     if (Direction == DIR_DOWN)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]);
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-Pip(4.0,InDecimal));
 
     else
       return;

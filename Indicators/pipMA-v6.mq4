@@ -39,6 +39,7 @@ input string         PipMAHeader          = "";                //+------ PipMA i
 input int            inpDegree            = 6;                 // Degree of poly regression
 input int            inpPeriods           = 200;               // Number of poly regression periods
 input double         inpTolerance         = 0.5;               // Trend change tolerance (sensitivity)
+input double         inpAggFactor         = 1.0;               // Tick Aggregate factor (1=1 PIP);
 input int            inpIdleTime          = 50;                // Market idle time in Pips
 input bool           inpShowFibo          = true;              // Show fibonacci points
 input bool           inpShowComment       = false;             // Display fibonacci data in Comment
@@ -49,7 +50,7 @@ input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal l
 
 
 //--- Class defs
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpIdleTime);
+  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpAggFactor,inpIdleTime);
 
 string    ShortName             = "pipMA-v6: Degree:"+IntegerToString(inpDegree)+" Period:"+IntegerToString(inpPeriods);
 int       IndWinId  = -1;
@@ -134,7 +135,7 @@ void RefreshScreen()
     UpdateLabel("lrFOCNow",NegLPad(pfractal.FOC(Now),1),DirColor(pfractal.FOCDirection()),15);
     UpdateLabel("lrFOCPivDev",NegLPad(Pip(pfractal.Pivot(Deviation)),1),DirColor(pfractal.Direction(Pivot)),15);
     UpdateDirection("lrFOCPivDir",pfractal.Direction(Pivot),DirColor(pfractal.Direction(Pivot)),20);
-    UpdateLabel("lrFOCRange",DoubleToStr(Pip(pfractal.Range(Size)),1),DirColor(pfractal.FOCDirection()),15);
+    UpdateLabel("lrFOCRange",DoubleToStr(Pip(pfractal.Range(Size))/inpAggFactor,1),DirColor(pfractal.FOCDirection()),15);
     UpdateDirection("lrRangeDir",pfractal.Direction(Range),DirColor(pfractal.Direction(Range)),30);
 
     UpdateLabel("lrFOCDev",DoubleToStr(pfractal.FOC(Deviation),1),DirColor(pfractal.FOCDirection()));
@@ -156,6 +157,8 @@ void RefreshScreen()
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));    
     UpdateLabel("lrPolyState",EnumToString(pfractal.PolyState()),BoolToInt(pfractal.PolyState()==Crest||pfractal.PolyState()==Trough,clrYellow,DirColor(pfractal.Direction(Polyline))));
     UpdateLabel("lrFOCState",FOCText(pfractal.TrendState()),DirColor(pfractal.FOCDirection()));
+    UpdateLabel("lrWaveStateL",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));                     
+    UpdateLabel("lrWaveStateS",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
 
     UpdateLabel("lrStdDevData","Std Dev: "+DoubleToStr(Pip(pfractal.StdDev(Now)),1)
                +" x:"+DoubleToStr(fmax(Pip(pfractal.StdDev(Positive)),fabs(Pip(pfractal.StdDev(Negative)))),1)
@@ -345,7 +348,11 @@ void InitScreenObjects()
     //--- Wave labels
     NewLabel("lrWave01","--------------- Wave Data --------------",12,82,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrWave02","State:",12,93,clrWhite,SCREEN_UL,IndWinId);    
-    NewLabel("lrWaveState","",45,93,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrWaveState","",48,93,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrWave03","Long:",12,104,clrWhite,SCREEN_UL,IndWinId); 
+    NewLabel("lrWave04","Short:",12,115,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrWaveStateL","Long",48,104,clrWhite,SCREEN_UL,IndWinId); 
+    NewLabel("lrWaveStateS","Short",48,115,clrWhite,SCREEN_UL,IndWinId);
 
     //--- Fibo labels
     NewLabel("lrFibo00","--------------- Fibonacci Data -------------------",226,82,clrGoldenrod,SCREEN_UL,IndWinId);

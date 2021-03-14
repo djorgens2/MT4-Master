@@ -43,6 +43,7 @@ input string          RegressionHeader     = "";    //+------ Regression Options
 input int             inpDegree            = 6;     // Degree of poly regression
 input int             inpSmoothFactor      = 3;     // MA Smoothing factor
 input double          inpTolerance         = 0.5;   // Directional sensitivity
+input double          inpAggFactor         = 1.0;   // Tick Aggregation factor (1=1p)
 input int             inpPipPeriods        = 200;   // Trade analysis periods (PipMA)
 input int             inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
 
@@ -64,7 +65,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   CSession           *session[SessionTypes];
   CSession           *lead;
   CFractal           *fractal              = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal             = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50);
+  CPipFractal        *pfractal             = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,inpAggFactor,50);
   CEvent             *rsEvents             = new CEvent();
   
   //--- Enums and Structs
@@ -678,7 +679,7 @@ void RefreshControlPanel(void)
   }
 
 //+------------------------------------------------------------------+
-//| ShowZoneLines - Diaplay zone lines                               |
+//| ShowZoneLines - Display zone lines                               |
 //+------------------------------------------------------------------+
 void ShowZoneLines(void)
   {

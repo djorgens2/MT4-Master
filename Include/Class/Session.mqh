@@ -1163,7 +1163,6 @@ void CSession::RefreshScreen(void)
                        " (r) "+DoubleToStr(Retrace(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(ftOrigin,Max,InPercent),1)+"%"+
                        " (e) "+DoubleToStr(Expansion(ftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(ftOrigin,Max,InPercent),1)+"%\n"+
         "\n"+EnumToString(sType)+" Active "+ActiveEventText());
-                       
   }
 
 //+------------------------------------------------------------------+

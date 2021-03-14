@@ -34,7 +34,7 @@ public:
                    SevereExpansion     =  4
                 };
 
-                CPipRegression(int Degree, int Periods, double Tolerance, int IdleTime);
+                CPipRegression(int Degree, int Periods, double Tolerance, double AggFactor, int IdleTime);
                ~CPipRegression();                     
 
     virtual
@@ -71,6 +71,7 @@ protected:
        int      ptrRangeAgeLow;
        int      ptrMarketIdleTime;
        
+       double   ptrAggFactor;
        double   ptrRangeSize;
        double   ptrRangeMean;
        double   ptrPriceHigh;
@@ -202,7 +203,7 @@ void CPipRegression::CalcMA(void)
   {
     static int  cmaRangeDir     = DirectionNone;
     
-    if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=1.0)
+    if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=ptrAggFactor)
     {
 
       pipHistory.Insert(0,Close[0]);
@@ -272,17 +273,18 @@ void CPipRegression::CalcMA(void)
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-CPipRegression::CPipRegression(int Degree, int Periods, double Tolerance, int IdleTime) : CTrendRegression(Degree,Periods,0)
+CPipRegression::CPipRegression(int Degree, int Periods, double Tolerance, double AggFactor, int IdleTime) : CTrendRegression(Degree,Periods,0)
   {
     SetTrendlineTolerance(Tolerance);
     SetMarketIdleTime(IdleTime);
     
-    pipHistory = new CArrayDouble(Degree+Periods);    
+    pipHistory = new CArrayDouble(Degree+Periods);
     pipHistory.Truncate  = true;
 
     pipHistory.SetAutoCompute(true);
     pipHistory.SetPrecision(Digits);
     
+    ptrAggFactor         = AggFactor;
     ptrTick              = 0;
     ptrTickDir           = DirectionNone;
   }

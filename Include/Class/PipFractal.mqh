@@ -11,7 +11,7 @@
 #include <Class\PipRegression.mqh>
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| PipFractal: Fractal Class derived from Poly(6) trend algorithm   |
 //+------------------------------------------------------------------+
 class CPipFractal : public CPipRegression
   {
@@ -46,11 +46,20 @@ class CPipFractal : public CPipRegression
     private:
           //--- Data buffer
           double         pfMap[];
-          int            pfBar;
-          bool           pfTerm161;
+
+          //--- Operational Bar variables
+          int            pfBar;                             //--- Bar now processing
+          int            pfBars;                            //--- Total Bars in Chart
+          int            pfHiBar;                           //--- Current Term High Bar
+          int            pfLoBar;                           //--- Current Term Low Bar
           
-          //--- Operational variables
-          double         pfBound[2];                        //--- Trend fibo forecast hi/lo price
+          double         pfTermHi;                          //--- Term hi/lo root price
+          double         pfTermLo;                          //--- Term hi/lo root price
+          
+          //--- Operational flags
+          bool           pfTerm161;                         //--- Term fibo 161 switch
+          bool           pfReversal;                        //--- Set on Trend Reversals
+          
           ReservedWords  pfState;                           //--- Current state of the fractal
 
           //--- Display flag operationals
@@ -62,12 +71,14 @@ class CPipFractal : public CPipRegression
           //--- Internal use methods
           void           UpdateRetrace(PipFractalType Type);        //--- Update Retrace by Type
           void           UpdateTerm(int Direction, double Price);   //--- Updates Term Fractal on change
+          void           UpdateTrend(void);                         //--- Updates Trend Fractal on change
+          void           UpdateOrigin(void);                        //--- Updates Origin Fractal on change
           void           UpdateNodes(void);
           void           CalcState(void);
           
 
     public:
-                         CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime);
+                         CPipFractal(int Degree, int Periods, double Tolerance, double AggFactor, int IdleTime);
                         ~CPipFractal();
                              
        virtual
@@ -93,16 +104,10 @@ class CPipFractal : public CPipRegression
 //+------------------------------------------------------------------+
 void CPipFractal::CalcState(void)
   {
-    ReservedWords usState          = pfState;
+    //-- Origin State
     
-    if (this.Direction(pftTerm)!=this.Direction(Boundary))
-      if (this.Direction(Range)!=this.Direction(Boundary))
-        pfState          = Correction;
-      else
-        pfState          = Retrace;
-    else  
-    if (this.Direction(Range)!=this.Direction(Boundary))   
-      pfState            = Reversal;
+    
+    
   }
 
 //+------------------------------------------------------------------+
@@ -117,7 +122,57 @@ void CPipFractal::UpdateRetrace(PipFractalType Type)
     else
       pf[Type].Recovery = BoolToDouble(pf[Type].Direction==DirectionUp,
                            fmax(BoolToDouble(pfBar==0,Close[pfBar],High[pfBar]),pf[Type].Recovery),
-                           fmin(BoolToDouble(pfBar==0,Close[pfBar],Low[pfBar]),pf[Type].Recovery),Digits);  
+                           fmin(BoolToDouble(pfBar==0,Close[pfBar],Low[pfBar]),pf[Type].Recovery),Digits);
+                           
+    if (IsChanged(pf[Type].Expansion,BoolToDouble(Direction(Type)==DirectionUp,
+                           fmax(BoolToDouble(pfBar==0,Close[pfBar],High[pfBar]),pf[Type].Expansion),
+                           fmin(BoolToDouble(pfBar==0,Close[pfBar],Low[pfBar]),pf[Type].Expansion),Digits)))
+    {
+      pf[Type].Retrace  = pf[Type].Expansion;
+      pf[Type].Recovery = pf[Type].Expansion;
+      
+      SetEvent(NewExpansion,Minor);
+      ShowFiboArrow(pf[Type].Expansion);
+    }                           
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateOrigin - updates Origin fractal data                       |
+//+------------------------------------------------------------------+
+void CPipFractal::UpdateOrigin(void)
+  {
+    if (pfReversal)
+    {
+      if (NewDirection(pf[pftOrigin].Direction,pf[pftTrend].Direction))
+        SetEvent(NewOrigin,Critical);
+
+      pf[pftOrigin].Root         = pf[pftTrend].Root;
+    }
+    
+    pf[pftOrigin].Base           = pf[pftTrend].Expansion;
+    pf[pftOrigin].Retrace        = pf[pftTerm].Expansion;
+    pf[pftOrigin].Recovery       = pf[pftTerm].Expansion;
+      
+    pf[pftOrigin].Expansion      = BoolToDouble(Direction(pftOrigin)==DirectionUp,
+                                     fmax(pf[pftOrigin].Expansion,pf[pftTrend].Expansion),
+                                     fmin(pf[pftOrigin].Expansion,pf[pftTrend].Expansion),Digits);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTrend - updates Trend fractal data                         |
+//+------------------------------------------------------------------+
+void CPipFractal::UpdateTrend(void)
+  {
+    pfReversal = (NewDirection(pf[pftTrend].Direction,pf[pftTerm].Direction));
+    
+    pf[pftTrend].Base           = Fibonacci(pftTerm,Forecast,Fibo161);
+    pf[pftTrend].Root           = BoolToDouble(Direction(pftTrend)==DirectionUp,pfTermLo,pfTermHi,Digits);
+
+    pf[pftTrend].Expansion      = pf[pftTerm].Expansion;
+    pf[pftTrend].Retrace        = pf[pftTerm].Expansion;
+    pf[pftTrend].Recovery       = pf[pftTerm].Expansion;
+    
+    SetEvent(NewTrend,Major);
   }
 
 //+------------------------------------------------------------------+
@@ -138,18 +193,19 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
       pf[pftTerm].Expansion      = pf[pftTerm].Retrace;
       pf[pftTerm].Retrace        = pf[pftTerm].Recovery;
       pf[pftTerm].Recovery       = Price;
+      
+      if (IsChanged(pfTerm161,false))
+      {
+        pfTermHi                 = pf[pftTerm].Root;
+        pfTermLo                 = pf[pftTerm].Root;
+        
+        SetEvent(NewOrigin,Minor);
+      }
+
+      pfTermHi                 = fmax(pfTermHi,pf[pftTerm].Root);
+      pfTermLo                 = fmin(pfTermLo,pf[pftTerm].Root);
  
-      SetEvent(NewTrend,Minor);
-    }
-
-    if (IsChanged(pf[pftTerm].Expansion,BoolToDouble(Direction(pftTerm)==DirectionUp,
-                                 fmax(Price,pf[pftTerm].Expansion),
-                                 fmin(Price,pf[pftTerm].Expansion),Digits)))
-    {
-      pfBound[Action(Direction)] = Fibonacci(pftTerm,Forecast,Fibo161);
-
-      pf[pftTerm].Retrace        = Price;
-      pf[pftTerm].Recovery       = Price;
+      SetEvent(NewTerm,Minor);
     }
   }
 
@@ -159,35 +215,42 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
 void CPipFractal::UpdateNodes(void)
   {
     //--- Clear fractal events
+    ClearEvent(NewExpansion);
     ClearEvent(NewTerm);
     ClearEvent(NewTrend);
     ClearEvent(NewOrigin);
 
     //--- Handle Term direction changes
+    if (pfBar>0&&pfMap[pfBar]>0.00)
+      UpdateTerm(BoolToInt(IsEqual(pfMap[pfBar],High[pfBar])==DirectionUp,DirectionUp,DirectionDown),pfMap[pfBar]);
+    else
     if (Event(NewBoundary))
-    {
       if (IsEqual(FOC(Deviation),0.0,1))
         if (HistoryLoaded())
           UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown),Close[pfBar]);
         else
           UpdateTerm(BoolToInt(Close[pfBar]>pf[pftTerm].Root,DirectionUp,DirectionDown),Close[pfBar]);
-
-      UpdateTerm(Direction(pftTerm),Close[pfBar]);
-    }
  
     UpdateRetrace(pftTerm);
     
     //-- Manage Trend changes
-//    if (pfMap[Bar]>0) Print (DoubleToStr(pfMap[Bar],Digits)+" : "+DoubleToStr(pf[pftTrend].Retrace,Digits)+" : "+DoubleToStr(pf[pftTrend].Recovery,Digits));
+    if (Fibonacci(pftTerm,Expansion,Max)>FiboPercent(Fibo161))
+      if (IsChanged(pfTerm161,true))
+        UpdateTrend();
+
+    UpdateRetrace(pftTrend);    
     
-    
-    //-- Manage Retrace/Recovery
+    //-- Manage Origin changes
+    if (EventAlert(NewOrigin,Minor))
+      UpdateOrigin();
+      
+    UpdateRetrace(pftOrigin);
   }
 
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime) : CPipRegression(Degree,Periods,Tolerance,IdleTime)
+CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, double AggFactor, int IdleTime) : CPipRegression(Degree,Periods,Tolerance,AggFactor,IdleTime)
   {
     //-- Initialize fibo graphics
     arrowName          = "";
@@ -197,18 +260,17 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime
 
     int    pfSeed      = 14;
     int    pfDir       = DirectionChange;
-
-    int    pfHiBar;
-    int    pfLoBar;
     
     int    pfLastHi    = NoValue;
     int    pfLastLo    = NoValue;
 
     pfBar              = 0;
+    pfBars             = Bars;
+    pfHiBar            = NoValue;
+    pfLoBar            = NoValue;
     
     ArrayResize(pfMap,Bars);
     ArrayInitialize(pfMap,0.00);
-    ArrayInitialize(pfBound,0.00);
     
     //-- Build fractal map
     while (pfBar<Bars)
@@ -260,28 +322,6 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime
       pfBar++;
     }
 
-    //--- Paint fractal
-    pfHiBar = NoValue;
-    pfLoBar = NoValue;
-    
-    for (pfBar=Bars-1;pfBar>0;pfBar--)
-    {
-      if (pfMap[pfBar]>0.00)
-      {
-        if (IsEqual(pfMap[pfBar],High[pfBar]))
-          pfHiBar = pfBar;
-        
-        if (IsEqual(pfMap[pfBar],Low[pfBar]))
-          pfLoBar = pfBar;
-          
-        if (pfHiBar>NoValue&&pfLoBar>NoValue)
-        {
-          NewRay("r:"+(string)pfBar,false);
-          UpdateRay("r:"+(string)pfBar,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
-        }
-      }
-    }
-
     //--- PipFractal Initialization
     pf[pftTerm].Direction          = DirectionChange;
     pf[pftTerm].Base               = NoValue;
@@ -294,17 +334,7 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, int IdleTime
     pf[pftOrigin]                  = pf[pftTerm];
     
     for (pfBar=Bars-1;pfBar>0;pfBar--)
-    {
-      if (pfMap[pfBar]>0.00)
-      {
-        UpdateTerm(BoolToInt(IsEqual(pfMap[pfBar],High[pfBar])==DirectionUp,DirectionUp,DirectionDown),pfMap[pfBar]);
-//        NewArrow(SYMBOL_DASH,Color(Direction,IN_CHART_DIR),"Fibo",Fibonacci(pftTerm,Forecast,Fibo161),pfBar);
-
-        ShowFiboArrow(pfMap[pfBar]);
-      }
-  
       UpdateNodes();
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -327,7 +357,14 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
       CalcWave();
     }
 
+    for (pfBars=pfBars;pfBars<Bars;pfBars++)
+    {
+      pfHiBar++;
+      pfLoBar++;
+    }
+
     UpdateNodes();
+    CalcState();
     
     ArrayCopy(MA,maData,0,0,fmin(prPeriods,pipHistory.Count));
   }
@@ -336,7 +373,7 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
 //| Update - Public interface to populate metrics                    |
 //+------------------------------------------------------------------+
 void CPipFractal::Update(void)
-  {
+  {      
     if (HistoryLoaded())
     {
       UpdatePoly();
@@ -347,8 +384,15 @@ void CPipFractal::Update(void)
       CalcMA();
       CalcWave();      
     }
+
+    for (pfBars=pfBars;pfBars<Bars;pfBars++)
+    {
+      pfHiBar++;
+      pfLoBar++;
+    }
       
-    UpdateNodes();          
+    UpdateNodes();
+    CalcState();
   }
 
 //+------------------------------------------------------------------+
@@ -460,17 +504,37 @@ void CPipFractal::ShowFiboArrow(double Price=0.00)
 
     if (IsChanged(arrowDir,Direction(pftTerm)))
     {
-      arrowPrice                = BoolToDouble(IsEqual(Price,0.00),Close[0],Price,Digits);
+      arrowPrice                = BoolToDouble(IsEqual(Price,0.00),Close[pfBar],Price,Digits);
       arrowName                 = NewArrow(sfaArrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir)+(string)arrowIdx++,arrowPrice,pfBar);
+      
+      if (Direction(pftTerm)==DirectionUp)   pfHiBar = pfBar;
+      if (Direction(pftTerm)==DirectionDown) pfLoBar = pfBar;
+
+      if (pfHiBar>NoValue&&pfLoBar>NoValue)
+      {
+        NewRay("r:"+(string)arrowIdx,false);
+        UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
+      }
+
     }
      
     switch (arrowDir)
     {
       case DirectionUp:    if (IsChanged(arrowPrice,fmax(arrowPrice,High[pfBar])))
+                           {
+                             pfHiBar = pfBar;
+                             
                              UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
+                             UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
+                           }
                            break;
       case DirectionDown:  if (IsChanged(arrowPrice,fmin(arrowPrice,Low[pfBar])))
+                           {
+                             pfLoBar = pfBar;
+                             
                              UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
+                             UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
+                           }
                            break;
     }
   }
