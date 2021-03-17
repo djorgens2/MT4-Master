@@ -92,6 +92,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
                         msWait,
                         msManage,
                         msHold,
+                        msAcquire,
                         msRisk,
                         msHalt,
                         ManagerStates
@@ -247,6 +248,8 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   struct              OrderMaster
                       {
                         ManagerState   State[2];                  //-- Trade State by Action
+                        int            Level[2];
+                        bool           Spotter[2];
                         TriggerType    Trigger[2][TriggerStates]; //-- Conditional order trigger
                         double         MarginTolerance[2];        //-- Max Margin by Action
                         FiboZone       Fibo[2];                   //-- Aggregate order detail by fibo zone
@@ -376,15 +379,16 @@ int ServerHour(void)
 //+------------------------------------------------------------------+
 //| ManagerStateText - Returns the text for the supplied state       |
 //+------------------------------------------------------------------+
-string ManagerStateText(ManagerState State)
+string ManagerStateText(ManagerState State, string Detail="")
   {
     switch (State)
     {
-      case msWait:     return ("Waiting...");
-      case msManage:   return ("Managing...");
-      case msHold:     return ("Holding...");
-      case msRisk:     return ("At Risk");
-      case msHalt:     return ("Halted");
+      case msWait:     return ("Waiting"+Detail);
+      case msManage:   return ("Managing"+Detail);
+      case msHold:     return ("Holding"+Detail);
+      case msAcquire:  return ("Acquisition"+Detail);
+      case msRisk:     return ("At Risk"+Detail);
+      case msHalt:     return ("Halted"+Detail);
       default:         return ("Invalid Manager State");
     }
   }
@@ -529,7 +533,7 @@ void RefreshControlPanel(void)
       rcpOptions                  = "  Lines: "+rcpOptions;
     
     UpdateLabel("lbvAC-Trading",BoolToStr(TradingOn,"Open","Halt"),BoolToInt(TradingOn,clrYellow,clrRed));
-    UpdateLabel("lbvAC-Options",rsShow+BoolToStr(rsShowPitch,"  Pitch")+rcpOptions,clrDarkGray);
+    UpdateLabel("lbvAC-Options",proper(rsShow)+BoolToStr(rsShowPitch,"  Pitch")+rcpOptions,clrDarkGray);
     
     //-- Order Detail (OD) --
     int    fibo[2]   = {-Fibo823,-Fibo823};
@@ -562,8 +566,10 @@ void RefreshControlPanel(void)
         }
       }
 
-    UpdateLabel("lbvOQ-BPlan",ManagerStateText(omMaster.State[OP_BUY]),BoolToInt(omMaster.Trigger[OP_BUY][tsOpen].Fired,clrYellow,clrDarkGray));
-    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL]),BoolToInt(omMaster.Trigger[OP_SELL][tsOpen].Fired,clrYellow,clrDarkGray));
+//    UpdateLabel("lbvOQ-BPlan",ManagerStateText(omMaster.State[OP_BUY]),BoolToInt(omMaster.Trigger[OP_BUY][tsOpen].Fired,clrYellow,clrDarkGray));
+//    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL]),BoolToInt(omMaster.Trigger[OP_SELL][tsOpen].Fired,clrYellow,clrDarkGray));
+    UpdateLabel("lbvOQ-LPlan",ManagerStateText(omMaster.State[OP_BUY])+":"+DoubleToStr(FiboPercent(omMaster.Level[OP_BUY],InPercent),1)+"%",BoolToInt(omMaster.Spotter[OP_BUY],clrYellow,clrDarkGray));
+    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL])+":"+DoubleToStr(FiboPercent(omMaster.Level[OP_SELL],InPercent),1)+"%",BoolToInt(omMaster.Spotter[OP_SELL],clrYellow,clrDarkGray));
 
     //-- Wave Action (WA) --
     if (ObjectGet("bxhWA-Long",OBJPROP_BGCOLOR)==clrBoxOff||pfractal.Event(NewWaveReversal))
@@ -1260,7 +1266,7 @@ void CalcFractalBias(SessionType Type)
 //      if (Direction(sFractalChange)==Direction(sFractalBias))
 //        NewArrow(BoolToInt(sFractalBias>=0,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(sFractalBias,IN_CHART_DIR),"Fractal");
 
-      Pause("Error: Bias Differential","Fractal Bias/Change Error");
+      CallPause("Error: Bias Differential: Fractal Bias/Change Error");
     }
   }
 
@@ -1420,9 +1426,6 @@ void UpdatePipMA(void)
     if (IsEqual(Close[0],pwInterlace[ArraySize(pwInterlace)-1]))
       if (NewDirection(pwInterlaceBrkDir,DirectionDown))
         pwInterlacePivot[OP_SELL]      = Close[0];
-
-    if (inpShowFiboArrows==Yes)
-      pfractal.ShowFiboArrow();
 
     //-- Update Fractal Matrix
     ArrayInitialize(fdetail[fatPipMA].HeadColor,clrDarkGray);
@@ -1733,18 +1736,17 @@ bool OrderClose(int Action, CloseOptions Option)
           }
 */          
     return(false);
-
   }
 
 //+------------------------------------------------------------------+
-//| OrderSubmit - Manages short order positions, profit and risk     |
+//| OrderSubmit - Creates orders, assigns key in the OM Queue        |
 //+------------------------------------------------------------------+
 void OrderSubmit(OrderRequest &Order, bool QueueOrders)
   {
     while (OrderApproved(Order))
     {
-      Order.Key                = omOrderKey.Count;
-      Order.Status             = Pending;
+      Order.Key              = omOrderKey.Count;
+      Order.Status           = Pending;
     
       omOrderKey.Add(ArraySize(omQueue));
       ArrayResize(omQueue,omOrderKey[Order.Key]+1);
@@ -1754,6 +1756,9 @@ void OrderSubmit(OrderRequest &Order, bool QueueOrders)
         Order.Price         += Pip(ordEQLotFactor,InDecimal)*Direction(Order.Action,IN_ACTION,Order.Action==OP_BUYLIMIT||Order.Action==OP_SELLLIMIT);
       else break;
     }
+
+    if (Order.Status==Declined)
+      Print("Order Declined: "+Order.Memo);
 
     RefreshOrders();
   }
@@ -1824,105 +1829,66 @@ void OrderProcessing(void)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static ActionState  smState   = Halt;
-    static bool         smProfit  = false;
-    static bool         smLoss    = false;
-    static OrderRequest smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
-    
-    //-- Manage Locks
-//    if (anFiboDetail[ftTrend].Direction==DirectionDown)
-//      if (IsHigher(FiboLevels[Fibo50],anFiboDetail[Trend].RetraceMax,NoUpdate))
-//        SetEquityHold(OP_SELL);
-//      else
-//      if (anFiboDetail[ftTerm].Direction==DirectionDown)
-//        SetEquityHold(OP_SELL);
-//      else
-//        SetEquityHold(OP_NO_ACTION);
+    static OrderRequest   smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
 
-    //-- Process Short Order Entry Events
-    if (pfractal.Event(NewWaveOpen))
-    {
-      switch (pfractal.ActiveSegment().Type)
+    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
+      if (pfractal.Direction(pftTerm)==DirectionDown)
+        omMaster.Spotter[OP_SELL]   = false;
+      else
       {
-        case Crest:  //if (IsChanged(omMaster.Trigger[OP_SELL],false))
-                     {
-                       //-- May require defensive action
-                     }
+        smRequest.Action            = OP_SELL;
+        smRequest.Expiry            = Time[0]+(Period()*(60*2));
 
-                     smLoss         = true;
-                     break;
-
-        case Trough: //if (IsChanged(omMaster[OP_SELL].Trigger,false)) //-- FFE?
-                     {
-                       //-- Position management
-                     }
-                     
-                     smProfit        = true;
-                     break;
-
-        case Decay:  switch (pfractal.WaveSegment(Last).Type)
-                     {
-                       case Crest:  switch (pfractal.WaveSegment(Last).Direction)
-                                    {
-                                      case DirectionUp:
-                                                     break;
-
-                                      case DirectionDown:
-                                                     smRequest.Action  = OP_SELLLIMIT;
-                                                     smRequest.Price   = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
-                                                     smRequest.Memo    = "Rally";
-                                                     smRequest.Expiry  = Time[0]+(Period()*(60*2));
-                                                     OrderSubmit(smRequest,NoQueue);
-                                                     //omMaster.Trigger[OP_SELL][tsOpen].Price = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
-                                                     //omMaster.Trigger[OP_SELL][tsOpen].Fired = true;
-                                                     break;
-                                    }
-                                    break;
-
-                       case Trough: switch (pfractal.WaveSegment(Last).Direction)
-                                    {
-                                      case DirectionUp:
-                                                     break;
-                                      case DirectionDown:
-                                                     break;
-                                    }
-                                    break;
-                     }
+        if (IsChanged(omMaster.Spotter[OP_SELL],true))
+        {
+          smRequest.Lots            = OrderLotSize(0.00,fdiv(ordEQLotFactor,2));
+          smRequest.Memo            = "Spotter";
+          omMaster.Level[OP_SELL]   = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));
+   
+          OrderSubmit(smRequest,NoQueue);
+        }
+        else
+        if (IsChanged(omMaster.Level[OP_SELL],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+        {
+          smRequest.Lots            = 0.00;
+          smRequest.Memo            = "Rally";
+          smRequest.Expiry          = Time[0]+(Period()*(60*2));
+   
+          OrderSubmit(smRequest,NoQueue);
+        }
       }
-    }
-
-    //-- Entry Triggers
-    //if (IsHigher(Close[0],omMaster.Entry[OP_SELL],NoUpdate))
-    //  if (pfractal.Direction(Tick)==DirectionDown)
-    //    if (IsChanged(omMaster.Trigger[OP_SELL][tsOpen].Fired,false))
-    //    {
-    //      smRequest.Expiry    = Time[0]+(Period()*60);
-    //      OrderSubmit(smRequest,NoQueue);
-    //    }
-
-//    switch (omMaster.State[OP_SELL])
-//    {
-//      case msWait:     break;
-//      case msTrigger:  
-//                        break;
-
-    //-- Profit Triggers
-//    if (IsLower(Close[0],omMaster[OP_SELL].Target,NoUpdate))
-//      if (smProfit)
-//        if (pfractal.ActiveSegment().Type == Decay)
-//          if (pfractal.Direction(Tick)==DirectionUp)
-//          {
-////            Pause("Profit","Trigger");
-//            smProfit = false;
-//          }
   }
-
+  
 //+------------------------------------------------------------------+
 //| LongManagement - Manages long order positions, profit and risk   |
 //+------------------------------------------------------------------+
 void LongManagement(void)
   {
+    static OrderRequest   lmRequest = {0,OP_BUY,"Mgr:Long",0,0,0,0,"",0,NoStatus};
 
+    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
+      if (pfractal.Direction(pftTerm)==DirectionUp)
+        omMaster.Spotter[OP_BUY]    = false;
+      else
+      if (IsChanged(omMaster.Spotter[OP_BUY],true))
+      {
+        lmRequest.Action            = OP_BUY;
+        lmRequest.Lots              = OrderLotSize(0.00,fdiv(ordEQLotFactor,2));
+        lmRequest.Memo              = "Spotter";
+        lmRequest.Expiry            = Time[0]+(Period()*(60*2));
+        OrderSubmit(lmRequest,NoQueue);
+        
+        omMaster.Level[OP_BUY]      = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));
+      }
+      else
+      if (IsChanged(omMaster.Level[OP_BUY],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+      {
+        lmRequest.Action            = OP_BUY;
+        lmRequest.Lots              = 0.00;
+        lmRequest.Memo              = "Pullback";
+        lmRequest.Expiry            = Time[0]+(Period()*(60*2));
+        OrderSubmit(lmRequest,NoQueue);
+      }
   }
 
 //+------------------------------------------------------------------+

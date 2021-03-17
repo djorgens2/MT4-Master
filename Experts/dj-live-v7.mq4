@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "8.00"
+#property version   "7.1T"
 #property strict
 
 #define   clrBoxOff      C'60,60,60'
@@ -28,7 +28,8 @@ enum                  MarginModel
                       };
  
 input string          AppHeader            = "";       //+---- Application Options -------+
-input double          inpMarginTolerance   = 6.5;      // Margin drawdown factor 
+input double          inpMarginTolerance   = 25.0;     // Margin drawdown factor
+input double          inpAgingThreshold    = 5;        // Aging threshold in periods
 input MarginModel     inpMarginModel       = Discount; // Account type margin handling
 input YesNoType       inpShowWaveSegs      = Yes;      // Display wave segment overlays
 input YesNoType       inpShowFiboFlags     = Yes;      // Display Fractal Fibo Events
@@ -42,6 +43,7 @@ input string          RegressionHeader     = "";    //+------ Regression Options
 input int             inpDegree            = 6;     // Degree of poly regression
 input int             inpSmoothFactor      = 3;     // MA Smoothing factor
 input double          inpTolerance         = 0.5;   // Directional sensitivity
+input double          inpAggFactor         = 1.0;   // Tick Aggregation factor (1=1p)
 input int             inpPipPeriods        = 200;   // Trade analysis periods (PipMA)
 input int             inpRegrPeriods       = 24;    // Trend analysis periods (RegrMA)
 
@@ -63,15 +65,34 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   CSession           *session[SessionTypes];
   CSession           *lead;
   CFractal           *fractal              = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal        *pfractal             = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,50);
+  CPipFractal        *pfractal             = new CPipFractal(inpDegree,inpPipPeriods,inpTolerance,inpAggFactor,50);
   CEvent             *rsEvents             = new CEvent();
   
   //--- Enums and Structs
+  enum                AccountMetric
+                      {
+                        eqPctOpen,
+                        eqPctClosed,
+                        eqPctVar,
+                        eqBal,
+                        acBal,
+                        acSpread,
+                        acMargin,
+                        acMarginLong,
+                        acMarginShort,
+                        acEquity,
+                        lotMarginRqmt,
+                        lotSizeMin,
+                        lotSizeMax,
+                        lotPrecision
+                      };
+                      
   enum                ManagerState
                       {
                         msWait,
                         msManage,
                         msHold,
+                        msAcquire,
                         msRisk,
                         msHalt,
                         ManagerStates
@@ -170,7 +191,8 @@ const color           DailyColor           = clrDarkGray;       // US session bo
                         string         Heading;
                         string         SubHead;
                         string         State;
-                        color          Color[3];       
+                        color          HeadColor[3];
+                        color          FiboColor[3];
                         int            ActiveDir;
                         int            BreakoutDir;
                         double         Expansion[3];
@@ -199,7 +221,6 @@ const color           DailyColor           = clrDarkGray;       // US session bo
 
   struct              OrderDetail 
                       {
-                        double         Price;                //-- Relative Price (Fibo zone);
                         int            Count;                //-- Open Order Count
                         double         Lots;                 //-- Lots by Pos, Neg, Net
                         double         Value;                //-- Order value by Pos, Neg, Net
@@ -209,6 +230,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   
   struct              FiboZone
                       {
+                        double         Price[20];            //-- Relative Price (Fibo zone);
                         OrderDetail    Zone[20];
                       };
 
@@ -226,10 +248,12 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   struct              OrderMaster
                       {
                         ManagerState   State[2];                  //-- Trade State by Action
+                        int            Level[2];
+                        bool           Spotter[2];
                         TriggerType    Trigger[2][TriggerStates]; //-- Conditional order trigger
-                        int            FiboLevel[2];              //-- The current Fibo Level
+                        double         MarginTolerance[2];        //-- Max Margin by Action
                         FiboZone       Fibo[2];                   //-- Aggregate order detail by fibo zone
-                        OrderDetail    Profit[Total];             //-- Positional value by Loss, Net, Profit
+                        OrderDetail    Order[Total];              //-- Positional value by Loss, Net, Profit
                         OrderDetail    Action[2];                 //-- Positional value by Action
                       };
                         
@@ -355,15 +379,16 @@ int ServerHour(void)
 //+------------------------------------------------------------------+
 //| ManagerStateText - Returns the text for the supplied state       |
 //+------------------------------------------------------------------+
-string ManagerStateText(ManagerState State)
+string ManagerStateText(ManagerState State, string Detail="")
   {
     switch (State)
     {
-      case msWait:     return ("Waiting...");
-      case msManage:   return ("Managing...");
-      case msHold:     return ("Holding...");
-      case msRisk:     return ("At Risk");
-      case msHalt:     return ("Halted");
+      case msWait:     return ("Waiting"+Detail);
+      case msManage:   return ("Managing"+Detail);
+      case msHold:     return ("Holding"+Detail);
+      case msAcquire:  return ("Acquisition"+Detail);
+      case msRisk:     return ("At Risk"+Detail);
+      case msHalt:     return ("Halted"+Detail);
       default:         return ("Invalid Manager State");
     }
   }
@@ -463,12 +488,37 @@ void RefreshControlPanel(void)
       }
     }
 
-    UpdateLabel("lbvAI-Bal","$"+LPad(DoubleToStr(AccountBalance()+AccountCredit(),0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-Eq","$"+LPad(NegLPad(omMaster.Profit[Net].Value,0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-EqBal","$"+LPad(DoubleToStr(AccountEquity(),0)," ",10),Color(omMaster.Profit[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-Bal","$"+LPad(DoubleToStr(Account(acBal),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-Eq","$"+LPad(NegLPad(Account(acEquity),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-EqBal","$"+LPad(DoubleToStr(Account(eqBal),0)," ",10),Color(omMaster.Order[Net].Equity),16,"Consolas");
      
-    UpdateLabel("lbvAI-Eq%",LPad(NegLPad(omMaster.Profit[Net].Equity*100,1)," ",5)+"%",Color(omMaster.Profit[Net].Equity),16);
-    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(Pip(Ask-Bid),1)," ",5),Color(omMaster.Profit[Net].Equity),16);
+    UpdateLabel("lbvAI-Eq%",LPad(NegLPad(Account(eqPctClosed,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),16);
+    UpdateLabel("lbvAI-EqOpen%",LPad(NegLPad(Account(eqPctOpen,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),12);
+    UpdateLabel("lbvAI-EqVar%",LPad(NegLPad(Account(eqPctVar,InPercent),1)," ",6)+"%",Color(omMaster.Order[Net].Equity),12);
+    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(Account(acSpread,InPips),1)," ",5),Color(omMaster.Order[Net].Equity),14);
+    UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account(acMargin,InPercent),1)+"%"," ",6),Color(omMaster.Order[Net].Equity),14);
+    
+    UpdateDirection("lbvAI-OrderBias",Direction(omMaster.Order[Net].Lots),Color(omMaster.Order[Net].Lots),30);
+    
+    for (int action=0;action<=2;action++)
+      if (action<=OP_SELL)
+      {
+//      UpdateLabel("lbhAI-"+proper(ActionText(action))+"Action",rcpKey,clrDarkGray,10);
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"#",LPad((string)omMaster.Action[action].Count," ",2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",LPad(DoubleToStr(omMaster.Action[action].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",LPad(DoubleToStr(omMaster.Action[action].Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",LPad(DoubleToStr(omMaster.Action[action].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",LPad(DoubleToStr(omMaster.Action[action].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
+      else
+      {
+//      UpdateLabel("lbhAI-NetAction",rcpKey,clrDarkGray,10);
+        UpdateLabel("lbvAI-Net#",LPad((string)omMaster.Order[Net].Count," ",2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetL",LPad(DoubleToStr(omMaster.Order[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetV",LPad(DoubleToStr(omMaster.Order[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetM",LPad(DoubleToStr(omMaster.Order[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetE",LPad(DoubleToStr(omMaster.Order[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
 
     //-- App Config (AC) --
     string rcpOptions   = "";
@@ -483,7 +533,7 @@ void RefreshControlPanel(void)
       rcpOptions                  = "  Lines: "+rcpOptions;
     
     UpdateLabel("lbvAC-Trading",BoolToStr(TradingOn,"Open","Halt"),BoolToInt(TradingOn,clrYellow,clrRed));
-    UpdateLabel("lbvAC-Options",rsShow+BoolToStr(rsShowPitch,"  Pitch")+rcpOptions,clrDarkGray);
+    UpdateLabel("lbvAC-Options",proper(rsShow)+BoolToStr(rsShowPitch,"  Pitch")+rcpOptions,clrDarkGray);
     
     //-- Order Detail (OD) --
     int    fibo[2]   = {-Fibo823,-Fibo823};
@@ -516,11 +566,10 @@ void RefreshControlPanel(void)
         }
       }
 
-    UpdateLabel("lbvOQ-BPlan",ManagerStateText(omMaster.State[OP_BUY]),BoolToInt(omMaster.Trigger[OP_BUY][tsOpen].Fired,clrYellow,clrDarkGray));
-    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL]),BoolToInt(omMaster.Trigger[OP_SELL][tsOpen].Fired,clrYellow,clrDarkGray));
-    //UpdateLabel("lbvAI-NetMarg",LPad(DoubleToStr(omTotal.Margin*100,1)," ",5)+"%",Color(omTotal.Equity),13,"Consolas");
-    //UpdateLabel("lbvAI-NetLots",LPad(DoubleToStr(omTotal.Lots,ordLotPrecision)," ",7),Color(omTotal.Lots),13,"Consolas");
-//    UpdateLabel("lbvOM-Strategy",PatternText[sFractalPattern]+" ("+EnumToString(sFractalSession)+")  "+(string)sFractalBias+":"+(string)sFractalChange,clrDarkGray);
+//    UpdateLabel("lbvOQ-BPlan",ManagerStateText(omMaster.State[OP_BUY]),BoolToInt(omMaster.Trigger[OP_BUY][tsOpen].Fired,clrYellow,clrDarkGray));
+//    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL]),BoolToInt(omMaster.Trigger[OP_SELL][tsOpen].Fired,clrYellow,clrDarkGray));
+    UpdateLabel("lbvOQ-LPlan",ManagerStateText(omMaster.State[OP_BUY])+":"+DoubleToStr(FiboPercent(omMaster.Level[OP_BUY],InPercent),1)+"%",BoolToInt(omMaster.Spotter[OP_BUY],clrYellow,clrDarkGray));
+    UpdateLabel("lbvOQ-SPlan",ManagerStateText(omMaster.State[OP_SELL])+":"+DoubleToStr(FiboPercent(omMaster.Level[OP_SELL],InPercent),1)+"%",BoolToInt(omMaster.Spotter[OP_SELL],clrYellow,clrDarkGray));
 
     //-- Wave Action (WA) --
     if (ObjectGet("bxhWA-Long",OBJPROP_BGCOLOR)==clrBoxOff||pfractal.Event(NewWaveReversal))
@@ -621,13 +670,14 @@ void RefreshControlPanel(void)
     {
       for (int col=0;col<3;col++)
       {
+        UpdateBox("bxfFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row,fdetail[row].FiboColor[col]);
         UpdateLabel("lbvFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row+"e",LPad(DoubleToStr(fdetail[row].Expansion[col]*100,1)," ",8),clrDarkGray,12,"Consolas");
         UpdateLabel("lbvFA-"+BoolToStr(row==0,faVar[col+3],faVar[col])+":"+(string)row+"rt",LPad(DoubleToStr(fdetail[row].Retrace[col]*100,1)," ",8),clrDarkGray,12,"Consolas");
       }
 
-      UpdateLabel("lbvFA-H1:"+(string)row,fdetail[row].Heading,fdetail[row].Color[0],14);
-      UpdateLabel("lbvFA-H2:"+(string)row,fdetail[row].SubHead,fdetail[row].Color[1],10);
-      UpdateLabel("lbvFA-State:"+(string)row,fdetail[row].State,fdetail[row].Color[2],14);
+      UpdateLabel("lbvFA-H1:"+(string)row,fdetail[row].Heading,fdetail[row].HeadColor[0],14);
+      UpdateLabel("lbvFA-H2:"+(string)row,fdetail[row].SubHead,fdetail[row].HeadColor[1],10);
+      UpdateLabel("lbvFA-State:"+(string)row,fdetail[row].State,fdetail[row].HeadColor[2],14);
 
       UpdateDirection("lbvFA-ADir:"+(string)row,fdetail[row].ActiveDir,Color(fdetail[row].ActiveDir),28);
       UpdateDirection("lbvFA-BDir:"+(string)row,fdetail[row].BreakoutDir,Color(fdetail[row].BreakoutDir),12);
@@ -635,7 +685,7 @@ void RefreshControlPanel(void)
   }
 
 //+------------------------------------------------------------------+
-//| ShowZoneLines - Diaplay zone lines                               |
+//| ShowZoneLines - Display zone lines                               |
 //+------------------------------------------------------------------+
 void ShowZoneLines(void)
   {
@@ -644,7 +694,7 @@ void ShowZoneLines(void)
     if (IsChanged(szlZone,rsFiboAction)||detail[Daily].NewFractal)
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
         UpdateLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1),
-          omMaster.Fibo[rsFiboAction].Zone[FiboExt(fibo)].Price,STYLE_SOLID,
+          omMaster.Fibo[rsFiboAction].Price[FiboExt(fibo)],STYLE_SOLID,
           BoolToInt(fibo==0,clrYellow,Color(fibo,IN_DARK_DIR)));
   }
   
@@ -964,12 +1014,12 @@ int FindZone(int Action, FiboZone &Fibo, double Price)
     switch (Action)
     {
       case OP_BUY:     for (int fibo=Fibo823;fibo>-Fibo823;fibo--)
-                         if (IsLower(Fibo.Zone[FiboExt(fibo)].Price,Price,NoUpdate))
+                         if (IsLower(Fibo.Price[FiboExt(fibo)],Price,NoUpdate))
                            return FiboExt(fibo);
                        break;
    
       case OP_SELL:    for (int fibo=-Fibo823;fibo<Fibo823;fibo++)
-                         if (IsHigher(Fibo.Zone[FiboExt(fibo)].Price,Price,NoUpdate))
+                         if (IsHigher(Fibo.Price[FiboExt(fibo)],Price,NoUpdate))
                            return FiboExt(fibo);
                        break;   
     }
@@ -978,27 +1028,95 @@ int FindZone(int Action, FiboZone &Fibo, double Price)
   }
 
 //+------------------------------------------------------------------+
-//| OrderMargin                                                      |
+//| Account - returns the value for the requested metric             |
 //+------------------------------------------------------------------+
-double OrderMargin(double Lots, int Format=InPercent)
+double Account(AccountMetric Metric, int Format=InDecimal)
   {
-    double omMarginPerLot     = (ordAcctLotSize*ordAcctMinLot)/AccountLeverage();   //--- Initialize for JPY
-    double omMarginRqmt       = 0.00;
+    int    aPrecision      = 0;
+    double aMetric         = 0.00;
+    
+    switch (Metric)
+    {
+      case eqPctOpen:      aMetric = (AccountEquity()-(AccountBalance()+AccountCredit()))/AccountEquity();
+                                     aPrecision       = 3;
+                                     break;
+      case eqPctClosed:    aMetric = (AccountEquity()-(AccountBalance()+AccountCredit()))/(AccountBalance()+AccountCredit());
+                                     aPrecision       = 3;
+                                     break;
+      case eqPctVar:       aMetric = Account(eqPctOpen)-Account(eqPctClosed);
+                                     aPrecision       = 3;
+                                     break;
+      case eqBal:          aMetric = AccountEquity();
+                                     break;
+      case acBal:          aMetric = AccountBalance()+AccountCredit();
+                                     break;
+      case acSpread:       aMetric = Ask-Bid;
+                                     aPrecision       = Digits;
+                                     
+                                     if (Format==InPips)
+                                     {
+                                       aMetric = Pip(aMetric);
+                                       aPrecision     = 1;
+                                     }
+                                     break;
+      case acEquity:       aMetric = Account(eqBal)-Account(acBal);
+                                     break;
+      case acMargin:       aMetric = AccountMargin()/AccountEquity();
+                                     aPrecision       = 1;
+                                     break;
+      case lotMarginRqmt:  aMetric = BoolToDouble(Symbol()=="USDJPY",(MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)),
+                                      (MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)*Close[0]))/AccountLeverage();
+                                     aPrecision       = 2;
+                                     break;
+      case lotSizeMin:     aMetric = MarketInfo(Symbol(),MODE_MINLOT);
+                                     aPrecision       = 2;
+                                     break;
+      case lotSizeMax:     aMetric = MarketInfo(Symbol(),MODE_MINLOT);
+                                     break;
+      case lotPrecision:   aMetric = BoolToInt(ordAcctMinLot==0.01,2,1);
+    }
 
-    if (IsEqual(AccountEquity(),0.00,2))
-      return (omMarginRqmt);
-
-    if (Symbol()!="USDJPY")
-      omMarginPerLot          = ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage();
-       
-    omMarginRqmt              = (Lots/ordAcctMinLot)*omMarginPerLot;
-  
     switch (Format)
     {
-      case InPercent: return (NormalizeDouble(omMarginRqmt/AccountEquity()*100,1));
-      case InDollar:  return (NormalizeDouble(omMarginRqmt,2));
-      default:        Print("Order Margin: Invalid format code supplied");
+      case InDecimal:     break;
+      case InPercent:     aMetric*=100;
     }
+    
+    return (NormalizeDouble(aMetric,aPrecision));
+  }
+
+//+------------------------------------------------------------------+
+//| OrderMargin                                                      |
+//+------------------------------------------------------------------+
+double Order(double Value, AccountMetric Metric, int Format=InPercent)
+  {
+    switch (Metric)
+    {
+      case acMargin:       switch (Format)
+                           {
+                             case InDecimal: return (NormalizeDouble(fdiv(Value,Account(lotSizeMin))*Account(lotMarginRqmt)/Account(eqBal),3));
+                             case InPercent: return (NormalizeDouble(fdiv(Value,Account(lotSizeMin))*Account(lotMarginRqmt)/Account(eqBal)*100,1));
+                             case InDollar:  return (NormalizeDouble(Value*Account(lotMarginRqmt),2));
+                           }
+                           break;
+      case acMarginLong:   if (inpMarginModel==Discount) //-- Shared burden on trunk; majority burden on excess variance
+                             return (Order(BoolToDouble(omMaster.Order[Net].Lots>0,omMaster.Order[Net].Lots)+
+                               fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),4),acMargin,Format));
+                           return (Order(omMaster.Action[OP_BUY].Lots,acMargin,Format));
+                           break;
+      case acMarginShort:  if (inpMarginModel==Discount) //-- Shared burden on trunk; majority burden on excess variance
+                             return (Order(BoolToDouble(omMaster.Order[Net].Lots<0,fabs(omMaster.Order[Net].Lots))+
+                               fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),4),acMargin,Format));
+                           return (Order(omMaster.Action[OP_SELL].Lots,acMargin,Format));
+                           break;
+      case acEquity:       switch (Format)
+                           {
+                             case InDecimal: return (NormalizeDouble(fdiv(Value,Account(eqBal)),3));
+                             case InPercent: return (NormalizeDouble(fdiv(Value,Account(eqBal)),3)*100);
+                             case InDollar:  return (NormalizeDouble(Value,2));
+                           }
+                           break;
+    };
       
     return (0.00);
   }
@@ -1008,41 +1126,36 @@ double OrderMargin(double Lots, int Format=InPercent)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    double uoPriceBase[2]                                  = {0.00,0.00};
-
-    //-- Margin calculation measures
-    double uoMBurden                                       = 0.00;     //-- Lots Basis for Margin Req. Calculation
-    double uoMDominant                                     = 0.00;     //-- Dominant margin calc factor
-    double uoMMinority                                     = 0.00;     //-- Minority margin calc factor
-      
+    AccountMetric uoAccountMetric                        = acMarginLong;
+    
     //-- Set zone details on NewFractal
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      omMaster.Action[action].Count                        = 0;
-      omMaster.Action[action].Lots                         = 0.00;
-      omMaster.Action[action].Value                        = 0.00;
-      omMaster.Action[action].Margin                       = 0.00;
-      omMaster.Action[action].Equity                       = 0.00;     
+      omMaster.Action[action].Count                      = 0;
+      omMaster.Action[action].Lots                       = 0.00;
+      omMaster.Action[action].Value                      = 0.00;
+      omMaster.Action[action].Margin                     = 0.00;
+      omMaster.Action[action].Equity                     = 0.00;     
       
       for (int pos=0;pos<Total;pos++)
       {
-        omMaster.Profit[pos].Count                         = 0;
-        omMaster.Profit[pos].Lots                          = 0.00;
-        omMaster.Profit[pos].Value                         = 0.00;
-        omMaster.Profit[pos].Margin                        = 0.00;
-        omMaster.Profit[pos].Equity                        = 0.00;
+        omMaster.Order[pos].Count                        = 0;
+        omMaster.Order[pos].Lots                         = 0.00;
+        omMaster.Order[pos].Value                        = 0.00;
+        omMaster.Order[pos].Margin                       = 0.00;
+        omMaster.Order[pos].Equity                       = 0.00;
       }
     
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Count    = 0;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots     = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Value    = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin   = 0.00;
-        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity   = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Count  = 0;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots   = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Value  = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin = 0.00;
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = 0.00;
   
         if (detail[Daily].NewFractal)
-          omMaster.Fibo[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Zone[FiboExt(fibo)].Price   = 
+          omMaster.Fibo[Action(detail[Daily].FractalDir,InDirection,InContrarian)].Price[FiboExt(fibo)]   = 
             detail[Daily].FractalPivot[Action(detail[Daily].FractalDir,InDirection)]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
       }
     }
@@ -1055,100 +1168,60 @@ void UpdateOrders(void)
           {
             //-- Agg By Action
             omMaster.Action[action].Count++;
-            omMaster.Action[action].Lots      += OrderLots();
-            omMaster.Action[action].Value     += OrderProfit();
-            
+            omMaster.Action[action].Lots         += OrderLots();
+            omMaster.Action[action].Value        += OrderProfit();
+
             //-- Agg By P/L
             if (NormalizeDouble(OrderProfit(),2)<0.00)
             {
-              omMaster.Profit[Loss].Count++;
-              omMaster.Profit[Loss].Lots      += OrderLots();
-              omMaster.Profit[Loss].Value     += OrderProfit();
+              omMaster.Order[Loss].Count++;
+              omMaster.Order[Loss].Lots          += OrderLots();
+              omMaster.Order[Loss].Value         += OrderProfit();
             }
             else
             {
-              omMaster.Profit[Profit].Count++;
-              omMaster.Profit[Profit].Lots    += OrderLots();
-              omMaster.Profit[Profit].Value   += OrderProfit();
+              omMaster.Order[Profit].Count++;
+              omMaster.Order[Profit].Lots        += OrderLots();
+              omMaster.Order[Profit].Value       += OrderProfit();
             }
             
             //-- Agg By Fibo
             omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Count++;
             omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Lots    += OrderLots();
-            omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Value   += OrderProfit();
+            omMaster.Fibo[action].Zone[FindZone(action,omMaster.Fibo[action],OrderOpenPrice())].Value   += OrderProfit();            
           }
 
-    switch (inpMarginModel)
-    {
-       case Discount:     uoMBurden          = fabs(omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots) +
-                                                 fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),2);
-       
-                          if (IsEqual(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),0.00))
-                            uoMDominant      = 1;
-                          else
-                          {
-                            uoMDominant      = fdiv(fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),omMaster.Action[OP_BUY].Lots+omMaster.Action[OP_SELL].Lots,2);
-                            uoMMinority      = fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),omMaster.Action[OP_BUY].Lots+omMaster.Action[OP_SELL].Lots,2);;
-                          }
-                          break;
-                          
-       case Premium:      uoMBurden          = fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots);
-                          uoMDominant        = 1;
-                          uoMMinority        = fdiv(fmin(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),uoMBurden);
-                          break;
-
-       case FIFO:         uoMBurden          = fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots);
-                          uoMDominant        = uoMBurden;
-    }
-
-    omMaster.Profit[Profit].Equity                      = fdiv(omMaster.Profit[Profit].Value,AccountEquity(),3);
-//    omMaster.Profit[Profit].Margin                      = fdiv(AccountMargin(),AccountEquity(),3);
-
-    omMaster.Profit[Loss].Equity                        = fdiv(omMaster.Profit[Loss].Value,AccountEquity(),3);
-//    omMaster.Profit[Loss].Margin                        = fdiv(AccountMargin(),AccountEquity(),3);
-
-    //-- Calc order summary
-    omMaster.Profit[Net].Lots                           = omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots;
-    omMaster.Profit[Net].Value                          = AccountEquity()-(AccountBalance()+AccountCredit());
-    omMaster.Profit[Net].Equity                         = fdiv(omMaster.Profit[Net].Value,(AccountEquity()),3);
-    omMaster.Profit[Net].Margin                         = fdiv(AccountMargin(),AccountEquity(),3);
+    //-- Compute interim Net Values req'd by Equity/Margin calcs
+    omMaster.Order[Net].Lots                     = omMaster.Action[OP_BUY].Lots-omMaster.Action[OP_SELL].Lots;
+    omMaster.Order[Net].Value                    = omMaster.Action[OP_BUY].Value+omMaster.Action[OP_SELL].Value;
 
     //-- Calculate zone values and margins
     for (int action=OP_BUY;action<=OP_SELL;action++)
-    {        
+    {
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
       {
-        //-- Compute zone margin
-        if (omMaster.Fibo[action].Zone[FiboExt(fibo)].Count>0)
-        {
-          switch (inpMarginModel)
-          {
-            case Discount:  if (IsEqual(omMaster.Action[action].Lots,fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),ordLotPrecision))
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,ordLotPrecision)*(uoMDominant*uoMBurden));
-                            else
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,ordLotPrecision)*(uoMMinority*uoMBurden));
-                            break;
-            
-            case Premium:   if (IsEqual(omMaster.Action[action].Lots,fmax(omMaster.Action[OP_BUY].Lots,omMaster.Action[OP_SELL].Lots),ordLotPrecision))
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots*uoMDominant);
-                            else
-                              omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  = 
-                                OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots*uoMMinority);
-                            break;
-                            
-            case FIFO:      omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin  =
-                              OrderMargin(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots);
-                            break;
-          }
-          
-          //-- Compute zone equity
-          omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Value,AccountEquity(),3)*100;
-        }
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Margin = Order(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,uoAccountMetric,InPercent)*
+                                                    fdiv(omMaster.Fibo[action].Zone[FiboExt(fibo)].Lots,omMaster.Action[action].Lots,1);
+        omMaster.Fibo[action].Zone[FiboExt(fibo)].Equity = Order(omMaster.Fibo[action].Zone[FiboExt(fibo)].Value,acEquity,InPercent);
       }
-    }    
+      
+      //-- Calc Action Aggregates
+      omMaster.Action[action].Equity             = Order(omMaster.Action[action].Value,acEquity,InPercent);
+      omMaster.Action[action].Margin             = Order(omMaster.Action[action].Lots,uoAccountMetric,InPercent);
+      
+      uoAccountMetric                            = acMarginShort;
+    }
+
+    //-- Calc P/L Aggregates
+    omMaster.Order[Profit].Equity                = Order(omMaster.Order[Profit].Value,acEquity,InPercent);
+    omMaster.Order[Profit].Margin                = Order(omMaster.Order[Profit].Lots,acMargin,InPercent);
+
+    omMaster.Order[Loss].Equity                  = Order(omMaster.Order[Loss].Value,acEquity,InPercent);
+    omMaster.Order[Loss].Margin                  = Order(omMaster.Order[Loss].Lots,acMargin,InPercent);
+
+    //-- Calc Net Aggregates
+    omMaster.Order[Net].Equity                   = Order(omMaster.Order[Net].Value,acEquity,InPercent);
+    omMaster.Order[Net].Margin                   = Order(omMaster.Order[Net].Lots,acMargin,InPercent);
   }
 
 //+------------------------------------------------------------------+
@@ -1193,7 +1266,7 @@ void CalcFractalBias(SessionType Type)
 //      if (Direction(sFractalChange)==Direction(sFractalBias))
 //        NewArrow(BoolToInt(sFractalBias>=0,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(sFractalBias,IN_CHART_DIR),"Fractal");
 
-      Pause("Error: Bias Differential","Fractal Bias/Change Error");
+      CallPause("Error: Bias Differential: Fractal Bias/Change Error");
     }
   }
 
@@ -1255,49 +1328,50 @@ void UpdateSession(void)
       //-- Fractal Detail Update
       int faType       = type+2;
       
-      ArrayInitialize(fdetail[faType].Color,clrDarkGray);
+      ArrayInitialize(fdetail[faType].HeadColor,clrDarkGray);
       
       fdetail[faType].Heading = EnumToString(type)+" "+proper(ActionText(session[type][ActiveSession].Bias))+
                   " "+BoolToStr(session[type][ActiveSession].Bias==Action(session[type][ActiveSession].Direction,InDirection),"Hold","Hedge");
 
-      fdetail[faType].ActiveDir      = session[type][ActiveSession].Direction;
-      fdetail[faType].BreakoutDir    = session[type][ActiveSession].BreakoutDir;
-      fdetail[faType].State          = EnumToString(session[type][ActiveSession].State);
+      fdetail[faType].ActiveDir        = session[type][ActiveSession].Direction;
+      fdetail[faType].BreakoutDir      = session[type][ActiveSession].BreakoutDir;
+      fdetail[faType].State            = EnumToString(session[type][ActiveSession].State);
       
       if (session[type].IsOpen())
       {
-        fdetail[faType].Color[0]     = clrWhite;
+        fdetail[faType].HeadColor[0]   = clrWhite;
         
         if (ServerHour()>session[type].SessionHour(SessionClose)-3)
         {
-          fdetail[faType].SubHead    = "Late Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrRed;
+          fdetail[faType].SubHead      = "Late Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrRed;
         }
         else
         if (session[type].SessionHour()>3)
         {
-          fdetail[faType].SubHead    = "Mid Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrYellow;
+          fdetail[faType].SubHead      = "Mid Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrYellow;
         }
         else
         {
-          fdetail[faType].SubHead    = "Early Session ("+IntegerToString(session[type].SessionHour())+")";
-          fdetail[faType].Color[1]   = clrLawnGreen;
+          fdetail[faType].SubHead      = "Early Session ("+IntegerToString(session[type].SessionHour())+")";
+          fdetail[faType].HeadColor[1] = clrLawnGreen;
         }
       }
       else
-        fdetail[faType].SubHead      = "Session Is Closed";
+        fdetail[faType].SubHead        = "Session Is Closed";
 
       if (session[type].Event(NewBreakout) || session[type].Event(NewReversal))
-        fdetail[faType].Color[2]     = clrWhite;
+        fdetail[faType].HeadColor[2]   = clrWhite;
       else
       if (session[type].Event(NewRally) || session[type].Event(NewPullback))
-        fdetail[faType].Color[2]     = clrYellow;
+        fdetail[faType].HeadColor[2]   = clrYellow;
 
       for (FractalType fibo=ftOrigin;fibo<ftPrior;fibo++)
       {
-        fdetail[faType].Expansion[fibo]    = session[type].Expansion(fibo,Now,InDecimal);
-        fdetail[faType].Retrace[fibo]      = session[type].Retrace(fibo,Now,InDecimal);
+        fdetail[faType].Expansion[fibo] = session[type].Expansion(fibo,Now,InDecimal);
+        fdetail[faType].Retrace[fibo]   = session[type].Retrace(fibo,Now,InDecimal);
+        fdetail[faType].FiboColor[fibo] = (color)BoolToInt(session[type].Fractal(fibo).Direction==DirectionUp,C'0,42,0',C'42,0,0');
       }
 
       //--- Session detail operational checks
@@ -1353,25 +1427,26 @@ void UpdatePipMA(void)
       if (NewDirection(pwInterlaceBrkDir,DirectionDown))
         pwInterlacePivot[OP_SELL]      = Close[0];
 
-    if (inpShowFiboArrows==Yes)
-      pfractal.ShowFiboArrow();
-
     //-- Update Fractal Matrix
-    ArrayInitialize(fdetail[fatPipMA].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatPipMA].HeadColor,clrDarkGray);
     
     fdetail[fatPipMA].Heading          = "PipMA (Micro)";
     fdetail[fatPipMA].State            = EnumToString(pfractal.State());
 
-    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(Term);
-    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(Trend);
+    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(pftTerm);
+    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(pftTrend);
 
-    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(pftOrigin,Expansion,Now);
+    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(pftTrend,Expansion,Now);
+    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(pftTerm,Expansion,Now);
+    
+    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(pftOrigin),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(pftTrend),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(pftTerm),IN_DARK_PANEL);
 
-    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(Term,Retrace,Now);
+    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(pftOrigin,Retrace,Now);
+    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(pftTrend,Retrace,Now);
+    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(pftTerm,Retrace,Now);
   }
 
 //+------------------------------------------------------------------+
@@ -1387,20 +1462,20 @@ void UpdateFractal(void)
     {
       Flag("Major",clrWhite,rsShowFlags);
       
-      if (fractal.IsDivergent(Retrace))
+      if (fractal.IsRange(Divergent))
         ArrayInitialize(ufExpand,Fibo161);
     }
     else
     {
       //--Origin Fibo Flags
-      if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,Expansion,Now))
+      if (FiboLevels[ufExpand[3]]<fractal.Fibonacci(Origin,fpExpansion,Now))
       {
         Flag("Origin "+EnumToString(ufExpand[3]),clrRed,rsShowFlags);
         ufExpand[3]++;
       }
 
       //-- Base Fibo Flags
-      if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,Expansion,Now))
+      if (FiboLevels[ufExpand[2]]<fractal.Fibonacci(Base,fpExpansion,Now))
       {
         Flag("Base "+EnumToString(ufExpand[2]),clrGray,rsShowFlags);
         ufExpand[2]++;
@@ -1408,7 +1483,7 @@ void UpdateFractal(void)
 
       //-- Trend/Term Fibo Flags
       for (RetraceType fibo=Trend;fibo<=Term;fibo++)
-        if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,Expansion,Now))
+        if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,fpExpansion,Now))
         {
           Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod),rsShowFlags);
           ufExpand[fibo]++;
@@ -1422,61 +1497,70 @@ void UpdateFractal(void)
 void CalcFractal(void)
   {    
     //-- Update Fractal Matrix (Meso)
-    ArrayInitialize(fdetail[fatMeso].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatMeso].HeadColor,Color(fractal.Direction(Expansion)));
+    ArrayInitialize(fdetail[fatMeso].FiboColor,BoolToInt(fractal.Direction(Expansion)==DirectionUp,C'0,42,0',C'42,0,0'));
     
-    fdetail[fatMeso].Heading          = "Meso "+EnumToString((RetraceType)fractal.Leg(Trend));
-    fdetail[fatMeso].State            = "State Undefined";
+    for (RetraceType type=fractal.Leg(Active);type>Root;type--)
+      if (fractal[type].Bar>inpAgingThreshold)
+      {
+        fdetail[fatMeso].SubHead        = EnumToString(type)+" ("+(string)fractal[type].Bar+")";
 
-    fdetail[fatMeso].ActiveDir        = fractal.Direction(fractal.Leg(Trend));
+        if (fractal.Direction(type)==fractal.Direction(Expansion))
+          fdetail[fatMeso].HeadColor[1] = clrYellow;
+        break;
+      }
+    
+    fdetail[fatMeso].Heading          = proper(DirText(fractal.Direction(Base)))+" "+BoolToStr(fractal.BarDir()==DirectionUp,"Rally","Pullback");
+    fdetail[fatMeso].State            = EnumToString(fractal.State(Active));
+
+    if (fractal.State(Active)==Correction)
+      fdetail[fatMeso].HeadColor[2]       = Color(fractal.Direction(Expansion),IN_DIRECTION,Contrarian);
+      
+    if (fractal.State(Active)==Retrace)
+      fdetail[fatMeso].HeadColor[2]       = clrYellow;
+
+    fdetail[fatMeso].ActiveDir        = fractal.Direction(Base);
     fdetail[fatMeso].BreakoutDir      = fractal.Origin().Direction;
+    fdetail[fatMeso].FiboColor[2]     = (color)BoolToInt(fractal.Direction(fractal.Leg(Min))==DirectionUp,C'0,42,0',C'42,0,0');
 
-    fdetail[fatMeso].Expansion[0]     = fractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatMeso].Expansion[1]     = fractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatMeso].Expansion[2]     = fractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatMeso].Expansion[0]     = fractal.Fibonacci(Base,fpExpansion,Max);
+    fdetail[fatMeso].Expansion[1]     = fractal.Fibonacci(Base,fpExpansion,Now);
+    fdetail[fatMeso].Expansion[2]     = fractal.Fibonacci(fractal.Previous(fractal.Leg(Min),Convergent),fpExpansion,Now);
 
-    fdetail[fatMeso].Retrace[0]       = fractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatMeso].Retrace[1]       = fractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatMeso].Retrace[2]       = fractal.Fibonacci(Term,Retrace,Now);
+    fdetail[fatMeso].Retrace[0]       = fractal.Fibonacci(Base,fpRetrace,Max);
+    fdetail[fatMeso].Retrace[1]       = fractal.Fibonacci(Base,fpRetrace,Now);
+    fdetail[fatMeso].Retrace[2]       = fractal.Fibonacci(fractal.Previous(fractal.Leg(Min),Convergent),fpRetrace,Now);
 
     //-- Update Fractal Matrix (Macro)
-    ArrayInitialize(fdetail[fatMacro].Color,clrDarkGray);
+    ArrayInitialize(fdetail[fatMacro].HeadColor,Color(fractal.Origin().Direction));
+    ArrayInitialize(fdetail[fatMacro].FiboColor,BoolToInt(fractal.Direction(Expansion)==DirectionUp,C'0,42,0',C'42,0,0'));    
     
     fdetail[fatMacro].Heading         = BoolToStr(fractal.Origin().Direction==DirectionUp,"Long","Short")+" "+EnumToString(fractal.Origin().State);
     Append(fdetail[fatMacro].Heading,BoolToStr(fractal.Origin().Correction,"Correction"));
+    fdetail[fatMacro].SubHead         = BoolToStr(fractal.IsRange(Divergent,Origin),"Divergent","Convergent");
+    
+    if (fractal.IsRange(Divergent))
+      fdetail[fatMacro].HeadColor[1]  = clrYellow;
 
-    fdetail[fatMacro].State           = "State Undefined";
+    fdetail[fatMacro].State           = EnumToString(fractal.State(Origin));
+
+    if (fractal.State(Origin)==Correction)
+      fdetail[fatMacro].HeadColor[2]  = Color(fractal.Origin().Direction,IN_DIRECTION,Contrarian);
+      
+    if (fractal.State(Origin)==Retrace)
+      fdetail[fatMacro].HeadColor[2]  = clrYellow;
 
     fdetail[fatMacro].ActiveDir       = fractal.Direction();
     fdetail[fatMacro].BreakoutDir     = fractal.Origin().Direction;
+    fdetail[fatMacro].FiboColor[0]    = (color)BoolToInt(fractal.Origin().Direction==DirectionUp,C'0,42,0',C'42,0,0');
 
-    fdetail[fatMacro].Expansion[0]    = fractal.Fibonacci(Origin,Expansion,Now);
-    fdetail[fatMacro].Expansion[1]    = fractal.Fibonacci(Trend,Expansion,Now);
-    fdetail[fatMacro].Expansion[2]    = fractal.Fibonacci(Term,Expansion,Now);
+    fdetail[fatMacro].Expansion[0]    = fractal.Fibonacci(Origin,fpExpansion,Now);
+    fdetail[fatMacro].Expansion[1]    = fractal.Fibonacci(Trend,fpExpansion,Now);
+    fdetail[fatMacro].Expansion[2]    = fractal.Fibonacci(Term,fpExpansion,Now);
 
-    fdetail[fatMacro].Retrace[0]      = fractal.Fibonacci(Origin,Retrace,Now);
-    fdetail[fatMacro].Retrace[1]      = fractal.Fibonacci(Trend,Retrace,Now);
-    fdetail[fatMacro].Retrace[2]      = fractal.Fibonacci(Term,Retrace,Now);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateBar - Analyze bar dynamics and pocket traversals           |
-//+------------------------------------------------------------------+
-void UpdateBar(void)
-  {
-    static int usBarDir             = DirectionNone;
-    
-    //-- Set Pocket value
-//    if (Close[0]<Low[1])
-//    if (NewDirection(usBarDir,DirectionDown))
-//    {
-//      Pause("Going Down","Bar Direction");
-//    }
-//    
-//    if (Close[0]>High[1])
-//    if (NewDirection(usBarDir,DirectionUp))
-//    {
-//      Pause("Going Up","Bar Direction");
-//    }    
+    fdetail[fatMacro].Retrace[0]      = fractal.Fibonacci(Origin,fpRetrace,Now);
+    fdetail[fatMacro].Retrace[1]      = fractal.Fibonacci(Trend,fpRetrace,Now);
+    fdetail[fatMacro].Retrace[2]      = fractal.Fibonacci(Term,fpRetrace,Now);
   }
 
 //+------------------------------------------------------------------+
@@ -1485,9 +1569,6 @@ void UpdateBar(void)
 bool OrderApproved(OrderRequest &Order)
   {
     double oaLots[6]                           = {0.00,0.00,0.00,0.00,0.00,0.00};
-    double oaMargin                            = 0.00;
-    double oaMarginReq                         = BoolToDouble(Symbol()=="USDJPY",(ordAcctLotSize*ordAcctMinLot)/AccountLeverage(),
-                                                              ((ordAcctLotSize*ordAcctMinLot)*Close[0])/AccountLeverage())*100;
     
     if (TradingOn)
     {      
@@ -1504,26 +1585,13 @@ bool OrderApproved(OrderRequest &Order)
         oaLots[Action(Order.Action,InAction)] += oaLots[Order.Action];
       }
       
-      switch (inpMarginModel)
-      {
-        case Discount:       //-- FX Choice                             
-                             oaMargin = (((fdiv(fmin(oaLots[OP_BUY],oaLots[OP_SELL]),2,ordLotPrecision)+fabs(oaLots[OP_BUY]-oaLots[OP_SELL]))*oaMarginReq)/AccountEquity())*100;
-                             break;
-        case Premium:        //-- FXCM
-                             oaMargin = ((fmax(oaLots[OP_BUY],oaLots[OP_SELL])*oaMarginReq)/AccountEquity())*100;
-                             break;
-        case FIFO:           //-- Forex.com
-                             oaMargin = ((oaLots[Action(Order.Action,InAction)]*oaMarginReq)/AccountEquity())*100;
-                             break;        
-      }
-
-      if (oaMargin<=(ordEQMaxRisk+inpMarginTolerance))
+      if (IsLower(Order(oaLots[Action(Order.Action,InAction)],acMargin,InPercent),omMaster.MarginTolerance[Action(Order.Action,InAction)],NoUpdate))
       {
         Order.Status         = Approved;
         return (true);
       }
       else
-        Order.Memo           = "Margin ("+DoubleToStr(oaMargin,1)+")";
+        Order.Memo           = "Margin-"+DoubleToStr(Order(oaLots[Action(Order.Action,InAction)],acMargin,InPercent),1)+"%";
     }
     else
       Order.Memo             = "Trade disabled.";
@@ -1668,18 +1736,17 @@ bool OrderClose(int Action, CloseOptions Option)
           }
 */          
     return(false);
-
   }
 
 //+------------------------------------------------------------------+
-//| OrderSubmit - Manages short order positions, profit and risk     |
+//| OrderSubmit - Creates orders, assigns key in the OM Queue        |
 //+------------------------------------------------------------------+
 void OrderSubmit(OrderRequest &Order, bool QueueOrders)
   {
     while (OrderApproved(Order))
     {
-      Order.Key                = omOrderKey.Count;
-      Order.Status             = Pending;
+      Order.Key              = omOrderKey.Count;
+      Order.Status           = Pending;
     
       omOrderKey.Add(ArraySize(omQueue));
       ArrayResize(omQueue,omOrderKey[Order.Key]+1);
@@ -1689,6 +1756,9 @@ void OrderSubmit(OrderRequest &Order, bool QueueOrders)
         Order.Price         += Pip(ordEQLotFactor,InDecimal)*Direction(Order.Action,IN_ACTION,Order.Action==OP_BUYLIMIT||Order.Action==OP_SELLLIMIT);
       else break;
     }
+
+    if (Order.Status==Declined)
+      Print("Order Declined: "+Order.Memo);
 
     RefreshOrders();
   }
@@ -1759,105 +1829,66 @@ void OrderProcessing(void)
 //+------------------------------------------------------------------+
 void ShortManagement(void)
   {
-    static ActionState  smState   = Halt;
-    static bool         smProfit  = false;
-    static bool         smLoss    = false;
-    static OrderRequest smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
-    
-    //-- Manage Locks
-//    if (anFiboDetail[ftTrend].Direction==DirectionDown)
-//      if (IsHigher(FiboLevels[Fibo50],anFiboDetail[Trend].RetraceMax,NoUpdate))
-//        SetEquityHold(OP_SELL);
-//      else
-//      if (anFiboDetail[ftTerm].Direction==DirectionDown)
-//        SetEquityHold(OP_SELL);
-//      else
-//        SetEquityHold(OP_NO_ACTION);
+    static OrderRequest   smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
 
-    //-- Process Short Order Entry Events
-    if (pfractal.Event(NewWaveOpen))
-    {
-      switch (pfractal.ActiveSegment().Type)
+    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
+      if (pfractal.Direction(pftTerm)==DirectionDown)
+        omMaster.Spotter[OP_SELL]   = false;
+      else
       {
-        case Crest:  //if (IsChanged(omMaster.Trigger[OP_SELL],false))
-                     {
-                       //-- May require defensive action
-                     }
+        smRequest.Action            = OP_SELL;
+        smRequest.Expiry            = Time[0]+(Period()*(60*2));
 
-                     smLoss         = true;
-                     break;
-
-        case Trough: //if (IsChanged(omMaster[OP_SELL].Trigger,false)) //-- FFE?
-                     {
-                       //-- Position management
-                     }
-                     
-                     smProfit        = true;
-                     break;
-
-        case Decay:  switch (pfractal.WaveSegment(Last).Type)
-                     {
-                       case Crest:  switch (pfractal.WaveSegment(Last).Direction)
-                                    {
-                                      case DirectionUp:
-                                                     break;
-
-                                      case DirectionDown:
-                                                     smRequest.Action  = OP_SELLLIMIT;
-                                                     smRequest.Price   = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
-                                                     smRequest.Memo    = "Rally";
-                                                     smRequest.Expiry  = Time[0]+(Period()*(60*2));
-                                                     OrderSubmit(smRequest,NoQueue);
-                                                     //omMaster.Trigger[OP_SELL][tsOpen].Price = fdiv(pfractal.WaveSegment(Last).High+pfractal.WaveSegment(Last).Low,2,Digits);
-                                                     //omMaster.Trigger[OP_SELL][tsOpen].Fired = true;
-                                                     break;
-                                    }
-                                    break;
-
-                       case Trough: switch (pfractal.WaveSegment(Last).Direction)
-                                    {
-                                      case DirectionUp:
-                                                     break;
-                                      case DirectionDown:
-                                                     break;
-                                    }
-                                    break;
-                     }
+        if (IsChanged(omMaster.Spotter[OP_SELL],true))
+        {
+          smRequest.Lots            = OrderLotSize(0.00,fdiv(ordEQLotFactor,2));
+          smRequest.Memo            = "Spotter";
+          omMaster.Level[OP_SELL]   = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));
+   
+          OrderSubmit(smRequest,NoQueue);
+        }
+        else
+        if (IsChanged(omMaster.Level[OP_SELL],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+        {
+          smRequest.Lots            = 0.00;
+          smRequest.Memo            = "Rally";
+          smRequest.Expiry          = Time[0]+(Period()*(60*2));
+   
+          OrderSubmit(smRequest,NoQueue);
+        }
       }
-    }
-
-    //-- Entry Triggers
-    //if (IsHigher(Close[0],omMaster.Entry[OP_SELL],NoUpdate))
-    //  if (pfractal.Direction(Tick)==DirectionDown)
-    //    if (IsChanged(omMaster.Trigger[OP_SELL][tsOpen].Fired,false))
-    //    {
-    //      smRequest.Expiry    = Time[0]+(Period()*60);
-    //      OrderSubmit(smRequest,NoQueue);
-    //    }
-
-//    switch (omMaster.State[OP_SELL])
-//    {
-//      case msWait:     break;
-//      case msTrigger:  
-//                        break;
-
-    //-- Profit Triggers
-//    if (IsLower(Close[0],omMaster[OP_SELL].Target,NoUpdate))
-//      if (smProfit)
-//        if (pfractal.ActiveSegment().Type == Decay)
-//          if (pfractal.Direction(Tick)==DirectionUp)
-//          {
-////            Pause("Profit","Trigger");
-//            smProfit = false;
-//          }
   }
-
+  
 //+------------------------------------------------------------------+
 //| LongManagement - Manages long order positions, profit and risk   |
 //+------------------------------------------------------------------+
 void LongManagement(void)
   {
+    static OrderRequest   lmRequest = {0,OP_BUY,"Mgr:Long",0,0,0,0,"",0,NoStatus};
 
+    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
+      if (pfractal.Direction(pftTerm)==DirectionUp)
+        omMaster.Spotter[OP_BUY]    = false;
+      else
+      if (IsChanged(omMaster.Spotter[OP_BUY],true))
+      {
+        lmRequest.Action            = OP_BUY;
+        lmRequest.Lots              = OrderLotSize(0.00,fdiv(ordEQLotFactor,2));
+        lmRequest.Memo              = "Spotter";
+        lmRequest.Expiry            = Time[0]+(Period()*(60*2));
+        OrderSubmit(lmRequest,NoQueue);
+        
+        omMaster.Level[OP_BUY]      = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));
+      }
+      else
+      if (IsChanged(omMaster.Level[OP_BUY],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+      {
+        lmRequest.Action            = OP_BUY;
+        lmRequest.Lots              = 0.00;
+        lmRequest.Memo              = "Pullback";
+        lmRequest.Expiry            = Time[0]+(Period()*(60*2));
+        OrderSubmit(lmRequest,NoQueue);
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -2212,7 +2243,6 @@ void OnTick()
     UpdateFractal();
     UpdatePipMA();
     CalcFractal();
-    UpdateBar();
     UpdateOrders();
 
     RefreshScreen();
@@ -2330,10 +2360,16 @@ int OnInit()
     for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
     {
       NewLine("lnZone:"+DoubleToStr(FiboLevels[fabs(fibo)]*Direction(fibo)*100,1));
-      omMaster.Fibo[OP_BUY].Zone[FiboExt(fibo)].Price      = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
-      omMaster.Fibo[OP_SELL].Zone[FiboExt(fibo)].Price     = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster.Fibo[OP_BUY].Price[FiboExt(fibo)]      = detail[Daily].FractalPivot[OP_SELL]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
+      omMaster.Fibo[OP_SELL].Price[FiboExt(fibo)]     = detail[Daily].FractalPivot[OP_BUY]+(Pip(FiboLevels[fabs(fibo)]*100*Direction(fibo),InPoints));
     }
-
+    
+    //--- Initialize Order Directives
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      omMaster.MarginTolerance[action]   = inpMarginTolerance;
+    }
+    
     UpdateOrders();
     RefreshOrders();
 

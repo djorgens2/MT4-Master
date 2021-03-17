@@ -52,6 +52,7 @@ class CPipFractal : public CPipRegression
           int            pfBars;                            //--- Total Bars in Chart
           int            pfHiBar;                           //--- Current Term High Bar
           int            pfLoBar;                           //--- Current Term Low Bar
+          int            pfRtBar;                           //--- Current Term Retrace Bar
           
           double         pfTermHi;                          //--- Term hi/lo root price
           double         pfTermLo;                          //--- Term hi/lo root price
@@ -96,7 +97,7 @@ class CPipFractal : public CPipRegression
           ReservedWords  State(void) {return (pfState);};
           
           void           RefreshScreen(void);
-          void           ShowFiboArrow(double Price=0.00);
+          void           ShowFiboArrow(double Price);
   };
 
 //+------------------------------------------------------------------+
@@ -118,7 +119,11 @@ void CPipFractal::UpdateRetrace(PipFractalType Type)
     if (IsChanged(pf[Type].Retrace,BoolToDouble(pf[Type].Direction==DirectionUp,
                            fmin(BoolToDouble(pfBar==0,Close[pfBar],Low[pfBar]),pf[Type].Retrace),
                            fmax(BoolToDouble(pfBar==0,Close[pfBar],High[pfBar]),pf[Type].Retrace),Digits)))
+    {
       pf[Type].Recovery = pf[Type].Retrace;
+
+      SetEvent(NewRetrace,Minor);
+    }
     else
       pf[Type].Recovery = BoolToDouble(pf[Type].Direction==DirectionUp,
                            fmax(BoolToDouble(pfBar==0,Close[pfBar],High[pfBar]),pf[Type].Recovery),
@@ -132,7 +137,6 @@ void CPipFractal::UpdateRetrace(PipFractalType Type)
       pf[Type].Recovery = pf[Type].Expansion;
       
       SetEvent(NewExpansion,Minor);
-      ShowFiboArrow(pf[Type].Expansion);
     }                           
   }
 
@@ -184,10 +188,6 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
     
     if (NewDirection(pf[pftTerm].Direction,Direction))
     {
-      //-- Consider: We set expansion to retrace; confirm: on breakout resume, set root to divergent expansion;
-      if (Direction==DirectionDown&&Price>pf[pftTerm].Retrace) NewArrow(SYMBOL_STOPSIGN,clrRed);
-      if (Direction==DirectionUp&&Price<pf[pftTerm].Retrace) NewArrow(SYMBOL_STOPSIGN,clrYellow);
-
       pf[pftTerm].Base           = pf[pftTerm].Root;
       pf[pftTerm].Root           = pf[pftTerm].Expansion;
       pf[pftTerm].Expansion      = pf[pftTerm].Retrace;
@@ -228,10 +228,16 @@ void CPipFractal::UpdateNodes(void)
       if (IsEqual(FOC(Deviation),0.0,1))
         if (HistoryLoaded())
           UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown),Close[pfBar]);
-        else
-          UpdateTerm(BoolToInt(Close[pfBar]>pf[pftTerm].Root,DirectionUp,DirectionDown),Close[pfBar]);
- 
+        else UpdateTerm(BoolToInt(Close[pfBar]>pf[pftTerm].Root,DirectionUp,DirectionDown),Close[pfBar]);
+      else UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)*Direction(Fibonacci(pftTerm,Expansion,Now)),Close[pfBar]);
+
     UpdateRetrace(pftTerm);
+    
+    if (Event(NewExpansion)||Event(NewRetrace))
+      pfRtBar                = pfBar;
+    
+    if (Event(NewExpansion)||Event(NewTerm))
+      ShowFiboArrow(pf[pftTerm].Expansion);
     
     //-- Manage Trend changes
     if (Fibonacci(pftTerm,Expansion,Max)>FiboPercent(Fibo161))
@@ -268,6 +274,7 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, double AggFa
     pfBars             = Bars;
     pfHiBar            = NoValue;
     pfLoBar            = NoValue;
+    pfRtBar            = NoValue;
     
     ArrayResize(pfMap,Bars);
     ArrayInitialize(pfMap,0.00);
@@ -361,6 +368,7 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
     {
       pfHiBar++;
       pfLoBar++;
+      pfRtBar++;
     }
 
     UpdateNodes();
@@ -389,6 +397,7 @@ void CPipFractal::Update(void)
     {
       pfHiBar++;
       pfLoBar++;
+      pfRtBar++;
     }
       
     UpdateNodes();
@@ -480,7 +489,7 @@ int CPipFractal::Direction(int Type, bool Contrarian=false)
 //+------------------------------------------------------------------+
 //| ShowFiboArrow - paints the pipMA fibo arrow                      |
 //+------------------------------------------------------------------+
-void CPipFractal::ShowFiboArrow(double Price=0.00)
+void CPipFractal::ShowFiboArrow(double Price)
   {
     uchar     sfaArrowCode      = SYMBOL_DASH;
     double    sfaExpansion      = Fibonacci(pftTerm,Expansion,Max);
@@ -504,35 +513,34 @@ void CPipFractal::ShowFiboArrow(double Price=0.00)
 
     if (IsChanged(arrowDir,Direction(pftTerm)))
     {
-      arrowPrice                = BoolToDouble(IsEqual(Price,0.00),Close[pfBar],Price,Digits);
-      arrowName                 = NewArrow(sfaArrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir)+(string)arrowIdx++,arrowPrice,pfBar);
+      arrowPrice                = Price;
+      arrowName                 = NewArrow(sfaArrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir)+(string)arrowIdx++,arrowPrice,pfRtBar);
       
-      if (Direction(pftTerm)==DirectionUp)   pfHiBar = pfBar;
-      if (Direction(pftTerm)==DirectionDown) pfLoBar = pfBar;
+      if (Direction(pftTerm)==DirectionUp)   pfHiBar = pfRtBar;
+      if (Direction(pftTerm)==DirectionDown) pfLoBar = pfRtBar;
 
       if (pfHiBar>NoValue&&pfLoBar>NoValue)
       {
         NewRay("r:"+(string)arrowIdx,false);
         UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
       }
-
     }
      
     switch (arrowDir)
     {
       case DirectionUp:    if (IsChanged(arrowPrice,fmax(arrowPrice,High[pfBar])))
                            {
-                             pfHiBar = pfBar;
+                             pfHiBar = pfRtBar;
                              
-                             UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
+                             UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice,pfRtBar);
                              UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
                            }
                            break;
       case DirectionDown:  if (IsChanged(arrowPrice,fmin(arrowPrice,Low[pfBar])))
                            {
-                             pfLoBar = pfBar;
+                             pfLoBar = pfRtBar;
                              
-                             UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
+                             UpdateArrow(arrowName,sfaArrowCode,DirColor(arrowDir,clrYellow),arrowPrice,pfRtBar);
                              UpdateRay("r:"+(string)arrowIdx,High[pfHiBar],pfHiBar,Low[pfLoBar],pfLoBar,STYLE_SOLID,Color(pfLoBar-pfHiBar,IN_DARK_DIR));
                            }
                            break;

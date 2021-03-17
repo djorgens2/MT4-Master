@@ -509,13 +509,13 @@ string NewArrow(int ArrowCode, int Color, string Text="", double Price=0.00, int
 //+------------------------------------------------------------------+
 //| UpdateArrow - repaints existing arrow with supplied properties   |
 //+------------------------------------------------------------------+
-void UpdateArrow(string ArrowName, int ArrowCode, int Color, double Price=0.00)
+void UpdateArrow(string ArrowName, int ArrowCode, int Color, double Price=0.00, int Bar=0)
   {
     if (Price==0.00)
       Price = Close[0];
 
     ObjectDelete (ArrowName);
-    ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[0], Price);
+    ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
     ObjectSet    (ArrowName, OBJPROP_ARROWCODE, ArrowCode);
     ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
   }
