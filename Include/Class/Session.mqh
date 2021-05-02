@@ -898,13 +898,13 @@ void CSession::LoadHistory(void)
     for (int type=0;type<FractalTypes;type++)
       sfractal[type]                 = srec[ActiveSession];
 
-    //--- *** May need to modify this if the sbar Open==Close
-    if (IsEqual(Open[sBar],Close[sBar]))
-    {
-      Print ("Freak anomaly: aborting due to sbar(Open==Close)");
-      ExpertRemove();
-      return;
-    }
+    ////--- *** May need to modify this if the sbar Open==Close
+    //if (IsEqual(Open[sBar],Close[sBar]))
+    //{
+    //  Print ("Freak anomaly: aborting due to sbar(Open==Close)");
+    //  ExpertRemove();
+    //  return;
+    //}
 
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();

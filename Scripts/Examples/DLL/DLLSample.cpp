@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                              Sample DLL for MQL4 |
-//|                   Copyright 2000-2020, MetaQuotes Software Corp. |
-//|                                        http://www.metaquotes.net |
+//|                             Copyright 2000-2021, MetaQuotes Ltd. |
+//|                                               www.metaquotes.net |
 //+------------------------------------------------------------------+
 #include <windows.h>
 #include <stdlib.h>

@@ -191,19 +191,19 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Active,
                   State,
                   NoState,
-                  Forecast,
                   Retrace,
                   Reversal,
                   Breakout,
                   Rally,
                   Pullback,
+                  Recovery,
+                  Correction,
                   Trap,
+                  Forecast,
                   Support,
                   Resistance,
-                  Recovery,
                   Resume,
                   Contrarian,
-                  Correction,
                   WordCount      //--- must be last
               };
               
@@ -698,6 +698,16 @@ int BoolToInt(bool IsTrue, int TrueValue, int FalseValue=0)
     return (FalseValue);
   }
 
+//+------------------------------------------------------------------+
+//| BoolToWord - Returns a qualified Reserved Word based on a query  |
+//+------------------------------------------------------------------+
+ReservedWords BoolToWord(bool IsTrue, ReservedWords TrueValue, ReservedWords FalseValue=0)
+  {
+    if (IsTrue)
+      return (TrueValue);
+
+    return (FalseValue);
+  }
 
 //+------------------------------------------------------------------+
 //| BoolToDouble - returns user defined double for supplied value    |

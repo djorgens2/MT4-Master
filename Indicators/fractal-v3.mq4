@@ -39,6 +39,8 @@ input bool   inpShowPoints     = false;    // Show Fractal points
 input bool   inpShowFlags      = false;    // Show Fibonacci Events
 input bool   inpShowRootLines  = false;    // Show Modified Root Lines
 input FTL    inpShowTypeLines  = ftlNone;  // Show Fibonacci Lines by Type
+input int    inpUpOffset       = 12;       // Upper tag offset
+input int    inpDownOffset     = 8;        // Lower tag offset
 
 
 #property indicator_buffers   3
@@ -157,13 +159,13 @@ void RefreshScreen(void)
 
     if (inpShowPoints)
     {
-      UpdatePriceTag("ptExpansion",fractal[Expansion].Bar,fractal[Expansion].Direction);
-      UpdatePriceTag("ptRoot",fractal[Root].Bar,fractal[Root].Direction);
-      UpdatePriceTag("ptBase",fractal[Base].Bar,fractal[Base].Direction);
-      UpdatePriceTag("ptPrior",fractal[Prior].Bar,fractal[Prior].Direction);
-      UpdatePriceTag("ptTerm",fractal[Term].Bar,fractal[Term].Direction);
-      UpdatePriceTag("ptTrend",fractal[Trend].Bar,fractal[Trend].Direction);
-      UpdatePriceTag("ptOrigin",fractal.Origin().Bar,fractal[Expansion].Direction);
+      UpdatePriceTag("ptExpansion",fractal[Expansion].Bar,fractal[Expansion].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptRoot",fractal[Root].Bar,fractal[Root].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptBase",fractal[Base].Bar,fractal[Base].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptPrior",fractal[Prior].Bar,fractal[Prior].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptTerm",fractal[Term].Bar,fractal[Term].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptTrend",fractal[Trend].Bar,fractal[Trend].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptOrigin",fractal.Origin().Bar,fractal[Expansion].Direction,inpUpOffset,inpDownOffset);
     }
     
     if (inpShowFibo)

@@ -49,19 +49,81 @@ input bool           inpShowWaveBounds    = false;             // Display Crest/
 input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal lines by type
 
 
-//--- Class defs
-  CPipFractal      *pfractal    = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpAggFactor,inpIdleTime);
+  //--- Class defs
+  CPipFractal *pfractal           = new CPipFractal(inpDegree,inpPeriods,inpTolerance,inpAggFactor,inpIdleTime);
 
-string    ShortName             = "pipMA-v6: Degree:"+IntegerToString(inpDegree)+" Period:"+IntegerToString(inpPeriods);
-int       IndWinId  = -1;
+  //--- Indicator Declarations
+  string       ShortName          = "pipMA-v6: Degree:"+IntegerToString(inpDegree)+" Period:"+IntegerToString(inpPeriods);
+  int          IndWinId  = -1;
 
-double    indHistoryBuffer[];
-double    indTLineBuffer[];
-double    indPLineBuffer[];
+  //--- Buffers
+  double       indHistoryBuffer[];
+  double       indTLineBuffer[];
+  double       indPLineBuffer[];
 
-const string pmFiboPeriod[3]    = {"tm","tr","o"};
-const string pmFiboType[5]      = {"b","r","e","rt","rc"};
-const int    pmFiboTypeId[5]    = {Base,Root,Expansion,Retrace,Recovery};
+  //--- Translation Arrays
+  const string pmFiboPeriod[3]    = {"tm","tr","o"};
+  const string pmFiboType[5]      = {"b","r","e","rt","rc"};
+  const int    pmFiboTypeId[5]    = {Base,Root,Expansion,Retrace,Recovery};
+
+  //--- Operational Variables
+  int          pmRangeId          = 0;
+  int          pmRangeDir         = DirectionNone;
+  string       pmRangeKey         = "";
+  double       pmRangeHigh        = 0.00;
+  double       pmRangeLow         = 0.00;
+  datetime     pmOpenTime         = NoValue;
+
+//+------------------------------------------------------------------+
+//| CreateRange - Paints the session boxes                           |
+//+------------------------------------------------------------------+
+void CreateRange(int Bar=0)
+ {   
+   pmRangeKey               = "pmRng:"+(string)pmRangeId++;
+     
+   pmOpenTime               = Time[Bar];
+   pmRangeHigh              = Close[Bar];
+   pmRangeLow               = Close[Bar];
+   
+   ObjectCreate(pmRangeKey,OBJ_TRIANGLE,0,pmOpenTime,Close[Bar],pmOpenTime,Close[Bar],pmOpenTime,Close[Bar]);
+   
+   ObjectSet(pmRangeKey, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSet(pmRangeKey, OBJPROP_COLOR, Color(pmRangeDir,IN_DARK_PANEL));
+   ObjectSet(pmRangeKey, OBJPROP_BACK, true);
+ }
+
+//+------------------------------------------------------------------+
+//| UpdateRange - Repaints the range box                             |
+//+------------------------------------------------------------------+
+void UpdateRange(int Bar=0)
+ {
+   if (IsChanged(pmRangeDir,pfractal.State().Direction))
+     CreateRange(Bar);
+   else
+   {
+     if (IsHigher(Close[Bar],pmRangeHigh))
+       ObjectSet(pmRangeKey,OBJPROP_PRICE3,pmRangeHigh);
+
+     if (IsLower(Close[Bar],pmRangeLow))
+       ObjectSet(pmRangeKey,OBJPROP_PRICE2,pmRangeLow);
+
+//     if (pmRangeDir==DirectionDown)
+       ObjectSet(pmRangeKey,OBJPROP_TIME2,Time[Bar]);
+//     else
+       ObjectSet(pmRangeKey,OBJPROP_TIME3,Time[Bar]);
+   }
+ }
+
+//+------------------------------------------------------------------+
+//| DeleteRanges - Removes all objects created by the indicator      |
+//+------------------------------------------------------------------+
+void DeleteRanges()
+  {
+    for (int range=0;range<pmRangeId;range++)
+      ObjectDelete("pmRng:"+(string)range);
+  }
+
+
 
 //+------------------------------------------------------------------+
 //| UpdateEvent - Reports event changes retaining the last event     |
@@ -105,7 +167,6 @@ string FOCText(RangeStateType State)
 void RefreshScreen()
   {
     static int           lastDir    = DirectionNone;
-    static ReservedWords lastState  = NoState;
   
     ObjectSet("piprMean",OBJPROP_TIME1,Time[0]);
     ObjectSet("piprMean",OBJPROP_PRICE1,pfractal.Range(Mean));
@@ -133,15 +194,15 @@ void RefreshScreen()
       SetIndexStyle(2,DRAW_LINE,STYLE_DOT,1,DirColor(pfractal.Direction(Polyline)));
     
     UpdateLabel("lrFOCNow",NegLPad(pfractal.FOC(Now),1),DirColor(pfractal.FOCDirection()),15);
-    UpdateLabel("lrFOCPivDev",NegLPad(Pip(pfractal.Pivot(Deviation)),1),DirColor(pfractal.Direction(Pivot)),15);
+    UpdateLabel("lrFOCPivDev",center(DoubleToStr(Pip(pfractal.Pivot(Deviation)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)),15);
     UpdateDirection("lrFOCPivDir",pfractal.Direction(Pivot),DirColor(pfractal.Direction(Pivot)),20);
     UpdateLabel("lrFOCRange",DoubleToStr(Pip(pfractal.Range(Size))/inpAggFactor,1),DirColor(pfractal.FOCDirection()),15);
     UpdateDirection("lrRangeDir",pfractal.Direction(Range),DirColor(pfractal.Direction(Range)),30);
 
     UpdateLabel("lrFOCDev",DoubleToStr(pfractal.FOC(Deviation),1),DirColor(pfractal.FOCDirection()));
     UpdateLabel("lrFOCMax",NegLPad(pfractal.FOC(Max),1),DirColor(pfractal.FOCDirection()));
-    UpdateLabel("lrFOCPivDevMin",NegLPad(Pip(pfractal.Pivot(Min)),1),DirColor(pfractal.Direction(Pivot)));
-    UpdateLabel("lrFOCPivDevMax",NegLPad(Pip(pfractal.Pivot(Max)),1),DirColor(pfractal.Direction(Pivot)));
+    UpdateLabel("lrFOCPivDevMin",center(DoubleToStr(Pip(pfractal.Pivot(Min)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
+    UpdateLabel("lrFOCPivDevMax",center(DoubleToStr(Pip(pfractal.Pivot(Max)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCPivPrice",DoubleToStr(pfractal.Pivot(Price),Digits),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCTick",LPad(IntegerToString(pfractal.Age(Tick))," ",2),DirColor(pfractal.Direction(Tick)));
     UpdateLabel("lrFOCAge",LPad(IntegerToString(pfractal.Age(Range))," ",2),DirColor(pfractal.Direction(Range)));
@@ -155,8 +216,8 @@ void RefreshScreen()
     UpdateLabel("lrWaveState",EnumToString(pfractal.ActiveWave().Type)+" "
                       +BoolToStr(pfractal.ActiveSegment().Type==Decay,"Decay ")
                       +EnumToString(pfractal.WaveState()),DirColor(pfractal.ActiveWave().Direction));    
-    UpdateLabel("lrPolyState",EnumToString(pfractal.PolyState()),BoolToInt(pfractal.PolyState()==Crest||pfractal.PolyState()==Trough,clrYellow,DirColor(pfractal.Direction(Polyline))));
-    UpdateLabel("lrFOCState",FOCText(pfractal.TrendState()),DirColor(pfractal.FOCDirection()));
+    UpdateLabel("lrPolyState",center(EnumToString(pfractal.PolyState()),9),BoolToInt(pfractal.PolyState()==Crest||pfractal.PolyState()==Trough,clrYellow,DirColor(pfractal.Direction(Polyline))));
+    UpdateLabel("lrFOCState",center(FOCText(pfractal.TrendState()),22),DirColor(pfractal.FOCDirection()));
     UpdateLabel("lrWaveStateL",EnumToString(pfractal.ActionState(OP_BUY)),DirColor(pfractal.ActiveSegment().Direction));                     
     UpdateLabel("lrWaveStateS",EnumToString(pfractal.ActionState(OP_SELL)),DirColor(pfractal.ActiveSegment().Direction));
 
@@ -195,6 +256,9 @@ void RefreshScreen()
     if (inpShowFractal!=PipFractalTypes)
       for (int ftype=0;ftype<5;ftype++)
         UpdateLine("piprFractal("+pmFiboType[ftype]+")",pfractal.Price(inpShowFractal,pmFiboTypeId[ftype]),BoolToInt(ftype==4,STYLE_DOT,STYLE_SOLID),pfColor[ftype]);
+        
+    UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
+    UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
 
     if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
@@ -228,13 +292,7 @@ void RefreshScreen()
     else
       UpdateEvent("No Event",clrGray);
       
-    if (lastState!=pfractal.State())
-    {
-      lastState            = pfractal.State();
-      UpdateLabel("lrFiboState",EnumToString(lastState),clrYellow);
-    }
-    else
-      UpdateLabel("lrFiboState",EnumToString(lastState),clrGray);
+    UpdateLabel("lrFiboState",pfractal.StateText(),Color(pfractal.Direction(pftTerm)));
 
     if (inpShowBounds)
     {
@@ -257,17 +315,28 @@ void RefreshScreen()
       UpdateLine("piprWaveShort",pfractal.ActionLine(OP_SELL,Opportunity),STYLE_DOT,clrDodgerBlue);
     }
 
-    if (inpShowFibo)
-      pfractal.ShowFiboArrow();
-      
     if (inpShowWaveSegs)
       pfractal.DrawWaveOverlays();
     
     if (inpShowComment)
       pfractal.RefreshScreen();
     
+    UpdateRange();
+
     lastDir = pfractal.FOCDirection();
   }
+
+void PauseOnEvent(void)
+  {
+    static int mbOK  = IDOK;
+          
+//    if (pfractal.State().Pivots>0)
+//      mbOK           = IDOK;
+//    else
+//    if (mbOK==IDOK)
+//      mbOK  = Pause("Zero Pivot Event. Click Cancel to ignore.","Event Handler",MB_OKCANCEL|MB_ICONHAND);
+//
+  };
 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
@@ -288,6 +357,8 @@ int OnCalculate(const int rates_total,
     if (Bars>inpPeriods)
       indHistoryBuffer[inpPeriods]=0.00;
 
+    PauseOnEvent();
+    
     RefreshScreen();                 
 
     return(rates_total);
@@ -304,7 +375,7 @@ void InitScreenObjects()
     NewLabel("lrFOC2","------- Range Age/State ---------      ----- Poly -----",206,12,clrGoldenrod,SCREEN_UL,IndWinId);
     NewLabel("lrFOC3","Current",20,22,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC4","Dev",113,22,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC5","Current",215,22,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC5","Range",217,22,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC6","Dev",12,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC7","Max",51,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC8","Min",92,65,clrWhite,SCREEN_UL,IndWinId);
@@ -312,8 +383,8 @@ void InitScreenObjects()
     NewLabel("lrFOC10","Price",169,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC11","Tick",208,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC12","Age",234,65,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC13","Low",306,53,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lrFOC14","High",306,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC13","Low",270,65,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lrFOC14","High",340,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC15","Price",374,65,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOC16","Trend",410,65,clrWhite,SCREEN_UL,IndWinId);
 
@@ -322,10 +393,10 @@ void InitScreenObjects()
     NewLabel("lrFOCPivDev","",92,32,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrFOCPivDir","",170,29,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrFOCRange","",212,32,clrLightGray,SCREEN_UL,IndWinId);
-    NewLabel("lrFOCState","",260,23,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrRangeDir","",262,34,clrLightGray,SCREEN_UL,IndWinId);
+    NewLabel("lrFOCState","",266,22,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrRangeDir","",296,32,clrLightGray,SCREEN_UL,IndWinId);
     NewLabel("lrPolyDir","",394,36,clrLightGray,SCREEN_UL,IndWinId);
-    NewLabel("lrPolyState","",385,23,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrPolyState","",385,22,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrPricePolyDev","",375,53,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrPolyTrendDev","",412,53,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lrFOCDev","",12,53,clrNONE,SCREEN_UL,IndWinId);
@@ -335,8 +406,8 @@ void InitScreenObjects()
     NewLabel("lrFOCPivPrice","",160,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCTick","",212,53,clrNONE,SCREEN_UL,IndWinId);
     NewLabel("lrFOCAge","",235,53,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrMALow","",340,53,clrNONE,SCREEN_UL,IndWinId);
-    NewLabel("lrMAHigh","",340,65,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrMALow","",270,53,clrNONE,SCREEN_UL,IndWinId);
+    NewLabel("lrMAHigh","",340,53,clrNONE,SCREEN_UL,IndWinId);
 
     
     NewLabel("lrWave01","State:",12,93,clrWhite,SCREEN_UL,IndWinId);    
@@ -433,6 +504,9 @@ void InitScreenObjects()
     
     for (int ftype=0;ftype<5;ftype++)
       NewLine("piprFractal("+pmFiboType[ftype]+")");
+      
+    NewLine("piprRangeHi");
+    NewLine("piprRangeLo");
   }
 
 //+------------------------------------------------------------------+

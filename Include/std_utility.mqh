@@ -274,6 +274,16 @@ string proper(string Value)
 }
 
 //+------------------------------------------------------------------+
+//| center - center a string                                         |
+//+------------------------------------------------------------------+
+string center(string Value, int Length)
+{
+  int cValueLen     = StringLen(Value);
+  
+  return(LPad(Value," ",cValueLen+((Length-StringLen(Value))/2)));
+}
+
+//+------------------------------------------------------------------+
 //| upper - a uppercase string                                       |
 //+------------------------------------------------------------------+
 string upper(string Value)
@@ -592,17 +602,17 @@ void UpdateBarNote(string LabelName, double Price=0.00, int Color=clrWhite)
 //+------------------------------------------------------------------+
 //| UpdatePriceTag                                                   |
 //+------------------------------------------------------------------+
-void UpdatePriceTag(string PriceTagName, int Bar, int Direction)
+void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int Down=8)
   {
     if (Bar<0 || Bar>Bars)
       return;
       
     if (Direction == DIR_UP)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+Pip(12.0,InDecimal));
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+Pip(Up,InDecimal));
     else
     
     if (Direction == DIR_DOWN)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-Pip(4.0,InDecimal));
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-Pip(Down,InDecimal));
 
     else
       return;
