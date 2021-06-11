@@ -657,18 +657,20 @@ void UpdateRay(string RayName, double PriceStart, int BarStart, double PriceEnd,
     ObjectSet(RayName,OBJPROP_STYLE,Style);
     ObjectSet(RayName,OBJPROP_COLOR,Color);
     ObjectSet(RayName,OBJPROP_PRICE1,PriceStart);
-    ObjectSet(RayName,OBJPROP_TIME1,Time[BarStart]);  
     ObjectSet(RayName,OBJPROP_PRICE2,PriceEnd);
-    ObjectSet(RayName,OBJPROP_TIME2,Time[BarEnd]);  
+    
+    ObjectSet(RayName,OBJPROP_TIME1,BoolToDT(BarStart<0,Time[0]+(fabs(BarStart)*(Period()*60)),Time[fabs(BarStart)]));
+    ObjectSet(RayName,OBJPROP_TIME2,BoolToDT(BarEnd<0,Time[0]+(fabs(BarEnd)*(Period()*60)),Time[fabs(BarEnd)]));
   }
   
 //+------------------------------------------------------------------+
 //| NewRay - creates a ray object                                    |
 //+------------------------------------------------------------------+
-void NewRay(string RayName, bool ExtendRay=true, int Window=0)
+void NewRay(string RayName, bool ExtendRay=true, int Thickness=1, int Window=0)
   {
     ObjectCreate(RayName,OBJ_TREND,Window,0,0);
     ObjectSet(RayName,OBJPROP_RAY,ExtendRay);
+    ObjectSet(RayName,OBJPROP_WIDTH,Thickness);
   }
 
 //+------------------------------------------------------------------+
@@ -678,7 +680,7 @@ void UpdatePriceLabel(string PriceLabelName, double Price, int Color=White, int 
   {
     ObjectSet(PriceLabelName,OBJPROP_COLOR,Color);
     ObjectSet(PriceLabelName,OBJPROP_PRICE1,Price);
-    ObjectSet(PriceLabelName,OBJPROP_TIME1,Time[Bar]);
+    ObjectSet(PriceLabelName,OBJPROP_TIME1,BoolToDT(Bar<0,Time[0]+(fabs(Bar)*(Period()*60)),Time[fabs(Bar)]));
   }
   
 //+------------------------------------------------------------------+

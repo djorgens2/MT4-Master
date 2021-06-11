@@ -27,6 +27,7 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
     return(rates_total);
   }
 
@@ -36,5 +37,6 @@ int OnCalculate(const int rates_total,
 int OnInit()
   {
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,0);
+    NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,0);
     return(INIT_SUCCEEDED);
   }

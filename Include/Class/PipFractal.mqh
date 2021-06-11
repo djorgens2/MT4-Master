@@ -70,6 +70,7 @@ class CPipFractal : public CPipRegression
           int            pfLoBar;                           //--- Current Term Low Bar
           int            pfRtBar;                           //--- Current Term Retrace Bar
           
+          int            pfTicks;                           //--- Ticks in current direction
           int            pfPivots;                          //--- Term pivot count
           double         pfTermHi;                          //--- Term hi/lo root price
           double         pfTermLo;                          //--- Term hi/lo root price
@@ -111,6 +112,7 @@ class CPipFractal : public CPipRegression
        virtual
           int            Direction(int Type, bool Contrarian=false);
 
+          int            Count(const ReservedWords Measure);
           StateRec       State(void) const {return(sr);};
           string         StateText(void);
 
@@ -336,12 +338,23 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
 //+------------------------------------------------------------------+
 void CPipFractal::UpdateNodes(void)
   {
+    static int unTickDir    = 0;
+    
     //--- Clear fractal events
     ClearEvent(NewExpansion);
     ClearEvent(NewTerm);
     ClearEvent(NewTrend);
     ClearEvent(NewOrigin);
 
+    //--- Handle tick counter
+    if (Event(NewTick))
+    {
+      if (IsChanged(unTickDir,Direction(Tick)))
+        pfTicks                = 0;
+
+      pfTicks++;
+    }
+          
     //--- Handle Term direction changes
     if (pfBar>0&&pfMap[pfBar]>0.00)
       UpdateTerm(BoolToInt(IsEqual(pfMap[pfBar],High[pfBar])==DirectionUp,DirectionUp,DirectionDown),pfMap[pfBar]);
@@ -351,7 +364,7 @@ void CPipFractal::UpdateNodes(void)
         if (HistoryLoaded())
           UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown),Close[pfBar]);
         else UpdateTerm(BoolToInt(Close[pfBar]>pf[pftTerm].Root,DirectionUp,DirectionDown),Close[pfBar]);
-      else UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown),Close[pfBar]); //*Direction(Fibonacci(pftTerm,Expansion,Now)),Close[pfBar]);
+      else UpdateTerm(BoolToInt(Event(NewHigh),DirectionUp,DirectionDown),Close[pfBar]);
 
     if (Fibonacci(pftTerm,Expansion,Max)>FiboPercent(Fibo100))
       if (IsChanged(pfTerm100,true))
@@ -574,7 +587,7 @@ double CPipFractal::Fibonacci(PipFractalType Type, int Method, int Measure, int 
       case Expansion: switch (Measure)
                       {
                         case Now: return (fdiv(Close[0]-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
-                        case Max: return (fdiv(pf[Type].Expansion-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
+                        case Max: return (fdiv(BoolToDouble(IsEqual(pf[Type].Expansion,pf[Type].Base),pf[Type].Recovery,pf[Type].Expansion)-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
                         case Min: return (fdiv(pf[Type].Retrace-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
                       }
       case Forecast:  return(NormalizeDouble(pf[Type].Root+((pf[Type].Base-pf[Type].Root)*FiboPercent(Measure)),Digits));
@@ -614,6 +627,20 @@ int CPipFractal::Direction(int Type, bool Contrarian=false)
     }
     
     return (DirectionNone);
+  }
+
+//+------------------------------------------------------------------+
+//|  Count - returns the count for the supplied Type                 |
+//+------------------------------------------------------------------+
+int CPipFractal::Count(const ReservedWords Type)
+  {
+    switch (Type)
+    {
+      case Tick:          return (pfTicks);
+      case Pivot:         return (pfPivots);
+    }
+    
+    return (NoValue);
   }
 
 //+------------------------------------------------------------------+

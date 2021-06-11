@@ -203,9 +203,10 @@ void CPipRegression::CalcMA(void)
   {
     static int  cmaRangeDir     = DirectionNone;
     
+    ClearEvent(NewTick);
+    
     if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=ptrAggFactor)
     {
-
       pipHistory.Insert(0,Close[0]);
       pipHistory.Copy(maData);
       
@@ -259,6 +260,8 @@ void CPipRegression::CalcMA(void)
 
         SetEvent(NewBoundary);
       }
+      
+      SetEvent(NewTick);
         
       ptrRangeAgeHigh++;
       ptrRangeAgeLow++;

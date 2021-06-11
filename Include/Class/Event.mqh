@@ -31,6 +31,7 @@ protected:
                 {
                   NoEvent,
                   NewDirection,
+                  NewTick,
                   NewFractal,
                   NewPivot,
                   NewStdDev,

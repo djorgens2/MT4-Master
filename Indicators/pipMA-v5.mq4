@@ -107,10 +107,8 @@ void UpdateRange(int Bar=0)
      if (IsLower(Close[Bar],pmRangeLow))
        ObjectSet(pmRangeKey,OBJPROP_PRICE2,pmRangeLow);
 
-//     if (pmRangeDir==DirectionDown)
-       ObjectSet(pmRangeKey,OBJPROP_TIME2,Time[Bar]);
-//     else
-       ObjectSet(pmRangeKey,OBJPROP_TIME3,Time[Bar]);
+     ObjectSet(pmRangeKey,OBJPROP_TIME2,Time[Bar]);
+     ObjectSet(pmRangeKey,OBJPROP_TIME3,Time[Bar]);
    }
  }
 
@@ -168,16 +166,10 @@ void RefreshScreen()
   {
     static int           lastDir    = DirectionNone;
   
-    ObjectSet("piprMean",OBJPROP_TIME1,Time[0]);
-    ObjectSet("piprMean",OBJPROP_PRICE1,pfractal.Range(Mean));
-
-    if (pfractal.TrendWane())
-      ObjectSet("piprMean", OBJPROP_COLOR, clrYellow);
-    else
-      ObjectSet("piprMean", OBJPROP_COLOR, DirColor(pfractal.FOCDirection()));
-
+    UpdatePriceLabel("piprMean",pfractal.Range(Mean),BoolToInt(pfractal.TrendWane(),clrYellow,Color(pfractal.FOCDirection())));
     UpdatePriceLabel("piprHead",pfractal.Trendline(Head),DirColor(pfractal.Direction(Trendline)));
     UpdatePriceLabel("piprTail",pfractal.Trendline(Tail),DirColor(pfractal.Direction(Trendline)));
+    UpdatePriceLabel("piprClose",Close[0],Color(Close[0]-Open[0]),-10);
 
     UpdateLine("piprFOCPivot",pfractal.Pivot(Price),STYLE_SOLID,DirColor(pfractal.Direction(Pivot)));
     UpdateLine("piprIntPos",pfractal.Intercept(Top),STYLE_DOT,clrForestGreen);
@@ -226,6 +218,7 @@ void RefreshScreen()
                +" p:"+DoubleToStr(Pip(pfractal.StdDev()),1)
                +" +"+DoubleToStr(Pip(pfractal.StdDev(Positive)),1)
                +" "+DoubleToStr(Pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
+    UpdateLabel("lrTickData","Tick Count: "+(string)pfractal.Count(Tick),Color(pfractal.Direction(Tick)),10);
                
     //---Fibonacci data
     UpdateLabel("lrFibo tm(e)",DoubleToStr(pfractal.Fibonacci(pftTerm,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(pftTerm)),16);
@@ -257,9 +250,6 @@ void RefreshScreen()
       for (int ftype=0;ftype<5;ftype++)
         UpdateLine("piprFractal("+pmFiboType[ftype]+")",pfractal.Price(inpShowFractal,pmFiboTypeId[ftype]),BoolToInt(ftype==4,STYLE_DOT,STYLE_SOLID),pfColor[ftype]);
         
-    UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
-    UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
-
     if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
     else
@@ -307,6 +297,9 @@ void RefreshScreen()
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,clrGoldenrod);
       else
         UpdateLine("piprRngHigh",pfractal.Range(Top),STYLE_DOT,DirColor(pfractal.Direction(RangeHigh)));
+        
+      UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
+      UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
     }
 
     if (inpShowWaveBounds)
@@ -317,6 +310,11 @@ void RefreshScreen()
 
     if (inpShowWaveSegs)
       pfractal.DrawWaveOverlays();
+
+    UpdateRay("piprSegHL",pfractal.ActiveSegment().High,-9,pfractal.ActiveSegment().Low,-9,STYLE_DOT,Color(pfractal.ActiveSegment().Direction,IN_CHART_DIR));
+    UpdateRay("piprSegOC",pfractal.ActiveSegment().Open,-9,pfractal.ActiveSegment().Close,-9,STYLE_SOLID,Color(pfractal.ActiveSegment().Direction,IN_DARK_DIR));
+    UpdateRay("piprWaveHL",pfractal.ActiveWave().High,-8,pfractal.ActiveWave().Low,-8,STYLE_SOLID,BoolToInt(pfractal.ActiveWave().Type==Crest,clrYellow,clrRed));
+    UpdateRay("piprWaveOC",pfractal.ActiveWave().Open,-8,pfractal.ActiveWave().Close,-8,STYLE_SOLID,Color(pfractal.ActiveWave().Direction,IN_DARK_DIR));
     
     if (inpShowComment)
       pfractal.RefreshScreen();
@@ -415,6 +413,7 @@ void InitScreenObjects()
     //--- Right-side labels and data
     NewLabel("lrEvent","",5,5,clrWhite,SCREEN_LR,IndWinId);
     NewLabel("lrStdDevData","",5,5,clrLightGray,SCREEN_UR,IndWinId);
+    NewLabel("lrTickData","",5,18,clrLightGray,SCREEN_UR,IndWinId);
     
     //--- Wave labels
     NewLabel("lrWave01","--------------- Wave Data --------------",12,82,clrGoldenrod,SCREEN_UL,IndWinId);
@@ -491,6 +490,9 @@ void InitScreenObjects()
     ObjectCreate("piprTail",OBJ_ARROW,IndWinId,0,0);
     ObjectSet("piprTail", OBJPROP_ARROWCODE, SYMBOL_RIGHTPRICE);
 
+    ObjectCreate("piprClose",OBJ_ARROW,IndWinId,0,0);
+    ObjectSet("piprClose", OBJPROP_ARROWCODE, SYMBOL_RIGHTPRICE);
+
     NewLine("piprFOCPivot",0.00,STYLE_DASHDOT,clrLightGray,IndWinId);
     NewLine("piprIntPos",0.00,STYLE_DASHDOT,clrLightGray,IndWinId);
     NewLine("piprIntNeg",0.00,STYLE_DASHDOT,clrLightGray,IndWinId);
@@ -501,6 +503,11 @@ void InitScreenObjects()
 
     NewLine("piprWaveLong");
     NewLine("piprWaveShort");
+    
+    NewRay("piprWaveOC",false,6,IndWinId);
+    NewRay("piprWaveHL",false,1,IndWinId);
+    NewRay("piprSegOC",false,6,IndWinId);
+    NewRay("piprSegHL",false,1,IndWinId);
     
     for (int ftype=0;ftype<5;ftype++)
       NewLine("piprFractal("+pmFiboType[ftype]+")");

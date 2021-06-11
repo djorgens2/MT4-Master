@@ -83,7 +83,7 @@ private:
        RetraceType   fLegMax;               //--- Most recent major leg
        RetraceType   fLegMin;               //--- Most recent minor leg
        RetraceType   fDominantTrend;        //--- Current dominant trend; largest fractal leg
-       RetraceType   fDominantTerm;         //--- Current dominant term; last leg greater tha RangeMax
+       RetraceType   fDominantTerm;         //--- Current dominant term; last leg greater than RangeMax
        
        CEvent       *fEvents;
 
@@ -332,17 +332,26 @@ void CFractal::CalcRetrace(void)
     }
 
     //--- Calc fractal state
+    if (fEvents.Event(NewReversal,Major))
+      fState                            = Reversal;
+
+    if (fEvents.Event(NewBreakout,Major))
+      fState                            = Breakout;
+
     switch (fState)
     {
+      case Recovery:    if (Fibonacci(Root,fpExpansion,Now)>1-FiboPercent(Fibo23))
+                        {
+                          fState        = Correction;
+                          fEvents.SetEvent(NewCorrection,Critical);
+                        }
+                        break;
+                        
       case Correction:  if (Fibonacci(Root,fpExpansion,Now)<FiboPercent(Fibo23))
                         {
                           fState        = Recovery;
                           fEvents.SetEvent(NewRecovery,Major);
                         }
-
-                        if (fEvents.Event(NewReversal,Major))
-                          fState        = Reversal;
-
                         break;
 
       case Breakout:
@@ -352,15 +361,15 @@ void CFractal::CalcRetrace(void)
                           fEvents.SetEvent(NewRetrace,Minor);
                         }
 
-      default:          if (Fibonacci(Root,fpExpansion,Now)>1-FiboPercent(Fibo23))
+      default:          if (Fibonacci(Root,fpExpansion,Max)>1-FiboPercent(Fibo23))
                         {
                           fState        = Correction;
                           fEvents.SetEvent(NewCorrection,Critical);
-                        }
-                        
-                        if (fEvents.Event(NewBreakout,Major))
-                          fState        = Breakout;
+                        }                        
     }
+    
+    if (Event(NewCorrection))
+      Flag("corr"+(string)fBarNow,clrWhite,true,fBarNow);
 
     //--- Calc fractal change events
     if (IsChanged(fLegMin,crStateMin))
@@ -946,7 +955,7 @@ double CFractal::Fibonacci(RetraceType Type, FractalPoint Fractal, int Measure, 
 void CFractal::RefreshScreen(bool WithEvents=false)
   {
     string           rsReport    = "";
-    const  string    rsSeg[RetraceTypes] = {"tr","tm","p","b","r","e","d","c","iv","cv","l"};
+    const  string    rsSeg[RetraceTypes] = {"tr","tm","p","b","r","e","d","c","iv","cv","lead"};
     const  string    rsFP[FractalPoints] = {"o","b","r","e","rt","rc"};
     
     rsReport   += "\n  Origin:\n";

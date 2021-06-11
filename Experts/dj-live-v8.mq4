@@ -220,6 +220,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
                         double         Value;                  //-- Order value by Pos, Neg, Net
                         double         Margin;                 //-- Margin% by Pos, Neg, Net
                         double         Equity;                 //-- Equity% by Pos, Neg, Net
+                        int            Ticket[];               //-- Orders aggregated in this summary
                       };
   
   struct              FiboZone
@@ -1106,24 +1107,25 @@ double Order(double Value, AccountMetric Metric, int Format=InPercent)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    AccountMetric uoAccountMetric                        = acMarginLong;
+    AccountMetric uoAccountMetric            = acMarginLong;
+    int           uoFibo                     = 0;
     
     //-- Set zone details on NewFractal
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      om[action].Summary.Count                = 0;
-      om[action].Summary.Lots                 = 0.00;
-      om[action].Summary.Value                = 0.00;
-      om[action].Summary.Margin               = 0.00;
-      om[action].Summary.Equity               = 0.00;     
+      om[action].Summary.Count                     = 0;
+      om[action].Summary.Lots                      = 0.00;
+      om[action].Summary.Value                     = 0.00;
+      om[action].Summary.Margin                    = 0.00;
+      om[action].Summary.Equity                    = 0.00;     
       
       for (int pos=0;pos<Total;pos++)
       {
-        omSummary[pos].Count                  = 0;
-        omSummary[pos].Lots                   = 0.00;
-        omSummary[pos].Value                  = 0.00;
-        omSummary[pos].Margin                 = 0.00;
-        omSummary[pos].Equity                 = 0.00;
+        omSummary[pos].Count                       = 0;
+        omSummary[pos].Lots                        = 0.00;
+        omSummary[pos].Value                       = 0.00;
+        omSummary[pos].Margin                      = 0.00;
+        omSummary[pos].Equity                      = 0.00;
       }
     
       for (int fibo=-Fibo823;fibo<=Fibo823;fibo++)
@@ -1147,33 +1149,39 @@ void UpdateOrders(void)
           if (OrderType()==action)
           {
             //-- Agg By Action
-            om[action].Summary.Count++;
-            om[action].Summary.Lots        += OrderLots();
-            om[action].Summary.Value       += OrderProfit();
-
+            ArrayResize(om[action].Summary.Ticket,++om[action].Summary.Count);
+            om[action].Summary.Lots               += OrderLots();
+            om[action].Summary.Value              += OrderProfit();
+            om[action].Summary.Ticket[om[action].Summary.Count-1] = OrderTicket();
+            
             //-- Agg By P/L
             if (NormalizeDouble(OrderProfit(),2)<0.00)
             {
-              omSummary[Loss].Count++;
-              omSummary[Loss].Lots         += OrderLots();
-              omSummary[Loss].Value        += OrderProfit();
+              ArrayResize(omSummary[Loss].Ticket,++omSummary[Loss].Count);
+              omSummary[Loss].Lots                += OrderLots();
+              omSummary[Loss].Value               += OrderProfit();
+              omSummary[Loss].Ticket[omSummary[Loss].Count-1] = OrderTicket();
             }
             else
             {
-              omSummary[Profit].Count++;
-              omSummary[Profit].Lots       += OrderLots();
-              omSummary[Profit].Value      += OrderProfit();
+              ArrayResize(omSummary[Profit].Ticket,++omSummary[Profit].Count);
+              omSummary[Profit].Lots              += OrderLots();
+              omSummary[Profit].Value             += OrderProfit();
+              omSummary[Profit].Ticket[omSummary[Profit].Count-1] = OrderTicket();
             }
             
             //-- Agg By Fibo
-            om[action].Fibo.Zone[FindZone(action,om[action].Fibo,OrderOpenPrice())].Count++;
-            om[action].Fibo.Zone[FindZone(action,om[action].Fibo,OrderOpenPrice())].Lots    += OrderLots();
-            om[action].Fibo.Zone[FindZone(action,om[action].Fibo,OrderOpenPrice())].Value   += OrderProfit();            
+            uoFibo                     = FindZone(action,om[action].Fibo,OrderOpenPrice());
+            
+            ArrayResize(om[action].Fibo.Zone[uoFibo].Ticket,++om[action].Fibo.Zone[uoFibo].Count);
+            om[action].Fibo.Zone[uoFibo].Lots     += OrderLots();
+            om[action].Fibo.Zone[uoFibo].Value    += OrderProfit();
+            om[action].Fibo.Zone[uoFibo].Ticket[om[action].Fibo.Zone[uoFibo].Count-1] = OrderTicket();
           }
 
     //-- Compute interim Net Values req'd by Equity/Margin calcs
-    omSummary[Net].Lots                     = om[OP_BUY].Summary.Lots-om[OP_SELL].Summary.Lots;
-    omSummary[Net].Value                    = om[OP_BUY].Summary.Value+om[OP_SELL].Summary.Value;
+    omSummary[Net].Lots                = om[OP_BUY].Summary.Lots-om[OP_SELL].Summary.Lots;
+    omSummary[Net].Value               = om[OP_BUY].Summary.Value+om[OP_SELL].Summary.Value;
 
     //-- Calculate zone values and margins
     for (int action=OP_BUY;action<=OP_SELL;action++)
@@ -1186,22 +1194,22 @@ void UpdateOrders(void)
       }
       
       //-- Calc Action Aggregates
-      om[action].Summary.Equity             = Order(om[action].Summary.Value,acEquity,InPercent);
-      om[action].Summary.Margin             = Order(om[action].Summary.Lots,uoAccountMetric,InPercent);
+      om[action].Summary.Equity        = Order(om[action].Summary.Value,acEquity,InPercent);
+      om[action].Summary.Margin        = Order(om[action].Summary.Lots,uoAccountMetric,InPercent);
       
-      uoAccountMetric                       = acMarginShort;
+      uoAccountMetric                  = acMarginShort;
     }
 
     //-- Calc P/L Aggregates
-    omSummary[Profit].Equity                = Order(omSummary[Profit].Value,acEquity,InPercent);
-    omSummary[Profit].Margin                = Order(omSummary[Profit].Lots,acMargin,InPercent);
+    omSummary[Profit].Equity           = Order(omSummary[Profit].Value,acEquity,InPercent);
+    omSummary[Profit].Margin           = Order(omSummary[Profit].Lots,acMargin,InPercent);
 
-    omSummary[Loss].Equity                  = Order(omSummary[Loss].Value,acEquity,InPercent);
-    omSummary[Loss].Margin                  = Order(omSummary[Loss].Lots,acMargin,InPercent);
+    omSummary[Loss].Equity             = Order(omSummary[Loss].Value,acEquity,InPercent);
+    omSummary[Loss].Margin             = Order(omSummary[Loss].Lots,acMargin,InPercent);
 
     //-- Calc Net Aggregates
-    omSummary[Net].Equity                   = Order(omSummary[Net].Value,acEquity,InPercent);
-    omSummary[Net].Margin                   = Order(omSummary[Net].Lots,acMargin,InPercent);
+    omSummary[Net].Equity              = Order(omSummary[Net].Value,acEquity,InPercent);
+    omSummary[Net].Margin              = Order(omSummary[Net].Lots,acMargin,InPercent);
   }
 
 //+------------------------------------------------------------------+
@@ -1209,35 +1217,35 @@ void UpdateOrders(void)
 //+------------------------------------------------------------------+
 void CalcFractalBias(SessionType Type)
   {
-    int ufbFractalBias               = 0;
+    int ufbFractalBias                 = 0;
     
     for (SessionType bias=Daily;bias<SessionTypes;bias++)
       if (bias==Daily)
         if (session[bias].Event(NewFractal))
-          master                     = lead.Type();
+          master                       = lead.Type();
         else
         {
           //-- do something?
         }
       else
       if (session[bias].Fractal(ftTerm).Direction==session[Daily].Fractal(ftTerm).Direction)
-        ufbFractalBias              += session[Daily].Fractal(ftTerm).Direction;
+        ufbFractalBias                += session[Daily].Fractal(ftTerm).Direction;
 
-    sFractalChange                  += session[Type].Fractal(ftTerm).Direction;
-    sFractalBias                     = ufbFractalBias;
-    sFractalSession                  = Type;
+    sFractalChange                    += session[Type].Fractal(ftTerm).Direction;
+    sFractalBias                       = ufbFractalBias;
+    sFractalSession                    = Type;
     
     if (fabs(sFractalBias)==3)
       if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
-        sFractalPattern              = TrendConvergent;
+        sFractalPattern                = TrendConvergent;
       else
-        sFractalPattern              = TermConvergent;
+        sFractalPattern                = TermConvergent;
     else
     {
       if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
-        sFractalPattern              = TrendDivergent;
+        sFractalPattern                = TrendDivergent;
       else
-        sFractalPattern              = TermDivergent;
+        sFractalPattern                = TermDivergent;
 
       //---Verification
       if (fabs(sFractalChange)+fabs(sFractalBias)==3)
@@ -1404,6 +1412,8 @@ void UpdatePipMA(void)
     if (IsEqual(Close[0],pwInterlace[ArraySize(pwInterlace)-1]))
       if (NewDirection(pwInterlaceBrkDir,DirectionDown))
         pwInterlacePivot[OP_SELL]      = Close[0];
+
+    //--- Update Prelim Action
 
     //-- Update CPanel Values (Micro)
     ArrayInitialize(fdetail[fatPipMA].HeadColor,clrDarkGray);

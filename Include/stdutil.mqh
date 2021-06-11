@@ -199,10 +199,10 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   Recovery,
                   Correction,
                   Trap,
+                  Resume,
                   Forecast,
                   Support,
                   Resistance,
-                  Resume,
                   Contrarian,
                   WordCount      //--- must be last
               };
@@ -680,6 +680,17 @@ string BoolToStr(bool IsTrue, int Format=InTrueFalse)
 //| BoolToStr - returns user defined text for the supplied value     |
 //+------------------------------------------------------------------+
 string BoolToStr(bool IsTrue, string TrueValue, string FalseValue="")
+  {
+    if (IsTrue)
+      return (TrueValue);
+
+    return (FalseValue);
+  }
+
+//+------------------------------------------------------------------+
+//| BoolToDT - returns the datetime of a user-defined condition      |
+//+------------------------------------------------------------------+
+datetime BoolToDT(bool IsTrue, datetime TrueValue, datetime FalseValue)
   {
     if (IsTrue)
       return (TrueValue);
