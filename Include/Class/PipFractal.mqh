@@ -638,6 +638,7 @@ int CPipFractal::Count(const ReservedWords Type)
     {
       case Tick:          return (pfTicks);
       case Pivot:         return (pfPivots);
+      case History:       return (pipHistory.Count);
     }
     
     return (NoValue);
