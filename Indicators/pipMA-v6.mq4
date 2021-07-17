@@ -66,65 +66,6 @@ input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal l
   const string pmFiboType[5]      = {"b","r","e","rt","rc"};
   const int    pmFiboTypeId[5]    = {Base,Root,Expansion,Retrace,Recovery};
 
-  //--- Operational Variables
-  int          pmRangeId          = 0;
-  int          pmRangeDir         = DirectionNone;
-  string       pmRangeKey         = "";
-  double       pmRangeHigh        = 0.00;
-  double       pmRangeLow         = 0.00;
-  datetime     pmOpenTime         = NoValue;
-
-//+------------------------------------------------------------------+
-//| CreateRange - Paints the session boxes                           |
-//+------------------------------------------------------------------+
-void CreateRange(int Bar=0)
- {   
-   pmRangeKey               = "pmRng:"+(string)pmRangeId++;
-     
-   pmOpenTime               = Time[Bar];
-   pmRangeHigh              = Close[Bar];
-   pmRangeLow               = Close[Bar];
-   
-   ObjectCreate(pmRangeKey,OBJ_TRIANGLE,0,pmOpenTime,Close[Bar],pmOpenTime,Close[Bar],pmOpenTime,Close[Bar]);
-   
-   ObjectSet(pmRangeKey, OBJPROP_STYLE, STYLE_SOLID);
-   ObjectSet(pmRangeKey, OBJPROP_COLOR, Color(pmRangeDir,IN_DARK_PANEL));
-   ObjectSet(pmRangeKey, OBJPROP_BACK, true);
- }
-
-//+------------------------------------------------------------------+
-//| UpdateRange - Repaints the range box                             |
-//+------------------------------------------------------------------+
-void UpdateRange(int Bar=0)
- {
-   if (IsChanged(pmRangeDir,pfractal.State().Direction))
-     CreateRange(Bar);
-   else
-   {
-     if (IsHigher(Close[Bar],pmRangeHigh))
-       ObjectSet(pmRangeKey,OBJPROP_PRICE3,pmRangeHigh);
-
-     if (IsLower(Close[Bar],pmRangeLow))
-       ObjectSet(pmRangeKey,OBJPROP_PRICE2,pmRangeLow);
-
-//     if (pmRangeDir==DirectionDown)
-       ObjectSet(pmRangeKey,OBJPROP_TIME2,Time[Bar]);
-//     else
-       ObjectSet(pmRangeKey,OBJPROP_TIME3,Time[Bar]);
-   }
- }
-
-//+------------------------------------------------------------------+
-//| DeleteRanges - Removes all objects created by the indicator      |
-//+------------------------------------------------------------------+
-void DeleteRanges()
-  {
-    for (int range=0;range<pmRangeId;range++)
-      ObjectDelete("pmRng:"+(string)range);
-  }
-
-
-
 //+------------------------------------------------------------------+
 //| UpdateEvent - Reports event changes retaining the last event     |
 //+------------------------------------------------------------------+
@@ -257,9 +198,6 @@ void RefreshScreen()
       for (int ftype=0;ftype<5;ftype++)
         UpdateLine("piprFractal("+pmFiboType[ftype]+")",pfractal.Price(inpShowFractal,pmFiboTypeId[ftype]),BoolToInt(ftype==4,STYLE_DOT,STYLE_SOLID),pfColor[ftype]);
         
-    UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
-    UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
-
     if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
     else
@@ -296,6 +234,9 @@ void RefreshScreen()
 
     if (inpShowBounds)
     {
+      UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
+      UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
+
       if (pfractal.Event(NewLow))
         UpdateLine("piprRngLow",pfractal.Range(Bottom),STYLE_DOT,clrGoldenrod);
       else
@@ -321,22 +262,8 @@ void RefreshScreen()
     if (inpShowComment)
       pfractal.RefreshScreen();
     
-    UpdateRange();
-
     lastDir = pfractal.FOCDirection();
   }
-
-void PauseOnEvent(void)
-  {
-    static int mbOK  = IDOK;
-          
-//    if (pfractal.State().Pivots>0)
-//      mbOK           = IDOK;
-//    else
-//    if (mbOK==IDOK)
-//      mbOK  = Pause("Zero Pivot Event. Click Cancel to ignore.","Event Handler",MB_OKCANCEL|MB_ICONHAND);
-//
-  };
 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
@@ -357,8 +284,6 @@ int OnCalculate(const int rates_total,
     if (Bars>inpPeriods)
       indHistoryBuffer[inpPeriods]=0.00;
 
-    PauseOnEvent();
-    
     RefreshScreen();                 
 
     return(rates_total);
