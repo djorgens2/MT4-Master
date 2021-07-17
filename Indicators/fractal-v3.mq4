@@ -13,34 +13,18 @@
 #include <stdutil.mqh>
 #include <Class\Fractal.mqh>
 
-enum FTL {
-           ftlTrend,
-           ftlTerm,
-           ftlPrior,
-           ftlBase,
-           ftlRoot,
-           ftlExpansion,
-           ftlDivergent,
-           ftlConvergent,
-           ftlInversion,
-           ftlConversion,
-           ftlActual,
-           ftlOrigin,
-           ftlNone
-         };
-         
 //--- Input params
-input string fractalHeader     = "";       //+----- Fractal inputs -----+
-input int    inpRange          = 120;      // Maximum fractal pip range
-input int    inpRangeMin       = 60;       // Minimum fractal pip range
-input bool   inpShowComment    = false;    // Show data in comment
-input bool   inpShowFibo       = false;    // Show Fibonacci Indicators
-input bool   inpShowPoints     = false;    // Show Fractal points
-input bool   inpShowFlags      = false;    // Show Fibonacci Events
-input bool   inpShowRootLines  = false;    // Show Modified Root Lines
-input FTL    inpShowTypeLines  = ftlNone;  // Show Fibonacci Lines by Type
-input int    inpUpOffset       = 12;       // Upper tag offset
-input int    inpDownOffset     = 8;        // Lower tag offset
+input string      fractalHeader     = "";           //+----- Fractal inputs -----+
+input int         inpRange          = 120;          // Maximum fractal pip range
+input int         inpRangeMin       = 60;           // Minimum fractal pip range
+input bool        inpShowComment    = false;        // Show data in comment
+input bool        inpShowFibo       = false;        // Show Fibonacci Indicators
+input bool        inpShowPoints     = false;        // Show Fractal points
+input bool        inpShowFlags      = false;        // Show Fibonacci Events
+input bool        inpShowRootLines  = false;        // Show Modified Root Lines
+input RetraceType inpShowTypeLines  = RetraceTypes; // Show Fibonacci Lines by Type
+input int         inpUpOffset       = 12;           // Upper tag offset
+input int         inpDownOffset     = 8;            // Lower tag offset
 
 
 #property indicator_buffers   3
@@ -175,30 +159,16 @@ void RefreshScreen(void)
       for (RetraceType type=Trend;type<RetraceTypes;type++)
         UpdateLine("modRL:"+EnumToString(type),fractal[type].modRoot,STYLE_DOT,clrFireBrick);
       
-    if (inpShowTypeLines==ftlNone)
+    if (inpShowTypeLines==RetraceTypes)
       return;
-    else
-      if (inpShowTypeLines==ftlOrigin)
-      {
-        ReservedWords Type = Origin;
 
-        UpdateLine("ftl:fpBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
-        UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
-        UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
-        UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
-        UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
-      }
-      else
-      {
-        RetraceType Type   = (RetraceType)inpShowTypeLines;
-
-        UpdateLine("ftl:fpOrigin",fractal.Price(Type,fpOrigin),STYLE_SOLID,Color(fractal.Direction(Type)));
-        UpdateLine("ftl:fpBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
-        UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
-        UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
-        UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
-        UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);        
-      }
+    RetraceType Type   = (RetraceType)inpShowTypeLines;
+    UpdateLine("ftl:fpOrigin",fractal.Price(Type,fpOrigin),STYLE_SOLID,Color(fractal.Direction(Type)));
+    UpdateLine("ftl:fpBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
+    UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
+    UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
+    UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
+    UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);        
   }
   
 //+------------------------------------------------------------------+
@@ -278,7 +248,7 @@ int OnInit()
       ObjectSet("fFiboExpansion",OBJPROP_LEVELCOLOR,clrForestGreen);
     }
 
-    if (inpShowTypeLines!=ftlNone)
+    if (inpShowTypeLines!=RetraceTypes)
       for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
         NewLine("ftl:"+EnumToString(type));
 

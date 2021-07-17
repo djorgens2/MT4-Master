@@ -33,10 +33,10 @@ public:
              //-- Period Types
              enum PeriodType
              {
-               PriorSession,
-               ActiveSession,
-               OffSession,
-               PeriodTypes
+               PriorSession,  // Prior (Closed) Session
+               ActiveSession, // Active (Open) Session
+               OffSession,    // Off-Session
+               PeriodTypes    // None
              };
 
              //-- Session Types
@@ -46,7 +46,7 @@ public:
                Asia,
                Europe,
                US,
-               SessionTypes
+               SessionTypes  // None
              };
 
              //-- FractalDetail

@@ -187,7 +187,6 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
                   History,
                   Pivot,
                   Peg,
-                  Origin,
                   Active,
                   State,
                   NoState,
@@ -210,19 +209,40 @@ static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.6
               
        enum     RetraceType
                 {
-                  Trend,              //--- Pertaining to trend
-                  Term,               //--- Pertaining to term
-                  Prior,              //--- Last Base (shift) where Prior=Base; Base=Root, Root=Expansion, etc.
-                  Base,               //--- Current fractal base
-                  Root,               //--- Current fractal root
-                  Expansion,          //--- Current fractal expansion
-                  Divergent,          //--- Current Root retrace
-                  Convergent,         //--- Current Root expansion after retrace
-                  Inversion,          //--- Current Convergent retrace
-                  Conversion,         //--- Current reversal retrace; trend resumption
-                  Lead,               //--- Lead retrace - retrace on the major leg
-                  RetraceTypes        //--- DO NOT REPOSITION -- used to report total count of enums
+                  Origin,
+                  Trend,
+                  Term,
+                  Prior,
+                  Base,
+                  Root,
+                  Expansion,
+                  Divergent,
+                  Convergent,
+                  Inversion,
+                  Conversion,
+                  Lead,
+                  RetraceTypes        // None
                 };
+
+//+------------------------------------------------------------------+
+//| BarDir - Returns the bar direction for the supplied bar          |
+//+------------------------------------------------------------------+
+int BarDir(int Bar=0)
+  {
+    // Need to work this for inside bars...
+    static int bdDir   = DirectionNone;
+    
+    if (Bar<Bars-1)
+    {
+      if (NormalizeDouble(Close[Bar],Digits)>NormalizeDouble(High[Bar+1],Digits))
+        bdDir          = DirectionUp;
+        
+      if (NormalizeDouble(Close[Bar],Digits)<NormalizeDouble(Low[Bar+1],Digits))
+        bdDir          = DirectionDown;
+    }
+    
+    return (bdDir);
+  }
 
 //+------------------------------------------------------------------+
 //| FiboExt - Converts signed fibos to extended                      |
