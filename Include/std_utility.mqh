@@ -697,18 +697,35 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
   }
   
 //+------------------------------------------------------------------+
+//| Default - returns a default when value == check                  |
+//+------------------------------------------------------------------+
+double Default(double Value, double Override, int Check=NoValue, int Precision=NoValue)
+  {
+    Precision                 = BoolToInt(Precision==NoValue,Digits,0);
+    
+    if (IsEqual(Value,Check))
+      return (NormalizeDouble(Override,Precision));
+      
+    return (NormalizeDouble(Value,Precision));
+  }
+
+//+------------------------------------------------------------------+
 //| Flag - creates a right price label object                        |
 //+------------------------------------------------------------------+
-void Flag(string Name, int Color, bool ShowFlag=Always, int Bar=0)
+void Flag(string Name, int Color, bool ShowFlag=Always, int Bar=0, double Price=NoValue)
   {
     static int fIdx  = 0;
-
+    
     if (ShowFlag)
     {
-      fIdx++;
-            
-      ObjectCreate(Name+"-"+IntegerToString(fIdx),OBJ_ARROW_RIGHT_PRICE,0,Time[Bar],Close[Bar]);
+      while (!ObjectCreate(Name+"-"+(string)fIdx,OBJ_ARROW_RIGHT_PRICE,0,Time[Bar],Default(Price,Close[Bar])))
+        if (GetLastError()==4200) //-- Object Exists
+          fIdx++;
+        else
+          break;
+//      Print(Name+"-"+(string)fIdx+":"+BoolToStr(ShowFlag,InYesNo)+" "+(string)GetLastError());
       ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+//      Print(GetLastError());
     }
   }
 

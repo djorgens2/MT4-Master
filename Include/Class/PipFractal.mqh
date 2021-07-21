@@ -278,7 +278,7 @@ void CPipFractal::UpdateTrend(void)
     pfReversal                  = NewDirection(pf[pftTrend].Direction,pf[pftTerm].Direction);
     pfPivots                    = 0;
     
-    pf[pftTrend].Base           = Fibonacci(pftTerm,Forecast,Fibo161);
+    pf[pftTrend].Base           = Fibonacci(pftTerm,Forecast|Expansion,Fibo161);
     pf[pftTrend].Root           = BoolToDouble(Direction(pftTrend)==DirectionUp,pfTermLo,pfTermHi,Digits);
 
     pf[pftTrend].Expansion      = pf[pftTerm].Expansion;
@@ -328,7 +328,7 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
           sr.Low                 = pf[pftTerm].Root;
 
       pfPivots++;
- 
+      
       SetEvent(NewTerm,Minor);
     }
   }
@@ -590,7 +590,9 @@ double CPipFractal::Fibonacci(PipFractalType Type, int Method, int Measure, int 
                         case Max: return (fdiv(BoolToDouble(IsEqual(pf[Type].Expansion,pf[Type].Base),pf[Type].Recovery,pf[Type].Expansion)-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
                         case Min: return (fdiv(pf[Type].Retrace-pf[Type].Root,pf[Type].Base-pf[Type].Root,3)*fFormat);
                       }
-      case Forecast:  return(NormalizeDouble(pf[Type].Root+((pf[Type].Base-pf[Type].Root)*FiboPercent(Measure)),Digits));
+
+      case Forecast|Expansion:    return(NormalizeDouble(pf[Type].Root+((pf[Type].Base-pf[Type].Root)*FiboPercent(Measure)),Digits));
+      case Forecast|Retrace:      return(NormalizeDouble(pf[Type].Expansion+((pf[Type].Root-pf[Type].Expansion)*FiboPercent(Measure)),Digits));
     }
     
     return (0.00);

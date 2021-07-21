@@ -59,6 +59,8 @@ double    indFractalBuffer[];
 double    indDivergentBuffer[];
 double    indConvergentBuffer[];
 
+FibonacciLevel fFlag[RetraceTypes];
+
 //+------------------------------------------------------------------+
 //| RefreshFibo - Update fibo objects                                |
 //+------------------------------------------------------------------+
@@ -90,38 +92,23 @@ void RefreshFibo(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    if (inpShowFlags)
-    {
-      static FibonacciLevel expand[4]  = {Fibo161,Fibo161,Fibo161,Fibo161};
+    const color rsFlagColor[5]  = {clrDarkOrange,clrGoldenrod,clrIndianRed,clrNONE,clrGray};
+
+    UpdateLabel("fr3GenInfo",BoolToStr(fractal.IsRange(Origin,Divergent),"Divergent","Convergent")+" Origin"+BoolToStr(fractal.Origin().Correction,"(Corrected)")+" "+EnumToString(fractal.Origin().State),clrWhite,12);
     
-      if (fractal.IsRange(Divergent))
-        ArrayInitialize(expand,Fibo161);
+    if (inpShowFlags)
+      if (fractal.Event(NewReversal)||fractal.Event(NewBreakout))
+        for (RetraceType type=Origin;type<Root;type++)
+          fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
       else
-      {
-        //--Origin Fibo Flags
-        if (FiboLevels[expand[3]]<fractal.Fibonacci(Origin,fpExpansion,Now))
-        {
-          Flag("Origin "+EnumToString(expand[3]),clrRed);
-          expand[3]++;
-        }
+        for (RetraceType type=Origin;type<Root;type++)
+          if (type!=Prior)
+            if (FiboLevels[fFlag[type]]<fractal.Fibonacci(type,Expansion,Now))
+            {
+              Flag(EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Fibonacci(type,Forecast|Expansion,fFlag[type]));
+              fFlag[type]++;
+            }
 
-        //-- Base Fibo Flags
-        if (FiboLevels[expand[2]]<fractal.Fibonacci(Base,fpExpansion,Now))
-        {
-          Flag("Base "+EnumToString(expand[2]),clrGray);
-          expand[2]++;
-        }
-
-        //-- Trend/Term Fibo Flags
-        for (RetraceType fibo=Trend;fibo<=Term;fibo++)
-          if (FiboLevels[expand[fibo]]<fractal.Fibonacci(fibo,fpExpansion,Now))
-          {
-            Flag(EnumToString(fibo)+" "+EnumToString(expand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod));
-            expand[fibo]++;
-          }
-      }
-    }
-      
     if (inpShowComment)
       fractal.RefreshScreen();
     
@@ -168,7 +155,9 @@ void RefreshScreen(void)
     UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
     UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
     UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
-    UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);        
+    UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
+    UpdateLine("ftl:Correction",fractal.Fibonacci(Type,Forecast|Correction,Fibo23),STYLE_DOT,clrFireBrick);
+    UpdateLine("ftl:Recovery",fractal.Fibonacci(Type,Forecast|Retrace,Fibo23),STYLE_DOT,clrForestGreen);
   }
   
 //+------------------------------------------------------------------+
@@ -228,6 +217,9 @@ int OnInit()
     SetIndexEmptyValue(2,0.00);
     ArrayInitialize(indConvergentBuffer,0.00);
 
+    for (RetraceType type=Origin;type<Root;type++)
+      fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
+    
     if (inpShowPoints)
     {
       NewPriceTag("ptExpansion","(e)",clrRed,12);
@@ -249,59 +241,24 @@ int OnInit()
     }
 
     if (inpShowTypeLines!=RetraceTypes)
+    {
       for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
         NewLine("ftl:"+EnumToString(type));
 
+      NewLine("ftl:Correction");
+      NewLine("ftl:Recovery");
+    }
+    
     if (inpShowRootLines)
       for (RetraceType type=Trend;type<RetraceTypes;type++)
         NewLine("modRL:"+EnumToString(type));
 
-//    DrawBox("bxbClear",402,5,20,20,C'90,90,90',BORDER_SUNKEN);
-//    DrawBox("bxbOrigin",424,5,60,20,C'90,90,90',BORDER_RAISED);
-//    
-//    ObjectDelete("bxfFractalInfo");
-//    DrawBox("bxfFractalInfo",400,28,400,200,C'0,0,60',BORDER_FLAT);
-//    ObjectSet("bxfFractalInfo",OBJPROP_BACK,false);
-//    ObjectSet("bxfFractalInfo",OBJPROP_ZORDER,0);
-//    ObjectSet("bxfFractalInfo",OBJ_RECTANGLE_LABEL,0);
-//
-//    NewLabel("lbbFOrigin","",440,7);
-//    ObjectSet("lbbFOrigin",OBJPROP_ZORDER,1);
-//    ObjectSet("lbbFOrigin",OBJPROP_,false);
-//    UpdateLabel("lbbFOrigin","Origin",clrWhite);
+    NewLabel("fr3GenInfo","General Info",250,5,clrWhite,SCREEN_UL);
+    
+    fractal.ShowFlags(inpShowFlags);
+   
     return(INIT_SUCCEEDED);    
   }
-
-
-//+------------------------------------------------------------------+
-//| ChartEvent                                                       |
-//+------------------------------------------------------------------+
-//void OnChartEvent(const int id, const long& lparam, const double& dparam, const string& sparam)
-//  {
-//    static string oceOption   = "bxbClear";
-//    
-//    if (id==CHARTEVENT_OBJECT_CLICK)
-//    {
-//      if (sparam=="bxbClear")
-//      {
-//        ObjectSet("bxfFractalInfo",OBJPROP_TIMEFRAMES,OBJ_NO_PERIODS);
-//        ObjectSet(sparam,OBJPROP_BORDER_TYPE,BORDER_SUNKEN);
-//        ObjectSet(oceOption,OBJPROP_BORDER_TYPE,BORDER_RAISED);
-//        
-//        oceOption   = sparam;
-//      }
-//
-//      if (StringSubstr(sparam,3)=="Origin")
-//      {
-//      Print(sparam+":"+StringSubstr(sparam,3));
-//        ObjectSet("bxfFractalInfo",OBJPROP_TIMEFRAMES,OBJ_ALL_PERIODS);
-//        ObjectSet(sparam,OBJPROP_BORDER_TYPE,BORDER_SUNKEN);
-//        ObjectSet(oceOption,OBJPROP_BORDER_TYPE,BORDER_RAISED);
-//        
-//        oceOption   = sparam;
-//      }
-//    }
-//  }
 
 //+------------------------------------------------------------------+
 //| Custom indicator deinitialization function                       |
@@ -315,6 +272,9 @@ void OnDeinit(const int reason)
 
     for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
       ObjectDelete("ftl:"+EnumToString(type));
+
+    ObjectDelete("ftl:Correction");
+    ObjectDelete("ftl:Recovery");
 
     ObjectDelete("ptExpansion");
     ObjectDelete("ptRoot");
