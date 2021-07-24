@@ -94,8 +94,6 @@ void RefreshScreen(void)
   {
     const color rsFlagColor[5]  = {clrDarkOrange,clrGoldenrod,clrIndianRed,clrNONE,clrGray};
 
-    UpdateLabel("fr3GenInfo",BoolToStr(fractal.IsRange(Origin,Divergent),"Divergent","Convergent")+" Origin"+BoolToStr(fractal.Origin().Correction,"(Corrected)")+" "+EnumToString(fractal.Origin().State),clrWhite,12);
-    
     if (inpShowFlags)
       if (fractal.Event(NewReversal)||fractal.Event(NewBreakout))
         for (RetraceType type=Origin;type<Root;type++)
@@ -105,7 +103,7 @@ void RefreshScreen(void)
           if (type!=Prior)
             if (FiboLevels[fFlag[type]]<fractal.Fibonacci(type,Expansion,Now))
             {
-              Flag(EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Fibonacci(type,Forecast|Expansion,fFlag[type]));
+              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Fibonacci(type,Forecast|Expansion,fFlag[type]));
               fFlag[type]++;
             }
 
@@ -253,8 +251,6 @@ int OnInit()
       for (RetraceType type=Trend;type<RetraceTypes;type++)
         NewLine("modRL:"+EnumToString(type));
 
-    NewLabel("fr3GenInfo","General Info",250,5,clrWhite,SCREEN_UL);
-    
     fractal.ShowFlags(inpShowFlags);
    
     return(INIT_SUCCEEDED);    

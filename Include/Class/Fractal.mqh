@@ -891,40 +891,35 @@ double CFractal::Range(RetraceType Type, ReservedWords Measure=Max, int Format=I
 //+------------------------------------------------------------------+
 double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format=InDecimal)
   {
-    double fibonacci     = 0.00;
-
     if (IsEqual(Price(Type,fpExpansion),0.00))
-      return (NormalizeDouble(0.00,Digits));
+      return (NormalizeDouble(0.00,3));
       
     switch (Method)
     {
       case Expansion:   switch (Measure)
                         {
-                          case Now: fibonacci = fdiv(Close[fBarNow]-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot));
-                                    break;
-
-                          case Max: fibonacci = fdiv(Price(Type,fpExpansion)-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot));
-                                    break;
+                          case Now: return(fdiv(Close[fBarNow]-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot))*BoolToInt(Format==InDecimal,1,100));
+                          case Max: return(fdiv(Price(Type,fpExpansion)-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot))*BoolToInt(Format==InDecimal,1,100));
+                          case Min: if (IsEqual(Price(Type,fpRetrace),0.00))
+                                      break;
+                                    return(fdiv(Price(Type,fpRetrace)-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot))*BoolToInt(Format==InDecimal,1,100));
                         }
                         break;
 
       case Retrace:     switch (Measure)
                         {
-                          case Now: fibonacci = fdiv(Close[fBarNow]-Price(Type,fpExpansion),Price(Type,fpRoot)-Price(Type,fpExpansion));
-                                    break;
-
-                          case Max: fibonacci = fdiv(Price(Type,fpRetrace)-Price(Type,fpExpansion),Price(Type,fpRoot)-Price(Type,fpExpansion));
-                                    break;
+                          case Now: return(fdiv(Close[fBarNow]-Price(Type,fpExpansion),Price(Type,fpRoot)-Price(Type,fpExpansion))*BoolToInt(Format==InDecimal,1,100));
+                          case Max: return(fdiv(Price(Type,fpRetrace)-Price(Type,fpExpansion),Price(Type,fpRoot)-Price(Type,fpExpansion))*BoolToInt(Format==InDecimal,1,100));
+                          case Min: if (IsEqual(Price(Type,fpRecovery),0.00))
+                                      break;
+                                    return(fdiv(Price(Type,fpRecovery)-Price(Type,fpExpansion),Price(Type,fpRoot)-Price(Type,fpExpansion))*BoolToInt(Format==InDecimal,1,100));
                         }
                         break;
 
       case Recovery:    switch (Measure)
                         {
-                          case Now: fibonacci = fdiv(Close[fBarNow]-Price(Type,fpRetrace),Price(Type,fpRetrace)-Price(Type,fpExpansion));
-                                    break;
-
-                          case Max: fibonacci = fdiv(Price(Type,fpRecovery)-Price(Type,fpRetrace),Price(Type,fpRetrace)-Price(Type,fpExpansion));
-                                    break;
+                          case Now: return(fdiv(Close[fBarNow]-Price(Type,fpRetrace),Price(Type,fpRetrace)-Price(Type,fpExpansion))*BoolToInt(Format==InDecimal,1,100));
+                          case Max: return(fdiv(Price(Type,fpRecovery)-Price(Type,fpRetrace),Price(Type,fpRetrace)-Price(Type,fpExpansion))*BoolToInt(Format==InDecimal,1,100));
                         }
                         break;
 
@@ -933,10 +928,7 @@ double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format
       case Forecast|Retrace:        return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboPercent(Measure)),Digits));
     }  
 
-    if (Format == InPercent)
-      return (NormalizeDouble(fabs(fibonacci)*100,3));
-    
-    return (NormalizeDouble(fabs(fibonacci),3));
+    return (NormalizeDouble(0.00,3));
   }
 
 //+------------------------------------------------------------------+
