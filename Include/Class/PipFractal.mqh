@@ -26,7 +26,6 @@ class CPipFractal : public CPipRegression
                       PipFractalTypes
                     };
 
-    
          //--- Fractal State Rec
          struct     StateRec
                     {
@@ -42,7 +41,6 @@ class CPipFractal : public CPipRegression
                       double           Low;                      //--- Consolidation Low
                     };
 
-
          //--- Fractal Age
          struct     FractalAgeRec
                     {
@@ -53,13 +51,13 @@ class CPipFractal : public CPipRegression
          //--- Fractal point data
          struct     PipFractalRec
                     {
-                      FractalAgeRec    Age;                      //--- Age in periods
-                      int              Direction;                //--- fractal direction
-                      double           Base;                     //--- base fp
-                      double           Root;                     //--- root fp
-                      double           Expansion;                //--- expansion fp
-                      double           Retrace;                  //--- retrace fp
-                      double           Recovery;                 //--- recovery fp
+                      FractalAgeRec    Age;                 //--- Age in periods
+                      int              Direction;           //--- fractal direction
+                      double           Base;                //--- base fp
+                      double           Root;                //--- root fp
+                      double           Expansion;           //--- expansion fp
+                      double           Retrace;             //--- retrace fp
+                      double           Recovery;            //--- recovery fp
                     };
 
          PipFractalRec pf[PipFractalTypes];
@@ -69,7 +67,7 @@ class CPipFractal : public CPipRegression
     private:
           //--- Data arrays
           double         pfMap[];
-          int            pfPattern;                 //--- Test Key
+          int            pfPattern;                         //--- Test Key
           
           //--- Operational Bar variables
           int            pfBar;                             //--- Bar now processing
@@ -79,6 +77,7 @@ class CPipFractal : public CPipRegression
           int            pfPivots;                          //--- Term pivot count
           double         pfTermHi;                          //--- Term hi/lo root price
           double         pfTermLo;                          //--- Term hi/lo root price
+          int            pfTermBar;                         //--- Term root bar
           
           //--- Operational flags
           bool           pfTerm100;                         //--- Term fibo 100 switch
@@ -103,8 +102,6 @@ class CPipFractal : public CPipRegression
                          CPipFractal(int Degree, int Periods, double Tolerance, double AggFactor, int IdleTime);
                         ~CPipFractal();
                              
-       PipFractalRec     operator[](const PipFractalType Type) const {return(pf[Type]);};
-
        virtual
           void           UpdateBuffer(double &MA[], double &PolyBuffer[], double &TrendBuffer[]);
        
@@ -122,8 +119,13 @@ class CPipFractal : public CPipRegression
           double         Price(PipFractalType Type, int Measure=Expansion);
           double         Fibonacci(PipFractalType Type, int Method, int Measure, int Format=InDecimal);
           
+          string         FractalStr(PipFractalType Type);
+          string         FractalStr(void);
+
           void           RefreshScreen(void);
           void           ShowFiboArrow(void);
+
+       PipFractalRec     operator[](const PipFractalType Type) const {return(pf[Type]);};
   };
 
 //+------------------------------------------------------------------+
@@ -223,6 +225,34 @@ void CPipFractal::UpdateState(void)
   }
 
 //+------------------------------------------------------------------+
+//| FractalStr - Returns formatted fractal data bu supplied type     |
+//+------------------------------------------------------------------+
+string CPipFractal::FractalStr(PipFractalType Type)
+  {
+    string fsText    = "\n";
+
+    Append(fsText,"  "+EnumToString(Type)+": "+DirText(Direction(Type))+" ["+(string)pf[Type].Age.Root+":"+(string)pf[Type].Age.Expansion+"]","\n");
+    Append(fsText,"     Base: "+DoubleToStr(pf[Type].Base,Digits)+" Root: "+DoubleToStr(pf[Type].Root,Digits)+" Expansion: "+DoubleToStr(pf[Type].Expansion,Digits),"\n");
+    Append(fsText,"     Retrace: "+DoubleToStr(Fibonacci(Type,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Type,Retrace,Max,InPercent),1)+"%","\n");
+    Append(fsText,"   Expansion: "+DoubleToStr(Fibonacci(Type,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Type,Expansion,Max,InPercent),1)+"%","\n");
+
+    return (fsText);
+  }
+
+//+------------------------------------------------------------------+
+//| FractalStr - Returns formatted Fractal data for all types        |
+//+------------------------------------------------------------------+
+string CPipFractal::FractalStr(void)
+  {
+    string fsText   = "";
+
+    for (PipFractalType type=pftOrigin;type<PipFractalTypes;type++)
+      Append(fsText,FractalStr(type),"\n");
+
+    return (fsText);
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateRetrace - updates retrace data based on supplied type      |
 //+------------------------------------------------------------------+
 void CPipFractal::UpdateRetrace(PipFractalType Type)
@@ -281,12 +311,22 @@ void CPipFractal::UpdateTrend(void)
   {
     pfReversal                  = NewDirection(pf[pftTrend].Direction,pf[pftTerm].Direction);
     pfPivots                    = 0;
-    
-    pf[pftTrend].Age.Root       = pf[pftTrend].Age.Expansion;
-    pf[pftTrend].Age.Expansion  = pfBar;
-    pf[pftTrend].Base           = Fibonacci(pftTerm,Forecast|Expansion,Fibo161);
-    pf[pftTrend].Root           = BoolToDouble(Direction(pftTrend)==DirectionUp,pfTermLo,pfTermHi,Digits);
 
+    if (pfReversal) //-- Trend Reversal
+    {
+      pf[pftTrend].Age.Root     = pf[pftTrend].Age.Expansion;
+      pf[pftTrend].Root         = BoolToDouble(Direction(pftTrend)==DirectionUp,pfTermLo,pfTermHi,Digits);
+      pf[pftTrend].Base         = Fibonacci(pftTerm,Forecast|Expansion,Fibo161);
+    }
+    else            //-- Interior Breakout
+    if (IsBetween(Fibonacci(pftTerm,Forecast|Expansion,Fibo161),pfTermHi,pfTermLo))
+    {
+      pf[pftTrend].Age.Root     = pfTermBar;
+      pf[pftTrend].Root         = BoolToDouble(Direction(pftTrend)==DirectionUp,pfTermLo,pfTermHi,Digits);
+      pf[pftTrend].Base         = Fibonacci(pftTerm,Forecast|Expansion,Fibo161);
+    }
+
+    pf[pftTrend].Age.Expansion  = pfBar;
     pf[pftTrend].Expansion      = pf[pftTerm].Expansion;
     pf[pftTrend].Retrace        = pf[pftTerm].Expansion;
     pf[pftTrend].Recovery       = pf[pftTerm].Expansion;
@@ -321,12 +361,16 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
       {
         pfTermHi                 = pf[pftTerm].Root;
         pfTermLo                 = pf[pftTerm].Root;
+        pfTermBar                = pfBar;
         
         SetEvent(NewOrigin,Major);
       }
 
-      pfTermHi                   = fmax(pfTermHi,pf[pftTerm].Root);
-      pfTermLo                   = fmin(pfTermLo,pf[pftTerm].Root);
+      if (IsHigher(pf[pftTerm].Root,pfTermHi))
+        pfTermBar                = pfBar;
+
+      if (IsLower(pf[pftTerm].Root,pfTermLo))
+        pfTermBar                = pfBar;
 
       if (IsChanged(pfTerm100,false))
         if (sr.Direction==DirectionUp)
@@ -364,11 +408,15 @@ void CPipFractal::UpdateNodes(void)
 
     //--- Update Fractal Node Ages
     for (pfBars=pfBars;pfBars<Bars;pfBars++)
+    {
+      pfTermBar++;
+
       for (PipFractalType type=pftOrigin;type<PipFractalTypes;type++)
       {
         pf[type].Age.Root++;
         pf[type].Age.Expansion++;
-      }    
+      }
+    }
 
     //--- Handle Term direction changes
     if (pfBar>0&&pfMap[pfBar]>0.00)
@@ -675,10 +723,10 @@ void CPipFractal::ShowFiboArrow(void)
     }
 
     if (Event(NewExpansion))
-    {        
+    {
       UpdateRay("r:"+(string)arrowIdx,pf[pftTerm].Root,pf[pftTerm].Age.Root,pf[pftTerm].Expansion,pf[pftTerm].Age.Expansion,STYLE_SOLID,Color(pf[pftTerm].Direction,IN_DARK_DIR));
 
-      if (pfBar==0) 
+      if (pfBar==0)
         UpdateArrow(arrowName,sfaArrowCode,Color(pf[pftTerm].Direction,IN_CHART_DIR),pf[pftTerm].Expansion,pfBar);
 
       ObjectSet("indFibo",OBJPROP_TIME1,Time[pf[pftTerm].Age.Root]);
