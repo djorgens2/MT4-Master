@@ -12,7 +12,7 @@
 #include <Class\Event.mqh>
 #include <stdutil.mqh>
 #include <std_utility.mqh>
-
+#include <fractal_lib.mqh>
 //+------------------------------------------------------------------+
 //| CFractal Class Methods and Properties                            |
 //+------------------------------------------------------------------+
@@ -47,7 +47,7 @@ private:
        };
 
        OriginRec       dOrigin;               //--- Derived origin data
-       FractalRec      f[RetraceTypes];       //--- Fractal Array
+       FractalRec      f[FractalTypes];       //--- Fractal Array
 
        ReservedWords   fState;                //--- State of the fractal
 
@@ -65,7 +65,7 @@ private:
        void            InsertFractal(FractalRec &Fractal);     //--- inserts a new fractal leg
        
        void            CalcRetrace(void);                                             //--- calculates retraces on the tick
-       void            UpdateRetrace(RetraceType Type, int Bar, double Price=0.00);   //--- Updates interior fractal changes
+       void            UpdateRetrace(FractalType Type, int Bar, double Price=0.00);   //--- Updates interior fractal changes
 
        void            CalcOrigin(void);      //--- calculates origin derivatives on the tick
 
@@ -79,29 +79,16 @@ private:
        int             fBarLow;               //--- Fractal bottom
        double          fRetracePrice;         //--- Current fractal leg retrace price
 
-       RetraceType     fLegNow;               //--- Current leg state
-       RetraceType     fLegMax;               //--- Most recent major leg
-       RetraceType     fLegMin;               //--- Most recent minor leg
-       RetraceType     fDominantTrend;        //--- Current dominant trend; largest fractal leg
-       RetraceType     fDominantTerm;         //--- Current dominant term; last leg greater than RangeMax
+       FractalType     fLegNow;               //--- Current leg state
+       FractalType     fLegMax;               //--- Most recent major leg
+       FractalType     fLegMin;               //--- Most recent minor leg
+       FractalType     fDominantTrend;        //--- Current dominant trend; largest fractal leg
+       FractalType     fDominantTerm;         //--- Current dominant term; last leg greater than RangeMax
        
        CEvent         *fEvents;
        bool            fShowFlags;
 
 public:
-
-       //--- Public fractal enums
-       enum            FractalPoint
-                       {
-                         fpOrigin,
-                         fpBase,
-                         fpRoot,
-                         fpExpansion,
-                         fpRetrace,
-                         fpRecovery,
-                         FractalPoints
-                       };
-
 
        //--- Fractal constructor/destructor
                        CFractal(int Range, int MinRange);
@@ -114,31 +101,31 @@ public:
        void             RefreshScreen(bool WithEvents=false, bool LogOutput=false);
 
        OriginRec        Origin(void) {return (dOrigin); }
-       int              Direction(RetraceType Type=Expansion, bool Contrarian=false, int Format=InDirection);
+       int              Direction(FractalType Type=Expansion, bool Contrarian=false, int Format=InDirection);
        
-       double           Price(RetraceType Type, FractalPoint Fractal);                                    //--- Returns the Price by Fractal Point       
-       double           Range(RetraceType Type, ReservedWords Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
+       double           Price(FractalType Type, FractalPoint Fractal);                                    //--- Returns the Price by Fractal Point       
+       double           Range(FractalType Type, ReservedWords Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
 
-       double           Fibonacci(RetraceType Type, int Fractal, int Measure, int Format=InDecimal);      //--- For each retrace type
+       double           Fibonacci(FractalType Type, int Fractal, int Measure, int Format=InDecimal);      //--- For each retrace type
 
        ReservedWords    State(void)                     { return(fState); }                               //--- Main fractal State by Type
 
-       RetraceType      Next(RetraceType Type)          { return((RetraceType)fmin(Lead,Type+1)); }       //--- enum typecast for the Next element
-       RetraceType      Previous(RetraceType Type, RetraceType Measure=Divergent)
+       FractalType      Next(FractalType Type)          { return((FractalType)fmin(Lead,Type+1)); }       //--- enum typecast for the Next element
+       FractalType      Previous(FractalType Type, FractalType Measure=Divergent)
                                                         {
-                                                          if (Measure==Divergent)  return((RetraceType)fmax(Origin,Type-1));
-                                                          if (Measure==Convergent) return((RetraceType)fmax(Origin,Type-2));
+                                                          if (Measure==Divergent)  return((FractalType)fmax(Origin,Type-1));
+                                                          if (Measure==Convergent) return((FractalType)fmax(Origin,Type-2));
                                                           return (Type);
                                                         }                                                 //--- enum typecast for the Prior element
 
-       RetraceType      Dominant(RetraceType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }
-       RetraceType      Leg(int Measure);
+       FractalType      Dominant(FractalType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }
+       FractalType      Leg(int Measure);
 
-       bool             IsRange(RetraceType Type, ReservedWords Measure=Max);
-       bool             IsRange(RetraceType Type, RetraceType Method);
+       bool             IsRange(FractalType Type, ReservedWords Measure=Max);
+       bool             IsRange(FractalType Type, FractalType Method);
        
-       bool             IsReversal(RetraceType Type)    { if (f[Type].Reversal) return (true); return (false); }
-       bool             IsBreakout(RetraceType Type)    { if (f[Type].Breakout) return (true); return (false); }
+       bool             IsReversal(FractalType Type)    { if (f[Type].Reversal) return (true); return (false); }
+       bool             IsBreakout(FractalType Type)    { if (f[Type].Breakout) return (true); return (false); }
 
        bool             Event(const EventType Type)     { return (fEvents[Type]); }                        //-- Returns TF for supplied event
        bool             Event(EventType Event, AlertLevelType AlertLevel)
@@ -149,7 +136,7 @@ public:
        string           ActiveEventText(const bool WithHeader=true)
                                                         { return  (fEvents.ActiveEventText(WithHeader)); } //-- returns the string of active events
        
-       FractalRec operator[](const RetraceType Type) const { return(f[Type]); }
+       FractalRec operator[](const FractalType Type) const { return(f[Type]); }
   };
 
 //+------------------------------------------------------------------+
@@ -291,12 +278,12 @@ void CFractal::CalcState(void)
 //+------------------------------------------------------------------+
 //| UpdateRetrace - Updates the fractal record                       |
 //+------------------------------------------------------------------+
-void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
+void CFractal::UpdateRetrace(FractalType Type, int Bar, double Price=0.00)
   {
     double     lastRangeMax       = 0.0;
     double     lastRangeMin       = fRange;
     
-    for (RetraceType type=Type;type<RetraceTypes;type++)
+    for (FractalType type=Type;type<FractalTypes;type++)
     {    
       //--- Initialize retrace data by type
       f[type].Direction           = DirectionNone;
@@ -330,7 +317,7 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
         f[Previous(Type,Convergent)].modRoot = Price(Type,fpOrigin);
 
     //--- Compute dominant legs
-    for (RetraceType type=Trend;type<=Lead;type++)
+    for (FractalType type=Trend;type<=Lead;type++)
     {
       if (IsHigher(Range(type,Max),lastRangeMax))
         fDominantTrend            = type;
@@ -345,12 +332,12 @@ void CFractal::UpdateRetrace(RetraceType Type, int Bar, double Price=0.00)
 //+------------------------------------------------------------------+
 void CFractal::CalcRetrace(void)
   {
-    RetraceType    crStateMax      = Expansion;
-    RetraceType    crStateMin      = Expansion;
-    RetraceType    crLastLegMax    = fLegMax;
+    FractalType    crStateMax      = Expansion;
+    FractalType    crStateMin      = Expansion;
+    FractalType    crLastLegMax    = fLegMax;
 
     //--- calc interior retraces    
-    for (RetraceType type=Expansion;type<RetraceTypes;type++)
+    for (FractalType type=Expansion;type<FractalTypes;type++)
     {
       if (Direction(type) == DirectionUp)
         if (f[type].Bar == NoValue)
@@ -672,7 +659,7 @@ void CFractal::Update(void)
       fBarHigh++;
       fBarLow++;
     
-      for (RetraceType type=Trend;type<RetraceTypes;type++)
+      for (FractalType type=Trend;type<FractalTypes;type++)
         if (f[type].Bar>NoValue)
           f[type].Bar++;
               
@@ -700,7 +687,7 @@ void CFractal::UpdateBuffer(double &Fractal[])
 //+------------------------------------------------------------------+
 //| Leg - Returns the leg based on the supplied measure              |
 //+------------------------------------------------------------------+
-RetraceType CFractal::Leg(int Measure)
+FractalType CFractal::Leg(int Measure)
   {
     switch (Measure)
     {
@@ -709,13 +696,13 @@ RetraceType CFractal::Leg(int Measure)
       case Active:  return (fLegNow);
     }
     
-    return (RetraceTypes);
+    return (FractalTypes);
   }
 
 //+------------------------------------------------------------------+
 //| IsRange - Returns true if Frectal meets the Supplied Measure     |
 //+------------------------------------------------------------------+
-bool CFractal::IsRange(RetraceType Type, RetraceType Method)
+bool CFractal::IsRange(FractalType Type, FractalType Method)
   { 
     switch (Method)
     {
@@ -729,7 +716,7 @@ bool CFractal::IsRange(RetraceType Type, RetraceType Method)
 //+------------------------------------------------------------------+
 //| IsRange - Returns true if Frectal meets the Supplied Measure     |
 //+------------------------------------------------------------------+
-bool CFractal::IsRange(RetraceType Type, ReservedWords Measure=Max)
+bool CFractal::IsRange(FractalType Type, ReservedWords Measure=Max)
   { 
     if (IsBetween(Type,Trend,Expansion,0))
       return(Measure==Max);
@@ -750,7 +737,7 @@ bool CFractal::IsRange(RetraceType Type, ReservedWords Measure=Max)
 //+------------------------------------------------------------------+
 //| Price - Returns the Price by Fractal Point                       |
 //+------------------------------------------------------------------+
-double CFractal::Price(RetraceType Type, FractalPoint Fractal)
+double CFractal::Price(FractalType Type, FractalPoint Fractal)
   {
     FractalPoint pfp = fpOrigin;
   
@@ -802,7 +789,7 @@ double CFractal::Price(RetraceType Type, FractalPoint Fractal)
     }
     else //-- Handle Linear Fractals
     {    
-      for (RetraceType type=Previous(Type);type<RetraceTypes;type++)
+      for (FractalType type=Previous(Type);type<FractalTypes;type++)
       {
         if (pfp==Fractal)
           if (f[type].Bar>NoValue)
@@ -824,7 +811,7 @@ double CFractal::Price(RetraceType Type, FractalPoint Fractal)
 //+------------------------------------------------------------------+
 //| Direction - Returns the direction for the supplied type          |
 //+------------------------------------------------------------------+
-int CFractal::Direction(RetraceType Type=Expansion, bool Contrarian=false, int Format=InDirection)
+int CFractal::Direction(FractalType Type=Expansion, bool Contrarian=false, int Format=InDirection)
   {
     int dDirection         = fDirection;
 
@@ -854,7 +841,7 @@ int CFractal::Direction(RetraceType Type=Expansion, bool Contrarian=false, int F
 //+------------------------------------------------------------------+
 //| Range - Returns the leg (Base-Root) Range for supplied Measure   |
 //+------------------------------------------------------------------+
-double CFractal::Range(RetraceType Type, ReservedWords Measure=Max, int Format=InDecimal)
+double CFractal::Range(FractalType Type, ReservedWords Measure=Max, int Format=InDecimal)
   {
     double rRange         = 0.00;
     
@@ -889,7 +876,7 @@ double CFractal::Range(RetraceType Type, ReservedWords Measure=Max, int Format=I
 //+------------------------------------------------------------------+
 //| Fibonacci - Calcuates fibo % for supplied type Type and Method   |
 //+------------------------------------------------------------------+
-double CFractal::Fibonacci(RetraceType Type, int Method, int Measure, int Format=InDecimal)
+double CFractal::Fibonacci(FractalType Type, int Method, int Measure, int Format=InDecimal)
   {
     if (IsEqual(Price(Type,fpExpansion),0.00))
       return (NormalizeDouble(0.00,3));
@@ -938,7 +925,7 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
   {
     string           rsReport        = "";
     static string    rsLastReport    = "";
-    const  string    rsSeg[RetraceTypes] = {"o","tr","tm","p","b","r","e","d","c","iv","cv","lead"};
+    const  string    rsSeg[FractalTypes] = {"o","tr","tm","p","b","r","e","d","c","iv","cv","lead"};
     const  string    rsFP[FractalPoints] = {"o","b","r","e","rt","rc"};
     
     rsReport   += "\n  Origin:\n";
@@ -969,7 +956,7 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
                +" (a) "+DoubleToString(fabs(Pip(Price(Origin,fpRoot)-Price(Origin,fpBase))),1)
                +" (m) "+DoubleToString(fabs(Pip(Price(Origin,fpRoot)-Price(Origin,fpExpansion))),1)+"\n";
       
-    for (RetraceType type=Trend;type<=fLegNow;type++)
+    for (FractalType type=Trend;type<=fLegNow;type++)
     {
       if (f[type].Bar>NoValue)
       {

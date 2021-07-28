@@ -498,28 +498,21 @@ int GetPeriod(string Value)
 //+------------------------------------------------------------------+
 //| New Arrow - paints an arrow on the chart in the price area       |
 //+------------------------------------------------------------------+
-string NewArrow(int ArrowCode, int Color, string Text="", double Price=0.00, int Bar=0)
-  {   
-    if (StringLen(Text)>0)
-      Text      = ":"+Text;
-      
-    string name = StringConcatenate("arrow_",TimeToStr(Time[Bar]),Text);
-    
+void NewArrow(string ArrowName, int ArrowCode, int Color, int Bar=0, double Price=0.00)
+  {      
     if (Price==0.00)
       Price = Close[Bar];
 
-    ObjectDelete (name);
-    ObjectCreate (name, OBJ_ARROW, 0, Time[Bar], Price);
-    ObjectSet    (name, OBJPROP_ARROWCODE, ArrowCode);
-    ObjectSet    (name, OBJPROP_COLOR,Color);
-    
-    return (name);
+    ObjectDelete (ArrowName);
+    ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
+    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, ArrowCode);
+    ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
   }
 
 //+------------------------------------------------------------------+
 //| UpdateArrow - repaints existing arrow with supplied properties   |
 //+------------------------------------------------------------------+
-void UpdateArrow(string ArrowName, int ArrowCode, int Color, double Price=0.00, int Bar=0)
+void UpdateArrow(string ArrowName, int ArrowCode, int Color, int Bar=0, double Price=0.00)
   {
     if (Price==0.00)
       Price = Close[0];

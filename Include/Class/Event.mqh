@@ -223,3 +223,13 @@ bool IsChanged(EventType &Compare, EventType Value)
     return (true);
   }
 
+//+------------------------------------------------------------------+
+//| BoolToEvent - Returns a TF event based on supplied condition     |
+//+------------------------------------------------------------------+
+EventType BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoEvent)
+  {
+    if (IsTrue)
+      return (TrueValue);
+
+    return (FalseValue);
+  }

@@ -22,7 +22,7 @@ input bool        inpShowFibo       = false;        // Show Fibonacci Indicators
 input bool        inpShowPoints     = false;        // Show Fractal points
 input bool        inpShowFlags      = false;        // Show Fibonacci Events
 input bool        inpShowRootLines  = false;        // Show Modified Root Lines
-input RetraceType inpShowTypeLines  = RetraceTypes; // Show Fibonacci Lines by Type
+input FractalType inpShowTypeLines  = FractalTypes; // Show Fibonacci Lines by Type
 input int         inpUpOffset       = 12;           // Upper tag offset
 input int         inpDownOffset     = 8;            // Lower tag offset
 
@@ -59,7 +59,7 @@ double    indFractalBuffer[];
 double    indDivergentBuffer[];
 double    indConvergentBuffer[];
 
-FibonacciLevel fFlag[RetraceTypes];
+FibonacciLevel fFlag[FractalTypes];
 
 //+------------------------------------------------------------------+
 //| RefreshFibo - Update fibo objects                                |
@@ -96,10 +96,10 @@ void RefreshScreen(void)
 
     if (inpShowFlags)
       if (fractal.Event(NewReversal)||fractal.Event(NewBreakout))
-        for (RetraceType type=Origin;type<Root;type++)
+        for (FractalType type=Origin;type<Root;type++)
           fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
       else
-        for (RetraceType type=Origin;type<Root;type++)
+        for (FractalType type=Origin;type<Root;type++)
           if (type!=Prior)
             if (FiboLevels[fFlag[type]]<fractal.Fibonacci(type,Expansion,Now))
             {
@@ -141,13 +141,13 @@ void RefreshScreen(void)
       RefreshFibo();
 
     if (inpShowRootLines)
-      for (RetraceType type=Trend;type<RetraceTypes;type++)
+      for (FractalType type=Trend;type<FractalTypes;type++)
         UpdateLine("modRL:"+EnumToString(type),fractal[type].modRoot,STYLE_DOT,clrFireBrick);
       
-    if (inpShowTypeLines==RetraceTypes)
+    if (inpShowTypeLines==FractalTypes)
       return;
 
-    RetraceType Type   = (RetraceType)inpShowTypeLines;
+    FractalType Type   = (FractalType)inpShowTypeLines;
     UpdateLine("ftl:fpOrigin",fractal.Price(Type,fpOrigin),STYLE_SOLID,Color(fractal.Direction(Type)));
     UpdateLine("ftl:fpBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
     UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
@@ -161,7 +161,7 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 //| SetBuffer - sets the retrace/inversion buffer values             |
 //+------------------------------------------------------------------+
-void SetBuffer(double &Buffer[], RetraceType Start, RetraceType End)
+void SetBuffer(double &Buffer[], FractalType Start, FractalType End)
   {
     ArrayInitialize(Buffer,0.00);
 
@@ -215,7 +215,7 @@ int OnInit()
     SetIndexEmptyValue(2,0.00);
     ArrayInitialize(indConvergentBuffer,0.00);
 
-    for (RetraceType type=Origin;type<Root;type++)
+    for (FractalType type=Origin;type<Root;type++)
       fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
     
     if (inpShowPoints)
@@ -227,7 +227,7 @@ int OnInit()
       NewPriceTag("ptTerm","(tm)",clrRed,12);
       NewPriceTag("ptTrend","(tr)",clrRed,12);
       NewPriceTag("ptOrigin","(o)",clrRed,12);
-    }
+    } 
    
     if (inpShowFibo)
     {
@@ -238,7 +238,7 @@ int OnInit()
       ObjectSet("fFiboExpansion",OBJPROP_LEVELCOLOR,clrForestGreen);
     }
 
-    if (inpShowTypeLines!=RetraceTypes)
+    if (inpShowTypeLines!=FractalTypes)
     {
       for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
         NewLine("ftl:"+EnumToString(type));
@@ -248,7 +248,7 @@ int OnInit()
     }
     
     if (inpShowRootLines)
-      for (RetraceType type=Trend;type<RetraceTypes;type++)
+      for (FractalType type=Trend;type<FractalTypes;type++)
         NewLine("modRL:"+EnumToString(type));
 
     fractal.ShowFlags(inpShowFlags);
@@ -263,7 +263,7 @@ void OnDeinit(const int reason)
   {    
     delete fractal;
     
-    for (RetraceType type=Trend;type<RetraceTypes;type++)
+    for (FractalType type=Trend;type<FractalTypes;type++)
       ObjectDelete("modRL:"+EnumToString(type));
 
     for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
