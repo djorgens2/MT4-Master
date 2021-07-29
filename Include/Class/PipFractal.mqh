@@ -78,6 +78,7 @@ class CPipFractal : public CPipRegression
           
           //--- Internal use methods
           void           ResetRetrace(FractalType Type, FractalPoint Price, EventType Event);
+          void           ShiftRetrace(FractalType Type, int Bar, double Price);
 
           void           UpdateState(void);                         //--- Update Fractal States
           void           UpdateRetrace(FractalType Type);           //--- Update Retrace by Type
@@ -126,6 +127,9 @@ void CPipFractal::UpdateState(void)
     int    usLastPattern    = pfPattern;
     int    usLastTrap       = sr.Trap;
     
+    if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo100))
+      sr.Direction         = Direction(Term);
+
     //-- Compute States By Type
     if (Event(NewTrend))
       sr.Type[Trend]     = BoolToWord(pfReversal,Reversal,Breakout);
@@ -221,7 +225,7 @@ string CPipFractal::FractalStr(FractalType Type)
     string fsText    = "";
 
     Append(fsText,"  "+EnumToString(Type)+": "+DirText(Direction(Type))+" (r) "+(string)pf[Type].Age[fpRoot]+" (e) "+(string)pf[Type].Age[fpExpansion]+" (rt) "+(string)pf[Type].Age[fpRetrace]);
-    Append(fsText,BoolToStr(pfBar>0," p:"+(string)pfBar+" @"+DoubleToStr(Close[pfBar],Digits)),"\n");
+    Append(fsText,BoolToStr(pfBar>0," p:"+(string)pfBar+" @"+DoubleToStr(Close[pfBar],Digits)));
 
     Append(fsText,"  Flags:");
     Append(fsText,BoolToStr(Event(NewOrigin),"Origin"));
@@ -252,6 +256,24 @@ string CPipFractal::FractalStr(void)
       Append(fsText,FractalStr(type),"\n\n");
 
     return (fsText);
+  }
+
+//+------------------------------------------------------------------+
+//| ShiftRetrace - shifts geometric and sets linear retrace data     |
+//+------------------------------------------------------------------+
+void CPipFractal::ShiftRetrace(FractalType Type, int Bar, double Price)
+  {
+    for (FractalPoint point=fpBase;point<fpRecovery;point++)
+      if (point<fpExpansion)
+      {
+        pf[Type].Age[point]         = pf[Type].Age[point+1];
+        pf[Type].Price[point]       = pf[Type].Price[point+1];
+      }
+      else
+      {
+        pf[Type].Age[point]         = Bar;
+        pf[Type].Price[point]       = Price;
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -294,21 +316,21 @@ void CPipFractal::UpdateRetrace(FractalType Type)
 //+------------------------------------------------------------------+
 void CPipFractal::UpdateOrigin(void)
   {
-    if (pfReversal)
+    if (Event(NewReversal))
+      if (Direction(Origin)==DirectionNone)
+        pf[Origin]                 = pf[Trend];
+      else
+      {
+        pf[Origin].Price[BoolToInt(Direction(Origin)==Direction(Trend),fpRoot,fpBase)]  = Price(Trend,fpRoot);
+        pf[Origin].Age[BoolToInt(Direction(Origin)==Direction(Trend),fpRoot,fpBase)]    = pf[Trend].Age[fpRoot];
+      }
+    else
     {
       if (NewDirection(pf[Origin].Direction,pf[Trend].Direction))
-        SetEvent(NewOrigin,Critical);
+        ShiftRetrace(Origin,pfBar,Price(Origin,fpRoot));
 
-      pf[Origin].Price[fpRoot]         = pf[Trend].Price[fpRoot];
+      SetEvent(NewOrigin,Critical);
     }
-    
-    pf[Origin].Price[fpBase]           = pf[Trend].Price[fpExpansion];
-    pf[Origin].Price[fpRetrace]        = pf[Term].Price[fpExpansion];
-    pf[Origin].Price[fpRecovery]       = pf[Term].Price[fpExpansion];
-      
-    pf[Origin].Price[fpExpansion]      = BoolToDouble(Direction(Origin)==DirectionUp,
-                                     fmax(pf[Origin].Price[fpExpansion],pf[Trend].Price[fpExpansion]),
-                                     fmin(pf[Origin].Price[fpExpansion],pf[Trend].Price[fpExpansion]),Digits);
   }
 
 //+------------------------------------------------------------------+
@@ -356,24 +378,12 @@ void CPipFractal::UpdateTerm(int Direction, double Price)
   {
     if (NewDirection(pf[Term].Direction,Direction))
     {
-      for (FractalPoint point=fpBase;point<fpRecovery;point++)
-        if (point<fpExpansion)
-        {
-          pf[Term].Age[point]         = pf[Term].Age[point+1];
-          pf[Term].Price[point]       = pf[Term].Price[point+1];
-        }
-        else
-        {
-          pf[Term].Age[point]         = pfBar;
-          pf[Term].Price[point]       = Price;
-        }
+      ShiftRetrace(Term,pfBar,Price);
 
       if (IsChanged(pfTerm161,false))
       {
         pfLoBar                       = BoolToInt(Direction(Term)==DirectionUp,pf[Term].Age[fpRoot],pfBar);
         pfHiBar                       = BoolToInt(Direction(Term)==DirectionUp,pfBar,pf[Term].Age[fpRoot]);
-                
-        SetEvent(NewOrigin,Major);
       }
 
       if (Direction(Term)==DirectionUp)
@@ -399,6 +409,8 @@ void CPipFractal::UpdateNodes(void)
     ClearEvent(NewTerm);
     ClearEvent(NewTrend);
     ClearEvent(NewOrigin);
+    ClearEvent(NewBreakout);
+    ClearEvent(NewReversal);
     ClearEvent(NewExpansion);
     ClearEvent(NewRetrace);
     ClearEvent(NewRecovery);
@@ -442,9 +454,6 @@ void CPipFractal::UpdateNodes(void)
       UpdateRetrace(Term);
     }
 
-    if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo100))
-      sr.Direction         = Direction(Term);
-
     //-- Manage Trend changes
     if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo161))
       if (IsChanged(pfTerm161,true))
@@ -453,11 +462,12 @@ void CPipFractal::UpdateNodes(void)
     UpdateRetrace(Trend);
     
     //-- Manage Origin changes
-    if (EventAlert(NewOrigin,Major))
+    if (Event(NewReversal)||Fibonacci(Origin,Expansion,Now)<0.00)
       UpdateOrigin();
       
     UpdateRetrace(Origin);
     
+    if (Event(NewOrigin)) Print("\n"+FractalStr(Origin));
     if (Event(NewExpansion)||Event(NewTerm))
     {
       ShowFiboArrow();
@@ -553,7 +563,7 @@ CPipFractal::CPipFractal(int Degree, int Periods, double Tolerance, double AggFa
     pf[Term].Price[fpRecovery]     = pf[Term].Price[fpBase];
     
     pf[Trend]                      = pf[Term];    
-    pf[Origin]                     = pf[Term];
+    pf[Origin].Direction           = DirectionNone;
 
     for (pfBar=Bars-1;pfBar>0;pfBar--)
       UpdateNodes();

@@ -62,8 +62,8 @@ input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal l
   double       indPLineBuffer[];
 
   //--- Translation Arrays
-  const string pmFiboPeriod[3]    = {"tm","tr","o"};
-  const string pmFiboType[5]      = {"b","r","e","rt","rc"};
+  const string pmFiboPeriod[3]           = {"o","tr","tm"};
+  const string pmFiboType[FractalPoints] = {"o","b","r","e","rt","rc"};
 
 //+------------------------------------------------------------------+
 //| UpdateEvent - Reports event changes retaining the last event     |
@@ -196,9 +196,10 @@ void RefreshScreen()
       }
       
     color pfColor[FractalPoints] = {clrNONE,clrSteelBlue,clrGoldenrod,clrFireBrick,clrDarkGray,clrDarkGray};
+
     if (inpShowFractal!=PipFractalTypes)
       for (FractalPoint point=fpBase;point<FractalPoints;point++)
-        UpdateLine("pipr"+StringSubstr(EnumToString(point),2),pfractal.Price((FractalType)inpShowFractal,point),BoolToInt(point==5,STYLE_DOT,STYLE_SOLID),pfColor[point]);
+        UpdateLine("pln["+pmFiboPeriod[inpShowFractal]+":"+pmFiboType[point]+"]",pfractal.Price((FractalType)inpShowFractal,point),BoolToInt(point==5,STYLE_DOT,STYLE_SOLID),pfColor[point]);
         
     if (pfractal.Event(NewIdle))
       UpdateEvent("Market is Idle",DirColor(pfractal.Direction(Aggregate)));
@@ -236,8 +237,8 @@ void RefreshScreen()
 
     if (inpShowBounds)
     {
-      UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
-      UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
+//      UpdateLine("piprRangeHi",pfractal.State().High,STYLE_DOT,clrYellow);
+//      UpdateLine("piprRangeLo",pfractal.State().Low,STYLE_DOT,clrYellow);
 
       if (pfractal.Event(NewLow))
         UpdateLine("piprRngLow",pfractal.Range(Bottom),STYLE_DOT,clrGoldenrod);
@@ -430,8 +431,8 @@ void InitScreenObjects()
     NewLine("piprWaveLong");
     NewLine("piprWaveShort");
     
-    for (int ftype=0;ftype<5;ftype++)
-      NewLine("piprFractal("+pmFiboType[ftype]+")");
+    for (FractalPoint point=fpBase;point<FractalPoints;point++)
+      NewLine("pln["+pmFiboPeriod[inpShowFractal]+":"+pmFiboType[point]+"]");
       
     NewLine("piprRangeHi");
     NewLine("piprRangeLo");
@@ -458,7 +459,7 @@ int OnInit()
     IndWinId = ChartWindowFind(0,ShortName);
 
     InitScreenObjects();
-    
+
     return(INIT_SUCCEEDED);
   }
   
@@ -476,7 +477,7 @@ void OnDeinit(const int reason)
     ObjectDelete("piprWaveLong");
     ObjectDelete("piprWaveShort");
     
-    for (int ftype=0;ftype<5;ftype++)
-      ObjectDelete("piprFractal("+pmFiboType[ftype]+")");
+    for (FractalPoint point=fpBase;point<FractalPoints;point++)
+      ObjectDelete("pln["+pmFiboPeriod[inpShowFractal]+":"+pmFiboType[point]+"]");
 
   }
