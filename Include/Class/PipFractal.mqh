@@ -224,18 +224,11 @@ string CPipFractal::FractalStr(FractalType Type)
   {
     string fsText    = "";
 
-    Append(fsText,"  "+EnumToString(Type)+": "+DirText(Direction(Type))+" (r) "+(string)pf[Type].Age[fpRoot]+" (e) "+(string)pf[Type].Age[fpExpansion]+" (rt) "+(string)pf[Type].Age[fpRetrace]);
+    Append(fsText,"  "+EnumToString(Type)+": "+DirText(Direction(Type))+" (b) "+(string)pf[Type].Age[fpBase]+" (r) "+(string)pf[Type].Age[fpRoot]
+                           +" (e) "+(string)pf[Type].Age[fpExpansion]+" (rt) "+(string)pf[Type].Age[fpRetrace]);
     Append(fsText,BoolToStr(pfBar>0," p:"+(string)pfBar+" @"+DoubleToStr(Close[pfBar],Digits)));
 
-    Append(fsText,"  Flags:");
-    Append(fsText,BoolToStr(Event(NewOrigin),"Origin"));
-    Append(fsText,BoolToStr(Event(NewTrend),"Trend"));
-    Append(fsText,BoolToStr(Event(NewTerm),"Term"));
-    Append(fsText,BoolToStr(Event(NewReversal),"Reversal"));
-    Append(fsText,BoolToStr(Event(NewRetrace),"Retrace"));
-    Append(fsText,BoolToStr(Event(NewRecovery),"Recovery"));
-                           
-    Append(fsText,"        Prices: (b) "+DoubleToStr(Price(Type,fpBase),Digits)+" (r) "+DoubleToStr(Price(Type,fpRoot),Digits)+" (e) "+DoubleToStr(Price(Type,fpExpansion),Digits)
+    Append(fsText,"\n        Points: (b) "+DoubleToStr(Price(Type,fpBase),Digits)+" (r) "+DoubleToStr(Price(Type,fpRoot),Digits)+" (e) "+DoubleToStr(Price(Type,fpExpansion),Digits)
                            +" (rt) "+DoubleToStr(Price(Type,fpRetrace),Digits)+" (rc) "+DoubleToStr(Price(Type,fpRecovery),Digits),"\n");
     Append(fsText,"       Retrace: "+DoubleToStr(Fibonacci(Type,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Type,Retrace,Max,InPercent),1)
                            +"%  Forecast:"+DoubleToStr(Fibonacci(Type,Forecast|Retrace,Fibo161),Digits),"\n");
@@ -893,7 +886,7 @@ string CPipFractal::StateText(void)
 //+------------------------------------------------------------------+
 void CPipFractal::RefreshScreen(void)
   { 
-    Comment("\n*--- PipFractal ---*\n"
+    Comment("\n*--- PipMA Fractal ---*\n"
            +"  FOC: "+DirText(FOCDirection(trTrendlineTolerance))+" "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)
            +"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"/"+DoubleToStr(Pip(Pivot(Max)),1)
            +"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
@@ -904,5 +897,5 @@ void CPipFractal::RefreshScreen(void)
                +" +"+DoubleToStr(Pip(StdDev(Positive)),1)
                +" "+DoubleToStr(Pip(StdDev(Negative)),1)+"\n\n"
            +FractalStr()+"\n"
-           +"\nPipMA Active "+ActiveEventText());
+           +"\n  PipMA Active "+ActiveEventText());
   }

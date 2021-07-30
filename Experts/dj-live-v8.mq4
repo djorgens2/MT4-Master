@@ -257,7 +257,7 @@ const color           DailyColor           = clrDarkGray;       // US session bo
   //--- Display operationals
   string              rsShow              = "APP";
   SessionType         rsSession           = SessionTypes;
-  FractalType         rsFractal           = FractalTypes;
+  SessionFractalType  rsFractal           = SessionFractalTypes;
   int                 rsWaveAction        = OP_BUY;
   int                 rsSegment           = NoValue;
   int                 rsFiboAction        = OP_NO_ACTION;
@@ -313,18 +313,6 @@ string Trim(FractalType Type)
 //| IsChanged - Compares events to determine if a change occurred    |
 //+------------------------------------------------------------------+
 bool IsChanged(OrderStatus &Compare, OrderStatus Value)
-  {
-    if (Compare==Value)
-      return (false);
-      
-    Compare = Value;
-    return (true);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - Detects changes to fractal types                     |
-//+------------------------------------------------------------------+
-bool IsChanged(FractalType &Compare, FractalType Value)
   {
     if (Compare==Value)
       return (false);
@@ -466,7 +454,7 @@ void RefreshControlPanel(void)
     {
       if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==C'60,60,60'||detail[type].NewFractal||session[type].Event(NewHour))
       {
-        UpdateBox("bxhAI-Session"+EnumToString(type),Color(session[type].Fractal(ftTerm).Direction,IN_DARK_DIR));
+        UpdateBox("bxhAI-Session"+EnumToString(type),Color(session[type].Fractal(sftTerm).Direction,IN_DARK_DIR));
         UpdateBox("bxbAI-OpenInd"+EnumToString(type),BoolToInt(session[type].IsOpen(),clrYellow,clrBoxOff));
       }
     }
@@ -507,7 +495,7 @@ void RefreshControlPanel(void)
     string rcpOptions   = "";
     
     if (rsSession!=SessionTypes)  Append(rcpOptions,EnumToString(rsSession));
-    if (rsFractal!=FractalTypes)  Append(rcpOptions,StringSubstr(EnumToString(rsFractal),2));
+    if (rsFractal!=SessionFractalTypes)  Append(rcpOptions,StringSubstr(EnumToString(rsFractal),2));
     if (rsWaveAction>NoValue)     Append(rcpOptions,"Wave "+SegmentText[rsWaveAction]);
     if (rsSegment>NoValue)        Append(rcpOptions,"Segment "+SegmentText[rsSegment]);
     if (rsFiboAction>NoValue)     Append(rcpOptions,"Zone "+SegmentText[rsFiboAction]);
@@ -696,10 +684,10 @@ void ZeroPriceTags(void)
 //+------------------------------------------------------------------+
 void ZeroLines(void)
   {
-    static int         zlAction       = OP_NO_ACTION;
-    static int         zlZone         = OP_NO_ACTION;
-    static SessionType zlSession      = SessionTypes;
-    static FractalType zlFractal      = FractalTypes;
+    static int                zlAction       = OP_NO_ACTION;
+    static int                zlZone         = OP_NO_ACTION;
+    static SessionType        zlSession      = SessionTypes;
+    static SessionFractalType zlFractal      = SessionFractalTypes;
     
     if (IsChanged(zlSession,rsSession)||IsChanged(zlFractal,rsFractal))
     {
@@ -765,15 +753,15 @@ void ShowLines(void)
     {
       UpdateLine("lnActive",session[rsSession].Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
       
-      if (rsFractal!=FractalTypes)
+      if (rsFractal!=SessionFractalTypes)
       {
         UpdateLine("lnSupport",session[rsSession].Fractal(rsFractal).Support,STYLE_SOLID,clrRed);
         UpdateLine("lnResistance",session[rsSession].Fractal(rsFractal).Resistance,STYLE_SOLID,clrLawnGreen);
         UpdateLine("lnLow",session[rsSession].Fractal(rsFractal).Low,STYLE_DOT,clrFireBrick);
         UpdateLine("lnHigh",session[rsSession].Fractal(rsFractal).High,STYLE_DOT,clrForestGreen);
       
-        UpdateLine("lnCorrectionHi",session[rsSession].Fractal(ftCorrection).High,STYLE_DASH,clrWhite);
-        UpdateLine("lnCorrectionLo",session[rsSession].Fractal(ftCorrection).Low,STYLE_DASH,clrWhite);
+        UpdateLine("lnCorrectionHi",session[rsSession].Fractal(sftCorrection).High,STYLE_DASH,clrWhite);
+        UpdateLine("lnCorrectionLo",session[rsSession].Fractal(sftCorrection).Low,STYLE_DASH,clrWhite);
       }
       else
       {
@@ -857,9 +845,9 @@ void RefreshScreen(void)
     ShowLines();
 
     rsComment          = "--BIAS--\n"+
-                         "  Origin:  "+ActionText(session[Daily].Fractal(ftOrigin).Bias)+"\n"+
-                         "  Trend:   "+ActionText(session[Daily].Fractal(ftTrend).Bias)+"\n"+
-                         "  Term:    "+ActionText(session[Daily].Fractal(ftTerm).Bias)+"\n"+
+                         "  Origin:  "+ActionText(session[Daily].Fractal(sftOrigin).Bias)+"\n"+
+                         "  Trend:   "+ActionText(session[Daily].Fractal(sftTrend).Bias)+"\n"+
+                         "  Term:    "+ActionText(session[Daily].Fractal(sftTerm).Bias)+"\n"+
                          "  Active:  "+ActionText(session[Daily][ActiveSession].Bias);
 
     if (inpShowWaveSegs==Yes)
@@ -1228,21 +1216,21 @@ void CalcFractalBias(SessionType Type)
           //-- do something?
         }
       else
-      if (session[bias].Fractal(ftTerm).Direction==session[Daily].Fractal(ftTerm).Direction)
-        ufbFractalBias                += session[Daily].Fractal(ftTerm).Direction;
+      if (session[bias].Fractal(sftTerm).Direction==session[Daily].Fractal(sftTerm).Direction)
+        ufbFractalBias                += session[Daily].Fractal(sftTerm).Direction;
 
-    sFractalChange                    += session[Type].Fractal(ftTerm).Direction;
+    sFractalChange                    += session[Type].Fractal(sftTerm).Direction;
     sFractalBias                       = ufbFractalBias;
     sFractalSession                    = Type;
     
     if (fabs(sFractalBias)==3)
-      if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
+      if (session[Daily].Fractal(sftTrend).Direction==session[Daily].Fractal(sftTerm).Direction)
         sFractalPattern                = TrendConvergent;
       else
         sFractalPattern                = TermConvergent;
     else
     {
-      if (session[Daily].Fractal(ftTrend).Direction==session[Daily].Fractal(ftTerm).Direction)
+      if (session[Daily].Fractal(sftTrend).Direction==session[Daily].Fractal(sftTerm).Direction)
         sFractalPattern                = TrendDivergent;
       else
         sFractalPattern                = TermDivergent;
@@ -1300,7 +1288,7 @@ void UpdateSession(void)
         if (session[type].Event(NewReversal))
           CalcFractalBias(type);
 
-        if (NewDirection(detail[type].FractalDir,session[type].Fractal(ftTerm).Direction))
+        if (NewDirection(detail[type].FractalDir,session[type].Fractal(sftTerm).Direction))
           detail[type].Reversal      = true;
         
         if (IsChanged(detail[type].FractalHour,ServerHour()))
@@ -1352,7 +1340,7 @@ void UpdateSession(void)
       if (session[type].Event(NewRally) || session[type].Event(NewPullback))
         fdetail[faType].HeadColor[2]   = clrYellow;
 
-      for (FractalType fibo=ftOrigin;fibo<ftPrior;fibo++)
+      for (SessionFractalType fibo=sftOrigin;fibo<sftPrior;fibo++)
       {
         fdetail[faType].Expansion[fibo] = session[type].Expansion(fibo,Now,InDecimal);
         fdetail[faType].Retrace[fibo]   = session[type].Retrace(fibo,Now,InDecimal);
@@ -1423,20 +1411,20 @@ void UpdatePipMA(void)
     
     fdetail[fatPipMA].State            = EnumToString(pfractal.State().Type[pftOrigin]);
 
-    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(pftTerm);
-    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(pftTrend);
+    fdetail[fatPipMA].ActiveDir        = pfractal.Direction(Term);
+    fdetail[fatPipMA].BreakoutDir      = pfractal.Direction(Trend);
 
-    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(pftOrigin,Expansion,Now);
-    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(pftTrend,Expansion,Now);
-    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(pftTerm,Expansion,Now);
+    fdetail[fatPipMA].Expansion[0]     = pfractal.Fibonacci(Origin,Expansion,Now);
+    fdetail[fatPipMA].Expansion[1]     = pfractal.Fibonacci(Trend,Expansion,Now);
+    fdetail[fatPipMA].Expansion[2]     = pfractal.Fibonacci(Term,Expansion,Now);
     
-    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(pftOrigin),IN_DARK_PANEL);
-    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(pftTrend),IN_DARK_PANEL);
-    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(pftTerm),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[0]     = Color(pfractal.Direction(Origin),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[1]     = Color(pfractal.Direction(Trend),IN_DARK_PANEL);
+    fdetail[fatPipMA].FiboColor[2]     = Color(pfractal.Direction(Term),IN_DARK_PANEL);
 
-    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(pftOrigin,Retrace,Now);
-    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(pftTrend,Retrace,Now);
-    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(pftTerm,Retrace,Now);
+    fdetail[fatPipMA].Retrace[0]       = pfractal.Fibonacci(Origin,Retrace,Now);
+    fdetail[fatPipMA].Retrace[1]       = pfractal.Fibonacci(Trend,Retrace,Now);
+    fdetail[fatPipMA].Retrace[2]       = pfractal.Fibonacci(Term,Retrace,Now);
   }
 
 //+------------------------------------------------------------------+
@@ -1472,7 +1460,7 @@ void UpdateFractal(void)
       }
 
       //-- Trend/Term Fibo Flags
-      for (RetraceType fibo=Trend;fibo<=Term;fibo++)
+      for (FractalType fibo=Trend;fibo<=Term;fibo++)
         if (FiboLevels[ufExpand[fibo]]<fractal.Fibonacci(fibo,fpExpansion,Now))
         {
           Flag(EnumToString(fibo)+" "+EnumToString(ufExpand[fibo]),BoolToInt(fibo==Trend,clrYellow,clrGoldenrod),rsShowFlags);
@@ -1490,7 +1478,7 @@ void CalcFractal(void)
     ArrayInitialize(fdetail[fatMeso].HeadColor,Color(fractal.Direction(Expansion)));
     ArrayInitialize(fdetail[fatMeso].FiboColor,BoolToInt(fractal.Direction(Expansion)==DirectionUp,C'0,42,0',C'42,0,0'));
     
-    for (RetraceType type=fractal.Leg(Active);type>Root;type--)
+    for (FractalType type=fractal.Leg(Active);type>Root;type--)
       if (fractal[type].Bar>inpAgingThreshold)
       {
         fdetail[fatMeso].SubHead        = EnumToString(type)+" ("+(string)fractal[type].Bar+")";
@@ -1500,13 +1488,13 @@ void CalcFractal(void)
         break;
       }
     
-    fdetail[fatMeso].Heading            = proper(DirText(fractal.Direction(Base)))+" "+BoolToStr(fractal.BarDir()==DirectionUp,"Rally","Pullback");
-    fdetail[fatMeso].State              = EnumToString(fractal.State(Active));
+    fdetail[fatMeso].Heading            = proper(DirText(fractal.Direction(Base)))+" "+BoolToStr(BarDir()==DirectionUp,"Rally","Pullback");
+    fdetail[fatMeso].State              = EnumToString(fractal.State());
 
-    if (fractal.State(Active)==Correction)
+    if (fractal.State()==Correction)
       fdetail[fatMeso].HeadColor[2]     = Color(fractal.Direction(Expansion),IN_DIRECTION,Contrarian);
       
-    if (fractal.State(Active)==Retrace)
+    if (fractal.State()==Retrace)
       fdetail[fatMeso].HeadColor[2]     = clrYellow;
 
     fdetail[fatMeso].ActiveDir          = fractal.Direction(Base);
@@ -1532,12 +1520,12 @@ void CalcFractal(void)
     if (fractal.IsRange(Divergent))
       fdetail[fatMacro].HeadColor[1]    = clrYellow;
 
-    fdetail[fatMacro].State             = EnumToString(fractal.State(Origin));
+    fdetail[fatMacro].State             = EnumToString(fractal.Origin().State);
 
-    if (fractal.State(Origin)==Correction)
+    if (fractal.Origin().State==Correction)
       fdetail[fatMacro].HeadColor[2]    = Color(fractal.Origin().Direction,IN_DIRECTION,Contrarian);
       
-    if (fractal.State(Origin)==Retrace)
+    if (fractal.Origin().State==Retrace)
       fdetail[fatMacro].HeadColor[2]    = clrYellow;
 
     fdetail[fatMacro].ActiveDir         = fractal.Direction();
@@ -1821,7 +1809,7 @@ void ShortManagement(void)
     OrderRequest   smRequest = {0,OP_SELL,"Mgr:Short",0,0,0,0,"",0,NoStatus};
 
 //    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
-//      if (pfractal.Direction(pftTerm)==DirectionDown)
+//      if (pfractal.Direction(Term)==DirectionDown)
 //        om[].Spotter[OP_SELL]   = false;
 //      else
 //      if (IsChanged(om[].Spotter[OP_SELL],true))
@@ -1831,10 +1819,10 @@ void ShortManagement(void)
 //        smRequest.Expiry          = Time[0]+(Period()*(60*2));
 //        OrderSubmit(smRequest,NoQueue);
 //   
-//        om[].Level[OP_SELL]   = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));   
+//        om[].Level[OP_SELL]   = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));   
 //      }
 //      else
-//      if (IsChanged(om[].Level[OP_SELL],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+//      if (IsChanged(om[].Level[OP_SELL],FiboLevel(pfractal.Fibonacci(Term,Expansion,Now))))
 //      {
 //        smRequest.Memo            = "Rally";
 //        smRequest.Expiry          = Time[0]+(Period()*(60*2));
@@ -1850,7 +1838,7 @@ void LongManagement(void)
     OrderRequest   lmRequest = {0,OP_BUY,"Mgr:Long",0,0,0,0,"",0,NoStatus};
 
 //    if (pfractal.Event(NewExpansion)||pfractal.Event(NewTerm))
-//      if (pfractal.Direction(pftTerm)==DirectionUp)
+//      if (pfractal.Direction(Term)==DirectionUp)
 //        om[].Spotter[OP_BUY]    = false;
 //      else
 //      if (IsChanged(om[].Spotter[OP_BUY],true))
@@ -1860,10 +1848,10 @@ void LongManagement(void)
 //        lmRequest.Memo              = "Spotter";
 //        OrderSubmit(lmRequest,NoQueue);
 //        
-//        om[].Level[OP_BUY]      = FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now));
+//        om[].Level[OP_BUY]      = FiboLevel(pfractal.Fibonacci(Term,Expansion,Now));
 //      }
 //      else
-//      if (IsChanged(om[].Level[OP_BUY],FiboLevel(pfractal.Fibonacci(pftTerm,Expansion,Now))))
+//      if (IsChanged(om[].Level[OP_BUY],FiboLevel(pfractal.Fibonacci(Term,Expansion,Now))))
 //      {
 //        lmRequest.Memo              = "Pullback";
 //        lmRequest.Expiry            = Time[0]+(Period()*(60*2));
@@ -1971,17 +1959,17 @@ SessionType GetSessionType(string &Type)
 //+------------------------------------------------------------------+
 //| GetFractalType - Converts text to Type                           |
 //+------------------------------------------------------------------+
-FractalType GetFractalType(string &Type)
+SessionFractalType GetFractalType(string &Type)
   {
-    if (Type=="ORIG"||Type=="ORIGIN")  return(ftOrigin);
-    if (Type=="TREND")                 return(ftTrend);
-    if (Type=="TERM")                  return(ftTerm);
-    if (Type=="PRIOR")                 return(ftPrior);
+    if (Type=="ORIG"||Type=="ORIGIN")  return(sftOrigin);
+    if (Type=="TREND")                 return(sftTrend);
+    if (Type=="TERM")                  return(sftTerm);
+    if (Type=="PRIOR")                 return(sftPrior);
 
     if (Type=="CORR"||Type=="CORRECT"||Type=="CORRECTION")
-                                       return(ftCorrection);
+                                       return(sftCorrection);
 
-    return (FractalTypes);
+    return (SessionFractalTypes);
   }
     
 //+------------------------------------------------------------------+
@@ -2017,7 +2005,7 @@ void ExecAppCommands(string &Command[])
       if (Command[1]=="LINES")
       {
         rsSession                      = SessionTypes;
-        rsFractal                      = FractalTypes;
+        rsFractal                      = SessionFractalTypes;
         rsFiboAction                   = OP_NO_ACTION;
          
         if (GetSessionType(Command[2])==SessionTypes)
@@ -2311,18 +2299,18 @@ int OnInit()
       detail[type].BiasPivot[OP_SELL]     = Close[0];
       detail[type].Reversal               = false;
       detail[type].Alerts                 = true;
-      detail[type].FractalDir             = session[type].Fractal(ftTerm).Direction;
+      detail[type].FractalDir             = session[type].Fractal(sftTerm).Direction;
       detail[type].Ceiling                = session[type][PriorSession].High;
       detail[type].Floor                  = session[type][PriorSession].Low;
       
       if (session[type].IsOpen())
         detail[type].Pitch                = fdiv(session[type][ActiveSession].High+session[type][ActiveSession].Low,2);
       else
-      if (session[type].Fractal(ftTerm).Direction==DirectionUp)
-        detail[type].Pitch                = fdiv(session[type].Fractal(ftTerm).High+session[type][PriorSession].Low,2);
+      if (session[type].Fractal(sftTerm).Direction==DirectionUp)
+        detail[type].Pitch                = fdiv(session[type].Fractal(sftTerm).High+session[type][PriorSession].Low,2);
       else
-      if (session[type].Fractal(ftTerm).Direction==DirectionDown)
-        detail[type].Pitch                = fdiv(session[type][PriorSession].High+session[type].Fractal(ftTerm).Low,2);
+      if (session[type].Fractal(sftTerm).Direction==DirectionDown)
+        detail[type].Pitch                = fdiv(session[type][PriorSession].High+session[type].Fractal(sftTerm).Low,2);
       else
         detail[type].Pitch                = session[type].Pivot(ActiveSession);
 
@@ -2332,8 +2320,8 @@ int OnInit()
     UpdateSession();
     CalcFractalBias(Daily);
 
-    detail[Daily].FractalPivot[OP_BUY]    = fmax(session[Daily].Fractal(ftTerm).Resistance,session[Daily].Fractal(ftTerm).High);
-    detail[Daily].FractalPivot[OP_SELL]   = fmin(session[Daily].Fractal(ftTerm).Support,session[Daily].Fractal(ftTerm).Low);
+    detail[Daily].FractalPivot[OP_BUY]    = fmax(session[Daily].Fractal(sftTerm).Resistance,session[Daily].Fractal(sftTerm).High);
+    detail[Daily].FractalPivot[OP_SELL]   = fmin(session[Daily].Fractal(sftTerm).Support,session[Daily].Fractal(sftTerm).Low);
 
     ArrayInitialize(pwInterlacePivot,Close[0]);
     

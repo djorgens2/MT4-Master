@@ -108,7 +108,7 @@ public:
 
        double           Fibonacci(FractalType Type, int Fractal, int Measure, int Format=InDecimal);      //--- For each retrace type
 
-       ReservedWords    State(void)                     { return(fState); }                               //--- Main fractal State by Type
+       ReservedWords    State(void) { return(fState); }                                                   //--- Main fractal State by Type
 
        FractalType      Next(FractalType Type)          { return((FractalType)fmin(Lead,Type+1)); }       //--- enum typecast for the Next element
        FractalType      Previous(FractalType Type, FractalType Measure=Divergent)

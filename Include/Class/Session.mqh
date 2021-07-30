@@ -1214,3 +1214,17 @@ bool IsChanged(SessionType &Compare, SessionType Value)
     return (true);
   }
 
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(SessionFractalType &Check, SessionFractalType Compare, bool Update=true)
+  {
+    if (Check == Compare)
+      return (false);
+  
+    if (Update)
+      Check   = Compare;
+  
+    return (true);
+  }
+
