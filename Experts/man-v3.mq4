@@ -47,7 +47,6 @@ void Execute(void)
     }
    
     order.Execute();
-    Print(order.QueueStr());
     
     if (order.Fulfilled())
       Print(order.MasterStr(OP_BUY));

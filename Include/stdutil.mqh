@@ -81,6 +81,21 @@
                   No
                 };
 
+       //---- Close Options
+       enum CloseOptions
+            {
+              CloseNone,          // Hold All
+              CloseAll,           // Close All
+              CloseMin,           // Close Worst
+              CloseMax,           // Close Best
+              CloseHalf,          // Close Half (All)
+              CloseProfit,        // Close Profit
+              CloseLoss,          // Close Losses
+              CloseConditional,   // Close Conditionally
+              CloseFIFO,          // FIFO Close
+              NoCloseOption = -1  // No Close Option
+            };
+
        //--- Quantitative measure types
        enum     MeasureType
                 { 
