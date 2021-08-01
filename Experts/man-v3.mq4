@@ -37,7 +37,7 @@ void Execute(void)
     
     OrderRequest   eRequest = {0,OP_BUY,"Mgr:Test",0,0,0,0,"",0,NoStatus};
   
-    if (OrdersTotal()==0)
+    if (OrdersTotal()<3)
     {
       eRequest.Lots            = order.LotSize(OP_BUY);
       eRequest.Memo            = "Test";
@@ -45,11 +45,16 @@ void Execute(void)
      
       order.Submit(eRequest,NoQueue);
     }
+    else
+    {
+      order.SetStop(OP_BUY,17.80,false);
+      Print(order.QueueStr());
+    }
    
     order.Execute();
     
     if (order.Fulfilled())
-      Print(order.MasterStr(OP_BUY));
+      Print(order.QueueStr());
   }
 
 //+------------------------------------------------------------------+
@@ -102,6 +107,7 @@ int OnInit()
       order.SetZone(OP_BUY,18.00,2.5);
     }
     
+    Print(order.MasterStr(OP_BUY));
     return(INIT_SUCCEEDED);
   }
 
