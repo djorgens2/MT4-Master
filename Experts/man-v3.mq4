@@ -52,10 +52,9 @@ void Execute(void)
     }
     else
     {
-      eRequest.Memo            = "Test-Tick";
+      eRequest.Memo            = "Test-Tick["+(string)Tick+"]";
       eRequest.Expiry          = Time[0]+(Period()*(60*2));
-                 //int omg =1;
-                 //OrderDetail detail  = OrderSearch(omg);
+
       switch(Tick)
       {
         case 4:  order.SetStop(OP_BUY,0.00,20,false);
@@ -73,11 +72,10 @@ void Execute(void)
                  eRequest.TakeProfit   = 18.16;
                  order.Submit(eRequest,NoQueue);
                  break;
-        case 8:  order.SetStop(OP_BUY,0.00,20,Always);  //-- Default stop not working on invisible...
-                 order.SetTarget(OP_BUY,0.00,0,Always);  //-- will work this issue after Order[] is finished
-                 order.Submit(eRequest,NoQueue);         //      (Now getting TP/SL prices from OrderSelect()/Live
-                 Print(order.OrderDetailStr(order.GetOrder(1)));
-                 break;                                  //       correction is to store on Order[];
+        case 8:  order.SetStop(OP_BUY,0.00,20,Always);
+                 order.SetTarget(OP_BUY,0.00,0,Always);
+                 order.Submit(eRequest,NoQueue);
+                 break;
         case 9:  order.SetStop(OP_BUY,17.2,0,Always);
                  order.SetTarget(OP_BUY,18.20,0,Always);
                  break;
@@ -110,9 +108,9 @@ void Execute(void)
     order.Execute();
     
 //    if (order.Fulfilled())
-      Print(order.QueueStr());
-      Print(order.OrderDetailStr(order.GetOrder(1)));
-
+//      Print(order.QueueStr());
+//
+    order.PrintLog(Order);
   }
 
 //+------------------------------------------------------------------+
