@@ -34,8 +34,13 @@ void RefreshScreen(void)
 void Execute(void)
   {
     #define NoQueue    false
+    static int Tick = 0;
     
-    OrderRequest   eRequest = {0,OP_BUY,"Mgr:Test",0,0,0,0,"",0,NoStatus};
+    Tick++;
+    
+    OrderRequest   eRequest = {0,0,OP_BUY,"Mgr:Test",0,0,0,0,"",0,NoStatus};
+    
+    order.SetRisk(OP_BUY,80,80,2);
   
     if (OrdersTotal()<3)
     {
@@ -47,14 +52,67 @@ void Execute(void)
     }
     else
     {
-      order.SetStop(OP_BUY,17.80,false);
-      Print(order.QueueStr());
-    }
-   
+      eRequest.Memo            = "Test-Tick";
+      eRequest.Expiry          = Time[0]+(Period()*(60*2));
+                 //int omg =1;
+                 //OrderDetail detail  = OrderSearch(omg);
+      switch(Tick)
+      {
+        case 4:  order.SetStop(OP_BUY,0.00,20,false);
+                 order.SetTarget(OP_BUY,0.00,20,false);
+                 break;
+        case 5:  order.SetStop(OP_BUY,17.40,0,false);
+                 order.SetTarget(OP_BUY,18.75,30,false);
+                 break;
+        case 6:  order.SetStop(OP_BUY,17.8,70,false);
+                 order.SetTarget(OP_BUY,18.20,70,false);
+                 order.Submit(eRequest,NoQueue);
+                 break;
+        case 7:  order.SetStop(OP_BUY,0.00,0,false);
+                 order.SetTarget(OP_BUY,0.00,0,false);
+                 eRequest.TakeProfit   = 18.16;
+                 order.Submit(eRequest,NoQueue);
+                 break;
+        case 8:  order.SetStop(OP_BUY,0.00,20,Always);  //-- Default stop not working on invisible...
+                 order.SetTarget(OP_BUY,0.00,0,Always);  //-- will work this issue after Order[] is finished
+                 order.Submit(eRequest,NoQueue);         //      (Now getting TP/SL prices from OrderSelect()/Live
+                 Print(order.OrderDetailStr(order.GetOrder(1)));
+                 break;                                  //       correction is to store on Order[];
+        case 9:  order.SetStop(OP_BUY,17.2,0,Always);
+                 order.SetTarget(OP_BUY,18.20,0,Always);
+                 break;
+        case 10: order.SetStop(OP_BUY,17.2,0,Always);
+                 order.SetTarget(OP_BUY,18.11,0,false);
+                 break;
+        case 11: order.SetRisk(OP_SELL,80,80,4);
+                 order.SetStop(OP_SELL,0.00,30,false);
+                 order.SetTarget(OP_SELL,0.00,30,false);
+                 eRequest.Action   = OP_SELL;
+                 order.Submit(eRequest,NoQueue);
+                 break;
+        case 12: order.SetStop(OP_SELL,18.40,0,false);
+                 order.SetTarget(OP_SELL,17.50,0,false);
+                 eRequest.Action   = OP_SELL;
+                 order.Submit(eRequest,NoQueue);
+                 break;
+        case 13: order.SetStop(OP_SELL,18.40,20,false);
+                 order.SetTarget(OP_SELL,0.00,20,false);
+                 eRequest.Action   = OP_SELL;
+                 order.Submit(eRequest,NoQueue);
+                 break;
+        case 14: order.SetStop(OP_SELL,0.00,50,Always);
+                 order.SetTarget(OP_SELL,0.00,30,false);
+                 eRequest.Action   = OP_SELL;
+                 order.Submit(eRequest,NoQueue);
+                 break;
+      }
+    } 
     order.Execute();
     
-    if (order.Fulfilled())
+//    if (order.Fulfilled())
       Print(order.QueueStr());
+      Print(order.OrderDetailStr(order.GetOrder(1)));
+
   }
 
 //+------------------------------------------------------------------+
@@ -107,7 +165,6 @@ int OnInit()
       order.SetZone(OP_BUY,18.00,2.5);
     }
     
-    Print(order.MasterStr(OP_BUY));
     return(INIT_SUCCEEDED);
   }
 
