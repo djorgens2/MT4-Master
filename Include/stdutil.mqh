@@ -61,14 +61,6 @@
 
 //--- Common terminology; global constants
 
-       enum     Operation
-                {
-                  Add,
-                  Insert,
-                  Update,
-                  Delete
-                };
-
        enum     OnOffType
                 {
                   On,
@@ -541,6 +533,20 @@ void Append(string &Source, string Text, string Separator=" ")
       Source += Separator;
       
     Source += Text;
+  }
+
+//+------------------------------------------------------------------+
+//| Operation - translates Pending Order Types to Market Actions      |
+//+------------------------------------------------------------------+
+int Operation(int Action, bool Contrarian=false)
+  {
+    if (IsEqual(Action,OP_BUY)||IsEqual(Action,OP_BUYLIMIT)||IsEqual(Action,OP_BUYSTOP))
+      return (BoolToInt(Contrarian,OP_SELL,OP_BUY));
+
+    if (IsEqual(Action,OP_SELL)||IsEqual(Action,OP_SELLLIMIT)||IsEqual(Action,OP_SELLSTOP))
+      return (BoolToInt(Contrarian,OP_BUY,OP_SELL));
+    
+    return (NoValue);  //-- << clean up for another day
   }
 
 //+------------------------------------------------------------------+
