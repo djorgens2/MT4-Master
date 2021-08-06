@@ -13,12 +13,13 @@
 
   COrder *order            = new COrder(Discount,3,true);
 
+  AccountMetrics Account;
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    order.Update();  
+    order.Update(Account);  
   }
 
 //+------------------------------------------------------------------+
@@ -26,6 +27,8 @@ void GetData(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+
+    UpdateLine("czDCA:"+(string)OP_BUY,Account.DCA[OP_BUY],STYLE_SOLID,clrYellow);  
   }
 
 //+------------------------------------------------------------------+
@@ -40,7 +43,7 @@ void Test1(void)
     
     OrderRequest eRequest   = order.BlankRequest();
     
-    eRequest.Requestor      = "Test[1] Manager";
+    eRequest.Requestor      = "Test[1] Market";
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 1-General Functionality";
     
@@ -215,7 +218,7 @@ void Execute(void)
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
-    order.Execute();
+    order.Execute(Account);
     
     //if (order.Fulfilled())
     //{
@@ -276,6 +279,9 @@ int OnInit()
       order.SetZoneStep(action,2.5);
     }
     
+         
+    NewLine("czDCA:0");
+
     Print(order.MasterStr(OP_BUY));
     
     return(INIT_SUCCEEDED);

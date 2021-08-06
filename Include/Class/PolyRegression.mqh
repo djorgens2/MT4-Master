@@ -36,7 +36,7 @@ public:
                   Stop,         //--- main support/resistance boundary;
                   Halt,         //--- Forward contrarian progress line; if inbounds, manage risk; oob - kill;
                   Kill,         //--- Risk Management slider
-                  Hold          //--- When nothing statistically viable occurs
+                  Keep          //--- When nothing statistically viable occurs
                 };
                 
      //--- Wave Analytics Record
@@ -190,7 +190,7 @@ private:
 
        WaveRec          prWave;
        WaveSegment      prLastSegment;
-       double           prLine[2][Hold];
+       double           prLine[2][Keep];
        
   };
 
@@ -753,7 +753,7 @@ void CPolyRegression::CalcActionState(const int Action)
         prWave.Bank                              = false;
         
         //--- Hold Line -- the decision box ("pivot box" or "pivot range")
-        if (prWave.ActionState[Action]==Hold)
+        if (prWave.ActionState[Action]==Keep)
         {
           if (Action==OP_BUY)
           {
@@ -782,7 +782,7 @@ void CPolyRegression::CalcActionState(const int Action)
               prWave.ActionState[OP_BUY]         = Risk;
             else
             if (IsLower(Close[0],prLine[OP_BUY][Build],NoUpdate))
-              prWave.ActionState[OP_BUY]         = Hold;
+              prWave.ActionState[OP_BUY]         = Keep;
             else
             if (ActiveSegment().Type==Trough)
               prWave.ActionState[OP_BUY]         = Build;
@@ -792,7 +792,7 @@ void CPolyRegression::CalcActionState(const int Action)
               prWave.ActionState[OP_SELL]        = Risk;
             else
             if (IsHigher(Close[0],prLine[OP_SELL][Build],NoUpdate))
-              prWave.ActionState[OP_SELL]        = Hold;
+              prWave.ActionState[OP_SELL]        = Keep;
             else
             if (ActiveSegment().Type==Crest)
               prWave.ActionState[OP_SELL]        = Build;

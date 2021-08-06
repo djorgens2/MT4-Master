@@ -284,6 +284,25 @@ bool IsChanged(double &Check, double Compare, bool Update=true, int Precision=0)
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
+bool IsChanged(double &Check, double Compare, double &Variance, bool Update=true, int Precision=0)
+  {
+    if (Precision == 0)
+      Precision  = Digits;
+      
+    Variance   = 0.00;
+
+    if (IsChanged(Variance,Compare-Check,true,Precision))
+    {  
+      Check    = BoolToDouble(Update,Compare,Check,Precision);
+      return (true);
+    }
+  
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
 bool IsChanged(int &Check, int Compare, bool Update=true)
   {
     if (Check == Compare)
@@ -522,6 +541,23 @@ double BoolToDouble(bool IsTrue, double TrueValue, double FalseValue=0.00, int P
       return (NormalizeDouble(TrueValue,Precision));
 
     return (NormalizeDouble(FalseValue,Precision));
+  }
+
+//+------------------------------------------------------------------+
+//| Coalesce - returns first non-zero value                          |
+//+------------------------------------------------------------------+
+double Coalesce(double El1, double El2, double El3=0.00, double El4=0.00)
+  {
+    if (El1==0.00)
+      if (El2==0.00)
+        if (El3==0.00)
+          return (El4);
+        else
+          return (El3);
+      else
+        return (El2);
+
+    return (El1);
   }
 
 //+------------------------------------------------------------------+
