@@ -79,9 +79,16 @@ int OnInit()
 
     DrawBox("bxf-OM",663,28,294,144,clrNONE,BORDER_FLAT,IndWinId);
 
-    //-- Order Details
-    DrawBox("bxfOD-Long",361,28,298,144,C'0,42,0',BORDER_FLAT,IndWinId);
-    DrawBox("bxfOD-Short",961,28,298,144,C'42,0,0',BORDER_FLAT,IndWinId);
+    //-- Order Config
+    DrawBox("bxfOC-Long",361,28,298,144,C'0,42,0',BORDER_FLAT,IndWinId);
+    DrawBox("bxfOC-Short",961,28,298,144,C'42,0,0',BORDER_FLAT,IndWinId);
+    
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      NewLabel("lbhOC-"+ActionText(action)+"-Trading","Trading",370+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
+
+      NewLabel("lbvOC-"+ActionText(action)+"-Enabled","Enabled",410+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
+    }
 
     string key;
     

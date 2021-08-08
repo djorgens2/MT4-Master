@@ -11,9 +11,14 @@
 #include <manual.mqh>
 #include <Class\Order.mqh>
 
-  COrder *order            = new COrder(Discount,3,true);
-
+  COrder *order            = new COrder(Discount,Hold, Hold);
   AccountMetrics Account;
+
+  int Tick                 = 0;
+
+  int CBatch[];
+
+
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
@@ -37,9 +42,6 @@ void RefreshScreen(void)
 void Test1(void)
   {
     #define NoQueue    false
-    static int Tick = 0;
-    
-    Tick++;
     
     OrderRequest eRequest   = order.BlankRequest();
     
@@ -55,7 +57,7 @@ void Test1(void)
       eRequest.Lots            = order.LotSize(OP_BUY);
       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
      
-      order.Submit(eRequest);
+      order.Submitted(eRequest);
     }
     else
     {
@@ -72,16 +74,16 @@ void Test1(void)
                  break;
         case 6:  order.SetStopLoss(OP_BUY,17.8,70,false);
                  order.SetTakeProfit(OP_BUY,18.20,70,false);
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 7:  order.SetStopLoss(OP_BUY,0.00,0,false);
                  order.SetTakeProfit(OP_BUY,0.00,0,false);
                  eRequest.TakeProfit   = 18.16;
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 8:  order.SetStopLoss(OP_BUY,0.00,20,Always);
                  order.SetTakeProfit(OP_BUY,0.00,0,Always);
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 9:  order.SetStopLoss(OP_BUY,17.2,0,Always);
                  order.SetTakeProfit(OP_BUY,18.20,0,Always);
@@ -93,28 +95,28 @@ void Test1(void)
                  order.SetStopLoss(OP_SELL,0.00,30,false);
                  order.SetTakeProfit(OP_SELL,0.00,30,false);
                  eRequest.Type   = OP_SELL;
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 12: order.SetStopLoss(OP_SELL,18.40,0,false);
                  order.SetTakeProfit(OP_SELL,17.50,0,false);
                  eRequest.Type   = OP_SELL;
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 13: order.SetStopLoss(OP_SELL,18.40,20,false);
                  order.SetTakeProfit(OP_SELL,0.00,20,false);
                  eRequest.Type   = OP_SELL;
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
         case 14: order.SetStopLoss(OP_SELL,0.00,50,Always);
                  order.SetTakeProfit(OP_SELL,0.00,30,false);
                  eRequest.Type   = OP_SELL;
-                 order.Submit(eRequest);
+                 order.Submitted(eRequest);
                  break;
       }
     }
     
 //    if (Tick>8)
-     Print(order.QueueStr());
+//     Print(order.QueueStr());
   }
 
 //+------------------------------------------------------------------+
@@ -125,7 +127,7 @@ void Test2(void)
     int req                 = 0;
     OrderRequest eRequest   = order.BlankRequest();
     
-    eRequest.Requestor      = "Test[2] Manager";
+    eRequest.Requestor      = "Test[2] Resub";
     eRequest.Memo           = "Test 2-Pend/Recur Test";
     
     static bool fill   = false;
@@ -146,7 +148,7 @@ void Test2(void)
         eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
      
 //        Print(order.RequestStr(eRequest));
-        if (order.Submit(eRequest))
+        if (order.Submitted(eRequest))
 //          Print(order.RequestStr(eRequest));
           fill=true;
       }
@@ -171,7 +173,7 @@ void Test3(void)
   {
     OrderRequest eRequest   = order.BlankRequest();
     
-    eRequest.Requestor      = "Test[3] Manager";
+    eRequest.Requestor      = "Test[3] Shorts";
     eRequest.Memo           = "Test 3-Short Pend/Recur Test";
     
     order.SetRiskLimits(OP_BUY,80,80,2);
@@ -180,23 +182,53 @@ void Test3(void)
     if (IsEqual(order[OP_SELL].Count,0))
       if (Close[0]>18.09)
       {
+        eRequest.Pend.Type       = OP_SELLSTOP;
         eRequest.Pend.Limit      = 17.982;
         eRequest.Pend.Step       = 2;
         eRequest.Pend.Cancel     = 18.112;
+        eRequest.Type            = OP_SELLLIMIT;
         eRequest.Price           = 0.00;
         eRequest.TakeProfit      = 18.12;
         eRequest.Price           = 17.982;
         eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
      
-        order.Submit(eRequest);
-        order.PrintLog(Order);
-        Print(order.QueueStr());
+        order.Submitted(eRequest);
+//        order.PrintLog();
+//        Print(order.QueueStr());
       }
       
       if (order.Fulfilled())
       {
-        order.PrintLog(Order);        
+//        order.PrintLog();       
       } 
+  }
+
+//+------------------------------------------------------------------+
+//| Duplicate EA request management                                  |
+//+------------------------------------------------------------------+
+void Test4(void)
+  {
+    OrderRequest eRequest   = order.BlankRequest();
+    
+    eRequest.Requestor      = "Test[4] Dups";
+    eRequest.Memo           = "Test 4-Lotsa Dups";
+    
+    order.SetRiskLimits(OP_BUY,80,80,2);
+      
+    //--- Queue Order Test
+    if (Tick<20)
+    {
+      eRequest.Pend.Type       = OP_SELLSTOP;
+      eRequest.Pend.Limit      = 17.75;
+      eRequest.Pend.Step       = 2;
+      eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_SELLLIMIT;
+      eRequest.TakeProfit      = 18.12;
+      eRequest.Price           = 17.982;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+     
+      order.Submitted(eRequest);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -205,6 +237,8 @@ void Test3(void)
 void Execute(void)
   {
     #define Test   1
+
+    Comment("Tick: "+(string)++Tick);
     
     switch (Test)
     {
@@ -213,12 +247,17 @@ void Execute(void)
       case 2:  Test2();
                break;
       case 3:  Test3();
+               break;
+      case 4:  Test4();
+               break;
     }
     
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
-    order.Execute(Account);
+    if (Tick==5) Print (">>>Before:"+order.OrderStr());
+    order.Execute(CBatch,true);
+    if (Tick==5) Print (">>>After:"+order.OrderStr());
     
     //if (order.Fulfilled())
     //{
@@ -273,10 +312,10 @@ int OnInit()
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       order.EnableTrade(action);
-      order.SetEquityTargets(action,inpMinTarget,inpMinProfit,inpEQHalf,inpEQProfit);
+      order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetZoneStep(action,2.5);
+      order.SetZoneStep(action,2.5,60.0);
     }
     
          
