@@ -1134,38 +1134,35 @@ bool COrder::TradeEnabled(OrderRequest &Request)
 //+------------------------------------------------------------------+
 double COrder::Price(MeasureType Measure, int RequestType, double Requested, double Basis=0.00)
   {
+    //-- Set Initial Values
     int    action       = Operation(RequestType);
     double direction    = BoolToDouble(IsEqual(action,OP_BUY),1,NoValue)*BoolToInt(IsEqual(RequestType,OP_BUYLIMIT)||IsEqual(RequestType,OP_SELLLIMIT),NoValue,1);
     double slippage     = point(Account.MaxSlippage)+Account.Spread;
     double requested    = fmax(0.00,Requested);
-    double stored;
-    double calculated;
-    
-    Basis               = BoolToDouble(IsEqual(Basis,0.00),BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid),Basis,Digits);
-    
-    switch (Measure)
+    double stored       = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),BoolToDouble(IsEqual(Measure,Profit),Master[action].TakeProfit,Master[action].StopLoss),0.00,Digits);
+    double calculated   = BoolToDouble(IsEqual(Measure,Profit),
+                            BoolToDouble(IsEqual(Master[action].DefaultTarget,0.00),0.00,Basis+(direction*point(Master[action].DefaultTarget))),
+                            BoolToDouble(IsEqual(Master[action].DefaultStop,0.00),0.00,Basis-(direction*point(Master[action].DefaultStop))));
+
+    //-- Validate and return
+    if (IsEqual(Measure,Profit)||IsEqual(Measure,Loss))
     {
-      case Profit:   stored      = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),Master[action].TakeProfit,0.00,Digits);
-                     calculated  = BoolToDouble(IsEqual(Master[action].DefaultTarget,0.00),0.00,Basis+(direction*point(Master[action].DefaultTarget)));
-                     break;
-      case Loss:     stored      = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),Master[action].StopLoss,0.00,Digits);
-                     calculated  = BoolToDouble(IsEqual(Master[action].DefaultStop,0.00),0.00,Basis-(direction*point(Master[action].DefaultStop)));
-                     break;
-      default:       return (NormalizeDouble(0.00,Digits));
-    }
-Print(">>>>Before:"+DirText(direction)+" B-S:"+DoubleToStr(Basis+slippage,Digits)+" Req:"+DoubleToStr(requested,Digits)+" Sto:"+DoubleToStr(stored,Digits));
-    requested     = BoolToDouble(IsEqual(direction,DirectionUp),
-                      BoolToDouble(IsHigher(Basis+slippage,requested,NoUpdate),0.00,requested),
-                      BoolToDouble(IsLower(Basis-slippage,requested,NoUpdate),0.00,requested),Digits);
+      Basis             = BoolToDouble(IsEqual(Basis,0.00),BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid),Basis,Digits);
+
+      requested         = BoolToDouble(IsEqual(direction,BoolToInt(IsEqual(Measure,Profit),DirectionUp,DirectionDown)),
+                            BoolToDouble(IsHigher(Basis+slippage,requested,NoUpdate),0.00,requested),
+                            BoolToDouble(IsLower(Basis-slippage,requested,NoUpdate),0.00,requested),Digits);
     
-    stored        = BoolToDouble(IsEqual(direction,DirectionUp),
-                      BoolToDouble(IsHigher(Basis+slippage,stored,NoUpdate),0.00,stored),
-                      BoolToDouble(IsLower(Basis-slippage,stored,NoUpdate),0.00,stored),Digits);
+      stored            = BoolToDouble(IsEqual(direction,BoolToInt(IsEqual(Measure,Profit),DirectionUp,DirectionDown)),
+                            BoolToDouble(IsHigher(Basis+slippage,stored,NoUpdate),0.00,stored),
+                            BoolToDouble(IsLower(Basis-slippage,stored,NoUpdate),0.00,stored),Digits);
                      
-    calculated    = BoolToDouble(IsBetween(calculated,Basis+slippage,Basis-slippage),0.00,calculated,Digits);
-Print(">>>>After:"+DirText(direction)+" B-S:"+DoubleToStr(Basis+slippage,Digits)+" Req:"+DoubleToStr(requested,Digits)+" Sto:"+DoubleToStr(stored,Digits));
+      calculated        = BoolToDouble(IsBetween(calculated,Basis+slippage,Basis-slippage),0.00,calculated,Digits);
     
-    return (Coalesce(requested,stored,calculated));
+      return (Coalesce(requested,stored,calculated));
+    }
+    
+    return (0.00);
   }
 
 //+------------------------------------------------------------------+
@@ -1375,7 +1372,7 @@ void COrder::SetNode(int Action, OrderSummary &Node)
 //+------------------------------------------------------------------+
 void COrder::SetTradeState(int Action, TradeState State)
   {
-     Master[Action].State            = State;
+     Master[Action].State               = State;
   }
 
 //+------------------------------------------------------------------+
@@ -1385,9 +1382,9 @@ void COrder::SetStopLoss(int Action, double StopLoss, double DefaultStop, bool H
   {
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      Master[Action].StopLoss          = StopLoss;
-      Master[Action].HideStop          = HideStop;
-      Master[Action].DefaultStop       = DefaultStop;
+      Master[Action].StopLoss           = fmax(0.00,StopLoss);
+      Master[Action].DefaultStop        = fmax(0.00,DefaultStop);
+      Master[Action].HideStop           = HideStop;
 
       for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
         Master[Action].Order[detail].StopLoss   = Price(Loss,Action,StopLoss,
@@ -1402,9 +1399,9 @@ void COrder::SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, 
   {    
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      Master[Action].TakeProfit        = TakeProfit;
-      Master[Action].HideTarget        = HideTarget;
-      Master[Action].DefaultTarget     = DefaultTarget;
+      Master[Action].TakeProfit         = fmax(0.00,TakeProfit);
+      Master[Action].DefaultTarget      = fmax(0.00,DefaultTarget);
+      Master[Action].HideTarget         = HideTarget;
 
       for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
         Master[Action].Order[detail].TakeProfit =  Price(Profit,Action,TakeProfit,
@@ -1417,8 +1414,8 @@ void COrder::SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, 
 //+------------------------------------------------------------------+
 void COrder::SetEquityTargets(int Action, double EquityTarget, double MinEquity)
   {
-     Master[Action].EquityTarget     = EquityTarget;
-     Master[Action].MinEquity        = MinEquity;
+     Master[Action].EquityTarget        = fmax(0.00,EquityTarget);
+     Master[Action].MinEquity           = fmax(0.00,MinEquity);
   }
 
 //+------------------------------------------------------------------+
@@ -1426,9 +1423,9 @@ void COrder::SetEquityTargets(int Action, double EquityTarget, double MinEquity)
 //+------------------------------------------------------------------+
 void COrder::SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double LotScale)
   {
-     Master[Action].MaxRisk          = MaxRisk;
-     Master[Action].MaxMargin        = MaxMargin;
-     Master[Action].LotScale         = LotScale;
+     Master[Action].MaxRisk             = fmax(0.00,MaxRisk);
+     Master[Action].MaxMargin           = fmax(0.00,MaxMargin);
+     Master[Action].LotScale            = fmax(0.00,LotScale);
   }
 
 //+------------------------------------------------------------------+
@@ -1436,9 +1433,9 @@ void COrder::SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double 
 //+------------------------------------------------------------------+
 void COrder::SetDefaults(int Action, double DefaultLotSize, double DefaultStop, double DefaultTarget)
   {
-     Master[Action].DefaultLotSize   = DefaultLotSize;
-     Master[Action].DefaultStop      = DefaultStop;
-     Master[Action].DefaultTarget    = DefaultTarget;
+     Master[Action].DefaultLotSize      = fmax(0.00,DefaultLotSize);
+     Master[Action].DefaultStop         = fmax(0.00,DefaultStop);
+     Master[Action].DefaultTarget       = fmax(0.00,DefaultTarget);
   }
 
 //+------------------------------------------------------------------+
@@ -1446,8 +1443,8 @@ void COrder::SetDefaults(int Action, double DefaultLotSize, double DefaultStop, 
 //+------------------------------------------------------------------+
 void COrder::SetZoneStep(int Action, double Step, double MaxZoneMargin)
   {
-     Master[Action].Step             = Step;
-     Master[Action].MaxZoneMargin    = MaxZoneMargin;
+     Master[Action].Step                = fmax(0.00,Step);
+     Master[Action].MaxZoneMargin       = fmax(0.00,MaxZoneMargin);
   }
 
 //+------------------------------------------------------------------+
@@ -1455,9 +1452,9 @@ void COrder::SetZoneStep(int Action, double Step, double MaxZoneMargin)
 //+------------------------------------------------------------------+
 void COrder::SetFFE(int Action, double FFELots, double MaxFFEMargin)
   {
-     Master[Action].State            = FFE;
-     Master[Action].FFELots          = FFELots;
-     Master[Action].MaxFFEMargin     = MaxFFEMargin;
+     Master[Action].State               = fmax(0.00,FFE);
+     Master[Action].FFELots             = fmax(0.00,FFELots);
+     Master[Action].MaxFFEMargin        = fmax(0.00,MaxFFEMargin);
   }
 
 //+------------------------------------------------------------------+

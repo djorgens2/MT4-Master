@@ -11,7 +11,7 @@
 #include <manual.mqh>
 #include <Class\Order.mqh>
 
-  COrder *order            = new COrder(Discount,Hold, Hold);
+  COrder *order            = new COrder(Discount,Hold,Hold);
   AccountMetrics Account;
 
   int Tick                 = 0;
@@ -21,7 +21,7 @@
 
 //+------------------------------------------------------------------+
 //| GetData                                                          |
-//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+`
 void GetData(void)
   {
     order.Update(Account);  
@@ -153,13 +153,10 @@ void Test2(void)
           fill=true;
       }
 
-      if (order.Fulfilled())
-      {
-        fill = true;
-        ++req;
-//        Print(order.RequestStr(order.Request(req)));
-      }
-
+      if (Tick==1260)
+        order.SetStopLoss(OP_BUY,0.00,25,false);
+      if (Tick==1300)
+        order.SetStopLoss(OP_BUY,0.00,50,false,false);
 //      if (order[OP_BUY].Count>0)
 //        Print(order.ZoneSummaryStr());
 //
@@ -236,7 +233,7 @@ void Test4(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test   1
+    #define Test   2
 
     Comment("Tick: "+(string)++Tick);
     
