@@ -87,6 +87,7 @@ private:
                         double          MarginShort;
                         double          Equity;
                         double          LotMargin;
+                        double          MarginHedged;
                         double          LotSizeMin;
                         double          LotSizeMax;
                         int             LotPrecision;
@@ -239,6 +240,7 @@ public:
           //-- Order properties
           double       Price(MeasureType Type, int Action, double Requested, double Basis=0.00);
           double       LotSize(int Action, double Lots=0.00);
+          double       Margin(int Format=InPercent)                          {return(Account.Margin*BoolToInt(IsEqual(Format,InPercent),100,1));};
           double       Margin(double Lots, int Format=InPercent)             {return(Calc(Margin,Lots,Format));};
           double       Margin(int Action, double Lots, int Format=InPercent) {return(Calc((OrderMetric)BoolToInt(IsEqual(Operation(Action),OP_BUY),MarginLong,MarginShort),Lots,Format));};
           double       Equity(double Value, int Format=InPercent)            {return(Calc(Equity,Value,Format));};
@@ -325,13 +327,13 @@ double COrder::Calc(OrderMetric Metric, double Value, int Format=InPercent)
                            }
                            break;
       case MarginLong:     if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Long variance
-                             return (Calc(Margin,BoolToDouble(Summary[Net].Lots>0,Summary[Net].Lots)+
-                               fdiv(fmin(Master[OP_BUY].Summary.Lots,Master[OP_SELL].Summary.Lots),4),Format));
+                             return (Calc(Margin,fmax(0.00,Value-Master[OP_SELL].Summary.Lots)+
+                               (fmin(Value,Master[OP_SELL].Summary.Lots)*Account.MarginHedged),Format));
                            return (Calc(Margin,Master[OP_BUY].Summary.Lots,Format));
                            break;
       case MarginShort:    if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Short variance
-                             return (Calc(Margin,BoolToDouble(Summary[Net].Lots<0,fabs(Summary[Net].Lots))+
-                               fdiv(fmin(Master[OP_BUY].Summary.Lots,Master[OP_SELL].Summary.Lots),4),Format));
+                             return (Calc(Margin,fmax(0.00,Value-Master[OP_BUY].Summary.Lots)+
+                               (fmin(Value,Master[OP_BUY].Summary.Lots)*Account.MarginHedged),Format));
                            return (Calc(Margin,Master[OP_SELL].Summary.Lots,Format));
                            break;
       case Equity:         switch (Format)
@@ -393,19 +395,19 @@ void COrder::UpdateSummary(void)
   {
     OrderSummary node;
 
-    double usProfitMin               = 0.00;
-    double usProfitMax               = 0.00;
+    double usProfitMin                     = 0.00;
+    double usProfitMax                     = 0.00;
 
     //-- Initialize Summaries
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      Master[action].TicketMin[0]    = NoValue;
-      Master[action].TicketMax[0]    = NoValue;
+      Master[action].TicketMin[0]          = NoValue;
+      Master[action].TicketMax[0]          = NoValue;
 
       InitSummary(Master[action].Summary);
 
-      for (int pos=0;pos<Total;pos++)
-        InitSummary(Summary[pos]);
+      for (MeasureType measure=0;measure<Total;measure++)
+        InitSummary(Summary[measure]);
 
       ArrayResize(Master[action].Zone,0,100);
     }
@@ -413,82 +415,84 @@ void COrder::UpdateSummary(void)
     //-- Order preliminary aggregation
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      for (int ord=0;ord<OrdersTotal();ord++)
-        if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
-          if (IsEqual(OrderType(),action)&&Symbol()==OrderSymbol())
+      for (int detail=0;detail<ArraySize(Master[action].Order);detail++)
+        if (IsEqual(Master[action].Order[detail].Status,Fulfilled))
+        {
+          //-- Calc Min/Max by Action
+          if (IsEqual(Master[action].Summary.Count,0))
           {
-            //-- Calc Min/Max by Action
-            if (IsEqual(Master[action].Summary.Count,0))
-            {
-              Master[action].TicketMin[0]    = OrderTicket();
-              Master[action].TicketMax[0]    = OrderTicket();
+            Master[action].TicketMin[0]    = Master[action].Order[detail].Ticket;
+            Master[action].TicketMax[0]    = Master[action].Order[detail].Ticket;
 
-              usProfitMin                    = OrderProfit();
-              usProfitMax                    = OrderProfit();
-            }
-            else
-            {
-              Master[action].TicketMin[0]    = BoolToInt(IsLower(OrderProfit(),usProfitMin),OrderTicket(),Master[action].TicketMin[0]);
-              Master[action].TicketMax[0]    = BoolToInt(IsHigher(OrderProfit(),usProfitMax),OrderTicket(),Master[action].TicketMax[0]);
-            }
-
-            //-- Agg By Action
-            ArrayResize(Master[action].Summary.Ticket,++Master[action].Summary.Count,100);
-            Master[action].Summary.Lots     += OrderLots();
-            Master[action].Summary.Value    += OrderProfit();
-            Master[action].Summary.Ticket[Master[action].Summary.Count-1] = OrderTicket();
-
-            //-- Agg By P/L
-            if (NormalizeDouble(OrderProfit(),2)<0.00)
-            {
-              ArrayResize(Summary[Loss].Ticket,++Summary[Loss].Count,100);
-              Summary[Loss].Lots            += OrderLots();
-              Summary[Loss].Value           += OrderProfit();
-              Summary[Loss].Ticket[Summary[Loss].Count-1] = OrderTicket();
-            }
-            else
-            {
-              ArrayResize(Summary[Profit].Ticket,++Summary[Profit].Count,100);
-              Summary[Profit].Lots          += OrderLots();
-              Summary[Profit].Value         += OrderProfit();
-              Summary[Profit].Ticket[Summary[Profit].Count-1] = OrderTicket();
-            }
-
-            //-- Build Zone Summary Nodes By Action
-            node                     = Zone(action,NodeIndex(action,Account.DCA[action]));
-
-            ArrayResize(node.Ticket,++node.Count,100);
-            node.Lots                       += OrderLots();
-            node.Value                      += OrderProfit();
-            node.Ticket[node.Count-1]        = OrderTicket();
-
-            SetNode(action,node);
+            usProfitMin                    = Master[action].Order[detail].Profit;
+            usProfitMax                    = Master[action].Order[detail].Profit;
           }
+          else
+          {
+            Master[action].TicketMin[0]    = BoolToInt(IsLower(Master[action].Order[detail].Profit,usProfitMin),
+                                                Master[action].Order[detail].Ticket,Master[action].TicketMin[0]);
+            Master[action].TicketMax[0]    = BoolToInt(IsHigher(Master[action].Order[detail].Profit,usProfitMax),
+                                                Master[action].Order[detail].Ticket,Master[action].TicketMax[0]);
+          }
+
+          //-- Agg By Action
+          ArrayResize(Master[action].Summary.Ticket,++Master[action].Summary.Count,100);
+          Master[action].Summary.Lots     += Master[action].Order[detail].Lots;
+          Master[action].Summary.Value    += Master[action].Order[detail].Profit;
+          Master[action].Summary.Ticket[Master[action].Summary.Count-1] = Master[action].Order[detail].Ticket;
+
+          //-- Agg By P/L
+          if (NormalizeDouble(Master[action].Order[detail].Profit,2)<0.00)
+          {
+            ArrayResize(Summary[Loss].Ticket,++Summary[Loss].Count,100);
+            Summary[Loss].Lots            += Master[action].Order[detail].Lots;
+            Summary[Loss].Value           += Master[action].Order[detail].Profit;
+            Summary[Loss].Ticket[Summary[Loss].Count-1] = Master[action].Order[detail].Ticket;
+          }
+          else
+          {
+            ArrayResize(Summary[Profit].Ticket,++Summary[Profit].Count,100);
+            Summary[Profit].Lots          += Master[action].Order[detail].Lots;
+            Summary[Profit].Value         += Master[action].Order[detail].Profit;
+            Summary[Profit].Ticket[Summary[Profit].Count-1] = Master[action].Order[detail].Ticket;
+          }
+
+          //-- Build Zone Summary Nodes By Action
+          node                     = Zone(action,NodeIndex(action,Account.DCA[action]));
+
+          ArrayResize(node.Ticket,++node.Count,100);
+          node.Lots                       += Master[action].Order[detail].Lots;
+          node.Value                      += Master[action].Order[detail].Profit;
+          node.Ticket[node.Count-1]        = Master[action].Order[detail].Ticket;
+
+          SetNode(action,node);
+        }
     }
 
     //-- Compute interim Net Values req'd by Equity/Margin calcs
-    Summary[Net].Count               = Master[OP_BUY].Summary.Count-Master[OP_SELL].Summary.Count;
-    Summary[Net].Lots                = Master[OP_BUY].Summary.Lots-Master[OP_SELL].Summary.Lots;
-    Summary[Net].Value               = Master[OP_BUY].Summary.Value+Master[OP_SELL].Summary.Value;
+    Summary[Net].Count                     = Master[OP_BUY].Summary.Count-Master[OP_SELL].Summary.Count;
+    Summary[Net].Lots                      = Master[OP_BUY].Summary.Lots-Master[OP_SELL].Summary.Lots;
+    Summary[Net].Value                     = Master[OP_BUY].Summary.Value+Master[OP_SELL].Summary.Value;
 
     //-- Calc Action Aggregates
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       for (int index=0;index<ArraySize(Master[action].Zone);index++)
       {
-        Master[action].Zone[index].Equity   = Equity(Master[action].Zone[index].Value,InPercent);
-        Master[action].Zone[index].Margin   = Margin(action,Master[action].Zone[index].Lots,InPercent)*fdiv(Master[action].Zone[index].Lots,Master[action].Summary.Lots,1);
+        Master[action].Zone[index].Equity  = Equity(Master[action].Zone[index].Value,InPercent);
+        Master[action].Zone[index].Margin  = Margin(action,Master[action].Zone[index].Lots,InPercent)
+                                               *fdiv(Master[action].Zone[index].Lots,Master[action].Summary.Lots,1);
       }
 
-      Master[action].Summary.Equity  = Equity(Master[action].Summary.Value,InPercent);
-      Master[action].Summary.Margin  = Margin(action,Master[action].Summary.Lots,InPercent);
+      Master[action].Summary.Equity        = Equity(Master[action].Summary.Value,InPercent);
+      Master[action].Summary.Margin        = Margin(action,Master[action].Summary.Lots,InPercent);
     }
 
     //-- Calc P/L Aggregates
     for (MeasureType measure=0;measure<Total;measure++)
     {
-      Summary[measure].Equity        = Equity(Summary[measure].Value,InPercent);
-      Summary[measure].Margin        = Margin(Summary[measure].Lots,InPercent);
+      Summary[measure].Equity              = Equity(Summary[measure].Value,InPercent);
+      Summary[measure].Margin              = Margin(Summary[measure].Lots,InPercent);
     }
   }
 
@@ -508,6 +512,7 @@ void COrder::UpdateAccount(void)
     Account.Margin                  = NormalizeDouble(AccountMargin()/AccountEquity(),3);
     Account.LotMargin               = NormalizeDouble(BoolToDouble(Symbol()=="USDJPY",(MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)),
                                         (MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)*Close[0]))/AccountLeverage(),2);
+    Account.MarginHedged            = fdiv(MarketInfo(Symbol(),MODE_MARGINHEDGED),MarketInfo(Symbol(),MODE_LOTSIZE),2);
   }
 
 //+------------------------------------------------------------------+
@@ -791,6 +796,9 @@ bool COrder::OrderApproved(OrderRequest &Request)
         if (IsLower(Margin(Request.Action,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),
                                Master[Request.Action].MaxMargin,NoUpdate))
         {
+          Print("Lots Before:"+DoubleToStr(Master[Request.Action].Summary.Lots,2)+" Req:"+DoubleToStr(LotSize(Request.Action,Request.Lots),2)+" Margin Now:"
+               +DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary.Lots,InPercent),1)+" Req:"
+               +DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),1));
           //-- if zone limits met
           if (Zone(Request.Action,NodeIndex(Request.Action,Account.DCA[Request.Action])).Margin>0.00)
           {

@@ -230,11 +230,41 @@ void Test4(void)
   }
 
 //+------------------------------------------------------------------+
+//| Margin management                                                |
+//+------------------------------------------------------------------+
+void Test5(void)
+  {
+    static int action  = OP_BUY;
+    OrderRequest eRequest   = order.BlankRequest();
+    
+    eRequest.Requestor      = "Test[5] Margin";
+    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
+    
+    
+    order.SetRiskLimits(OP_BUY,80,80,2);
+      
+    //--- Queue Order Test
+    if (Tick<20)
+    {
+      eRequest.Pend.Type       = OP_SELLSTOP;
+      eRequest.Pend.Limit      = 17.75;
+      eRequest.Pend.Step       = 2;
+      eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_SELLLIMIT;
+      eRequest.TakeProfit      = 18.12;
+      eRequest.Price           = 17.982;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+     
+      order.Submitted(eRequest);
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test   2
+    #define Test  5
 
     Comment("Tick: "+(string)++Tick);
     
@@ -248,12 +278,16 @@ void Execute(void)
                break;
       case 4:  Test4();
                break;
+      case 5:  Test5();
+               break;
     }
     
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
     order.Execute(CBatch,true);
+       Print("Free margin required to open 1 lot for buying=",MarketInfo(Symbol(),MODE_MARGINREQUIRED)); 
+
 //    if (Tick==5) Print (">>>After:"+order.OrderStr());
     
     //if (order.Fulfilled())
@@ -315,7 +349,35 @@ int OnInit()
       order.SetZoneStep(action,2.5,60.0);
     }
     
-         
+Print("Symbol=",Symbol()); 
+   Print("Low day price=",MarketInfo(Symbol(),MODE_LOW)); 
+   Print("High day price=",MarketInfo(Symbol(),MODE_HIGH)); 
+   Print("The last incoming tick time=",(MarketInfo(Symbol(),MODE_TIME))); 
+   Print("Last incoming bid price=",MarketInfo(Symbol(),MODE_BID)); 
+   Print("Last incoming ask price=",MarketInfo(Symbol(),MODE_ASK)); 
+   Print("Point size in the quote currency=",MarketInfo(Symbol(),MODE_POINT)); 
+   Print("Digits after decimal point=",MarketInfo(Symbol(),MODE_DIGITS)); 
+   Print("Spread value in points=",MarketInfo(Symbol(),MODE_SPREAD)); 
+   Print("Stop level in points=",MarketInfo(Symbol(),MODE_STOPLEVEL)); 
+   Print("Lot size in the base currency=",MarketInfo(Symbol(),MODE_LOTSIZE)); 
+   Print("Tick value in the deposit currency=",MarketInfo(Symbol(),MODE_TICKVALUE)); 
+   Print("Tick size in points=",MarketInfo(Symbol(),MODE_TICKSIZE));  
+   Print("Swap of the buy order=",MarketInfo(Symbol(),MODE_SWAPLONG)); 
+   Print("Swap of the sell order=",MarketInfo(Symbol(),MODE_SWAPSHORT)); 
+   Print("Market starting date (for futures)=",MarketInfo(Symbol(),MODE_STARTING)); 
+   Print("Market expiration date (for futures)=",MarketInfo(Symbol(),MODE_EXPIRATION)); 
+   Print("Trade is allowed for the symbol=",MarketInfo(Symbol(),MODE_TRADEALLOWED)); 
+   Print("Minimum permitted amount of a lot=",MarketInfo(Symbol(),MODE_MINLOT)); 
+   Print("Step for changing lots=",MarketInfo(Symbol(),MODE_LOTSTEP)); 
+   Print("Maximum permitted amount of a lot=",MarketInfo(Symbol(),MODE_MAXLOT)); 
+   Print("Swap calculation method=",MarketInfo(Symbol(),MODE_SWAPTYPE)); 
+   Print("Profit calculation mode=",MarketInfo(Symbol(),MODE_PROFITCALCMODE)); 
+   Print("Margin calculation mode=",MarketInfo(Symbol(),MODE_MARGINCALCMODE)); 
+   Print("Initial margin requirements for 1 lot=",MarketInfo(Symbol(),MODE_MARGININIT)); 
+   Print("Margin to maintain open orders calculated for 1 lot=",MarketInfo(Symbol(),MODE_MARGINMAINTENANCE)); 
+   Print("Hedged margin calculated for 1 lot=",MarketInfo(Symbol(),MODE_MARGINHEDGED)); 
+   Print("Free margin required to open 1 lot for buying=",MarketInfo(Symbol(),MODE_MARGINREQUIRED)); 
+   Print("Order freeze level in points=",MarketInfo(Symbol(),MODE_FREEZELEVEL));  
     NewLine("czDCA:0");
 
     Print(order.MasterStr(OP_BUY));
