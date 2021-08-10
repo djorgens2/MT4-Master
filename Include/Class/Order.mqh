@@ -80,6 +80,7 @@ private:
                         double          NetProfit[2];    //-- Net profit by Action
                         double          DCA[2];
                         double          Balance;
+                        double          Variance;
                         double          Spread;
                         double          Margin;
                         double          MarginLong;
@@ -198,11 +199,11 @@ private:
           void         AppendLog(int Key, int Ticket,string Note);
           void         PurgeLog(int Retain=0);
 
-          double       CalcMetric(OrderMetric Metric, double Value, int Format=InPercent);
+          double       Calc(OrderMetric Metric, double Value, int Format=InPercent);
 
           void         InitMaster(int Action, TradeState DefaultState);
           void         InitSummary(OrderSummary &Line, int Node=NoValue);
-
+          void         UpdateMaster(void);
           void         UpdateSummary(void);
           void         UpdateAccount(void);
           void         UpdateOrder(OrderDetail &Order);
@@ -235,9 +236,14 @@ public:
           void         EnableTrade(int Action)           {Master[Action].TradeEnabled=true;};
           void         DisableTrade(int Action)          {Master[Action].TradeEnabled=false;};
 
-          //-- Order methods
+          //-- Order properties
           double       Price(MeasureType Type, int Action, double Requested, double Basis=0.00);
           double       LotSize(int Action, double Lots=0.00);
+          double       Margin(double Lots, int Format=InPercent)             {return(Calc(Margin,Lots,Format));};
+          double       Margin(int Action, double Lots, int Format=InPercent) {return(Calc((OrderMetric)BoolToInt(IsEqual(Operation(Action),OP_BUY),MarginLong,MarginShort),Lots,Format));};
+          double       Equity(double Value, int Format=InPercent)            {return(Calc(Equity,Value,Format));};
+
+          //-- Order methods
           void         Cancel(int Action, string Reason="");
           void         Cancel(OrderRequest &Request, QueueStatus Status, string Reason="");
           bool         Fulfilled(int Action=OP_NO_ACTION);
@@ -305,9 +311,9 @@ void COrder::PurgeLog(int Retain=0)
   }
 
 //+------------------------------------------------------------------+
-//| CalcMetric - Returns derived order Metric for the Value supplied |
+//| Calc - Returns derived order Metric for the Value supplied       |
 //+------------------------------------------------------------------+
-double COrder::CalcMetric(OrderMetric Metric, double Value, int Format=InPercent)
+double COrder::Calc(OrderMetric Metric, double Value, int Format=InPercent)
   {
     switch (Metric)
     {
@@ -318,15 +324,15 @@ double COrder::CalcMetric(OrderMetric Metric, double Value, int Format=InPercent
                              case InDollar:  return (NormalizeDouble(Value*Account.LotMargin,2));
                            }
                            break;
-      case MarginLong:     if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess variance
-                             return (CalcMetric(Margin,BoolToDouble(Summary[Net].Lots>0,Summary[Net].Lots)+
+      case MarginLong:     if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Long variance
+                             return (Calc(Margin,BoolToDouble(Summary[Net].Lots>0,Summary[Net].Lots)+
                                fdiv(fmin(Master[OP_BUY].Summary.Lots,Master[OP_SELL].Summary.Lots),4),Format));
-                           return (CalcMetric(Margin,Master[OP_BUY].Summary.Lots,Format));
+                           return (Calc(Margin,Master[OP_BUY].Summary.Lots,Format));
                            break;
-      case MarginShort:    if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess variance
-                             return (CalcMetric(Margin,BoolToDouble(Summary[Net].Lots<0,fabs(Summary[Net].Lots))+
+      case MarginShort:    if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Short variance
+                             return (Calc(Margin,BoolToDouble(Summary[Net].Lots<0,fabs(Summary[Net].Lots))+
                                fdiv(fmin(Master[OP_BUY].Summary.Lots,Master[OP_SELL].Summary.Lots),4),Format));
-                           return (CalcMetric(Margin,Master[OP_SELL].Summary.Lots,Format));
+                           return (Calc(Margin,Master[OP_SELL].Summary.Lots,Format));
                            break;
       case Equity:         switch (Format)
                            {
@@ -389,13 +395,10 @@ void COrder::UpdateSummary(void)
 
     double usProfitMin               = 0.00;
     double usProfitMax               = 0.00;
-    double usExtended                = 0.00;
 
     //-- Initialize Summaries
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      Account.DCA[action]            = 0.00;
-      
       Master[action].TicketMin[0]    = NoValue;
       Master[action].TicketMax[0]    = NoValue;
 
@@ -414,11 +417,7 @@ void COrder::UpdateSummary(void)
         if (OrderSelect(ord,SELECT_BY_POS,MODE_TRADES))
           if (IsEqual(OrderType(),action)&&Symbol()==OrderSymbol())
           {
-            MergeOrder(OrderType(),OrderTicket());
-
-            //-- Calc Min/Max/Extended by Action
-            usExtended                      += OrderOpenPrice()*OrderLots();
-
+            //-- Calc Min/Max by Action
             if (IsEqual(Master[action].Summary.Count,0))
             {
               Master[action].TicketMin[0]    = OrderTicket();
@@ -432,16 +431,6 @@ void COrder::UpdateSummary(void)
               Master[action].TicketMin[0]    = BoolToInt(IsLower(OrderProfit(),usProfitMin),OrderTicket(),Master[action].TicketMin[0]);
               Master[action].TicketMax[0]    = BoolToInt(IsHigher(OrderProfit(),usProfitMax),OrderTicket(),Master[action].TicketMax[0]);
             }
-
-            //-- Build and Agg Zone Summary By Action
-            node                     = Zone(action,NodeIndex(action,OrderOpenPrice()));
-
-            ArrayResize(node.Ticket,++node.Count,100);
-            node.Lots                       += OrderLots();
-            node.Value                      += OrderProfit();
-            node.Ticket[node.Count-1]        = OrderTicket();
-
-            SetNode(action,node);
 
             //-- Agg By Action
             ArrayResize(Master[action].Summary.Ticket,++Master[action].Summary.Count,100);
@@ -464,12 +453,17 @@ void COrder::UpdateSummary(void)
               Summary[Profit].Value         += OrderProfit();
               Summary[Profit].Ticket[Summary[Profit].Count-1] = OrderTicket();
             }
-          }
 
-      //-- Calc DCA
-      Account.DCA[action]     = BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask)
-                               -fdiv((Master[action].Summary.Lots*BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask))
-                               -usExtended,Master[action].Summary.Lots);
+            //-- Build Zone Summary Nodes By Action
+            node                     = Zone(action,NodeIndex(action,Account.DCA[action]));
+
+            ArrayResize(node.Ticket,++node.Count,100);
+            node.Lots                       += OrderLots();
+            node.Value                      += OrderProfit();
+            node.Ticket[node.Count-1]        = OrderTicket();
+
+            SetNode(action,node);
+          }
     }
 
     //-- Compute interim Net Values req'd by Equity/Margin calcs
@@ -482,25 +476,20 @@ void COrder::UpdateSummary(void)
     {
       for (int index=0;index<ArraySize(Master[action].Zone);index++)
       {
-        Master[action].Zone[index].Equity   = CalcMetric(Equity,Master[action].Zone[index].Value,InPercent);
-        Master[action].Zone[index].Margin   = CalcMetric((OrderMetric)BoolToInt(IsEqual(action,OP_BUY),MarginLong,MarginShort),
-                                                Master[action].Zone[index].Lots,InPercent)*fdiv(Master[action].Zone[index].Lots,Master[action].Summary.Lots,1);
+        Master[action].Zone[index].Equity   = Equity(Master[action].Zone[index].Value,InPercent);
+        Master[action].Zone[index].Margin   = Margin(action,Master[action].Zone[index].Lots,InPercent)*fdiv(Master[action].Zone[index].Lots,Master[action].Summary.Lots,1);
       }
 
-      Master[action].Summary.Equity  = CalcMetric(Equity,Master[action].Summary.Value,InPercent);
-      Master[action].Summary.Margin  = CalcMetric((OrderMetric)BoolToInt(IsEqual(action,OP_BUY),MarginLong,MarginShort),Master[action].Summary.Lots,InPercent);
+      Master[action].Summary.Equity  = Equity(Master[action].Summary.Value,InPercent);
+      Master[action].Summary.Margin  = Margin(action,Master[action].Summary.Lots,InPercent);
     }
 
     //-- Calc P/L Aggregates
-    Summary[Profit].Equity           = CalcMetric(Equity,Summary[Profit].Value,InPercent);
-    Summary[Profit].Margin           = CalcMetric(Margin,Summary[Profit].Lots,InPercent);
-
-    Summary[Loss].Equity             = CalcMetric(Equity,Summary[Loss].Value,InPercent);
-    Summary[Loss].Margin             = CalcMetric(Margin,Summary[Loss].Lots,InPercent);
-
-    //-- Calc Net Aggregates
-    Summary[Net].Equity              = CalcMetric(Equity,Summary[Net].Value,InPercent);
-    Summary[Net].Margin              = CalcMetric(Margin,Summary[Net].Lots,InPercent);
+    for (MeasureType measure=0;measure<Total;measure++)
+    {
+      Summary[measure].Equity        = Equity(Summary[measure].Value,InPercent);
+      Summary[measure].Margin        = Margin(Summary[measure].Lots,InPercent);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -508,8 +497,8 @@ void COrder::UpdateSummary(void)
 //+------------------------------------------------------------------+
 void COrder::UpdateAccount(void)
   {
-    double Variance;
-    
+    Account.Variance                = Account.Balance-(AccountBalance()+AccountCredit());
+    Account.Balance                 = AccountBalance()+AccountCredit();
     Account.EquityOpen              = NormalizeDouble((AccountEquity()-(AccountBalance()+AccountCredit()))/AccountEquity(),3);
     Account.EquityClosed            = NormalizeDouble((AccountEquity()-(AccountBalance()+AccountCredit()))/(AccountBalance()+AccountCredit()),3);
     Account.EquityVariance          = NormalizeDouble(Account.EquityOpen-Account.EquityClosed,3);
@@ -519,26 +508,67 @@ void COrder::UpdateAccount(void)
     Account.Margin                  = NormalizeDouble(AccountMargin()/AccountEquity(),3);
     Account.LotMargin               = NormalizeDouble(BoolToDouble(Symbol()=="USDJPY",(MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)),
                                         (MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)*Close[0]))/AccountLeverage(),2);
+  }
 
-    if (IsChanged(Account.Balance,AccountBalance()+AccountCredit(),Variance,Always,2))
-      for (int action=OP_BUY;action<=OP_SELL;action++)
-        //-- Initialize
-        if (IsEqual(Account.Balance,Variance))
-        {
-          Account.EquityBase[action]                  = Account.Balance;
-          Account.NetProfit[action]                   = 0.00;
-        }
+//+------------------------------------------------------------------+
+//| UpdateMaster - Maintains the order master                        |
+//+------------------------------------------------------------------+
+void COrder::UpdateMaster(void)
+  {
+    OrderDetail updated[];
+    
+    double extended;
+    double lots;
+    
+    //-- Merge Untracked/Update Tracked
+    for (int position=0;position<OrdersTotal();position++)
+      if (OrderSelect(position,SELECT_BY_POS,MODE_TRADES))
+        if (IsEqual(Symbol(),OrderSymbol(),false))
+          MergeOrder(OrderType(),OrderTicket());
+
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      ArrayResize(updated,0,1000);
+      
+      Account.DCA[action]                          = 0.00;
+
+      extended                                     = 0.00;
+      lots                                         = 0.00;
+      
+      for (int ticket=0;ticket<ArraySize(Master[action].Order);ticket++)
+      {
+        if (IsEqual(Master[action].Order[ticket].Status,Closed))
+          Master[action].Order[ticket].Status       = Completed;
         else
+        if (OrderSelect(Master[action].Order[ticket].Ticket,SELECT_BY_TICKET,MODE_HISTORY))
+           if (OrderCloseTime()>0)
+           {
+             Master[action].Order[ticket].Status    = Closed;
 
-        //-- Resolve OOB
-        for (int ticket=0;ticket<ArraySize(Master[action].Order);ticket++)
-          if (OrderSelect(ticket,SELECT_BY_TICKET,MODE_HISTORY))
-             if (OrderCloseTime()>0)
-             {
-               Master[action].Order[ticket].Status    = Closed;
-               Account.EquityBase[action]            += OrderProfit()+OrderSwap();
-               Account.NetProfit[action]             += OrderProfit()+OrderSwap();
-             }
+             Account.EquityBase[action]            += OrderProfit()+OrderSwap();
+             Account.NetProfit[action]             += OrderProfit()+OrderSwap();
+           }
+           else
+           {
+             extended                              += OrderLots()*OrderOpenPrice();
+             lots                                  += OrderLots();
+           }
+         
+        if (!IsEqual(Master[action].Order[ticket].Status,Completed))
+        {
+          ArrayResize(updated,ArraySize(updated)+1);      
+          updated[ArraySize(updated)-1]             = Master[action].Order[ticket];
+        }
+      }
+
+      Account.DCA[action]     = BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask)
+                                  -fdiv((lots*BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask))-extended,lots);
+      
+      ArrayResize(Master[action].Order,ArraySize(updated),1000);
+
+      for (int update=0;update<ArraySize(updated);update++)
+        Master[action].Order[update]                = updated[update];
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -611,7 +641,8 @@ void COrder::UpdatePanel(void)
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled","Disabled"),BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].State),"Disabled"),
+                     BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
     }
 
     //-- Row 2: Request Queue
@@ -757,10 +788,13 @@ bool COrder::OrderApproved(OrderRequest &Request)
     if (TradeEnabled(Request))
     {
       if (IsEqual(Request.Status,Pending)||IsEqual(Request.Status,Immediate))
-        if (IsLower(CalcMetric(Margin,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),
+        if (IsLower(Margin(Request.Action,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),
                                Master[Request.Action].MaxMargin,NoUpdate))
         {
           //-- if zone limits met
+          if (Zone(Request.Action,NodeIndex(Request.Action,Account.DCA[Request.Action])).Margin>0.00)
+          {
+          }
           Request.Status        = Approved;
           return (true);
           //-- else
@@ -769,7 +803,7 @@ bool COrder::OrderApproved(OrderRequest &Request)
         else
         {
           Request.Status        = Declined;
-          Request.Memo          = "Margin limit "+DoubleToStr(CalcMetric(Margin,Master[Request.Action].Summary.Lots+
+          Request.Memo          = "Margin limit "+DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary.Lots+
                                                               LotSize(Request.Action,Request.Lots),InPercent),1)+"% exceeded";
 
           AppendLog(Request.Key,NoValue,"[Approval]"+Request.Memo);
@@ -996,6 +1030,7 @@ void COrder::ProcessRequests(void)
 
             //-- Reconcile
             UpdateAccount();
+            UpdateMaster();
             UpdateSummary();
           }
           
@@ -1021,6 +1056,7 @@ void COrder::ProcessOrders(void)
     
     //-- Reconcile
     UpdateAccount();
+    UpdateMaster();
     UpdateSummary();
     UpdatePanel();
   }
@@ -1030,22 +1066,29 @@ void COrder::ProcessOrders(void)
 //+------------------------------------------------------------------+
 COrder::COrder(BrokerModel Model, TradeState LongState, TradeState ShortState)
   {
-     //-- Initialize Account
-     Account.MarginModel    = Model;
-     Account.TradeEnabled   = !(IsEqual(LongState,Halt)&&IsEqual(ShortState,Halt));
-     Account.MaxSlippage    = 3;
+    //-- Initialize Account
+    Account.MarginModel    = Model;
+    Account.TradeEnabled   = !(IsEqual(LongState,Halt)&&IsEqual(ShortState,Halt));
+    Account.MaxSlippage    = 3;
 
-     Account.Balance        = 0.00;
+    Account.Balance        = AccountBalance()+AccountCredit();
 
-     Account.LotSizeMin     = NormalizeDouble(MarketInfo(Symbol(),MODE_MINLOT),2);
-     Account.LotSizeMax     = NormalizeDouble(MarketInfo(Symbol(),MODE_MAXLOT),2);
-     Account.LotPrecision   = BoolToInt(IsEqual(Account.LotSizeMin,0.01),2,1);
+    Account.LotSizeMin     = NormalizeDouble(MarketInfo(Symbol(),MODE_MINLOT),2);
+    Account.LotSizeMax     = NormalizeDouble(MarketInfo(Symbol(),MODE_MAXLOT),2);
+    Account.LotPrecision   = BoolToInt(IsEqual(Account.LotSizeMin,0.01),2,1);
 
-     InitMaster(OP_BUY,LongState);
-     InitMaster(OP_SELL,ShortState);
+    InitMaster(OP_BUY,LongState);
+    InitMaster(OP_SELL,ShortState);
 
-     UpdateAccount();
-     UpdateSummary();     
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      Account.EquityBase[action]                  = Account.Balance;
+      Account.NetProfit[action]                   = 0.00;
+    }
+
+    UpdateAccount();
+    UpdateMaster();
+    UpdateSummary();     
   }
 
 //+------------------------------------------------------------------+
@@ -1088,6 +1131,7 @@ void COrder::Execute(int &Batch[], bool Conditional=true)
         if (OrderClosed(Ticket(Batch[ticket])))
         {
           UpdateAccount();
+          UpdateMaster();
           UpdateSummary();
         }
       }

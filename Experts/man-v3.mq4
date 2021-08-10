@@ -160,7 +160,13 @@ void Test2(void)
 //      if (order[OP_BUY].Count>0)
 //        Print(order.ZoneSummaryStr());
 //
-      Print(order.QueueStr());
+      if (order.Fulfilled())
+      {
+//        Print(DoubleToStr(Account.DCA[OP_BUY],Digits));
+        Print(order.OrderStr());
+      } 
+
+//      Print(order.QueueStr());
   }
 
 //+------------------------------------------------------------------+
@@ -192,12 +198,7 @@ void Test3(void)
         order.Submitted(eRequest);
 //        order.PrintLog();
 //        Print(order.QueueStr());
-      }
-      
-      if (order.Fulfilled())
-      {
-//        order.PrintLog();       
-      } 
+      }      
   }
 
 //+------------------------------------------------------------------+
@@ -252,9 +253,8 @@ void Execute(void)
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
-    if (Tick==5) Print (">>>Before:"+order.OrderStr());
     order.Execute(CBatch,true);
-    if (Tick==5) Print (">>>After:"+order.OrderStr());
+//    if (Tick==5) Print (">>>After:"+order.OrderStr());
     
     //if (order.Fulfilled())
     //{
