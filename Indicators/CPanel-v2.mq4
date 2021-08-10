@@ -83,12 +83,32 @@ int OnInit()
     DrawBox("bxfOC-Long",361,28,298,144,C'0,42,0',BORDER_FLAT,IndWinId);
     DrawBox("bxfOC-Short",961,28,298,144,C'42,0,0',BORDER_FLAT,IndWinId);
     
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-      NewLabel("lbhOC-"+ActionText(action)+"-Trading","Trading",370+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
+//    for (int action=OP_BUY;action<=OP_SELL;action++)
+//    {
+//      NewLabel("lbhOC-"+ActionText(action)+"-Trading","Trading",370+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
+//
+//      NewLabel("lbvOC-"+ActionText(action)+"-Enabled","Enabled",410+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
+//    }
+    for (int row=0;row<11;row++)
+      for (int col=0;col<=OP_SELL;col++)
+      {
+        if (row==0)
+        {
+          NewLabel("lbhOD-"+ActionText(col)+"F","Fibo%",374+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"#","#",418+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"L","Lots",444+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"V","------ Value -------",482+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"M","Mrg%",578+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+          NewLabel("lbhOD-"+ActionText(col)+"E","Eq%",625+(col*600),30,clrGoldenrod,SCREEN_UL,IndWinId);
+        }
 
-      NewLabel("lbvOC-"+ActionText(action)+"-Enabled","Enabled",410+(300*action),32,clrWhite,SCREEN_UL,IndWinId);
-    }
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"F","-999.9",368+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"#","99",412+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"L","000.00",427+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"V","-0000000",482+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"M","00.0",556+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+        NewLabel("lbvOD-"+ActionText(col)+(string)row+"E","999.9",613+(col*600),44+(11*row),clrDarkGray,SCREEN_UL,IndWinId);
+      }
 
     string key;
     

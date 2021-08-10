@@ -234,29 +234,41 @@ void Test4(void)
 //+------------------------------------------------------------------+
 void Test5(void)
   {
-    static int action  = OP_BUY;
     OrderRequest eRequest   = order.BlankRequest();
     
     eRequest.Requestor      = "Test[5] Margin";
-    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
     
     
     order.SetRiskLimits(OP_BUY,80,80,2);
+    order.SetRiskLimits(OP_SELL,80,80,5);
       
     //--- Queue Order Test
-    if (Tick<20)
+    if (Tick<4)
     {
-      eRequest.Pend.Type       = OP_SELLSTOP;
-      eRequest.Pend.Limit      = 17.75;
-      eRequest.Pend.Step       = 2;
-      eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELLLIMIT;
+      //eRequest.Pend.Type       = OP_SELLSTOP;
+      //eRequest.Pend.Limit      = 17.75;
+      //eRequest.Pend.Step       = 2;
+      //eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_BUY;
       eRequest.TakeProfit      = 18.12;
       eRequest.Price           = 17.982;
       eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-     
-      order.Submitted(eRequest);
     }
+    else
+    if (Tick<8)
+    {
+      //eRequest.Pend.Type       = OP_SELLSTOP;
+      //eRequest.Pend.Limit      = 17.75;
+      //eRequest.Pend.Step       = 2;
+      //eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_SELL;
+      eRequest.TakeProfit      = 18.12;
+      eRequest.Price           = 17.982;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));     
+    }
+    
+    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
+    order.Submitted(eRequest);
   }
 
 //+------------------------------------------------------------------+
@@ -264,7 +276,7 @@ void Test5(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test  5
+    #define Test  2
 
     Comment("Tick: "+(string)++Tick);
     

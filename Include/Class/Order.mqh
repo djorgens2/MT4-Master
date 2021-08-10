@@ -458,7 +458,7 @@ void COrder::UpdateSummary(void)
           }
 
           //-- Build Zone Summary Nodes By Action
-          node                     = Zone(action,NodeIndex(action,Account.DCA[action]));
+          node                     = Zone(action,NodeIndex(action,Master[action].Order[detail].Price));
 
           ArrayResize(node.Ticket,++node.Count,100);
           node.Lots                       += Master[action].Order[detail].Lots;
@@ -480,8 +480,7 @@ void COrder::UpdateSummary(void)
       for (int index=0;index<ArraySize(Master[action].Zone);index++)
       {
         Master[action].Zone[index].Equity  = Equity(Master[action].Zone[index].Value,InPercent);
-        Master[action].Zone[index].Margin  = Margin(action,Master[action].Zone[index].Lots,InPercent)
-                                               *fdiv(Master[action].Zone[index].Lots,Master[action].Summary.Lots,1);
+        Master[action].Zone[index].Margin  = Margin(action,Master[action].Zone[index].Lots,InPercent);
       }
 
       Master[action].Summary.Equity        = Equity(Master[action].Summary.Value,InPercent);
@@ -492,7 +491,7 @@ void COrder::UpdateSummary(void)
     for (MeasureType measure=0;measure<Total;measure++)
     {
       Summary[measure].Equity              = Equity(Summary[measure].Value,InPercent);
-      Summary[measure].Margin              = Margin(Summary[measure].Lots,InPercent);
+      Summary[measure].Margin              = BoolToDouble(IsEqual(measure,Net),Margin(InPercent));
     }
   }
 
@@ -649,6 +648,26 @@ void COrder::UpdatePanel(void)
       UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].State),"Disabled"),
                      BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
     }
+    for (int node=0;node<11;node++)
+      for (int action=0;action<=OP_SELL;action++)
+        if (node<ArraySize(Master[action].Zone))
+        {
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"F",IntegerToString(Master[action].Zone[node].Index,3),clrDarkGray,9,"Consolas");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"#",IntegerToString(Master[action].Zone[node].Count,2),clrDarkGray,9,"Consolas");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"L",LPad(DoubleToString(Master[action].Zone[node].Lots,Account.LotPrecision)," ",6),clrDarkGray,9,"Consolas");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"V","$"+LPad(DoubleToString(Master[action].Zone[node].Value,0)," ",11),clrDarkGray,9,"Consolas");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"M",LPad(DoubleToString(Master[action].Zone[node].Margin,1)+"%"," ",7),clrDarkGray,9,"Consolas");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"E",LPad(DoubleToString(Master[action].Zone[node].Equity,1)+"%"," ",7),clrDarkGray,9,"Consolas");
+        }
+        else
+        {
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"F","");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"#","");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"L","");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"V","");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"M","");
+          UpdateLabel("lbvOD-"+ActionText(action)+(string)node+"E","");
+        }
 
     //-- Row 2: Request Queue
     int qstart  = fmax(0,ArraySize(Queue)-25);
@@ -1388,8 +1407,8 @@ int COrder::NodeIndex(int Action, double Price)
   {
     switch(Action)
     {
-      case OP_BUY:   return((int)ceil(fdiv(Close[0]-Price,point(Master[Action].Step),Digits+1)));
-      case OP_SELL:  return((int)ceil(fdiv(Price,point(Master[Action].Step)-Close[0],Digits+1)));
+      case OP_BUY:   return((int)ceil(fdiv(Account.DCA[OP_BUY]-Price,point(Master[Action].Step),Digits+1)));
+      case OP_SELL:  return((int)ceil(fdiv(Price,point(Master[Action].Step)-Account.DCA[OP_BUY],Digits+1)));
     }
     
     return (0);
