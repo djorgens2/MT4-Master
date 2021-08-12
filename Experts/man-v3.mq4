@@ -33,7 +33,7 @@ void GetData(void)
 void RefreshScreen(void)
   {
 
-    UpdateLine("czDCA:"+(string)OP_BUY,Account.DCA[OP_BUY],STYLE_SOLID,clrYellow);  
+    UpdateLine("czDCA:"+(string)OP_BUY,Account.DCA[OP_SELL],STYLE_SOLID,clrYellow);  
   }
 
 //+------------------------------------------------------------------+
@@ -148,7 +148,7 @@ void Test2(void)
         eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
     
 //        Print(order.RequestStr(eRequest));
-//        if (order.Submitted(eRequest))
+        if (order.Submitted(eRequest))
 //          Print(order.RequestStr(eRequest));
           fill=true;
           

@@ -259,7 +259,7 @@ public:
           OrderRequest Request(int Key, int Ticket=NoValue);
           OrderSummary Zone(int Action, int Node);
 
-          int          NodeIndex(int Action, double Price);
+          int          NodeIndex(int Action, double Price) {return((int)ceil(fdiv(Price-(Account.DCA[Action]+Account.Spread),point(Master[Action].Step),Digits)));};
 
           //-- Configuration methods
           void         SetNode(int Action, OrderSummary &Node);
@@ -1422,20 +1422,6 @@ OrderSummary COrder::Zone(int Action, int Index)
     InitSummary(Node,Index);
     
     return(Node);
-  }
-
-//+------------------------------------------------------------------+
-//| NodeIndex - Returns Node by Price                                |
-//+------------------------------------------------------------------+
-int COrder::NodeIndex(int Action, double Price)
-  {
-    switch(Action)
-    {
-      case OP_BUY:   return((int)ceil(fdiv(Account.DCA[OP_BUY]-Price,point(Master[Action].Step),Digits)));
-      case OP_SELL:  return((int)ceil(fdiv(Price,point(Master[Action].Step)-Account.DCA[OP_SELL],Digits)));
-    }
-    
-    return (0);
   }
 
 //+------------------------------------------------------------------+
