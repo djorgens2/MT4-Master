@@ -12,11 +12,13 @@
 #include <Class\Order.mqh>
 
   COrder *order            = new COrder(Discount,Hold,Hold);
-  AccountMetrics Account;
 
   int Tick                 = 0;
 
-  int CBatch[];
+  AccountMetrics Account;
+  int            Tickets[];
+  OrderSummary   NodeNow[2];
+  int            IndexNow[2];
 
 
 //+------------------------------------------------------------------+
@@ -24,7 +26,26 @@
 //+------------------------------------------------------------------+`
 void GetData(void)
   {
-    order.Update(Account);  
+    static int index[2]  = {0,0};
+    
+    order.Update(Account);
+    
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      IndexNow[action]    = order.Index(action);
+      NodeNow[action]     = order.Node(action,IndexNow[action]);
+
+      if (IsChanged(index[action],IndexNow[action]))
+        Print(order.ZoneSummaryStr(action));
+    }
+    
+    if (order.Fulfilled())
+    {
+      Print(DoubleToStr(order[Net].Margin,1)+"%");
+      Print(DoubleToStr(order[OP_BUY].Lots,Account.LotPrecision)+" $"+DoubleToStr(order[OP_BUY].Value,0));
+      for (int node=0;node<order.Nodes(OP_BUY);node++)
+      Print("Zone: $"+DoubleToStr(order.Zone(OP_BUY,node).Value,2));
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -177,8 +198,8 @@ void Test2(void)
 
       if (order.Fulfilled())
       {
-//        Print(DoubleToStr(Account.DCA[OP_BUY],Digits));
-        Print(order.OrderStr());
+//        Print("Fulfilled: "+order.ZoneSummaryStr(order.Zone(OP_BUY,order.NodeIndex(OP_BUY)).Count));
+//        Print(order.OrderStr());
       } 
 
 //      Print(order.QueueStr());
@@ -312,7 +333,7 @@ void Execute(void)
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
-    order.Execute(CBatch,true);
+    order.Execute(Tickets,true);
 
 //    if (Tick==5) Print (">>>After:"+order.OrderStr());
     

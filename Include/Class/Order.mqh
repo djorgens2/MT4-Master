@@ -206,11 +206,13 @@ private:
 
           void         InitMaster(int Action, TradeState DefaultState);
           void         InitSummary(OrderSummary &Line, int Node=NoValue);
-          void         UpdateMaster(void);
+
+          void         UpdatePanel(void);
+          void         UpdateNode(int Action, OrderSummary &Node);
           void         UpdateSummary(void);
           void         UpdateAccount(void);
+          void         UpdateMaster(void);
           void         UpdateOrder(OrderDetail &Order);
-          void         UpdatePanel(void);
 
           OrderDetail  MergeRequest(OrderRequest &Request, bool Split=false);
           void         MergeOrder(int Action, int Ticket);
@@ -257,12 +259,15 @@ public:
           OrderRequest BlankRequest(void);
           OrderDetail  Ticket(int Ticket);
           OrderRequest Request(int Key, int Ticket=NoValue);
-          OrderSummary Zone(int Action, int Node);
+          OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
+          OrderSummary Node(int Action, int Index);
 
-          int          NodeIndex(int Action, double Price) {return((int)ceil(fdiv(Price-(Account.DCA[Action]+Account.Spread),point(Master[Action].Step),Digits)));};
+          int          Nodes(int Action) {return (ArraySize(Master[Action].Zone));};
+          int          Index(int Action, double Price=0.00) {return((int)ceil(fdiv(BoolToDouble(IsEqual(Price,0.00),
+                                   BoolToDouble(IsEqual(Operation(Action),OP_BUY),Bid,Ask),Price)-(Account.DCA[Action]+Account.Spread),
+                                   point(Master[Action].Step),Digits)));};
 
           //-- Configuration methods
-          void         SetNode(int Action, OrderSummary &Node);
           void         SetTradeState(int Action, TradeState State);
           void         SetStopLoss(int Action, double StopLoss, double DefaultStop, bool HideStop, bool FromClose=true);
           void         SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, bool HideTarget, bool FromClose=true);
@@ -392,6 +397,187 @@ void COrder::InitSummary(OrderSummary &Line, int Index=NoValue)
   }
 
 //+------------------------------------------------------------------+
+//| UpdatePanel - Updates control panel display                      |
+//+------------------------------------------------------------------+
+void COrder::UpdatePanel(void)
+  {
+    //-- Account Information frame
+    UpdateLabel("lbvAI-Bal",LPad(DoubleToStr(Account.Balance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-Eq",LPad(NegLPad(Account.Equity,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+    UpdateLabel("lbvAI-EqBal",LPad(DoubleToStr(Account.EquityBalance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+     
+    UpdateLabel("lbvAI-Eq%",center(DoubleToStr(Account.EquityClosed*100,1),7)+"%",Color(Summary[Net].Equity),16);
+    UpdateLabel("lbvAI-EqOpen%",center(DoubleToStr(Account.EquityOpen*100,1),6)+"%",Color(Summary[Net].Equity),12);
+    UpdateLabel("lbvAI-EqVar%",center(DoubleToStr(Account.EquityVariance*100,1),6)+"%",Color(Summary[Net].Equity),12);
+    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(pip(Account.Spread),1)," ",5),Color(Summary[Net].Equity),14);
+    UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account.Margin*100,1)+"%"," ",6),Color(Summary[Net].Equity),14);
+
+    UpdateDirection("lbvAI-OrderBias",Direction(Summary[Net].Lots),Color(Summary[Net].Lots),30);
+    
+    for (int action=0;action<=2;action++)
+      if (action<=OP_SELL)
+      {
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"#",IntegerToString(Master[action].Summary.Count,2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",LPad(DoubleToStr(Master[action].Summary.Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",LPad(DoubleToStr(Master[action].Summary.Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",LPad(DoubleToStr(Master[action].Summary.Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",LPad(DoubleToStr(Master[action].Summary.Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
+      else
+      {
+        UpdateLabel("lbvAI-Net#",IntegerToString(Summary[Net].Count,2),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetL",LPad(DoubleToStr(Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetV",LPad(DoubleToStr(Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetM",LPad(DoubleToStr(Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+        UpdateLabel("lbvAI-NetE",LPad(DoubleToStr(Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+      }
+
+    //-- Order Config by Action frames
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].State),"Disabled"),
+                     BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
+      UpdateLabel("lbvOC-"+ActionText(action)+"-EqTarget",center(DoubleToStr(Master[action].EquityTarget,1)+"%",7),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].MinEquity,1)+"%",6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action,0.00),Digits),9),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltTarget","Default "+DoubleToStr(Master[action].TakeProfit,Digits)+" ("+DoubleToStr(Master[action].DefaultTarget,1)+"p)",clrDarkGray,8);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxRisk",center(DoubleToStr(Master[action].MaxRisk,1)+"%",6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxMargin",center(DoubleToStr(Master[action].MaxMargin,1)+"%",6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Stop",center(DoubleToStr(Price(Loss,action,0.00),Digits),9),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltStop","Default "+DoubleToStr(Master[action].StopLoss,Digits)+" ("+DoubleToStr(Master[action].DefaultStop,1)+"p)",clrDarkGray,8);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-EQBase",DoubleToStr(Account.EquityBase[action],0)+" ("+DoubleToStr(fdiv(Account.NetProfit[action],Account.EquityBase[action])*100,1)+"%)",clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-DCA",DoubleToStr(Account.DCA[action],Digits)+BoolToStr(IsEqual(Master[action].DCATarget,0.00),"","("+DoubleToStr(Master[action].DCATarget,1)+"%)"),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-LotSize",center(DoubleToStr(LotSize(action),Account.LotPrecision),6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MinLotSize",center(DoubleToStr(Account.LotSizeMin,Account.LotPrecision),6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxLotSize",center(DoubleToStr(Account.LotSizeMax,Account.LotPrecision),7),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltLotSize",BoolToStr(IsEqual(Master[action].LotScale,0.00),"Default "+DoubleToStr(Master[action].DefaultLotSize,Account.LotPrecision),
+                                                   "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%"),clrDarkGray,8);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneNow",center(DoubleToStr(Index(action),0),5),clrDarkGray,10);
+    }
+    
+    //-- Order Zone metrics by Action
+    for (int node=0;node<11;node++)
+      for (int action=0;action<=OP_SELL;action++)
+      {
+        int index  = Index(action);
+        
+        if (node<ArraySize(Master[action].Zone))
+        {
+          int nodecolor = BoolToInt(IsEqual(Master[action].Zone[node].Index,index),clrYellow,clrDarkGray);
+          
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"Z",IntegerToString(Master[action].Zone[node].Index,3),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"#",IntegerToString(Master[action].Zone[node].Count,2),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"L",LPad(DoubleToString(Master[action].Zone[node].Lots,Account.LotPrecision)," ",6),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"V","$"+LPad(DoubleToString(Master[action].Zone[node].Value,0)," ",11),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"M",LPad(DoubleToString(Master[action].Zone[node].Margin,1)," ",7),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"E",LPad(DoubleToString(Master[action].Zone[node].Equity,1)," ",7),nodecolor,9,"Consolas");
+        }
+        else
+        {
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"Z","");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"#","");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"L","");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"V","");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"M","");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"E","");
+        }
+      }
+
+    //-- Row 2: Request Queue
+    for (int request=0;request<25;request++)
+      if (request<ArraySize(Queue))
+      {      
+        UpdateLabel("lbvOQ-"+(string)request+"-Key",IntegerToString(BoolToInt(IsEqual(Queue[request].Status,Fulfilled),
+                     Queue[request].Ticket,Queue[request].Key),8,'-'),BoolToInt(IsEqual(Queue[request].Status,Fulfilled),clrYellow,clrDarkGray),8,"Consolas");
+
+        UpdateLabel("lbvOQ-"+(string)request+"-Status",EnumToString(Queue[request].Status),
+                     BoolToInt(IsEqual(Queue[request].Status,Fulfilled),clrWhite,BoolToInt(IsEqual(Queue[request].Status,Pending),clrYellow,clrRed)));
+
+        UpdateLabel("lbvOQ-"+(string)request+"-Requestor",Queue[request].Requestor,clrDarkGray);
+        UpdateLabel("lbvOQ-"+(string)request+"-Type",proper(ActionText(Queue[request].Type))+BoolToStr(IsBetween(Queue[request].Type,OP_BUY,OP_SELL)," (m)"),clrDarkGray);
+        UpdateLabel("lbvOQ-"+(string)request+"-Price",DoubleToStr(Queue[request].Price,Digits),clrDarkGray);
+
+        if (IsEqual(Queue[request].Status,Pending))
+        {
+          UpdateLabel("lbvOQ-"+(string)request+"-Lots",DoubleToStr(LotSize(Queue[request].Action,Queue[request].Lots),Account.LotPrecision),
+                     BoolToInt(IsEqual(Queue[request].Lots,0.00),clrDarkGray,clrYellow));
+          UpdateLabel("lbvOQ-"+(string)request+"-Target",LPad(DoubleToStr(Price(Profit,Queue[request].Type,Queue[request].TakeProfit,Queue[request].Price),Digits)," ",7),
+                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00),clrDarkGray,clrYellow));
+          UpdateLabel("lbvOQ-"+(string)request+"-Stop",LPad(DoubleToStr(Price(Loss,Queue[request].Type,Queue[request].StopLoss,Queue[request].Price),Digits)," ",7),
+                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00),clrDarkGray,clrYellow));
+        }
+        else
+        {
+          UpdateLabel("lbvOQ-"+(string)request+"-Lots",DoubleToStr(LotSize(Queue[request].Action,Queue[request].Lots),Account.LotPrecision),clrDarkGray);
+          UpdateLabel("lbvOQ-"+(string)request+"-Target",LPad(DoubleToStr(Queue[request].TakeProfit,Digits)," ",7),clrDarkGray);
+          UpdateLabel("lbvOQ-"+(string)request+"-Stop",LPad(DoubleToStr(Queue[request].StopLoss,Digits)," ",7),clrDarkGray);
+        }
+        
+        UpdateLabel("lbvOQ-"+(string)request+"-Expiry",TimeToStr(Queue[request].Expiry),clrDarkGray);
+        UpdateLabel("lbvOQ-"+(string)request+"-Limit",LPad(DoubleToStr(Queue[request].Pend.Limit,Digits)," ",7),clrDarkGray);
+        UpdateLabel("lbvOQ-"+(string)request+"-Cancel",LPad(DoubleToStr(Queue[request].Pend.Cancel,Digits)," ",7),clrDarkGray);
+        UpdateLabel("lbvOQ-"+(string)request+"-Resubmit",proper(ActionText(Queue[request].Pend.Type)),clrDarkGray);
+        
+        if (IsEqual(Queue[request].Pend.Type,OP_NO_ACTION))
+          UpdateLabel("lbvOQ-"+(string)request+"-Step"," 0.00",clrDarkGray);
+        else
+          UpdateLabel("lbvOQ-"+(string)request+"-Step",LPad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
+                     Master[Queue[request].Action].Step,Queue[request].Pend.Step,1),1)," ",4),
+                     BoolToInt(IsEqual(Queue[request].Pend.Step,0.00),clrYellow,clrDarkGray));
+                     
+        UpdateLabel("lbvOQ-"+(string)request+"-Memo",Queue[request].Memo,clrDarkGray);
+      }
+      else
+      {
+        UpdateLabel("lbvOQ-"+(string)request+"-Key","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Status","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Requestor","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Type","");        
+        UpdateLabel("lbvOQ-"+(string)request+"-Price","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Lots","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Target","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Stop","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Expiry","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Limit","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Cancel","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Resubmit","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Step","");
+        UpdateLabel("lbvOQ-"+(string)request+"-Memo","");
+      }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateNode - Applies Node changes to the Master Zone             |
+//+------------------------------------------------------------------+
+void COrder::UpdateNode(int Action, OrderSummary &Node)
+  {
+    int   node;
+
+    for (node=0;node<ArraySize(Master[Action].Zone);node++)
+      if (IsEqual(Master[Action].Zone[node].Index,Node.Index))
+        break;
+
+    if (IsEqual(node,ArraySize(Master[Action].Zone)))
+    {
+      ArrayResize(Master[Action].Zone,node+1,100);
+
+      while (node>0)
+      {
+        if (Node.Index<Master[Action].Zone[node-1].Index)
+          break;
+        else
+          Master[Action].Zone[node] = Master[Action].Zone[node-1];
+
+        node--;
+      }
+    }
+
+    Master[Action].Zone[node]           = Node;
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateSummary - Updates Order summaries                          |
 //+------------------------------------------------------------------+
 void COrder::UpdateSummary(void)
@@ -461,14 +647,14 @@ void COrder::UpdateSummary(void)
           }
 
           //-- Build Zone Summary Nodes By Action
-          node                     = Zone(action,NodeIndex(action,Master[action].Order[detail].Price));
+          node                     = Node(action,Index(action,Master[action].Order[detail].Price));
 
           ArrayResize(node.Ticket,++node.Count,100);
           node.Lots                       += Master[action].Order[detail].Lots;
           node.Value                      += Master[action].Order[detail].Profit;
           node.Ticket[node.Count-1]        = Master[action].Order[detail].Ticket;
 
-          SetNode(action,node);
+          UpdateNode(action,node);
         }
     }
 
@@ -612,152 +798,6 @@ void COrder::UpdateOrder(OrderDetail &Order)
   }
 
 //+------------------------------------------------------------------+
-//| UpdatePanel - Updates control panel display                      |
-//+------------------------------------------------------------------+
-void COrder::UpdatePanel(void)
-  {
-    //-- Account Information frame
-    UpdateLabel("lbvAI-Bal",LPad(DoubleToStr(Account.Balance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-Eq",LPad(NegLPad(Account.Equity,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
-    UpdateLabel("lbvAI-EqBal",LPad(DoubleToStr(Account.EquityBalance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
-     
-    UpdateLabel("lbvAI-Eq%",center(DoubleToStr(Account.EquityClosed*100,1),7)+"%",Color(Summary[Net].Equity),16);
-    UpdateLabel("lbvAI-EqOpen%",center(DoubleToStr(Account.EquityOpen*100,1),6)+"%",Color(Summary[Net].Equity),12);
-    UpdateLabel("lbvAI-EqVar%",center(DoubleToStr(Account.EquityVariance*100,1),6)+"%",Color(Summary[Net].Equity),12);
-    UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(pip(Account.Spread),1)," ",5),Color(Summary[Net].Equity),14);
-    UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account.Margin*100,1)+"%"," ",6),Color(Summary[Net].Equity),14);
-
-    UpdateDirection("lbvAI-OrderBias",Direction(Summary[Net].Lots),Color(Summary[Net].Lots),30);
-    
-    for (int action=0;action<=2;action++)
-      if (action<=OP_SELL)
-      {
-        UpdateLabel("lbvAI-"+proper(ActionText(action))+"#",IntegerToString(Master[action].Summary.Count,2),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",LPad(DoubleToStr(Master[action].Summary.Lots,2)," ",6),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",LPad(DoubleToStr(Master[action].Summary.Value,0)," ",10),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",LPad(DoubleToStr(Master[action].Summary.Margin,1)," ",5),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",LPad(DoubleToStr(Master[action].Summary.Equity,1)," ",5),clrDarkGray,10,"Consolas");
-      }
-      else
-      {
-        UpdateLabel("lbvAI-Net#",IntegerToString(Summary[Net].Count,2),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-NetL",LPad(DoubleToStr(Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-NetV",LPad(DoubleToStr(Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-NetM",LPad(DoubleToStr(Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
-        UpdateLabel("lbvAI-NetE",LPad(DoubleToStr(Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
-      }
-
-    //-- Order Config by Action frames
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].State),"Disabled"),
-                     BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-EqTarget",center(DoubleToStr(Master[action].EquityTarget,1)+"%",7),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].MinEquity,1)+"%",6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action,0.00),Digits),9),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltTarget","Default "+DoubleToStr(Master[action].TakeProfit,Digits)+" ("+DoubleToStr(Master[action].DefaultTarget,1)+"p)",clrDarkGray,8);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxRisk",center(DoubleToStr(Master[action].MaxRisk,1)+"%",6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxMargin",center(DoubleToStr(Master[action].MaxMargin,1)+"%",6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Stop",center(DoubleToStr(Price(Loss,action,0.00),Digits),9),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltStop","Default "+DoubleToStr(Master[action].StopLoss,Digits)+" ("+DoubleToStr(Master[action].DefaultStop,1)+"p)",clrDarkGray,8);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-EQBase",DoubleToStr(Account.EquityBase[action],0)+" ("+DoubleToStr(fdiv(Account.NetProfit[action],Account.EquityBase[action])*100,1)+"%)",clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-DCA",DoubleToStr(Account.DCA[action],Digits)+BoolToStr(IsEqual(Master[action].DCATarget,0.00),"","("+DoubleToStr(Master[action].DCATarget,1)+"%)"),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-LotSize",center(DoubleToStr(LotSize(action),Account.LotPrecision),6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MinLotSize",center(DoubleToStr(Account.LotSizeMin,Account.LotPrecision),6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxLotSize",center(DoubleToStr(Account.LotSizeMax,Account.LotPrecision),7),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-DfltLotSize",BoolToStr(IsEqual(Master[action].LotScale,0.00),"Default "+DoubleToStr(Master[action].DefaultLotSize,Account.LotPrecision),
-                                                   "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%"),clrDarkGray,8);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneNow",center(DoubleToStr(NodeIndex(action,BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask,Digits)),0),5),clrDarkGray,10);
-    }
-    
-    //-- Order Zone metrics by Action
-    for (int node=0;node<11;node++)
-      for (int action=0;action<=OP_SELL;action++)
-        if (node<ArraySize(Master[action].Zone))
-        {
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"Z",IntegerToString(Master[action].Zone[node].Index,3),clrDarkGray,9,"Consolas");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"#",IntegerToString(Master[action].Zone[node].Count,2),clrDarkGray,9,"Consolas");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"L",LPad(DoubleToString(Master[action].Zone[node].Lots,Account.LotPrecision)," ",6),clrDarkGray,9,"Consolas");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"V","$"+LPad(DoubleToString(Master[action].Zone[node].Value,0)," ",11),clrDarkGray,9,"Consolas");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"M",LPad(DoubleToString(Master[action].Zone[node].Margin,1)," ",7),clrDarkGray,9,"Consolas");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"E",LPad(DoubleToString(Master[action].Zone[node].Equity,1)," ",7),clrDarkGray,9,"Consolas");
-        }
-        else
-        {
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"Z","");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"#","");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"L","");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"V","");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"M","");
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)node+"E","");
-        }
-
-    //-- Row 2: Request Queue
-    for (int request=0;request<25;request++)
-      if (request<ArraySize(Queue))
-      {      
-        UpdateLabel("lbvOQ-"+(string)request+"-Key",IntegerToString(BoolToInt(IsEqual(Queue[request].Status,Fulfilled),
-                     Queue[request].Ticket,Queue[request].Key),8,'-'),BoolToInt(IsEqual(Queue[request].Status,Fulfilled),clrYellow,clrDarkGray),8,"Consolas");
-
-        UpdateLabel("lbvOQ-"+(string)request+"-Status",EnumToString(Queue[request].Status),
-                     BoolToInt(IsEqual(Queue[request].Status,Fulfilled),clrWhite,BoolToInt(IsEqual(Queue[request].Status,Pending),clrYellow,clrRed)));
-
-        UpdateLabel("lbvOQ-"+(string)request+"-Requestor",Queue[request].Requestor,clrDarkGray);
-        UpdateLabel("lbvOQ-"+(string)request+"-Type",proper(ActionText(Queue[request].Type))+BoolToStr(IsBetween(Queue[request].Type,OP_BUY,OP_SELL)," (m)"),clrDarkGray);
-        UpdateLabel("lbvOQ-"+(string)request+"-Price",DoubleToStr(Queue[request].Price,Digits),clrDarkGray);
-
-        if (IsEqual(Queue[request].Status,Pending))
-        {
-          UpdateLabel("lbvOQ-"+(string)request+"-Lots",DoubleToStr(LotSize(Queue[request].Action,Queue[request].Lots),Account.LotPrecision),
-                     BoolToInt(IsEqual(Queue[request].Lots,0.00),clrDarkGray,clrYellow));
-          UpdateLabel("lbvOQ-"+(string)request+"-Target",LPad(DoubleToStr(Price(Profit,Queue[request].Type,Queue[request].TakeProfit,Queue[request].Price),Digits)," ",7),
-                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00),clrDarkGray,clrYellow));
-          UpdateLabel("lbvOQ-"+(string)request+"-Stop",LPad(DoubleToStr(Price(Loss,Queue[request].Type,Queue[request].StopLoss,Queue[request].Price),Digits)," ",7),
-                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00),clrDarkGray,clrYellow));
-        }
-        else
-        {
-          UpdateLabel("lbvOQ-"+(string)request+"-Lots",DoubleToStr(LotSize(Queue[request].Action,Queue[request].Lots),Account.LotPrecision),clrDarkGray);
-          UpdateLabel("lbvOQ-"+(string)request+"-Target",LPad(DoubleToStr(Queue[request].TakeProfit,Digits)," ",7),clrDarkGray);
-          UpdateLabel("lbvOQ-"+(string)request+"-Stop",LPad(DoubleToStr(Queue[request].StopLoss,Digits)," ",7),clrDarkGray);
-        }
-        
-        UpdateLabel("lbvOQ-"+(string)request+"-Expiry",TimeToStr(Queue[request].Expiry),clrDarkGray);
-        UpdateLabel("lbvOQ-"+(string)request+"-Limit",LPad(DoubleToStr(Queue[request].Pend.Limit,Digits)," ",7),clrDarkGray);
-        UpdateLabel("lbvOQ-"+(string)request+"-Cancel",LPad(DoubleToStr(Queue[request].Pend.Cancel,Digits)," ",7),clrDarkGray);
-        UpdateLabel("lbvOQ-"+(string)request+"-Resubmit",proper(ActionText(Queue[request].Pend.Type)),clrDarkGray);
-        
-        if (IsEqual(Queue[request].Pend.Type,OP_NO_ACTION))
-          UpdateLabel("lbvOQ-"+(string)request+"-Step"," 0.00",clrDarkGray);
-        else
-          UpdateLabel("lbvOQ-"+(string)request+"-Step",LPad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
-                     Master[Queue[request].Action].Step,Queue[request].Pend.Step,1),1)," ",4),
-                     BoolToInt(IsEqual(Queue[request].Pend.Step,0.00),clrYellow,clrDarkGray));
-                     
-        UpdateLabel("lbvOQ-"+(string)request+"-Memo",Queue[request].Memo,clrDarkGray);
-      }
-      else
-      {
-        UpdateLabel("lbvOQ-"+(string)request+"-Key","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Status","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Requestor","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Type","");        
-        UpdateLabel("lbvOQ-"+(string)request+"-Price","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Lots","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Target","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Stop","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Expiry","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Limit","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Cancel","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Resubmit","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Step","");
-        UpdateLabel("lbvOQ-"+(string)request+"-Memo","");
-      }
-  }
-
-//+------------------------------------------------------------------+
 //| MergeRequest - Merge EA-opened order requests into Master        |
 //+------------------------------------------------------------------+
 OrderDetail COrder::MergeRequest(OrderRequest &Request, bool Split=false)
@@ -838,15 +878,17 @@ bool COrder::OrderApproved(OrderRequest &Request)
         if (IsLower(Margin(Request.Action,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),
                                Master[Request.Action].MaxMargin,NoUpdate))
         {
-          Print("Lots Before:"+DoubleToStr(Master[Request.Action].Summary.Lots,2)+" Req:"+DoubleToStr(LotSize(Request.Action,Request.Lots),2)+" Margin Now:"
-               +DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary.Lots,InPercent),1)+" Req:"
-               +DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary.Lots+LotSize(Request.Action,Request.Lots),InPercent),1));
-          //-- if zone limits met
-          if (Zone(Request.Action,NodeIndex(Request.Action,Account.DCA[Request.Action])).Margin>0.00)
-          {
-          }
+          //-- if FFE
+          if (IsEqual(Master[Request.Action].State,FFE))
+            Request.Status      = Approved;
+          else
+
+          ////-- if zone limits met
+          //if (Zone(Request.Action,NodeIndex(Request.Action,Account.DCA[Request.Action])).Margin>0.00)
+          //{
+          //}
           Request.Status        = Approved;
-          return (true);
+          return (IsEqual(Request.Status,Approved));
           //-- else
           // Request.Memo                  = "Zone maximum exceeded";
         }
@@ -1409,9 +1451,9 @@ OrderRequest COrder::Request(int Key, int Ticket=NoValue)
   }
 
 //+------------------------------------------------------------------+
-//| Zone - Returns Zone Summary Node by Index                        |
+//| Node - Returns Node Summary by Action/Index                      |
 //+------------------------------------------------------------------+
-OrderSummary COrder::Zone(int Action, int Index)
+OrderSummary COrder::Node(int Action, int Index)
   {
     OrderSummary Node;
     
@@ -1422,30 +1464,6 @@ OrderSummary COrder::Zone(int Action, int Index)
     InitSummary(Node,Index);
     
     return(Node);
-  }
-
-//+------------------------------------------------------------------+
-//| SetNode - Applies Node changes to the Master Zone                |
-//+------------------------------------------------------------------+
-void COrder::SetNode(int Action, OrderSummary &Node)
-  {
-    int   node;
-    
-    for (node=0;node<ArraySize(Master[Action].Zone);node++)
-      if (IsEqual(Master[Action].Zone[node].Index,Node.Index))
-        break;
-
-    if (IsEqual(node,ArraySize(Master[Action].Zone)))
-      ArrayResize(Master[Action].Zone,node+1,100);
-
-    Master[Action].Zone[node].Index   = Node.Index;
-    Master[Action].Zone[node].Count   = Node.Count;
-    Master[Action].Zone[node].Lots    = Node.Lots;
-    Master[Action].Zone[node].Value   = Node.Value;
-    Master[Action].Zone[node].Margin  = Node.Margin;
-    Master[Action].Zone[node].Equity  = Node.Equity;
-        
-    ArrayCopy(Master[Action].Zone[node].Ticket,Node.Ticket);
   }
 
 //+------------------------------------------------------------------+
