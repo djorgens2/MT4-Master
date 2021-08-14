@@ -178,6 +178,7 @@ int OnInit()
 
     //-- Request Queue    
     DrawBox("bxfRQ-Request",5,176,957,309,C'0,42,0',BORDER_FLAT,IndWinId);
+    NewLabel("lbhOQ-Request","Order Request Queue",10,178,clrWhite,SCREEN_UL,IndWinId);
 
     //-- Request Queue Headers
     NewLabel("lbhOQ-"+"-Key","Request #",12,191,clrGold,SCREEN_UL,IndWinId);

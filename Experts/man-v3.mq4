@@ -41,10 +41,10 @@ void GetData(void)
     
     if (order.Fulfilled())
     {
-      Print(DoubleToStr(order[Net].Margin,1)+"%");
-      Print(DoubleToStr(order[OP_BUY].Lots,Account.LotPrecision)+" $"+DoubleToStr(order[OP_BUY].Value,0));
-      for (int node=0;node<order.Nodes(OP_BUY);node++)
-      Print("Zone: $"+DoubleToStr(order.Zone(OP_BUY,node).Value,2));
+//      Print(DoubleToStr(order[Net].Margin,1)+"%");
+//      Print(DoubleToStr(order[OP_BUY].Lots,Account.LotPrecision)+" $"+DoubleToStr(order[OP_BUY].Value,0));
+//      for (int node=0;node<order.Nodes(OP_BUY);node++)
+//      Print("Zone: $"+DoubleToStr(order.Zone(OP_BUY,node).Value,2));
     }
   }
 
@@ -70,6 +70,7 @@ void Test1(void)
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 1-General Functionality";
     
+//    order.DisableTrade(OP_BUY);
     order.SetRiskLimits(OP_BUY,80,80,2);
   
  //--- Stop/Limit Test
@@ -308,11 +309,65 @@ void Test5(void)
   }
 
 //+------------------------------------------------------------------+
+//| Request Fulfilled/Reject/Expired signals                         |
+//+------------------------------------------------------------------+
+void Test6(void)
+  {
+    OrderRequest eRequest   = order.BlankRequest();
+    
+    eRequest.Requestor      = "Test[6] Margin";
+    
+    
+    order.SetRiskLimits(OP_BUY,80,80,2);
+    order.SetRiskLimits(OP_SELL,80,80,5);
+      
+    //--- Queue Order Test
+    if (Tick<4)
+    {
+      //eRequest.Pend.Type       = OP_SELLSTOP;
+      //eRequest.Pend.Limit      = 17.75;
+      //eRequest.Pend.Step       = 2;
+      //eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_BUYLIMIT;
+      eRequest.TakeProfit      = 18.12;
+      eRequest.Price           = 17.892;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+    }
+    else
+    if (Tick<8)
+    {
+      //eRequest.Pend.Type       = OP_SELLSTOP;
+      //eRequest.Pend.Limit      = 17.75;
+      //eRequest.Pend.Step       = 2;
+      //eRequest.Pend.Cancel     = 18.20;
+      eRequest.Type            = OP_SELLLIMIT;
+      eRequest.TakeProfit      = 18.12;
+      eRequest.Price           = 18.14;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));     
+    }
+    
+    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
+    order.Submitted(eRequest);
+    
+    if (order.Pending())
+      order.PrintSnapshotStr();
+
+    if (order.Fulfilled(OP_BUY))
+      Print(order.QueueStr());
+      
+    if (order.Rejected())
+      Print(order.QueueStr());
+      
+    if (order.Expired(OP_SELL))
+      Print(order.QueueStr());
+  }
+
+//+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test  2
+    #define Test  1
 
     Comment("Tick: "+(string)++Tick);
     
@@ -328,6 +383,8 @@ void Execute(void)
                break;
       case 5:  Test5();
                break;
+      case 6:  Test6();
+               break;
     }
     
 //    if (order[OP_BUY].Count>0)
@@ -341,7 +398,7 @@ void Execute(void)
     //{
     //  Print(order.QueueStr());
     //  if (order[OP_BUY].Count>0)
-    //    order.PrintLog(Order);
+    //order.PrintLog();
     //  Print(order.ZoneSummaryStr());
     //}
   }
@@ -385,11 +442,11 @@ int OnInit()
   {
     ManualInit();
     
-    order.EnableTrade();
+    order.Enable();
     
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      order.EnableTrade(action);
+      order.Enable(action);
       order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
