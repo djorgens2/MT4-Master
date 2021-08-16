@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                                    CPanel-v2.mq4 |
 //|                                                 Dennis Jorgenson |
-//|                                                                  |
+//|                                                                  |CHARTEVENT_OBJECT_CLICK
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
 #property link      ""

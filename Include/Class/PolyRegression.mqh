@@ -34,7 +34,7 @@ public:
                   Chance,       //--- Recovery management slider
                   Mercy,        //--- retained prior intial breakout point, for "mercy" rallies/pullbacks
                   Stop,         //--- main support/resistance boundary;
-                  Halt,         //--- Forward contrarian progress line; if inbounds, manage risk; oob - kill;
+                  Quit,         //--- Forward contrarian progress line; if inbounds, manage risk; oob - kill;
                   Kill,         //--- Risk Management slider
                   Keep          //--- When nothing statistically viable occurs
                 };
@@ -682,16 +682,16 @@ void CPolyRegression::CalcLines(const int Action, const bool Contrarian=false)
       {
         case OP_BUY:      prLine[Action][Go]           = prWave.Active[OP_SELL].Open;
                           prLine[Action][Opportunity]  = prWave.Active[OP_SELL].Close;
-                          prLine[Action][Halt]         = prWave.Trough.Low;
-                          prLine[Action][Mercy]        = fdiv(prLine[OP_BUY][Halt]+prLine[OP_BUY][Go],2,Digits);
+                          prLine[Action][Quit]         = prWave.Trough.Low;
+                          prLine[Action][Mercy]        = fdiv(prLine[OP_BUY][Quit]+prLine[OP_BUY][Go],2,Digits);
                           prLine[Action][Kill]         = fdiv(prLine[Action][Opportunity]+prWave.Active[OP_BUY].Retrace,2,Digits);
                           prLine[OP_SELL][Risk]        = fmin(prWave.Active[OP_SELL].High,prLine[OP_SELL][Risk]);
                           break;
 
         case OP_SELL:     prLine[Action][Go]           = prWave.Active[OP_BUY].Open;
                           prLine[Action][Opportunity]  = prWave.Active[OP_BUY].Close;
-                          prLine[Action][Halt]         = prWave.Crest.High;
-                          prLine[Action][Mercy]        = fdiv(prLine[OP_SELL][Halt]+prLine[OP_SELL][Go],2,Digits);
+                          prLine[Action][Quit]         = prWave.Crest.High;
+                          prLine[Action][Mercy]        = fdiv(prLine[OP_SELL][Quit]+prLine[OP_SELL][Go],2,Digits);
                           prLine[Action][Kill]         = fdiv(prLine[Action][Opportunity]+prWave.Active[OP_SELL].Retrace,2,Digits);
                           prLine[OP_BUY][Risk]         = fmax(prLine[OP_BUY][Risk],prWave.Active[OP_BUY].Low);
                           break;
@@ -821,7 +821,7 @@ void CPolyRegression::CalcActionState(const int Action)
         }
         else
         {
-          prWave.ActionState[OP_BUY]             = Halt;  //--- Happens either in tight quarters or volatile snaps
+          prWave.ActionState[OP_BUY]             = Quit;  //--- Happens either in tight quarters or volatile snaps
           prWave.Kill                            = true;
         }
       else
@@ -833,7 +833,7 @@ void CPolyRegression::CalcActionState(const int Action)
         }
         else
         {
-          prWave.ActionState[OP_SELL]            = Halt;  //--- Happens either in tight quarters or volatile snaps
+          prWave.ActionState[OP_SELL]            = Quit;  //--- Happens either in tight quarters or volatile snaps
           prWave.Kill                            = true;
         }
     }
@@ -842,18 +842,18 @@ void CPolyRegression::CalcActionState(const int Action)
     //--- Handle Contrarian States
     {
       //--- Interior states
-      if (IsBetween(Close[0],prLine[Action][Go],prLine[Action][Halt]))
+      if (IsBetween(Close[0],prLine[Action][Go],prLine[Action][Quit]))
       {
         //--- Reset profit flag
         if (prWave.ActionState[Action]==Opportunity)
         {
           if (Action==OP_BUY)
             if (IsLower(Close[0],prLine[OP_BUY][Kill],NoUpdate))
-              prWave.ActionState[OP_BUY]         = Halt;
+              prWave.ActionState[OP_BUY]         = Quit;
 
           if (Action==OP_SELL)
             if (IsHigher(Close[0],prLine[OP_SELL][Kill],NoUpdate))
-              prWave.ActionState[OP_SELL]        = Halt;
+              prWave.ActionState[OP_SELL]        = Quit;
         }
         else
         {
@@ -884,7 +884,7 @@ void CPolyRegression::CalcActionState(const int Action)
         }
         else
         {
-          prWave.ActionState[OP_BUY]             = Halt;
+          prWave.ActionState[OP_BUY]             = Quit;
           prWave.Kill                            = true;
         }
       else
@@ -896,7 +896,7 @@ void CPolyRegression::CalcActionState(const int Action)
         }
         else
         {
-          prWave.ActionState[OP_SELL]            = Halt;
+          prWave.ActionState[OP_SELL]            = Quit;
           prWave.Kill                            = true;
         }
       }

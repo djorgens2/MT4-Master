@@ -33,10 +33,10 @@ void GetData(void)
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       IndexNow[action]    = order.Index(action);
-      NodeNow[action]     = order.Node(action,IndexNow[action]);
+      order.GetNode(action,IndexNow[action],NodeNow[action]);
 
-      if (IsChanged(index[action],IndexNow[action]))
-        Print(order.ZoneSummaryStr(action));
+      //if (IsChanged(index[action],IndexNow[action]))
+      //  Print(order.ZoneSummaryStr(action));
     }
     
     if (order.Fulfilled())
@@ -367,7 +367,7 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test  1
+    #define Test 2
 
     Comment("Tick: "+(string)++Tick);
     
@@ -396,11 +396,18 @@ void Execute(void)
     
     //if (order.Fulfilled())
     //{
-    //  Print(order.QueueStr());
+    //  Print(order.OrderStr());
     //  if (order[OP_BUY].Count>0)
     //order.PrintLog();
     //  Print(order.ZoneSummaryStr());
     //}
+  }
+
+//+------------------------------------------------------------------+
+//| ExecAppCommands                                                  |
+//+------------------------------------------------------------------+
+void ChartEventObjectClick(string &Command[])
+  {
   }
 
 //+------------------------------------------------------------------+
@@ -440,6 +447,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 int OnInit()
   {
+    //-- MouseEvents
+    ChartSetInteger(0,CHART_EVENT_MOUSE_MOVE,1);
+    
     ManualInit();
     
     order.Enable();
@@ -466,4 +476,29 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete (order);
+  }
+
+//+------------------------------------------------------------------+
+//| MouseState                                                       |
+//+------------------------------------------------------------------+
+string MouseState(uint state)
+  {
+   string res;
+   res+="\nML: "   +(((state& 1)== 1)?"DN":"UP");   // mouse left
+   res+="\nMR: "   +(((state& 2)== 2)?"DN":"UP");   // mouse right 
+   res+="\nMM: "   +(((state&16)==16)?"DN":"UP");   // mouse middle
+   res+="\nMX: "   +(((state&32)==32)?"DN":"UP");   // mouse first X key
+   res+="\nMY: "   +(((state&64)==64)?"DN":"UP");   // mouse second X key
+   res+="\nSHIFT: "+(((state& 4)== 4)?"DN":"UP");   // shift key
+   res+="\nCTRL: " +(((state& 8)== 8)?"DN":"UP");   // control key
+   return(res);
+  }
+//+------------------------------------------------------------------+
+//| ChartEvent function                                              |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id,const long &lparam,const double &dparam,const string &sparam)
+  {
+   Print("Got Here");
+   if(id==CHARTEVENT_OBJECT_CLICK)
+      Comment("POINT: ",(int)lparam,",",(int)dparam,"\n",MouseState((uint)sparam));
   }

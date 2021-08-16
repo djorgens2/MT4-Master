@@ -274,6 +274,28 @@ string proper(string Value)
 }
 
 //+------------------------------------------------------------------+
+//| dollar - returns dollar formatted string by pad/precision        |
+//+------------------------------------------------------------------+
+string dollar(double Value, int Length, bool WithCents=false)
+{
+  int    precision   = BoolToInt(WithCents,2,0);
+  int    scale       = 0;
+  string invalue     = DoubleToStr(fabs(Value),0);
+  string outvalue    = "";
+
+  for (int pos=StringLen(invalue);pos>0;pos--)
+    if (fmod(scale++,3)==0&&scale>1)
+      outvalue       = StringSubstr(invalue,pos-1,1)+","+outvalue;
+    else
+      outvalue       =  StringSubstr(invalue,pos-1,1)+outvalue;
+
+  if (Value<0)
+    outvalue         = "-"+outvalue;
+
+  return(LPad(outvalue," ",Length));
+}
+
+//+------------------------------------------------------------------+
 //| center - center a string                                         |
 //+------------------------------------------------------------------+
 string center(string Value, int Length)
