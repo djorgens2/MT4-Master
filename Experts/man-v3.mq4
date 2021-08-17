@@ -319,7 +319,7 @@ void Test6(void)
     
     
     order.SetRiskLimits(OP_BUY,80,80,2);
-    order.SetRiskLimits(OP_SELL,80,80,5);
+    order.SetRiskLimits(OP_SELL,80,15,5);
       
     //--- Queue Order Test
     if (Tick<4)
@@ -334,7 +334,7 @@ void Test6(void)
       eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
     }
     else
-    if (Tick<8)
+    if (IsBetween(Tick,4,8))
     {
       //eRequest.Pend.Type       = OP_SELLSTOP;
       //eRequest.Pend.Limit      = 17.75;
@@ -343,11 +343,14 @@ void Test6(void)
       eRequest.Type            = OP_SELLLIMIT;
       eRequest.TakeProfit      = 18.12;
       eRequest.Price           = 18.14;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));     
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
     }
     
-    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
-    order.Submitted(eRequest);
+    if (Tick<8)
+    {
+//      eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(Operation(eRequest.Type),Pending,InPercent),1)+"%";
+      order.Submitted(eRequest);
+    }
     
     if (order.Pending())
       order.PrintSnapshotStr();
@@ -367,7 +370,7 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 2
+    #define Test 6
 
     Comment("Tick: "+(string)++Tick);
     

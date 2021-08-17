@@ -23,7 +23,7 @@ int OnInit()
     IndWinId = ChartWindowFind(0,ShortName);
   
     //-- Account Information Box
-    DrawBox("bxfAI",5,28,352,144,clrNONE,BORDER_FLAT,IndWinId);
+    DrawBox("bxfAI",5,28,352,144,C'5,10,25',BORDER_FLAT,IndWinId);
 
     for (int type=0;type<4;type++)
     {
@@ -212,7 +212,7 @@ int OnInit()
       }
 
     //-- Request Queue    
-    DrawBox("bxfRQ-Request",360,28,960,144,C'0,42,0',BORDER_FLAT,IndWinId);
+    DrawBox("bxfRQ-Request",360,28,960,144,C'5,10,20',BORDER_FLAT,IndWinId);
 
     //-- Request Queue Headers
     NewLabel("lbhRQ-"+"-Key","Request #",366,30,clrGold,SCREEN_UL,IndWinId);

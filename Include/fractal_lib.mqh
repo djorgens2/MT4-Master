@@ -9,58 +9,77 @@
 #include <stdutil.mqh>
 
   //--- Public fractal enums
-  enum     FractalPoint       // Fractal Price Points
-           {
-             fpOrigin,        // Origin
-             fpBase,          // Base
-             fpRoot,          // Root
-             fpExpansion,     // Expansion
-             fpRetrace,       // Retrace
-             fpRecovery,      // Recovery
-             FractalPoints    // All Points
-           };
-                
-  enum     FractalType        // Fractal Type
-           {
-             //-- Geometric Types
-             Origin,
-             Trend,
-             Term,
-             Prior,
-             Base,
-             Root,
-             Expansion,
-             //-- Linear Types
-             Divergent,
-             Convergent,
-             Inversion,
-             Conversion,
-             Lead,
-             FractalTypes     // None
-           };
+  enum             FractalPoint       // Fractal Price Points
+                   {
+                     fpOrigin,        // Origin
+                     fpBase,          // Base
+                     fpRoot,          // Root
+                     fpExpansion,     // Expansion
+                     fpRetrace,       // Retrace
+                     fpRecovery,      // Recovery
+                     FractalPoints    // All Points
+                   };
+
+  enum             FractalType        // Fractal Type
+                   {
+                     //-- Geometric Types
+                     Origin,
+                     Trend,
+                     Term,
+                     Prior,
+                     Base,
+                     Root,
+                     Expansion,
+                     //-- Linear Types
+                     Divergent,
+                     Convergent,
+                     Inversion,
+                     Conversion,
+                     Lead,
+                     FractalTypes     // None
+                   };
 
   //--- Fibo Defines
-  enum     FiboFormat
-           {
-             Unsigned,
-             Signed,
-             Extended
-           };
+  enum             FiboFormat
+                   {
+                     Unsigned,
+                     Signed,
+                     Extended
+                   };
 
-  enum     FibonacciLevel
-           {
-             FiboRoot,
-             Fibo23,
-             Fibo38,
-             Fibo50,
-             Fibo61,
-             Fibo100,
-             Fibo161,
-             Fibo261,
-             Fibo423,
-             Fibo823
-           };                     
+  enum             FibonacciLevel
+                   {
+                     FiboRoot,
+                     Fibo23,
+                     Fibo38,
+                     Fibo50,
+                     Fibo61,
+                     Fibo100,
+                     Fibo161,
+                     Fibo261,
+                     Fibo423,
+                     Fibo823
+                   };                     
 
+  //-- Canonical Fractal Rec
+  struct           FiboCalcRec
+                   {
+                     double          Min;
+                     double          Max;
+                     double          Now;
+                   };
+  
+  struct           FractalDetail
+                   {
+                     FractalType     Type;
+                     ReservedWords   State;
+                     int             Direction;
+                     int             Bias;
+                     double          Age;
+                     double          Price[FractalPoints];
+                     FiboCalcRec     Expansion;
+                     FiboCalcRec     Retrace;
+                   };
 
 static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 
