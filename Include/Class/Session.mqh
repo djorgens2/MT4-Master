@@ -94,6 +94,7 @@ public:
              
              double           Pivot(const PeriodType Type);
              int              Bias(double Price);
+             int              Age(void)                         {return(sBarFE);}   //--- Number of periods since the last fractal event
              
              FiboDetail       Fibonacci(SessionFractalType Type);
              double           Retrace(SessionFractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
@@ -103,12 +104,12 @@ public:
              void             Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
              void             RefreshScreen(void);
 
+             string           FractalStr(void);
              string           SessionText(PeriodType Type);
+
+             SessionRec       Fractal(const SessionFractalType Type)   {return(sfractal[Type]);}
              
              SessionRec       operator[](const PeriodType Type) {return(srec[Type]);}
-             SessionRec       Fractal(const SessionFractalType Type)   {return(sfractal[Type]);}
-             int              Age(void)                         {return(sBarFE);}   //--- Number of periods since the last fractal event
-             
                                  
 private:
 
@@ -221,10 +222,7 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
     {
       if (ChangeState==Reversal)
         if (State==Reversal)
-        {
           State                    = Correction;
-          Print(TimeToStr(Time[sBar])+": Corrected reversal");
-        }
      }
      else
      if (ChangeState==Breakout)
@@ -247,9 +245,13 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
     { 
       switch (State)
       {
-        case Reversal:    sEvent.SetEvent(NewReversal,Major);
+        case Reversal:    sEvent.SetEvent(NewFractal,(AlertLevelType)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
+                                                                     BoolToInt(IsEqual(EventTrigger,NewTrend),Major,Minor)));
+                          sEvent.SetEvent(NewReversal,Major);
                           break;
-        case Breakout:    sEvent.SetEvent(NewBreakout,Major);
+        case Breakout:    sEvent.SetEvent(NewFractal,(AlertLevelType)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
+                                                                     BoolToInt(IsEqual(EventTrigger,NewTrend),Major,Minor)));
+                          sEvent.SetEvent(NewBreakout,Major);
                           break;
         case Rally:       sEvent.SetEvent(NewRally,Nominal);
                           break;
@@ -452,7 +454,7 @@ void CSession::UpdateTerm(void)
       }
       
       if (NewState(sfractal[sftTerm].State,ufState,NewTerm))
-        sEvent.SetEvent(NewTermState,Notify);
+        sEvent.SetEvent(NewState,Notify);
     }
   }
 
@@ -543,7 +545,7 @@ void CSession::UpdateTrend(void)
         if (!NewDirection(sfractal[sftTrend].BreakoutDir,sfractal[sftTrend].Direction))
           sEvent.SetEvent(NewExpansion,Major);   //--- Continuation breakout; strong trend
 
-      sEvent.SetEvent(NewTrendState,Notify);
+      sEvent.SetEvent(NewState,Notify);
      }
   }
 
@@ -645,7 +647,7 @@ void CSession::UpdateOrigin(void)
     }
     
     if (NewState(sfractal[sftOrigin].State,uoState,NewOrigin))
-      sEvent.SetEvent(NewOriginState,Notify);
+      sEvent.SetEvent(NewState,Notify);
   }
 
 //+------------------------------------------------------------------+
@@ -759,41 +761,7 @@ void CSession::UpdateSession(void)
     }
     
     if (NewState(srec[ActiveSession].State,usState,NewDirection))
-    {
       sEvent.SetEvent(NewState,Nominal);
-/*
-      switch (usState)
-      {
-        case Breakout:   usArrowHigh    = sfractal[sftTerm].High;
-                         usArrowLow     = sfractal[sftTerm].Low;
-                         usArrow        = BoolToInt(sEvent[NewHigh],SYMBOL_ARROWUP,SYMBOL_ARROWDOWN);
-                         break;
-        case Reversal:   usArrowHigh    = fmax(srec[PriorSession].High,fmax(Open[sBar],usLastSession.High));
-                         usArrowLow     = fmin(srec[PriorSession].Low,fmin(Open[sBar],usLastSession.Low));
-                         usArrow        = SYMBOL_CHECKSIGN;
-                         break;
-        default:         usArrow        = SYMBOL_DASH;
-                         usArrowHigh    = usLastSession.High;
-                         usArrowLow     = usLastSession.Low;
-      }
-       
-      if (sEvent[NewHigh])
-      {
-        if (!IsBetween(usArrowHigh,High[sBar],Low[sBar]))
-          usArrowHigh                   = Open[sBar];
-
-        NewArrow(usArrow,clrYellow,EnumToString(sType)+"-"+EnumToString(usState),usArrowHigh,sBar);
-      }
-
-      if (sEvent[NewLow])
-      {
-        if (!IsBetween(usArrowLow,High[sBar],Low[sBar]))
-          usArrowLow                    = Open[sBar];
-
-        NewArrow(usArrow,clrRed,EnumToString(sType)+"-"+EnumToString(usState),usArrowLow,sBar);
-      }
-*/
-    }
   }
   
 //+------------------------------------------------------------------+
@@ -1153,6 +1121,25 @@ FiboDetail CSession::Fibonacci(SessionFractalType Type)
 void CSession::RefreshScreen(void)
   {  
     Comment("*---------- "+EnumToString(this.Type())+ " Session Fractal ----------*\n"+
+        "Correction: "+EnumToString(sfractal[sftCorrection].State)+" Direction: "+DirText(sfractal[sftCorrection].Direction)+"/"+DirText(sfractal[sftCorrection].BreakoutDir)+"\n"+
+        "Term State: "+EnumToString(sfractal[sftTerm].State)+" Direction: "+DirText(sfractal[sftTerm].Direction)+"/"+DirText(sfractal[sftTerm].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(sftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(sftTerm,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(sftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(sftTerm,Max,InPercent),1)+"%\n"+
+        "Trend State: "+EnumToString(sfractal[sftTrend].State)+" Direction: "+DirText(sfractal[sftTrend].Direction)+"/"+DirText(sfractal[sftTrend].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(sftTrend,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(sftTrend,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(sftTrend,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(sftTrend,Max,InPercent),1)+"%\n"+
+        "Origin State:  "+EnumToString(sfractal[sftOrigin].State)+" Direction: "+DirText(sfractal[sftOrigin].Direction)+"/"+DirText(sfractal[sftOrigin].BreakoutDir)+
+                       " (r) "+DoubleToStr(Retrace(sftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(sftOrigin,Max,InPercent),1)+"%"+
+                       " (e) "+DoubleToStr(Expansion(sftOrigin,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(sftOrigin,Max,InPercent),1)+"%\n"+
+        "\n"+EnumToString(sType)+" Active "+ActiveEventText());
+  }
+
+//+------------------------------------------------------------------+
+//| FractalStr - Formatted fibonacci data                            |
+//+------------------------------------------------------------------+
+string CSession::FractalStr(void)
+  {  
+    return ("*---------- "+EnumToString(this.Type())+ " Session Fractal ----------*\n"+
         "Correction: "+EnumToString(sfractal[sftCorrection].State)+" Direction: "+DirText(sfractal[sftCorrection].Direction)+"/"+DirText(sfractal[sftCorrection].BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[sftTerm].State)+" Direction: "+DirText(sfractal[sftTerm].Direction)+"/"+DirText(sfractal[sftTerm].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(sftTerm,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(sftTerm,Max,InPercent),1)+"%"+

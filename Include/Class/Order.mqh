@@ -10,7 +10,7 @@
 
 #include <std_utility.mqh>
 
-//+------------------------------------------------------------------+ 
+//+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 class COrder
@@ -283,8 +283,8 @@ public:
           OrderDetail  Ticket(int Ticket);
           OrderRequest Request(int Key, int Ticket=NoValue);
           OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
-          void         GetNode(int Action, int Index, OrderSummary &Node);
 
+          void         GetNode(int Action, int Index, OrderSummary &Node);
           int          Nodes(int Action) {return (ArraySize(Master[Action].Zone));};
           int          Index(int Action, double Price=0.00) {return((int)ceil(fdiv(BoolToDouble(IsEqual(Price,0.00),
                                    BoolToDouble(IsEqual(Operation(Action),OP_BUY),Bid,Ask),Price)-(Account.DCA[Action]+Account.Spread),
@@ -544,10 +544,10 @@ void COrder::UpdatePanel(void)
       }
     }
 
-    //-- Row 2: Request Queue
+    //-- Col 2: Request Queue
     for (int request=0;request<25;request++)
       if (request<ArraySize(Queue))
-      {      
+      {
         UpdateLabel("lbvRQ-"+(string)request+"-Key",IntegerToString(BoolToInt(IsEqual(Queue[request].Status,Fulfilled),
                      Queue[request].Ticket,Queue[request].Key),8,'-'),BoolToInt(IsEqual(Queue[request].Status,Fulfilled),clrYellow,clrDarkGray),8,"Consolas");
 
@@ -561,11 +561,11 @@ void COrder::UpdatePanel(void)
         if (IsEqual(Queue[request].Status,Pending))
         {
           UpdateLabel("lbvRQ-"+(string)request+"-Lots",DoubleToStr(LotSize(Queue[request].Action,Queue[request].Lots),Account.LotPrecision),
-                     BoolToInt(IsEqual(Queue[request].Lots,0.00),clrYellow,clrDarkGray));
+                     BoolToInt(IsEqual(Queue[request].Lots,0.00,Digits),clrYellow,clrDarkGray));
           UpdateLabel("lbvRQ-"+(string)request+"-Target",DoubleToStr(Price(Profit,Queue[request].Type,Queue[request].TakeProfit,Queue[request].Price),Digits),
-                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00),clrYellow,clrDarkGray));
+                     BoolToInt(IsEqual(Queue[request].TakeProfit,0.00,Digits),clrYellow,clrDarkGray));
           UpdateLabel("lbvRQ-"+(string)request+"-Stop",DoubleToStr(Price(Loss,Queue[request].Type,Queue[request].StopLoss,Queue[request].Price),Digits),
-                     BoolToInt(IsEqual(Queue[request].StopLoss,0.00),clrYellow,clrDarkGray));
+                     BoolToInt(IsEqual(Queue[request].StopLoss,0.00,Digits),clrYellow,clrDarkGray));
         }
         else
         {

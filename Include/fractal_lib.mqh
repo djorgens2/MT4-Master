@@ -3,10 +3,10 @@
 //|                                                 Dennis Jorgenson |
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
-//#property link      "https://www.mql5.com"
 #property strict
 
 #include <stdutil.mqh>
+#include <Class/Event.mqh>
 
   //--- Public fractal enums
   enum             FractalPoint       // Fractal Price Points
@@ -74,9 +74,12 @@
                      FractalType     Type;
                      ReservedWords   State;
                      int             Direction;
+                     int             BreakoutDir;
                      int             Bias;
                      double          Age;
-                     double          Price[FractalPoints];
+                     EventType       Event;
+                     double          Points[FractalPoints];
+                     double          Forecast;
                      FiboCalcRec     Expansion;
                      FiboCalcRec     Retrace;
                    };

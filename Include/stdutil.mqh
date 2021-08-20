@@ -557,12 +557,15 @@ double BoolToDouble(bool IsTrue, double TrueValue, double FalseValue=0.00, int P
 //+------------------------------------------------------------------+
 //| Coalesce - returns first non-zero value                          |
 //+------------------------------------------------------------------+
-double Coalesce(double El1, double El2, double El3=0.00, double El4=0.00)
+double Coalesce(double El1, double El2, double El3=0.00, double El4=0.00, double El5=0.00)
   {
     if (El1==0.00)
       if (El2==0.00)
         if (El3==0.00)
-          return (El4);
+          if (El4==0.00)
+            return(El5);
+          else
+            return (El4);
         else
           return (El3);
       else
