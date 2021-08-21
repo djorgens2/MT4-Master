@@ -738,9 +738,8 @@ void Flag(string Name, int Color, bool ShowFlag=Always, int Bar=0, double Price=
           fIdx++;
         else
           break;
-//      Print(Name+"-"+(string)fIdx+":"+BoolToStr(ShowFlag,InYesNo)+" "+(string)GetLastError());
+
       ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
-//      Print(GetLastError());
     }
   }
 
@@ -755,10 +754,10 @@ void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, 
     ObjectSet(Name,OBJPROP_XSIZE,Width);
     ObjectSet(Name,OBJPROP_YSIZE,Height);
     ObjectSet(Name,OBJPROP_CORNER,SCREEN_UL);
-    ObjectSet(Name,OBJPROP_STYLE, STYLE_SOLID);
-    ObjectSet(Name,OBJPROP_BORDER_TYPE, Border);
-    ObjectSet(Name,OBJPROP_BGCOLOR, Color);
-    ObjectSet(Name,OBJPROP_BACK, true);
+    ObjectSet(Name,OBJPROP_STYLE,STYLE_SOLID);
+    ObjectSet(Name,OBJPROP_BORDER_TYPE,Border);
+    ObjectSet(Name,OBJPROP_BGCOLOR,Color);
+    ObjectSet(Name,OBJPROP_BACK,true);
   }
 
 //+------------------------------------------------------------------+
@@ -766,5 +765,6 @@ void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, 
 //+------------------------------------------------------------------+
 void UpdateBox(string Name, color Color)
   {
-      ObjectSet(Name,OBJPROP_BGCOLOR, Color);
+      ObjectSet(Name,OBJPROP_BGCOLOR,Color);
+      ObjectSet(Name,OBJPROP_BORDER_COLOR,clrGold);
   }
