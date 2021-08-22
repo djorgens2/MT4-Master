@@ -103,7 +103,7 @@ void RefreshScreen(void)
           if (type!=Prior)
             if (FiboLevels[fFlag[type]]<fractal.Fibonacci(type,Expansion,Now))
             {
-              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Fibonacci(type,Forecast|Expansion,fFlag[type]));
+              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Forecast(type,Expansion,fFlag[type]));
               fFlag[type]++;
             }
 
@@ -154,8 +154,8 @@ void RefreshScreen(void)
     UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
     UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
     UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("ftl:Correction",fractal.Fibonacci(Type,Forecast|Correction,Fibo23),STYLE_DOT,clrFireBrick);
-    UpdateLine("ftl:Recovery",fractal.Fibonacci(Type,Forecast|Retrace,Fibo23),STYLE_DOT,clrForestGreen);
+    UpdateLine("ftl:Correction",fractal.Forecast(Type,Correction,Fibo23),STYLE_DOT,clrFireBrick);
+    UpdateLine("ftl:Recovery",fractal.Forecast(Type,Retrace,Fibo23),STYLE_DOT,clrForestGreen);
   }
   
 //+------------------------------------------------------------------+
@@ -252,7 +252,7 @@ int OnInit()
         NewLine("modRL:"+EnumToString(type));
 
     fractal.ShowFlags(inpShowFlags);
-   
+
     return(INIT_SUCCEEDED);    
   }
 

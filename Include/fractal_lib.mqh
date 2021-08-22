@@ -9,6 +9,20 @@
 #include <Class/Event.mqh>
 
   //--- Public fractal enums
+  enum             FractalState       // Fractal States
+                   {
+                     NoState,
+                     Rally,
+                     Pullback,
+                     Retrace,
+                     Recovery,
+                     Correction,
+                     Trap,
+                     Breakout,
+                     Reversal,
+                     FractalStates
+                   };
+  
   enum             FractalPoint       // Fractal Price Points
                    {
                      fpOrigin,        // Origin
@@ -72,7 +86,7 @@
   struct           FractalDetail
                    {
                      FractalType     Type;
-                     ReservedWords   State;
+                     FractalState    State;
                      int             Direction;
                      int             BreakoutDir;
                      int             Bias;
@@ -280,3 +294,15 @@ bool IsHigher(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
     return (false);
   }
 
+  
+//+------------------------------------------------------------------+
+//| IsChanged - Compares FractalStates to detect changes             |
+//+------------------------------------------------------------------+
+bool IsChanged(FractalState &Compare, FractalState Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }

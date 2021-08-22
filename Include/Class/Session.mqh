@@ -68,7 +68,7 @@ public:
                int            Direction;
                int            BreakoutDir;     //--- Direction of the last breakout or reversal
                int            Bias;            //--- Current session Bias in action
-               ReservedWords  State;
+               FractalState   State;
                double         High;            //--- High/Low store daily/session high & low
                double         Low;
                double         Support;         //--- Support/Resistance determines reversal, breakout & continuation
@@ -154,7 +154,7 @@ private:
              
              bool             NewBias(int &Now, int New);
              bool             NewDirection(int &Direction, int NewDirection, bool Update=true);
-             bool             NewState(ReservedWords &State, ReservedWords NewState, EventType EventTrigger);
+             bool             NewState(FractalState &State, FractalState NewState, EventType EventTrigger);
 
              void             UpdateBias(void);
              void             UpdateTerm(void);
@@ -210,7 +210,7 @@ bool CSession::NewDirection(int &Direction, int ChangeDirection, bool Update=tru
 //+------------------------------------------------------------------+
 //| NewState - Tests for new state events                            |
 //+------------------------------------------------------------------+
-bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventType EventTrigger)
+bool CSession::NewState(FractalState &State, FractalState ChangeState, EventType EventTrigger)
   {
     if (ChangeState==NoState)
       return(false);
@@ -262,8 +262,6 @@ bool CSession::NewState(ReservedWords &State, ReservedWords ChangeState, EventTy
         case Retrace:     sEvent.SetEvent(NewRetrace,Minor);
                           break;
         case Recovery:    sEvent.SetEvent(NewRecovery,Minor);
-                          break;
-        case Resume:      sEvent.SetEvent(NewResume,Minor);
                           break;
         case Correction:  sEvent.SetEvent(NewCorrection,Major);
                           break;
@@ -358,7 +356,7 @@ void CSession::UpdateBias(void)
 void CSession::UpdateTerm(void)
   {
     double        ufExpansion          = 0.00;
-    ReservedWords ufState              = NoState;
+    FractalState  ufState              = NoState;
     
     //--- Check for term changes
     if (sEvent[NewReversal])
@@ -463,7 +461,7 @@ void CSession::UpdateTerm(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTrend(void)
   {
-    ReservedWords utState              = sfractal[sftTrend].State;
+    FractalState  utState              = sfractal[sftTrend].State;
 
     //--- Check for trend changes      
     if (sEvent[NewTerm])        //--- After a term reversal
@@ -554,7 +552,7 @@ void CSession::UpdateTrend(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateOrigin(void)
   {
-    ReservedWords uoState               = NoState;
+    FractalState  uoState               = NoState;
     
     if (sEvent[NewTrend])
     {
@@ -624,13 +622,13 @@ void CSession::UpdateOrigin(void)
     {
       if (FiboLevel(Retrace(sftOrigin,Now))<Fibo23)
         if (sfractal[sftOrigin].State==Retrace)
-          uoState                       = Resume;
+          uoState                       = Recovery;
 
-      if (sfractal[sftOrigin].State==Resume)
+      if (sfractal[sftOrigin].State==Recovery)
         if (FiboLevel(Retrace(sftOrigin,Now))>Fibo23)
           uoState                       = NoState;
         else
-          uoState                       = Resume;
+          uoState                       = Recovery;
                 
       if (uoState==NoState)
       {
@@ -655,9 +653,9 @@ void CSession::UpdateOrigin(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {    
-    ReservedWords usState              = NoState;
-    ReservedWords usHighState          = NoState;
-    ReservedWords usLowState           = NoState;
+    FractalState  usState              = NoState;
+    FractalState  usHighState          = NoState;
+    FractalState  usLowState           = NoState;
 
     SessionRec    usLastSession        = srec[ActiveSession];
 

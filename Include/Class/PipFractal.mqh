@@ -33,7 +33,7 @@ class CPipFractal : public CPipRegression
                       int              Direction;              //--- Consolidated Direction
                       int              Pivots;                 //--- Term pivot count
                       FractalType      Bearing;                //--- Trend Convergence/Divergence
-                      ReservedWords    Type[PipFractalTypes];  //--- Current States by Type
+                      FractalState     State[PipFractalTypes]; //--- Current States by Type
                       int              Action;                 //--- Current Term Action
                       double           Speed;                  //--- Term v. Origin traversal speed
                       string           Condition;              //--- Term Condition {0,1,2,D,C};
@@ -108,6 +108,7 @@ class CPipFractal : public CPipRegression
 
           double         Price(FractalType Type, FractalPoint Measure=fpExpansion);
           double         Fibonacci(FractalType Type, int Method, int Measure, int Format=InDecimal);
+          double         Forecast(FractalType Type, int Method, int Fibo);
           
           string         FractalStr(FractalType Type);
           string         FractalStr(void);
@@ -123,53 +124,53 @@ class CPipFractal : public CPipRegression
 //+------------------------------------------------------------------+
 void CPipFractal::UpdateState(void)
   {
-    int    usLastState      = sr.Type[Origin];
+    int    usLastState      = sr.State[Origin];
     int    usLastPattern    = pfPattern;
     int    usLastTrap       = sr.Trap;
     
     if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo100))
-      sr.Direction         = Direction(Term);
+      sr.Direction          = Direction(Term);
 
     //-- Compute States By Type
     if (Event(NewTrend))
-      sr.Type[Trend]     = BoolToWord(pfReversal,Reversal,Breakout);
+      sr.State[Trend]       = (FractalState)BoolToInt(pfReversal,Reversal,Breakout);
           
-    sr.Type[Term]        = BoolToWord(Fibonacci(Term,Expansion,Max)>=1,
-                                BoolToWord(Direction(pftTerm)==Direction(pftTrend),sr.Type[Trend],Reversal),
-                                BoolToWord(Direction(pftTerm)==DirectionUp,Rally,Pullback));
+    sr.State[Term]          = (FractalState)BoolToInt(Fibonacci(Term,Expansion,Max)>=1,
+                                BoolToInt(IsEqual(Direction(pftTerm),Direction(pftTrend)),sr.State[Trend],Reversal),
+                                BoolToInt(IsEqual(Direction(pftTerm),DirectionUp),Rally,Pullback));
 
     if (Fibonacci(Origin,Expansion,Min)<FiboPercent(Fibo23))
     {
       if (Fibonacci(Origin,Retrace,Now)<FiboPercent(Fibo23))
-        sr.Type[Origin]  = Recovery;
+        sr.State[Origin]  = Recovery;
 
       if (Fibonacci(Origin,Expansion,Now)<FiboPercent(Fibo23))
-        sr.Type[Origin]  = Correction;
+        sr.State[Origin]  = Correction;
       
       if (Fibonacci(Term,Expansion,Max)>FiboPercent(Fibo161)&&
           Fibonacci(Origin,Expansion,Min)<FiboPercent(FiboRoot))
-        sr.Type[Origin]  = Reversal;
+        sr.State[Origin]  = Reversal;
     }
     else
     if (Fibonacci(Origin,Retrace,Max)>FiboPercent(Fibo23)||
        (Event(NewTerm)&&Direction(pftOrigin)!=Direction(pftTerm)))
-      sr.Type[Origin]    = Retrace;
+      sr.State[Origin]    = Retrace;
     else
     if (IsEqual(Fibonacci(Origin,Retrace,Now),FiboPercent(FiboRoot),3))
-      sr.Type[Origin]    = Breakout;
+      sr.State[Origin]    = Breakout;
     
     sr.Bearing              = (FractalType)BoolToInt(Direction(pftOrigin)==Direction(pftTrend),Convergent,Divergent);
     sr.Action               = Action(Direction(pftTerm));
     sr.Bias                 = Action(sr.Direction);
     sr.Speed                = fabs(fdiv(Price(Term,fpRoot)-Price(Term,fpExpansion),Price(Term,fpRoot)-Price(Term,fpExpansion),3));
     sr.Trap                 = (FractalType)BoolToInt(IsBetween(Fibonacci(Term,Expansion,Max),FiboPercent(Fibo100),FiboPercent(Fibo161)),pftTerm,NoValue);
-    sr.Trap                 = (FractalType)BoolToInt(sr.Pivots==0&&sr.Type[Origin]==Retrace,pftTrend,sr.Trap);
+    sr.Trap                 = (FractalType)BoolToInt(IsEqual(sr.Pivots,0)&&IsEqual(sr.State[Origin],Retrace),pftTrend,sr.Trap);
     sr.Condition            = BoolToStr(sr.Pivots<3,(string)sr.Pivots,BoolToStr(fmod(sr.Pivots,2)==0,"C","D"));
                                         
     pfPattern               = 0;
     
     for (FractalType type=0;type<(int)PipFractalTypes;type++)
-      pfPattern           += sr.Type[type]*(int)MathPow(10,2*type);
+      pfPattern           += sr.State[type]*(int)MathPow(10,type);
       
 //    Comment("Last: "+usLastPattern+" | Now: "+pfPattern);
     
@@ -231,9 +232,9 @@ string CPipFractal::FractalStr(FractalType Type)
     Append(fsText,"\n        Points: (b) "+DoubleToStr(Price(Type,fpBase),Digits)+" (r) "+DoubleToStr(Price(Type,fpRoot),Digits)+" (e) "+DoubleToStr(Price(Type,fpExpansion),Digits)
                            +" (rt) "+DoubleToStr(Price(Type,fpRetrace),Digits)+" (rc) "+DoubleToStr(Price(Type,fpRecovery),Digits),"\n");
     Append(fsText,"       Retrace: "+DoubleToStr(Fibonacci(Type,Retrace,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Type,Retrace,Max,InPercent),1)
-                           +"%  Forecast:"+DoubleToStr(Fibonacci(Type,Forecast|Retrace,Fibo161),Digits),"\n");
+                           +"%  Forecast:"+DoubleToStr(Forecast(Type,Retrace,Fibo161),Digits),"\n");
     Append(fsText,"   Expansion: "+DoubleToStr(Fibonacci(Type,Expansion,Now,InPercent),1)+"% "+DoubleToStr(Fibonacci(Type,Expansion,Max,InPercent),1)
-                           +"%  Forecast:"+DoubleToStr(Fibonacci(Type,Forecast|Expansion,Fibo161),Digits),"\n");
+                           +"%  Forecast:"+DoubleToStr(Forecast(Type,Expansion,Fibo161),Digits),"\n");
 
     return (fsText);
   }
@@ -331,7 +332,7 @@ void CPipFractal::UpdateOrigin(void)
 //+------------------------------------------------------------------+
 void CPipFractal::UpdateTrend(void)
   {
-    double utNewBase                = Fibonacci(Term,Forecast|Expansion,Fibo161);
+    double utNewBase                = Forecast(Term,Expansion,Fibo161);
     
     pfInterior                      = IsBetween(utNewBase,Low[pfLoBar],High[pfHiBar]);
     pfReversal                      = NewDirection(pf[Trend].Direction,Direction(Term));
@@ -443,7 +444,7 @@ void CPipFractal::UpdateNodes(void)
 
     if (Fibonacci(Term,Retrace,Max)>FiboPercent(Fibo161))
     {
-      UpdateTerm(Direction(Term,InContrarian),Fibonacci(Term,Forecast|Retrace,Fibo161));
+      UpdateTerm(Direction(Term,InContrarian),Forecast(Term,Retrace,Fibo161));
       UpdateRetrace(Term);
     }
 
@@ -576,11 +577,7 @@ void CPipFractal::UpdateBuffer(double &MA[], double &PolyBuffer[], double &Trend
   {    
     if (HistoryLoaded())
       UpdateBuffer(PolyBuffer,TrendBuffer);
-    else
-    {
-      CalcMA();
-      CalcWave();
-    }
+    else CalcMA();
 
     UpdateNodes();
     
@@ -597,11 +594,7 @@ void CPipFractal::Update(void)
       UpdatePoly();
       UpdateTrendline();
     }
-    else
-    {
-      CalcMA();
-      CalcWave();      
-    }
+    else CalcMA();
 
     UpdateNodes();
   }
@@ -649,12 +642,23 @@ double CPipFractal::Fibonacci(FractalType Type, int Method, int Measure, int For
                         case Max: return (fdiv(BoolToDouble(IsEqual(Price(Type,fpExpansion),Price(Type,fpBase)),Price(Type,fpRecovery),Price(Type,fpExpansion))-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot),3)*fFormat);
                         case Min: return (fdiv(Price(Type,fpRetrace)-Price(Type,fpRoot),Price(Type,fpBase)-Price(Type,fpRoot),3)*fFormat);
                       }
-
-      case Forecast|Expansion:    return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*FiboPercent(Measure)),Digits));
-      case Forecast|Retrace:      return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboPercent(Measure)),Digits));
     }
     
-    return (0.00);
+    return (NormalizeDouble(0.00,3));
+  }
+
+//+------------------------------------------------------------------+
+//| Forecast - Returns Forecast Price for supplied Fibo              |
+//+------------------------------------------------------------------+
+double CPipFractal::Forecast(FractalType Type, int Method, int Fibo)
+  {
+    switch (Method)
+    {
+      case Expansion:    return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*FiboPercent(Fibo)),Digits));
+      case Retrace:      return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboPercent(Fibo)),Digits));
+    }
+    
+    return (NormalizeDouble(0.00,Digits));
   }
 
 //+------------------------------------------------------------------+
@@ -781,76 +785,76 @@ string CPipFractal::StateText(void)
     switch (pfPattern)
     {
       //-- Reversal
-      case 525251: if (sr.Pivots==0) stState  = "Reversing";
+      case 883: if (sr.Pivots==0) stState  = "Reversing";
                    if (sr.Pivots==1) stState  = "ATTENTION";
                    if (sr.Pivots==2) stState  = "Breakout";
 
                    Append(stState,stTrap);
                    break;
-      case 525252: stState                   = "Reversal";
+      case 888: stState                   = "Reversal";
                    Append(stState,stTrap);
                    break;
 
-      case 525253: if (sr.Pivots==0) stState  = "Breakout";
+      case 887: if (sr.Pivots==0) stState  = "Breakout";
                      else           stState  = "Breaking";
 
                    Append(stState,stTrap);
                    break;
-      case 525257: stState                   = "Reversing Correction";
+      case 885: stState                   = "Reversing Correction";
                    Append(stState,stTermState);
                    break;
-      case 525351: if (sr.Pivots==1) stState  = "Reversing";
+      case 873: if (sr.Pivots==1) stState  = "Reversing";
 
                    Append(stState,stTrap);
                    break;
-      case 525357: stState                   = "Reversing Correction";
+      case 875: stState                   = "Reversing Correction";
 
                    Append(stState,stTermState);
                    break;
 
       //-- Breakout
-      case 535251: if (sr.Pivots==1) stState  = "Reversing";
+      case 783: if (sr.Pivots==1) stState  = "Reversing";
 
                    Append(stState,stTrap);
                    break;
 
-      case 535257: stState                   = "Correction";
+      case 785: stState                   = "Correction";
 
                    Append(stState,stTermState);
                    break;
 
-      case 535351: if (sr.Pivots==0) stState  = "Breaking";
+      case 773: if (sr.Pivots==0) stState  = "Breaking";
                    if (sr.Pivots==1) stState  = "ATTENTION";
                    if (sr.Pivots==2) stState  = "Breakout";
 //                   if (pfPivots>2)  stState  = "Consolidated";
 
                    Append(stState,stTrap);
                    break;
-      case 535352: if (sr.Pivots==0) stState  = "Reversal";
+      case 778: if (sr.Pivots==0) stState  = "Reversal";
                      else           stState  = "Reversing";
 
                    Append(stState,stTrap);
                    break;
-      case 535353: stState                   = "Breakout";
+      case 777: stState                   = "Breakout";
 
                    Append(stState,stTrap);
                    break;
-      case 535357: stState                   = "ATTENTION";
+      case 775: stState                   = "ATTENTION";
 
                    Append(stState,stTermState);
                    break;
                    
       //-- Rally
-      case 545251: if (sr.Pivots==0) stState  = "ATTENTION";
+      case 138: if (sr.Pivots==0) stState  = "ATTENTION";
                    if (sr.Pivots==1) stState  = "Reversal";
                    if (sr.Pivots==2) stState  = "Recovery";
 
                    Append(stState,BoolToStr(sr.Bias==OP_BUY,"Long","Short"));
                    Append(stState,"Rally");
                    break;
-      case 545253: stState                   = "Adverse Bear Reversal";
+      case 187: stState                   = "Adverse Bear Reversal";
                    break;
-      case 545351: if (sr.Pivots==0) stState  = "ATTENTION";
+      case 173: if (sr.Pivots==0) stState  = "ATTENTION";
                    if (sr.Pivots==1) stState  = "Breakout";
                    if (sr.Pivots==2) stState  = "Recovery";
                    
@@ -859,16 +863,16 @@ string CPipFractal::StateText(void)
                    break;
 
       //-- Pullback
-      case 555251: if (sr.Pivots==0) stState  = "ATTENTION";
+      case 283: if (sr.Pivots==0) stState  = "ATTENTION";
                    if (sr.Pivots==1) stState  = "Reversal";
                    if (sr.Pivots==2) stState  = "Recovery";
 
                    Append(stState,BoolToStr(sr.Bias==OP_BUY,"Long","Short"));
                    Append(stState,"Pullback");
                    break;
-      case 555253: stState                   = "Adverse Bull Reversal";
+      case 287: stState                   = "Adverse Bull Reversal";
                    break;
-      case 555351: if (sr.Pivots==0) stState  = "ATTENTION";
+      case 273: if (sr.Pivots==0) stState  = "ATTENTION";
                    if (sr.Pivots==1) stState  = "Breakout";
                    if (sr.Pivots==2) stState  = "Recovery";
 
