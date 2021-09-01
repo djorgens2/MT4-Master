@@ -95,7 +95,7 @@ bool FormatPrice(string &Price, int Action)
 
     if (upper(StringSubstr(Price,StringLen(Price)-1,1))=="P")
     {
-      sopPips       = Pip(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)),InPoints);
+      sopPips       = point(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)));
       
       switch (Action)
       {
@@ -344,7 +344,7 @@ void GetManualRequest(string Command="")
                             OpenProfitPlan(OP_BUY,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
                           else
                           if (ActionCode(params[1])==OP_SELL)
-                            OpenProfitPlan(OP_SELL,StringToDouble(params[2])+Spread(InPoints),StringToDouble(params[3]),StringToDouble(params[4]));
+                            OpenProfitPlan(OP_SELL,StringToDouble(params[2])+(Ask-Bid),StringToDouble(params[3]),StringToDouble(params[4]));
                         }                    
                         break;
                       }
@@ -420,7 +420,7 @@ void GetManualRequest(string Command="")
                       else
                       {
                         if (ActionCode(params[1])==OP_SELL)
-                          params[2]=DoubleToStr(StrToDouble(params[2])-Spread(InPoints),Digits);
+                          params[2]=DoubleToStr(StrToDouble(params[2])-(Ask-Bid),Digits);
 
                         if (ActionCode(params[1])!=OP_NO_ACTION)
                           SetTargetPrice(ActionCode(params[1]),StrToDouble(params[2]));
@@ -430,7 +430,7 @@ void GetManualRequest(string Command="")
               case 4: if (params[3]=="HIDE")
                       {
                         if (ActionCode(params[1])==OP_SELL)
-                          params[2]=DoubleToStr(StrToDouble(params[2])-Spread(InPoints),Digits);
+                          params[2]=DoubleToStr(StrToDouble(params[2])-(Ask-Bid),Digits);
 
                         if (ActionCode(params[1])!=OP_NO_ACTION)
                           SetTargetPrice(ActionCode(params[1]),StrToDouble(params[2]),true);
@@ -480,7 +480,7 @@ void GetManualRequest(string Command="")
                       else
                       {
                         if (ActionCode(params[1])==OP_SELL)
-                          params[2]=DoubleToStr(StrToDouble(params[2])+Spread(InPoints),Digits);
+                          params[2]=DoubleToStr(StrToDouble(params[2])+(Ask-Bid),Digits);
 
                         if (ActionCode(params[1])!=OP_NO_ACTION)
                           SetStopPrice(ActionCode(params[1]),StrToDouble(params[2]));
@@ -489,7 +489,7 @@ void GetManualRequest(string Command="")
               case 4: if (params[3]=="HIDE")
                       {
                         if (ActionCode(params[1])==OP_SELL)
-                          params[2]=DoubleToStr(StrToDouble(params[2])+Spread(InPoints),Digits);
+                          params[2]=DoubleToStr(StrToDouble(params[2])+(Ask-Bid),Digits);
 
                         if (ActionCode(params[1])!=OP_NO_ACTION)
                           SetStopPrice(ActionCode(params[1]),StrToDouble(params[2]),true);

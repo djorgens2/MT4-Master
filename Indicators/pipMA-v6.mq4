@@ -132,15 +132,15 @@ void RefreshScreen()
       SetIndexStyle(2,DRAW_LINE,STYLE_DOT,1,DirColor(pfractal.Direction(Polyline)));
     
     UpdateLabel("lrFOCNow",NegLPad(pfractal.FOC(Now),1),DirColor(pfractal.FOCDirection()),15);
-    UpdateLabel("lrFOCPivDev",center(DoubleToStr(Pip(pfractal.Pivot(Deviation)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)),15);
+    UpdateLabel("lrFOCPivDev",center(DoubleToStr(pip(pfractal.Pivot(Deviation)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)),15);
     UpdateDirection("lrFOCPivDir",pfractal.Direction(Pivot),DirColor(pfractal.Direction(Pivot)),20);
-    UpdateLabel("lrFOCRange",DoubleToStr(Pip(pfractal.Range(Size))/inpAggFactor,1),DirColor(pfractal.FOCDirection()),15);
+    UpdateLabel("lrFOCRange",DoubleToStr(pip(pfractal.Range(Size))/inpAggFactor,1),DirColor(pfractal.FOCDirection()),15);
     UpdateDirection("lrRangeDir",pfractal.Direction(Range),DirColor(pfractal.Direction(Range)),30);
 
     UpdateLabel("lrFOCDev",DoubleToStr(pfractal.FOC(Deviation),1),DirColor(pfractal.FOCDirection()));
     UpdateLabel("lrFOCMax",NegLPad(pfractal.FOC(Max),1),DirColor(pfractal.FOCDirection()));
-    UpdateLabel("lrFOCPivDevMin",center(DoubleToStr(Pip(pfractal.Pivot(Min)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
-    UpdateLabel("lrFOCPivDevMax",center(DoubleToStr(Pip(pfractal.Pivot(Max)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
+    UpdateLabel("lrFOCPivDevMin",center(DoubleToStr(pip(pfractal.Pivot(Min)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
+    UpdateLabel("lrFOCPivDevMax",center(DoubleToStr(pip(pfractal.Pivot(Max)/inpAggFactor),1),7),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCPivPrice",DoubleToStr(pfractal.Pivot(Price),Digits),DirColor(pfractal.Direction(Pivot)));
     UpdateLabel("lrFOCTick",LPad(IntegerToString(pfractal.Age(Tick))," ",2),DirColor(pfractal.Direction(Tick)));
     UpdateLabel("lrFOCAge",LPad(IntegerToString(pfractal.Age(Range))," ",2),DirColor(pfractal.Direction(Range)));
@@ -152,11 +152,11 @@ void RefreshScreen()
     UpdateLabel("lrPolyTrendDev",NegLPad(pfractal.Trendline(Deviation),1),Color(pfractal.Trendline(Deviation)));
     
     UpdateLabel("lrFOCState",center(FOCText(pfractal.TrendState()),22),DirColor(pfractal.FOCDirection()));
-    UpdateLabel("lrStdDevData","Std Dev: "+DoubleToStr(Pip(pfractal.StdDev(Now)),1)
-               +" x:"+DoubleToStr(fmax(Pip(pfractal.StdDev(Positive)),fabs(Pip(pfractal.StdDev(Negative)))),1)
-               +" p:"+DoubleToStr(Pip(pfractal.StdDev()),1)
-               +" +"+DoubleToStr(Pip(pfractal.StdDev(Positive)),1)
-               +" "+DoubleToStr(Pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
+    UpdateLabel("lrStdDevData","Std Dev: "+DoubleToStr(pip(pfractal.StdDev(Now)),1)
+               +" x:"+DoubleToStr(fmax(pip(pfractal.StdDev(Positive)),fabs(pip(pfractal.StdDev(Negative)))),1)
+               +" p:"+DoubleToStr(pip(pfractal.StdDev()),1)
+               +" +"+DoubleToStr(pip(pfractal.StdDev(Positive)),1)
+               +" "+DoubleToStr(pip(pfractal.StdDev(Negative)),1),DirColor(pfractal.Direction(StdDev)),10);
                
     //---Fibonacci data
     UpdateLabel("lrFibo tm(e)",DoubleToStr(pfractal.Fibonacci(Term,Expansion,Now,InPercent),1),DirColor(pfractal.Direction(pftTerm)),16);
@@ -210,7 +210,7 @@ void RefreshScreen()
     if (pfractal.Event(NewWane))
       UpdateEvent("Trend Wane",DirColor(pfractal.Direction(pftTerm)));
     else
-    if (pfractal.Event(NewResume))
+    if (pfractal.Event(NewRecovery))
       UpdateEvent("Trend Resume",DirColor(pfractal.Direction(pftTerm)));
     else
     if (pfractal.Event(NewBoundary))

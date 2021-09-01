@@ -432,7 +432,7 @@ double CPolyRegression::Poly(int Measure)
        case Head:       return (NormalizeDouble(prPolyHead,Digits));
        case Tail:       return (NormalizeDouble(prPolyTail,Digits));
        case Range:      return (NormalizeDouble(prPolyTop-prPolyBottom,Digits));
-       case Deviation:  return (Pip(prPricePolyDev));
+       case Deviation:  return (pip(prPricePolyDev));
     }
     
     return (NoValue);

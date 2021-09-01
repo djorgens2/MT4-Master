@@ -21,7 +21,6 @@ input bool        inpShowComment    = false;        // Show data in comment
 input bool        inpShowFibo       = false;        // Show Fibonacci Indicators
 input bool        inpShowPoints     = false;        // Show Fractal points
 input bool        inpShowFlags      = false;        // Show Fibonacci Events
-input bool        inpShowRootLines  = false;        // Show Modified Root Lines
 input FractalType inpShowTypeLines  = FractalTypes; // Show Fibonacci Lines by Type
 input int         inpUpOffset       = 12;           // Upper tag offset
 input int         inpDownOffset     = 8;            // Lower tag offset
@@ -53,7 +52,7 @@ input int         inpDownOffset     = 8;            // Lower tag offset
 #property indicator_width3    1
 
 
-CFractal  *fractal            = new CFractal(inpRange,inpRangeMin);
+CFractal  *f                = new CFractal(inpRange,inpRangeMin);
 
 double    indFractalBuffer[];
 double    indDivergentBuffer[];
@@ -66,24 +65,24 @@ FibonacciLevel fFlag[FractalTypes];
 //+------------------------------------------------------------------+
 void RefreshFibo(void)
   {
-    ObjectSet("fFiboRetrace",OBJPROP_TIME1,Time[fractal[Root].Bar]);
-    ObjectSet("fFiboRetrace",OBJPROP_PRICE1,fractal[Root].Price);
-    ObjectSet("fFiboRetrace",OBJPROP_TIME2,Time[fractal[Expansion].Bar]);
-    ObjectSet("fFiboRetrace",OBJPROP_PRICE2,fractal[Expansion].Price);
+    ObjectSet("fFiboRetrace",OBJPROP_TIME1,Time[f[Root].Bar]);
+    ObjectSet("fFiboRetrace",OBJPROP_PRICE1,f[Root].Price);
+    ObjectSet("fFiboRetrace",OBJPROP_TIME2,Time[f[Expansion].Bar]);
+    ObjectSet("fFiboRetrace",OBJPROP_PRICE2,f[Expansion].Price);
 
-    if (fractal.IsRange(Divergent))
+    if (f.IsRange(Base,Divergent,Max))
     {
-      ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[fractal[Expansion].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,fractal[Expansion].Price);
-      ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[fractal[Divergent].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,fractal[Divergent].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[f[Expansion].Bar]);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Expansion].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[f[Divergent].Bar]);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Divergent].Price);
     }
     else
     {
-      ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[fractal[Base].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,fractal[Base].Price);
-      ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[fractal[Root].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,fractal[Root].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[f[Base].Bar]);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Base].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[f[Root].Bar]);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Root].Price);
     }
   }
   
@@ -95,67 +94,51 @@ void RefreshScreen(void)
     const color rsFlagColor[5]  = {clrDarkOrange,clrGoldenrod,clrIndianRed,clrNONE,clrGray};
 
     if (inpShowFlags)
-      if (fractal.Event(NewReversal)||fractal.Event(NewBreakout))
+      if (f.Event(NewReversal)||f.Event(NewBreakout))
         for (FractalType type=Origin;type<Root;type++)
-          fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
+          fFlag[type] = fmax(FiboLevel(f.Fibonacci(type,Expansion,Max))+1,Fibo161);
       else
         for (FractalType type=Origin;type<Root;type++)
           if (type!=Prior)
-            if (FiboLevels[fFlag[type]]<fractal.Fibonacci(type,Expansion,Now))
+            if (FiboLevels[fFlag[type]]<f.Fibonacci(type,Expansion,Now))
             {
-              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,fractal.Forecast(type,Expansion,fFlag[type]));
+//              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,f.Forecast(type,Expansion,fFlag[type]));
               fFlag[type]++;
             }
 
     if (inpShowComment)
-      fractal.RefreshScreen();
+      f.RefreshScreen(Always);
     
-    if (fractal.IsRange(Divergent,Max))
-      SetIndexStyle(1,DRAW_SECTION,STYLE_SOLID);
-    else
-    if (fractal.IsRange(Divergent,Min))
-      SetIndexStyle(1,DRAW_SECTION,STYLE_DASHDOTDOT);
-    else
-      SetIndexStyle(1,DRAW_SECTION,STYLE_DOT);
-      
-    if (fractal.IsRange(Convergent,Max))
-      SetIndexStyle(2,DRAW_SECTION,STYLE_SOLID);      
-    else
-    if (fractal.IsRange(Convergent,Min))
-      SetIndexStyle(2,DRAW_SECTION,STYLE_DASHDOTDOT);      
-    else
-      SetIndexStyle(2,DRAW_SECTION,STYLE_DOT);
+    SetIndexStyle(1,DRAW_SECTION,BoolToInt(f.Is(Divergent,Max),STYLE_SOLID,BoolToInt(f.Is(Divergent,Min),STYLE_DASHDOTDOT,STYLE_DOT)));
+    SetIndexStyle(2,DRAW_SECTION,BoolToInt(f.Is(Convergent,Max),STYLE_SOLID,BoolToInt(f.Is(Convergent,Min),STYLE_DASHDOTDOT,STYLE_DOT)));
 
     if (inpShowPoints)
     {
-      UpdatePriceTag("ptExpansion",fractal[Expansion].Bar,fractal[Expansion].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptRoot",fractal[Root].Bar,fractal[Root].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptBase",fractal[Base].Bar,fractal[Base].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptPrior",fractal[Prior].Bar,fractal[Prior].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptTerm",fractal[Term].Bar,fractal[Term].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptTrend",fractal[Trend].Bar,fractal[Trend].Direction,inpUpOffset,inpDownOffset);
-      UpdatePriceTag("ptOrigin",fractal.Origin().Bar,fractal[Expansion].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptExpansion",f[Expansion].Bar,f[Expansion].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptRoot",f[Root].Bar,f[Root].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptBase",f[Base].Bar,f[Base].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptPrior",f[Prior].Bar,f[Prior].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptTerm",f[Term].Bar,f[Term].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptTrend",f[Trend].Bar,f[Trend].Direction,inpUpOffset,inpDownOffset);
+      UpdatePriceTag("ptOrigin",f[Origin].Bar,f[Expansion].Direction,inpUpOffset,inpDownOffset);
     }
     
     if (inpShowFibo)
       RefreshFibo();
 
-    if (inpShowRootLines)
-      for (FractalType type=Trend;type<FractalTypes;type++)
-        UpdateLine("modRL:"+EnumToString(type),fractal[type].modRoot,STYLE_DOT,clrFireBrick);
-      
     if (inpShowTypeLines==FractalTypes)
       return;
 
     FractalType Type   = (FractalType)inpShowTypeLines;
-    UpdateLine("ftl:fpOrigin",fractal.Price(Type,fpOrigin),STYLE_SOLID,Color(fractal.Direction(Type)));
-    UpdateLine("ftl:fpBase",fractal.Price(Type,fpBase),STYLE_DOT,clrWhite);
-    UpdateLine("ftl:fpRoot",fractal.Price(Type,fpRoot),STYLE_SOLID,clrWhite);
-    UpdateLine("ftl:fpExpansion",fractal.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
-    UpdateLine("ftl:fpRetrace",fractal.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
-    UpdateLine("ftl:fpRecovery",fractal.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("ftl:Correction",fractal.Forecast(Type,Correction,Fibo23),STYLE_DOT,clrFireBrick);
-    UpdateLine("ftl:Recovery",fractal.Forecast(Type,Retrace,Fibo23),STYLE_DOT,clrForestGreen);
+    
+    UpdateLine("ftl:fpOrigin",f.Price(Type,fpOrigin),STYLE_SOLID,clrWhite);
+    UpdateLine("ftl:fpBase",f.Price(Type,fpBase),STYLE_DOT,clrWhite);
+    UpdateLine("ftl:fpRoot",f.Price(Type,fpRoot),STYLE_DOT,clrWhite);
+    UpdateLine("ftl:fpExpansion",f.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
+    UpdateLine("ftl:fpRetrace",f.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
+    UpdateLine("ftl:fpRecovery",f.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
+    UpdateLine("ftl:Correction",f.Forecast(Type,Correction,Fibo23),STYLE_DOT,clrFireBrick);
+    UpdateLine("ftl:Recovery",f.Forecast(Type,Retrace,Fibo23),STYLE_DOT,clrForestGreen);
   }
   
 //+------------------------------------------------------------------+
@@ -165,10 +148,10 @@ void SetBuffer(double &Buffer[], FractalType Start, FractalType End)
   {
     ArrayInitialize(Buffer,0.00);
 
-    if (fractal[Start].Bar>NoValue && fractal[End].Bar>NoValue)
+    if (f[Start].Bar>NoValue && f[End].Bar>NoValue)
     {
-      Buffer[fractal[Start].Bar] = fractal[Start].Price;
-      Buffer[fractal[End].Bar]   = fractal[End].Price;
+      Buffer[f[Start].Bar] = f[Start].Price;
+      Buffer[f[End].Bar]   = f[End].Price;
     }
   }
 
@@ -186,7 +169,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    fractal.UpdateBuffer(indFractalBuffer);
+    f.UpdateBuffer(indFractalBuffer);
 
     SetBuffer(indDivergentBuffer,Expansion,Divergent);
     SetBuffer(indConvergentBuffer,Divergent,Convergent);
@@ -201,7 +184,7 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    fractal.Update();
+    f.Update();
     
     SetIndexBuffer(0,indFractalBuffer);
     SetIndexEmptyValue(0,0.00);
@@ -216,7 +199,7 @@ int OnInit()
     ArrayInitialize(indConvergentBuffer,0.00);
 
     for (FractalType type=Origin;type<Root;type++)
-      fFlag[type] = fmax(FiboLevel(fractal.Fibonacci(type,Expansion,Max))+1,Fibo161);
+      fFlag[type] = fmax(FiboLevel(f.Fibonacci(type,Expansion,Max))+1,Fibo161);
     
     if (inpShowPoints)
     {
@@ -243,15 +226,11 @@ int OnInit()
       for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
         NewLine("ftl:"+EnumToString(type));
 
-      NewLine("ftl:Correction");
-      NewLine("ftl:Recovery");
+//      NewLine("ftl:Correction");
+//      NewLine("ftl:Recovery");
     }
     
-    if (inpShowRootLines)
-      for (FractalType type=Trend;type<FractalTypes;type++)
-        NewLine("modRL:"+EnumToString(type));
-
-    fractal.ShowFlags(inpShowFlags);
+    f.ShowFlags(inpShowFlags);
 
     return(INIT_SUCCEEDED);    
   }
@@ -261,11 +240,8 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {    
-    delete fractal;
+    delete f;
     
-    for (FractalType type=Trend;type<FractalTypes;type++)
-      ObjectDelete("modRL:"+EnumToString(type));
-
     for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
       ObjectDelete("ftl:"+EnumToString(type));
 

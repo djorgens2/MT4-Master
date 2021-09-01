@@ -63,7 +63,8 @@ void RefreshScreen(void)
       Append(text,DoubleToStr(f.Fibonacci(type,Retrace,Now,InPercent),1),";");
     }
     
-    Comment(text);
+//    Comment(text);
+    f.RefreshScreen();
   }
 
 //+------------------------------------------------------------------+
@@ -73,14 +74,15 @@ void Execute(void)
   {
     #define format InPercent
     
-    double Points[FractalPoints];
-    
-    f.FractalPoints(Origin,Points);
-    
-    Print(fdiv(Points[fpRetrace]-Points[fpRoot],(Points[fpBase]-Points[fpRoot]))*BoolToInt(format==InDecimal,1,100));
-    Print(f.Fibonacci(Origin,Expansion,Min,InPercent));
+//    double Points[FractalPoints];
+//    
+//    f.FractalPoints(Origin,Points);
+//    
+//    Print(fdiv(Points[fpRetrace]-Points[fpRoot],(Points[fpBase]-Points[fpRoot]))*BoolToInt(format==InDecimal,1,100));
+//    Print(f.Fibonacci(Origin,Expansion,Min,InPercent));
 
-    
+    UpdateLine("Correction",f.Forecast(Base,Correction,Fibo23),STYLE_SOLID,clrWhite);
+    UpdateLine("Recovery",f.Forecast(Base,Retrace,Fibo23),STYLE_SOLID,clrSteelBlue);
   }
 
 //+------------------------------------------------------------------+
@@ -126,6 +128,9 @@ void OnTick()
 int OnInit()
   {
     ManualInit();
+    
+    NewLine("Recovery");
+    NewLine("Correction");
     
     return(INIT_SUCCEEDED);
   }

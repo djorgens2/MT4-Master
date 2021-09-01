@@ -8,7 +8,7 @@
 #property version   "1.00"
 #property strict
 
-#include <stdutil.mqh>
+#include <std_utility.mqh>
 
 //+------------------------------------------------------------------+
 //| Event Class - Indicator stack used to flag a named event         |
@@ -20,8 +20,8 @@ protected:
                 {
                   NoAlert,
                   Notify,
-                  Warning,
                   Nominal,
+                  Warning,
                   Minor,
                   Major,
                   Critical
@@ -42,14 +42,10 @@ protected:
                   NewProximityAlert,
                   NewBias,
                   NewRange,
-                  NewDecay,
-                  NewWaveOpen,
-                  NewWaveClose,
-                  NewWaveState,
-                  NewWaveReversal,
-                  NewTerm,
-                  NewTrend,
                   NewOrigin,
+                  NewTrend,
+                  NewTerm,
+                  NewBase,
                   NewDivergence,
                   NewConvergence,
                   NewExpansion,
@@ -57,7 +53,6 @@ protected:
                   NewRetrace,
                   NewCorrection,
                   NewRecovery,
-                  NewResume,
                   NewPoly,
                   NewPolyTrend,
                   NewPolyBoundary,
@@ -70,8 +65,6 @@ protected:
                   NewRally,
                   NewPullback,
                   NewTrap,
-                  NewCrest,
-                  NewTrough,
                   NewIdle,
                   NewWane,
                   SessionOpen,
@@ -96,19 +89,18 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
 
-      bool           Event(EventType Event, AlertLevelType AlertLevel)
-                                                 {return (eAlerts[Event]==AlertLevel);}
-      AlertLevelType AlertLevel(EventType Event) {return (eAlerts[Event]);}
-      AlertLevelType HighAlert(void)             {return (eMaxAlert);}
+      AlertLevelType AlertLevel(EventType Event)       {return (eAlerts[Event]);}
+      AlertLevelType HighAlert(void)                   {return (eMaxAlert);}
 
-      bool           ActiveEvent(void)           {return(!eEvents[NoEvent]);}
       string         ActiveEventText(bool WithHeader=true);
       
       //---  General use events
+      bool           Event(EventType Event, AlertLevelType AlertLevel)
+                                                       {return (eAlerts[Event]==AlertLevel);}
+      bool           ActiveEvent(void)                 {return(!eEvents[NoEvent]);}
       bool           ProximityAlert(double Price, double Proximity);
 
-      bool           operator[](const EventType Event) const {return(eEvents[Event]);}
-
+      bool           operator[](const EventType Event) {return(eEvents[Event]);}
   };
 
 //+------------------------------------------------------------------+
@@ -116,12 +108,13 @@ public:
 //+------------------------------------------------------------------+
 void CEvent::SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
   {
-    if (Event==NoEvent)
+    if (IsEqual(Event,NoEvent))
       return;
 
     eEvents[NoEvent]         = false;
     eEvents[Event]           = true;
     eAlerts[Event]           = fmax(AlertLevel,eAlerts[Event]);
+
     eMaxAlert                = fmax(AlertLevel,eMaxAlert);
   }
   
@@ -184,7 +177,7 @@ string CEvent::ActiveEventText(bool WithHeader=true)
 //+------------------------------------------------------------------+
 bool CEvent::ProximityAlert(double Price, double Proximity)
   {
-    if (IsBetween(Close[0],Price+Pip(Proximity,InPoints),Price-Pip(Proximity,InPoints),Digits))
+    if (IsBetween(Close[0],Price+point(Proximity),Price-point(Proximity),Digits))
     {      
       SetEvent(NewProximityAlert);
       return (true);
@@ -192,21 +185,6 @@ bool CEvent::ProximityAlert(double Price, double Proximity)
     
     return (false);
   }
-/*
-//+------------------------------------------------------------------+
-//| ProximityAlert - Returns a true when value (fibo) in proximity   |
-//+------------------------------------------------------------------+
-bool CEvent::ProximityAlert(double Basis, double Check, double Proximity, double Precision)
-  {
-    if (IsBetween(Basis,Check+Proximity,Check-Proximity,Precision))
-    {      
-      SetEvent(NewProximityAlert);
-      return (true);
-    }
-    
-    return (false);
-  }
-*/
 
 //+------------------------------------------------------------------+
 //| IsChanged - Compares events to determine if a change occurred    |

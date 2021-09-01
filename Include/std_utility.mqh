@@ -623,11 +623,11 @@ void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int 
       return;
       
     if (Direction == DIR_UP)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+Pip(Up,InDecimal));
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+point(Up));
     else
     
     if (Direction == DIR_DOWN)
-      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-Pip(Down,InDecimal));
+      ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-point(Down));
 
     else
       return;

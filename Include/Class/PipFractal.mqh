@@ -892,14 +892,14 @@ void CPipFractal::RefreshScreen(void)
   { 
     Comment("\n*--- PipMA Fractal ---*\n"
            +"  FOC: "+DirText(FOCDirection(trTrendlineTolerance))+" "+DoubleToStr(FOC(Now),1)+"/"+DoubleToStr(FOC(Deviation),1)
-           +"  Pivot: "+DoubleToStr(Pip(Pivot(Deviation)),1)+"/"+DoubleToStr(Pip(Pivot(Max)),1)
-           +"  Range: "+DoubleToStr(Pip(Range(Size)),1)+"\n"
+           +"  Pivot: "+DoubleToStr(pip(Pivot(Deviation)),1)+"/"+DoubleToStr(pip(Pivot(Max)),1)
+           +"  Range: "+DoubleToStr(pip(Range(Size)),1)+"\n"
            +"  Poly: "+EnumToString(prPolyState)+"  ("+DirText(Direction(Polyline))+"/"+DirText(Direction(PolyTrend))+")\n"
-           +"  Std Dev: "+DoubleToStr(Pip(StdDev(Now)),1)
-               +" x:"+DoubleToStr(fmax(Pip(StdDev(Positive)),fabs(Pip(StdDev(Negative)))),1)
-               +" p:"+DoubleToStr(Pip(StdDev()),1)
-               +" +"+DoubleToStr(Pip(StdDev(Positive)),1)
-               +" "+DoubleToStr(Pip(StdDev(Negative)),1)+"\n\n"
+           +"  Std Dev: "+DoubleToStr(pip(StdDev(Now)),1)
+               +" x:"+DoubleToStr(fmax(pip(StdDev(Positive)),fabs(pip(StdDev(Negative)))),1)
+               +" p:"+DoubleToStr(pip(StdDev()),1)
+               +" +"+DoubleToStr(pip(StdDev(Positive)),1)
+               +" "+DoubleToStr(pip(StdDev(Negative)),1)+"\n\n"
            +FractalStr()+"\n"
            +"\n  PipMA Active "+ActiveEventText());
   }

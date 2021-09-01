@@ -98,8 +98,35 @@
                      FiboCalcRec     Retrace;
                    };
 
-static const double FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
+static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
+static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
 
+//+------------------------------------------------------------------+
+//| FractalEvent - Returns the event associated by Fractal Event     |
+//+------------------------------------------------------------------+
+EventType FractalEvent(FractalState State)
+  {
+    return (FractalEvent[State]);
+  }
+
+//+------------------------------------------------------------------+
+//| FractalEvent - Returns the event associated by Fractal Event     |
+//+------------------------------------------------------------------+
+EventType FractalEvent(FractalType Type)
+  {
+    switch (Type)
+    {
+      case Origin:       return(NewOrigin);
+      case Trend:        return(NewTrend);
+      case Term:         return(NewTerm);
+      case Base:         return(NewBase);
+      case Expansion:    return(NewExpansion);
+      case Convergent:   return(NewConvergence);
+      case Divergent:    return(NewDivergence);
+    };
+    
+    return (NoEvent);
+  }
 
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |

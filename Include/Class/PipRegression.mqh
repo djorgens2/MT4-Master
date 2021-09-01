@@ -134,7 +134,7 @@ RangeStateType CPipRegression::CalcState(double Last, double Current)
       //--- validate expansion state
       if (ptrRangeState>IdleFlat)
       { 
-        Tolerance = fabs(Pip(trTrendlineTolerance,InPoints)*ptrRangeState);
+        Tolerance = fabs(point(trTrendlineTolerance)*ptrRangeState);
 
         if (ptrRangeDir==DirectionUp)
         {
@@ -205,7 +205,7 @@ void CPipRegression::CalcMA(void)
     
     ClearEvent(NewTick);
     
-    if (NormalizeDouble(fabs(Pip(pipHistory[0]-Close[0])),Digits)>=ptrAggFactor)
+    if (NormalizeDouble(fabs(pip(pipHistory[0]-Close[0])),Digits)>=ptrAggFactor)
     {
       pipHistory.Insert(0,Close[0]);
       pipHistory.Copy(maData);

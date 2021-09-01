@@ -199,33 +199,6 @@ int BarDir(int Bar=0)
   }
 
 //+------------------------------------------------------------------+
-//| Pip - returns the normalized pip value in integer+1 form         |
-//+------------------------------------------------------------------+
-double Pip(double Value, int Format=InPips)
-  {
-    //--- Convert points into pips
-    if (Format==InPips)
-      return (NormalizeDouble(Value*pow(10, Digits-1),1));
-
-    //--- Convert pips into points
-    return (NormalizeDouble(Value / pow(10, Digits-1), Digits));
-  }
-
-//+------------------------------------------------------------------+
-//| Spread - returns current Bid/Ask spread                          |
-//+------------------------------------------------------------------+
-double Spread(int Format=InPoints)
-  {
-    if (Format == InPips)
-      return (NormalizeDouble(Pip(Ask-Bid),1));
-    
-    if (Format == InPoints)
-      return (NormalizeDouble(Ask-Bid,Digits));
-      
-    return (NoValue);
-  }
-
-//+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
 bool IsChanged(datetime &Check, datetime Compare, bool Update=true)

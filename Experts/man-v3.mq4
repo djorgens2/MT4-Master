@@ -370,7 +370,7 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 6
+    #define Test 2
 
     Comment("Tick: "+(string)++Tick);
     
