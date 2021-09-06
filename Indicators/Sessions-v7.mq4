@@ -55,11 +55,6 @@ input PeriodType     inpShowMidLines = PeriodTypes;  // Display Mid-Price Lines
 input SessionType    inpShowSession  = SessionTypes; // Display Session Comment
 input YesNoType      inpShowData     = No;           // Display Session Data Labels
 
-const color          AsiaColor       = C'0,32,0';    // Asia session box color
-const color          EuropeColor     = C'48,0,0';    // Europe session box color
-const color          USColor         = C'0,0,56';    // US session box color
-const color          DailyColor      = C'64,64,0';   // US session box color
-
 struct SessionData
   {
      bool            IsOpen;

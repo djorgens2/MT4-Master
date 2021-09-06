@@ -43,18 +43,23 @@ protected:
   //--- Queue Statuses
   enum                QueueStatus
                       {
+                        //-- Request Submit States
                         Initial,
                         Immediate,
+                        Approved,
+                        //-- Queue Processing States
                         Pending,
                         Canceled,
-                        Approved,
                         Declined,
                         Rejected,
                         Expired,
+                        //-- Order Open States
                         Fulfilled,
                         Working,
+                        //-- Order Close States
                         Closed,
                         Completed,
+                        //-- Submit Error
                         Invalid,
                         QueueStates
                       };
@@ -228,10 +233,10 @@ private:
           void         UpdateOrder(OrderDetail &Order, QueueStatus Status);
 
           OrderDetail  MergeRequest(OrderRequest &Request, bool Split=false);
+          OrderRequest SubmitOrder(OrderRequest &Request, double Price=0.00);
           void         MergeOrder(int Action, int Ticket);
 
           bool         OrderApproved(OrderRequest &Request);
-          void         OrderSubmit(OrderRequest &Request, double Price=0.00);
           bool         OrderOpened(OrderRequest &Request);
           bool         OrderClosed(OrderDetail &Order, double Lots=0.00);
 
@@ -280,8 +285,8 @@ public:
 
           //-- Array Property Interfaces
           OrderRequest BlankRequest(void);
-          OrderDetail  Ticket(int Ticket);
           OrderRequest Request(int Key, int Ticket=NoValue);
+          OrderDetail  Ticket(int Ticket);
           OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
 
           void         GetNode(int Action, int Index, OrderSummary &Node);
@@ -1021,9 +1026,9 @@ bool COrder::OrderApproved(OrderRequest &Request)
   }
 
 //+------------------------------------------------------------------+
-//| OrderSubmit - Adds screened orders to Request Processing Queue   |
+//| SubmitOrder - Adds screened orders to Request Processing Queue   |
 //+------------------------------------------------------------------+
-void COrder::OrderSubmit(OrderRequest &Request, double Price=0.00)
+OrderRequest COrder::SubmitOrder(OrderRequest &Request, double Price=0.00)
   {
     static int key                    = 0;
     int        request                = ArraySize(Queue);
@@ -1083,7 +1088,7 @@ void COrder::OrderSubmit(OrderRequest &Request, double Price=0.00)
 
     UpdateSnapshot();
     
-    Request                           = Queue[request];
+    return(Queue[request]);
   }
 
 //+------------------------------------------------------------------+
@@ -1218,7 +1223,7 @@ void COrder::ProcessRequests(void)
           {
             //-- Resubmit Queued Pending Orders
             if (IsBetween(Queue[request].Pend.Type,OP_BUYLIMIT,OP_SELLSTOP))
-              OrderSubmit(Queue[request],Queue[request].Price+(BoolToDouble(IsEqual(Master[Queue[request].Action].State,FFE),Account.Spread,
+              SubmitOrder(Queue[request],Queue[request].Price+(BoolToDouble(IsEqual(Master[Queue[request].Action].State,FFE),Account.Spread,
                           BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),point(Master[Queue[request].Action].Step),point(Queue[request].Pend.Step)))
                          *Direction(Queue[request].Action,InAction,IsEqual(Queue[request].Action,OP_BUYLIMIT)||IsEqual(Queue[request].Action,OP_SELLLIMIT))));
 
@@ -1314,7 +1319,7 @@ void COrder::Update(AccountMetrics &Metrics)
 //| Execute - Updates/Closes orders based on closure strategy        |
 //+------------------------------------------------------------------+
 void COrder::Execute(int &Batch[], bool Conditional=true)
-  {
+  {  
     //-- Set stops/targets
     for (int action=OP_BUY;action<=OP_SELL;action++)
       for (int detail=0;detail<ArraySize(Master[action].Order);detail++)
@@ -1501,9 +1506,7 @@ bool COrder::Status(QueueStatus State, int Type=OP_NO_ACTION)
 //+------------------------------------------------------------------+
 bool COrder::Submitted(OrderRequest &Request)
   {
-    OrderSubmit(Request);
-    
-    if (IsEqual(Request.Status,Pending))
+    if (IsEqual(SubmitOrder(Request).Status,Pending))
       return (true);
       
     return (false);

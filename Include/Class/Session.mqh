@@ -286,11 +286,11 @@ void CSession::SetCorrectionState(void)
 
       if (sfractal[sftCorrection].Direction==DirectionUp)
         if (IsBetween(Close[sBar],sfractal[sftCorrection].Support,sfractal[sftCorrection].Low))
-          sfractal[sftCorrection].State        = Rally;
+          sfractal[sftCorrection].State      = Rally;
 
       if (sfractal[sftCorrection].Direction==DirectionDown)
         if (IsBetween(Close[sBar],sfractal[sftCorrection].Resistance,sfractal[sftCorrection].High))
-          sfractal[sftCorrection].State        = Pullback;
+          sfractal[sftCorrection].State      = Pullback;
     }
     else
     {
@@ -389,7 +389,7 @@ void CSession::UpdateTerm(void)
         UpdateFractalBuffer(DirectionUp,High[sBar]);
 
         sfractal[sftTerm].Low           = Close[sBar];        
-        ufExpansion                    = sfractal[sftTerm].High;
+        ufExpansion                     = sfractal[sftTerm].High;
       }
       else
       if (sBar==0)
@@ -658,10 +658,6 @@ void CSession::UpdateSession(void)
     FractalState  usLowState           = NoState;
 
     SessionRec    usLastSession        = srec[ActiveSession];
-
-    //int           usArrow;
-    //double        usArrowHigh;
-    //double        usArrowLow;
 
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {

@@ -461,7 +461,6 @@ void CPipFractal::UpdateNodes(void)
       
     UpdateRetrace(Origin);
     
-    if (Event(NewOrigin)) Print("\n"+FractalStr(Origin));
     if (Event(NewExpansion)||Event(NewTerm))
     {
       ShowFiboArrow();

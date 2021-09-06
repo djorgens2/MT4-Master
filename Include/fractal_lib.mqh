@@ -78,6 +78,7 @@
   //-- Canonical Fractal Rec
   struct           FiboCalcRec
                    {
+                     FibonacciLevel  Level;
                      double          Min;
                      double          Max;
                      double          Now;
@@ -92,10 +93,11 @@
                      int             Bias;
                      double          Age;
                      EventType       Event;
-                     double          Points[FractalPoints];
-                     double          Forecast;
+                     bool            Trigger;
+                     FiboCalcRec     Range;
                      FiboCalcRec     Expansion;
                      FiboCalcRec     Retrace;
+                     double          Points[FractalPoints];
                    };
 
 static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};

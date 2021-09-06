@@ -39,7 +39,6 @@ protected:
                   NewState,
                   NewAction,
                   NewActionState,
-                  NewProximityAlert,
                   NewBias,
                   NewRange,
                   NewOrigin,
@@ -98,7 +97,6 @@ public:
       bool           Event(EventType Event, AlertLevelType AlertLevel)
                                                        {return (eAlerts[Event]==AlertLevel);}
       bool           ActiveEvent(void)                 {return(!eEvents[NoEvent]);}
-      bool           ProximityAlert(double Price, double Proximity);
 
       bool           operator[](const EventType Event) {return(eEvents[Event]);}
   };
@@ -170,20 +168,6 @@ string CEvent::ActiveEventText(bool WithHeader=true)
     else Append(aeActiveEvents, "No Active Events", "\n");
     
     return (aeActiveEvents);
-  }
-
-//+------------------------------------------------------------------+
-//| ProximityAlert - Returns a true when price in proximity          |
-//+------------------------------------------------------------------+
-bool CEvent::ProximityAlert(double Price, double Proximity)
-  {
-    if (IsBetween(Close[0],Price+point(Proximity),Price-point(Proximity),Digits))
-    {      
-      SetEvent(NewProximityAlert);
-      return (true);
-    }
-    
-    return (false);
   }
 
 //+------------------------------------------------------------------+

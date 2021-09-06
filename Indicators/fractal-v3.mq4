@@ -52,7 +52,7 @@ input int         inpDownOffset     = 8;            // Lower tag offset
 #property indicator_width3    1
 
 
-CFractal  *f                = new CFractal(inpRange,inpRangeMin);
+CFractal  *f                = new CFractal(inpRange,inpRangeMin,inpShowFlags);
 
 double    indFractalBuffer[];
 double    indDivergentBuffer[];
@@ -70,7 +70,7 @@ void RefreshFibo(void)
     ObjectSet("fFiboRetrace",OBJPROP_TIME2,Time[f[Expansion].Bar]);
     ObjectSet("fFiboRetrace",OBJPROP_PRICE2,f[Expansion].Price);
 
-    if (f.IsRange(Base,Divergent,Max))
+    if (f.Is(Divergent,Max))
     {
       ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[f[Expansion].Bar]);
       ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Expansion].Price);

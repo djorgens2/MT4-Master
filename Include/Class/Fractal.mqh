@@ -131,6 +131,8 @@ public:
        bool             Event(const EventType Type)     { return (fEvent[Type]); }                        //-- Returns TF for supplied event
        bool             Event(EventType Event, AlertLevelType AlertLevel)
                                                         { return (fEvent.Event(Event,AlertLevel)); }      //-- Returns TF for supplied event/alert level
+       AlertLevelType   AlertLevel(EventType Type)      { return (fEvent.AlertLevel(Type)); }              //-- Returns the Alert Level for supplied Event
+
        bool             ActiveEvent(void)               { return (fEvent.ActiveEvent()); }
        string           ActiveEventText(const bool WithHeader=true)
                                                         { return  (fEvent.ActiveEventText(WithHeader)); } //-- returns the string of active events
@@ -232,17 +234,9 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     if (IsRange(Type,Expansion,Max))
     {
       if (IsEqual(Type,Root)||IsEqual(Type,Prior))
-        //if (Fibonacci(Previous(Type),Retrace,Max)>1-FiboPercent(Fibo23))
-        //  if (Fibonacci(Previous(Type),Retrace,Min)<FiboPercent(Fibo23))
-        //    state                       = Correction;
-        //  else
-        //    state                       = Recovery;
-        //else
-        //if (Fibonacci(Previous(Type),Retrace,Max)>FiboPercent(Fibo23))
-        //  state                         = Retrace;
-        //else
-        //  state                         = Reversal;
-        {}
+        {
+          //-- ???
+        }
       else
 
       if (IsBetween(Type,Origin,Base))
@@ -265,7 +259,19 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
               EventPrice                = Forecast(Type,Retrace,Fibo23);
             }
     }
-    else state                          = (FractalState)BoolToInt(IsEqual(Direction(fLegNow),DirectionUp),Rally,Pullback);
+    else
+    
+    //-- Handle short term bias changes
+    if (IsEqual(f[fLegNow].Bar,0))
+    {
+      if (High[fBarNow]>High[fBarNow+1])
+        state                         = Rally;
+
+      if (Low[fBarNow]<Low[fBarNow+1])
+        state                         = Pullback;
+    }
+    else
+      state                           = (FractalState)BoolToInt(IsEqual(Direction(fLegNow),DirectionUp),Rally,Pullback);
 
     if (IsChanged(State,(FractalState)BoolToInt(IsEqual(state,NoState),State,state)))
     {
@@ -277,7 +283,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
         fEvent.SetEvent(FractalEvent(Type),alertlevel);
 
       fEvent.SetEvent(FractalEvent(State),alertlevel);
-      fEventPrice[FractalEvent(State)]  = EventPrice;
+      fEventPrice[FractalEvent(State)]  = BoolToDouble(IsEqual(EventPrice,0.00),Close[fBarNow],EventPrice);
 
       if (IsChanged(f[Type].NewState,true))
       {
@@ -1114,5 +1120,9 @@ void CFractal::RefreshFlags(void)
         if (IsEqual(State(type),Correction))
           if (Event(NewCorrection)&&IsChanged(event[NewCorrection],true))
              Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],fShowFlags,fBarNow,fEventPrice[NewCorrection]);
+
+        //if (IsEqual(State(type),Recovery))
+        //  if (Event(NewRecovery)&&IsChanged(event[NewRecovery],true))
+        //     Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Recovery]",segment[type],fShowFlags,fBarNow,fEventPrice[NewRecovery]);
       }
   }

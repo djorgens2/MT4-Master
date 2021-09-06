@@ -8,12 +8,31 @@
 #property version   "2.00"
 #property strict
 #property indicator_separate_window
+#property indicator_buffers 2
 
 #include <std_utility.mqh>
 
 int       IndWinId = -1;
 string    ShortName             = "CPanel-v3";
 string    cpSessionTypes[4]     = {"Daily","Asia","Europe","US"};
+
+//--- plot indTLine
+#property indicator_type1   DRAW_SECTION
+#property indicator_label1  "indOpenLine"
+#property indicator_color1  clrGoldenrod
+#property indicator_style1  STYLE_SOLID
+#property indicator_width1  1
+
+//--- plot indPLine
+#property indicator_label2  "indCloseLine"
+#property indicator_type2   DRAW_SECTION
+#property indicator_color2  clrCrimson
+#property indicator_style2  STYLE_DOT
+#property indicator_width2  1
+
+  //--- Buffers
+  double       indOLineBuffer[];
+  double       indCLineBuffer[];
 
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
@@ -212,7 +231,7 @@ int OnInit()
       }
 
     //-- Request Queue    
-    DrawBox("bxfRQ-Request",360,28,960,144,C'5,10,20',BORDER_FLAT,IndWinId);
+    DrawBox("bxfRQ-Request",360,28,960,144,C'0,12,24',BORDER_FLAT,IndWinId);
 
     //-- Request Queue Headers
     NewLabel("lbhRQ-"+"-Key","Request #",366,30,clrGold,SCREEN_UL,IndWinId);
@@ -268,6 +287,9 @@ int OnInit()
       DrawBox("bxfFA-Bias:"+(string)row,1360,BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),45,54,clrNONE,BORDER_FLAT,IndWinId);
       DrawBox("bxfFA-Info:"+(string)row,1410,BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),330,54,clrNONE,BORDER_FLAT,IndWinId);
 
+      if (IsBetween(row,4,7))
+        UpdateBox("bxfFA-Info:"+(string)row,BoolToInt(IsEqual(row,4),DailyColor,BoolToInt(IsEqual(row,5),AsiaColor,BoolToInt(IsEqual(row,6),EuropeColor,USColor))));
+
       for (int col=0;col<3;col++)
       {
         DrawBox("bxfFA-"+(string)row+":"+(string)col,1744+(col*90),BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),85,54,clrNONE,BORDER_FLAT,IndWinId);
@@ -294,8 +316,32 @@ int OnInit()
       UpdateLabel("lbvFA-HD2:"+(string)row,"Sub-Head Line "+(string)row,clrDarkGray,10);
     }
 
+    SetIndexBuffer(0,indOLineBuffer);
+    SetIndexBuffer(1,indCLineBuffer);
+ 
+    SetIndexEmptyValue(0,0.00);
+    SetIndexEmptyValue(1,0.00);
+   
+    ArrayInitialize(indOLineBuffer,0.00);
+    ArrayInitialize(indCLineBuffer,0.00);
+
     return(INIT_SUCCEEDED);
   }
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+void LoadBuffer(double &Buffer[], string Parse)
+  {
+    string params[];
+    
+    ArrayInitialize(Buffer,0.00);
+    StringSplit(Parse,";",params);
+    
+    Buffer[0]                    = StringToDouble(params[0]);
+    Buffer[ArraySize(params)-1]  = StringToDouble(params[ArraySize(params)-1]);
+  }
+
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
 //+------------------------------------------------------------------+
@@ -310,9 +356,8 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-//---
-   
-//--- return value of prev_calculated for next call
-   return(rates_total);
+    LoadBuffer(indOLineBuffer,ObjectGetString(0,"lbv-Open",OBJPROP_TEXT));
+    LoadBuffer(indCLineBuffer,ObjectGetString(0,"lbv-Close",OBJPROP_TEXT));
+    
+    return(rates_total);
   }
-
