@@ -199,7 +199,7 @@ EventType BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoE
 //+------------------------------------------------------------------+
 //| IsEqual - Compares events to determine equivalence               |
 //+------------------------------------------------------------------+
-bool IsChanged(EventType Event1, EventType Event2)
+bool IsEqual(EventType Event1, EventType Event2)
   {
     return (Event1==Event2);
   }
