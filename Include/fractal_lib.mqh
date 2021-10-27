@@ -11,15 +11,18 @@
   //--- Public fractal enums
   enum             FractalState       // Fractal States
                    {
-                     NoState,
-                     Rally,
-                     Pullback,
-                     Retrace,
-                     Recovery,
-                     Correction,
-                     Trap,
-                     Breakout,
-                     Reversal,
+                     NoState,         //-- No State Assignment
+                     Rally,           //-- Advancing fractal
+                     Pullback,        //-- Declining fractal
+                     Retrace,         //-- Pegged retrace (>Rally||Pullack)
+                     Recovery,        //-- Trend resumption post-correction
+                     Correction,      //-- Fractal max stress point/Market Correction
+                     Trap,            //-- Fractal penetration into containment
+                     Breakout,        //-- Fractal Breakout
+                     Reversal,        //-- Fractal Reversal
+                     Snap,            //-- Sharp uni-directional move
+                     Wane,            //-- Weakening trend momentum
+                     Wax,             //-- Increasing trend momentum
                      FractalStates
                    };
   
@@ -73,15 +76,20 @@
                      Fibo261,
                      Fibo423,
                      Fibo823
-                   };                     
+                   };             
 
   //-- Canonical Fractal Rec
   struct           FiboCalcRec
                    {
-                     FibonacciLevel  Level;
-                     double          Min;
-                     double          Max;
-                     double          Now;
+                     int             ActiveDir;      //-- Price action direction
+                     FibonacciLevel  Level;          //-- Fibonacci Level Now
+                     double          High;           //-- Fibo boundary high
+                     double          Low;            //-- Fibo boundary low
+                     int             Momentum;       //-- Fibo change (+/-)
+                     EventType       Event;          //-- NewDirection|NewExpansion|NewRally|NewPullback
+                     double          Min;            //-- Lowest fibo %
+                     double          Max;            //-- Highest fibo %
+                     double          Now;            //-- Fibonacci % Now
                    };
   
   struct           FractalDetail
@@ -90,11 +98,9 @@
                      FractalState    State;
                      int             Direction;
                      int             BreakoutDir;
+                     EventType       Event;
                      int             Bias;
                      double          Age;
-                     EventType       Event;
-                     bool            Trigger;
-                     FiboCalcRec     Range;
                      FiboCalcRec     Expansion;
                      FiboCalcRec     Retrace;
                      double          Points[FractalPoints];
@@ -128,20 +134,6 @@ EventType FractalEvent(FractalType Type)
     };
     
     return (NoEvent);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - returns true if the updated value has changed        |
-//+------------------------------------------------------------------+
-bool IsChanged(FractalType &Check, FractalType Compare, bool Update=true)
-  {
-    if (Check == Compare)
-      return (false);
-  
-    if (Update)
-      Check   = Compare;
-  
-    return (true);
   }
 
 //+------------------------------------------------------------------+
@@ -206,26 +198,24 @@ double FiboPrice(double Fibo, double Base, double Root, int Method=Expansion)
 //+------------------------------------------------------------------+
 int FiboLevel(double Fibonacci, FiboFormat Format=Extended)
   {
-    int    flFibo;
-    
-    for (flFibo=-Fibo823;flFibo<10;flFibo++)
-      if (Fibonacci<FiboPercent(flFibo))
+    int    fibo;
+
+    for (fibo=FiboRoot;fibo<Fibo823;fibo++)
+      if (fabs(Fibonacci)<FiboPercent(fibo))
         break;
 
     if (Fibonacci<0.00)
       switch (Format)
       {
-        case Unsigned:  flFibo = 0;
+        case Unsigned:  fibo = 0;
                         break;
-        case Signed:    flFibo++;
+        case Signed:    fibo = -(fibo-1);
                         break;
-        case Extended:  if (flFibo != -Fibo823)
-                          flFibo   = fabs(flFibo)+11;
+        case Extended:  fibo = fabs(fibo)+10;
       }
-    else
-      flFibo--;
+    else fibo--;
     
-    return(flFibo);
+    return(fibo);
   }
 
 //+------------------------------------------------------------------+
@@ -323,7 +313,6 @@ bool IsHigher(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
     return (false);
   }
 
-  
 //+------------------------------------------------------------------+
 //| IsChanged - Compares FractalStates to detect changes             |
 //+------------------------------------------------------------------+
@@ -335,3 +324,18 @@ bool IsChanged(FractalState &Compare, FractalState Value)
     Compare = Value;
     return (true);
   }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(FractalType &Check, FractalType Compare, bool Update=true)
+  {
+    if (Check == Compare)
+      return (false);
+  
+    if (Update)
+      Check   = Compare;
+  
+    return (true);
+  }
+

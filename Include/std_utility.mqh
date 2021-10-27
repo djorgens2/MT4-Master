@@ -242,6 +242,34 @@ string ActionText(int Action, int Format=IN_ACTION)
     }
   }
 
+//+------------------------------------------------------------------+
+//| NewAction - Updates Action on change; filters OP_NO_ACTION       |
+//+------------------------------------------------------------------+
+bool NewAction(int &Change, int Compare, bool Update=true)
+  {
+    if (Compare==OP_NO_ACTION)
+      return (false);
+      
+    if (IsChanged(Change,Compare,Update))
+      return (true);
+      
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| NewDirection - Updates Direction on change;filters DirectionNone |
+//+------------------------------------------------------------------+
+bool NewDirection(int &Change, int Compare, bool Update=true)
+  {
+    if (Compare==DirectionNone)
+      return (false);
+
+    if (Change==DirectionNone)
+      if (IsChanged(Change,Compare,Update))
+        return (false);
+    
+    return (IsChanged(Change,Compare,Update));
+  }
 
 //+------------------------------------------------------------------+
 //| pip - returns the Value in pips based on the current Symbol()    |

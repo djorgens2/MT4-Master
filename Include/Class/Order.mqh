@@ -206,13 +206,13 @@ private:
                         OrderSummary   Summary;               //-- Order Summary by Action
                       };
 
-
-          //-- Operational variables
+          //-- Data Collections
           OrderLog        Log[];
           OrderRequest    Queue[];
           OrderMaster     Master[2];
           OrderSummary    Summary[Total];
           QueueSummary    Snapshot[QueueStates];
+
           AccountMetrics  Account;
 
           //-- Private Methods
@@ -1223,9 +1223,13 @@ void COrder::ProcessRequests(void)
           {
             //-- Resubmit Queued Pending Orders
             if (IsBetween(Queue[request].Pend.Type,OP_BUYLIMIT,OP_SELLSTOP))
+            {
+              Queue[request].Type           = Queue[request].Pend.Type;
+
               SubmitOrder(Queue[request],Queue[request].Price+(BoolToDouble(IsEqual(Master[Queue[request].Action].State,FFE),Account.Spread,
                           BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),point(Master[Queue[request].Action].Step),point(Queue[request].Pend.Step)))
                          *Direction(Queue[request].Action,InAction,IsEqual(Queue[request].Action,OP_BUYLIMIT)||IsEqual(Queue[request].Action,OP_SELLLIMIT))));
+            }
 
             //-- Merge fulfilled requests/update stops
             UpdateOrder(MergeRequest(Queue[request]),Fulfilled);

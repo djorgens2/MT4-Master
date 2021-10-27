@@ -599,7 +599,6 @@ int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
 //+------------------------------------------------------------------+
 int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
   {
-    const int NoAction        = 0;
     const int dInverseState   = 3;
     int       dContrarian     = BoolToInt(Contrarian,-1,1);
     
@@ -621,8 +620,8 @@ int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
                             Value        = DirectionNone;
     }
     
-    if (IsLower(DirectionNone,Value))  return (DirectionUp);
-    if (IsHigher(DirectionNone,Value)) return (DirectionDown);
+    if (IsLower(DirectionNone,Value,false,8))  return (DirectionUp);
+    if (IsHigher(DirectionNone,Value,false,8)) return (DirectionDown);
     
     return (DirectionNone);
   }

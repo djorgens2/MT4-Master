@@ -63,8 +63,6 @@ protected:
        void             SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
                                                     { prEvents.SetEvent(Event,AlertLevel); }   //-- sets the event condition
        void             ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }            //-- clears the event condition
-       bool             NewDirection(int &Direction, int ChangeDirection, bool Update=true);
-
 
        //--- input parameters
        int              prDegree;            // degree of regression
@@ -108,25 +106,6 @@ private:
   };
 
 //+------------------------------------------------------------------+
-//| NewDirection - Returns true if a direction has a legit change    |
-//+------------------------------------------------------------------+
-bool CPolyRegression::NewDirection(int &Direction, int ChangeDirection, bool Update=true)
-  {
-    if (ChangeDirection==DirectionNone)
-      return (false);
-      
-    //--- In this class, an invalid direction is always set with no change
-    //--- To override this behavior, send ChangeDirection=DirectionChange
-    if (Direction==DirectionNone)
-    {
-      Direction                    = ChangeDirection;
-      return (false);
-    }
-    
-    return (IsChanged(Direction,ChangeDirection,Update));
-  }
-
-//+------------------------------------------------------------------+
 //| CalcPoly - computes polynomial regression to x degree            |
 //+------------------------------------------------------------------+
 void CPolyRegression::CalcPoly(void)
@@ -137,7 +116,7 @@ void CPolyRegression::CalcPoly(void)
 
     double ai[10,10],b[10],x[10],sx[20];
     double sum; 
-    double qq,mm,tt;
+    double qq,rr,tt;
 
     int    ii,jj,kk,ll,nn;
     int    mi,n;
@@ -192,12 +171,12 @@ void CPolyRegression::CalcPoly(void)
     for(kk=1; kk<=nn-1; kk++)
     {
       ll=0;
-      mm=0;
+      rr=0;
       for(ii=kk; ii<=nn; ii++)
       {
-         if(MathAbs(ai[ii,kk])>mm)
+         if(MathAbs(ai[ii,kk])>rr)
          {
-            mm=MathAbs(ai[ii,kk]);
+            rr=MathAbs(ai[ii,kk]);
             ll=ii;
          }
       }
@@ -266,7 +245,7 @@ void CPolyRegression::CalcPoly(void)
         cpBottomBar   = n;
     }
 
-    prRSquared        = ((1-(se_l/se_y))*100);  //--- R^2 factor
+    prRSquared        = ((1-fdiv(se_l,se_y))*100);  //--- R^2 factor
     prPolyMean        = fdiv(prPolyTop-prPolyBottom,2)+prPolyBottom;
     prPolyHead        = prData[0];
     prPolyTail        = prData[prPeriods-1];

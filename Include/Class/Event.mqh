@@ -33,6 +33,7 @@ protected:
                   NewDirection,
                   NewTick,
                   NewFractal,
+                  NewFibonacci,
                   NewPivot,
                   NewStdDev,
                   NewFOC,
@@ -65,6 +66,7 @@ protected:
                   NewPullback,
                   NewTrap,
                   NewIdle,
+                  NewWax,
                   NewWane,
                   SessionOpen,
                   SessionClose,
@@ -94,6 +96,7 @@ public:
       string         ActiveEventText(bool WithHeader=true);
       
       //---  General use events
+      bool           Event(EventType Event)            {return (eEvents[Event]);}
       bool           Event(EventType Event, AlertLevelType AlertLevel)
                                                        {return (eAlerts[Event]==AlertLevel);}
       bool           ActiveEvent(void)                 {return(!eEvents[NoEvent]);}
@@ -191,4 +194,12 @@ EventType BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoE
       return (TrueValue);
 
     return (FalseValue);
+  }
+
+//+------------------------------------------------------------------+
+//| IsEqual - Compares events to determine equivalence               |
+//+------------------------------------------------------------------+
+bool IsChanged(EventType Event1, EventType Event2)
+  {
+    return (Event1==Event2);
   }
