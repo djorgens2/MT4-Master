@@ -8,13 +8,133 @@
 #property version   "2.00"
 #property strict
 #property indicator_separate_window
+#property indicator_buffers 8
+#property indicator_plots   8
 
+#include <Class\PipMA.mqh>
 #include <std_utility.mqh>
 
 int       IndWinId = -1;
 string    ShortName             = "CPanel-v3";
 string    cpSessionTypes[4]     = {"Daily","Asia","Europe","US"};
 
+//--- plot plOpen
+#property indicator_label1  "plOpen"
+#property indicator_type1   DRAW_SECTION
+#property indicator_color1  clrForestGreen
+#property indicator_style1  STYLE_SOLID
+#property indicator_width1  2
+
+//--- plot plClose
+#property indicator_label2  "plClose"
+#property indicator_type2   DRAW_SECTION
+#property indicator_color2  clrFireBrick
+#property indicator_style2  STYLE_SOLID
+#property indicator_width2  2
+
+//--- plot plSlope
+#property indicator_label3  "plHigh"
+#property indicator_type3   DRAW_SECTION
+#property indicator_color3  clrSilver
+#property indicator_style3  STYLE_SOLID
+#property indicator_width3  1
+
+//--- plot plMA
+#property indicator_label4  "plLow"
+#property indicator_type4   DRAW_SECTION
+#property indicator_color4  clrGoldenrod
+#property indicator_style4  STYLE_SOLID
+#property indicator_width4  1
+
+//--- plot plOpen
+#property indicator_label5  "plOpenSMA"
+#property indicator_type5   DRAW_SECTION
+#property indicator_color5  clrForestGreen
+#property indicator_style5  STYLE_SOLID
+#property indicator_width5  1
+
+//--- plot plClose
+#property indicator_label6  "plCloseSMA"
+#property indicator_type6   DRAW_SECTION
+#property indicator_color6  clrFireBrick
+#property indicator_style6  STYLE_SOLID
+#property indicator_width6  1
+
+//--- plot plSlope
+#property indicator_label7  "plHighSMA"
+#property indicator_type7   DRAW_SECTION
+#property indicator_color7  clrSilver
+#property indicator_style7  STYLE_DOT
+#property indicator_width7  1
+
+//--- plot plMA
+#property indicator_label8  "plLowSMA"
+#property indicator_type8   DRAW_SECTION
+#property indicator_color8  clrGoldenrod
+#property indicator_style8  STYLE_DOT
+#property indicator_width8  1
+
+//--- input parameters
+input int      inpRetention           =  90;   // Retention
+input int      inpRegr                =   9;   // Regression Periods
+input int      inpSMA                 =   3;   // SMA Smoothing
+input double   inpAgg                 = 2.5;   // Tick Aggregation
+
+//--- indicator buffers
+double         plOpenBuffer[];
+double         plCloseBuffer[];
+double         plHighBuffer[];
+double         plLowBuffer[];
+double         plOpenSMABuffer[];
+double         plCloseSMABuffer[];
+double         plHighSMABuffer[];
+double         plLowSMABuffer[];
+
+CPipMA        *pma           = new CPipMA(inpRetention,inpRegr,inpSMA,inpAgg);
+
+//+------------------------------------------------------------------+
+//| RefreshScreen - Repaint indicator display                        |
+//+------------------------------------------------------------------+
+void RefreshScreen(void)
+  {
+    UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
+  }
+
+//+------------------------------------------------------------------+
+//| LoadBuffer - Insert Regression buffer value                      |
+//+------------------------------------------------------------------+
+void LoadBuffer(double &Buffer[], double Price)
+  {
+    double copy[];
+    
+    ArrayCopy(copy,Buffer,1,0,inpRetention-1);
+    ArrayInitialize(Buffer,0.00);
+    ArrayCopy(Buffer,copy,0,0,inpRetention);
+    
+    Buffer[0]          = Price;
+  }
+
+//+------------------------------------------------------------------+
+//| UpdatePipMA - refreshes indicator data                           |
+//+------------------------------------------------------------------+
+void UpdatePipMA(void)
+  {
+    pma.Update();
+    
+    if (pma[NewTick])
+      if (pma[0].Segment>inpSMA)
+      {
+        LoadBuffer(plOpenBuffer,pma.Master().History[0].Open);
+        LoadBuffer(plCloseBuffer,pma.Master().History[1].Close);
+        LoadBuffer(plHighBuffer,pma.Master().History[1].High);
+        LoadBuffer(plLowBuffer,pma.Master().History[1].Low);
+        LoadBuffer(plOpenSMABuffer,pma.Master().SMA.Open);
+        LoadBuffer(plCloseSMABuffer,pma.Master().SMA.Close);
+        LoadBuffer(plHighSMABuffer,pma.Master().SMA.High);
+        LoadBuffer(plLowSMABuffer,pma.Master().SMA.Low);
+      }
+  }
 
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
@@ -251,59 +371,28 @@ int OnInit()
       NewLabel("lbvRQ-"+(string)row+"-Memo","1234567890123456789012345678901234567",1092,44+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
     }
 
-    //-- Fractal Area
-//    DrawBox("bxfFA-PipMA",1324,28,30,106,clrNONE,BORDER_FLAT,IndWinId);
-//    DrawBox("bxfFA-Fractal",1324,139,30,107,clrNONE,BORDER_FLAT,IndWinId);
-//    DrawBox("bxfFA-Session",1324,250,30,213,clrNONE,BORDER_FLAT,IndWinId);
-//
-//    NewLabel("lbhFA-PipMA","PipMA",1332,90,clrGoldenrod,SCREEN_UL,IndWinId);
-//    NewLabel("lbhFA-Fractal","Fractal",1332,202,clrGoldenrod,SCREEN_UL,IndWinId);
-//    NewLabel("lbhFA-Session","Session",1332,360,clrGoldenrod,SCREEN_UL,IndWinId);
-//
-//    ObjectSet("lbhFA-Fractal",OBJPROP_ANGLE,90);
-//    ObjectSet("lbhFA-Session",OBJPROP_ANGLE,90);
-//    ObjectSet("lbhFA-PipMA",OBJPROP_ANGLE,90);
-//
-//    for (int row=0;row<8;row++)
-//    {
-//      DrawBox("bxfFA-Bias:"+(string)row,1360,BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),45,54,clrNONE,BORDER_FLAT,IndWinId);
-//      DrawBox("bxfFA-Info:"+(string)row,1410,BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),330,54,clrNONE,BORDER_FLAT,IndWinId);
-//
-//      for (int col=0;col<3;col++)
-//      {
-//        DrawBox("bxfFA-"+(string)row+":"+(string)col,1744+(col*90),BoolToInt(row>3,38,BoolToInt(row>1,33,28))+(row*53),85,54,clrNONE,BORDER_FLAT,IndWinId);
-//        NewLabel("lbvFA-H"+(string)row+":"+(string)col,"Convergent",1758+(col*90),BoolToInt(row>3,38,BoolToInt(row>1,35,32))+(row*54),clrGoldenrod,SCREEN_UL,IndWinId);
-//        NewLabel("lbvFA-E"+(string)row+":"+(string)col,LPad("-999.9%"," ",10),1758+(col*90),
-//                                   BoolToInt(row>3,53,BoolToInt(row>1,50,47))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//        NewLabel("lbvFA-R"+(string)row+":"+(string)col,LPad("-999.9%"," ",10),1758+(col*90),
-//                                   BoolToInt(row>3,67,BoolToInt(row>1,64,61))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      }
-//
-//      NewLabel("lbvFA-HD0:"+(string)row,"",1422,BoolToInt(row>3,38,BoolToInt(row>1,35,32))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      NewLabel("lbvFA-HD1:"+(string)row,"",1610,BoolToInt(row>3,38,BoolToInt(row>1,35,32))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      NewLabel("lbvFA-HD2:"+(string)row,"",1422,BoolToInt(row>3,64,BoolToInt(row>1,62,59))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      NewLabel("lbvFA-ADir:"+(string)row,"",1362,BoolToInt(row>3,40,BoolToInt(row>1,37,34))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      NewLabel("lbvFA-BDir:"+(string)row,"",1388,BoolToInt(row>3,40,BoolToInt(row>1,37,34))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//      NewLabel("lbvFA-Trigger:"+(string)row,"",1386,BoolToInt(row>3,62,BoolToInt(row>1,59,56))+(row*54),clrDarkGray,SCREEN_UL,IndWinId);
-//
-//      UpdateDirection("lbvFA-ADir:"+(string)row,DirectionUp,clrLawnGreen,28);
-//      UpdateDirection("lbvFA-BDir:"+(string)row,DirectionDown,clrRed,12);
-//      UpdateLabel("lbvFA-Trig:"+(string)row,CharToStr(177),clrFireBrick,14,"Wingdings");
-//
-//      UpdateLabel("lbvFA-HD0:"+(string)row,"Heading Line "+(string)row,clrDarkGray,14);
-//      UpdateLabel("lbvFA-HD1:"+(string)row,"Correction",clrDarkGray,14);
-//      UpdateLabel("lbvFA-HD2:"+(string)row,"Sub-Head Line "+(string)row,clrDarkGray,10);
-//    }
-//
-//    SetIndexBuffer(0,indOLineBuffer);
-//    SetIndexBuffer(1,indCLineBuffer);
-// 
-//    SetIndexEmptyValue(0,0.00);
-//    SetIndexEmptyValue(1,0.00);
-//   
-//    ArrayInitialize(indOLineBuffer,0.00);
-//    ArrayInitialize(indCLineBuffer,0.00);
+    NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
+    NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
 
+    //--- indicator buffers mapping
+    SetIndexBuffer(0,plOpenBuffer);
+    SetIndexBuffer(1,plCloseBuffer);
+    SetIndexBuffer(2,plHighBuffer);
+    SetIndexBuffer(3,plLowBuffer);
+    SetIndexBuffer(4,plOpenSMABuffer);
+    SetIndexBuffer(5,plCloseSMABuffer);
+    SetIndexBuffer(6,plHighSMABuffer);
+    SetIndexBuffer(7,plLowSMABuffer);
+    
+    SetIndexEmptyValue(0,0.00);
+    SetIndexEmptyValue(1,0.00);
+    SetIndexEmptyValue(2,0.00);
+    SetIndexEmptyValue(3,0.00);
+    SetIndexEmptyValue(4,0.00);
+    SetIndexEmptyValue(5,0.00);
+    SetIndexEmptyValue(6,0.00);
+    SetIndexEmptyValue(7,0.00);
+  
     return(INIT_SUCCEEDED);
   }
 
@@ -320,6 +409,17 @@ int OnCalculate(const int rates_total,
                 const long &tick_volume[],
                 const long &volume[],
                 const int &spread[])
-  {    
+  {
+    UpdatePipMA();
+    RefreshScreen();
+
     return(rates_total);
+  }
+
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+    delete pma;
   }

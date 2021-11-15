@@ -25,15 +25,16 @@
   input int           inpDefaultTarget   = 50;     // Default Take Profit (pips)
 
   input string        PipMAConfig        = "";     //+------ PipMA Config ------+
-  input int           inpHistSize        = 80;     // History Retention
-  input int           inpRegression      = 9;      // Linear Regression Factor
+  input int           inpHistRetention   = 80;     // History Retention
+  input int           inpLinearRegr      = 9;      // Linear Regression Periods
+  input int           intPolyRegr        = 6;      // Polynomial Regression Degree
   input int           inpSMA             = 2;      // SMA Factor
-  input double        inpAggSize         = 2.5;    // Tick Aggregation Range
+  input double        inpTickAgg         = 2.5;    // Tick Aggregation Range
 
   //-- Structure Defs
 
   //--- Class Defs
-  CPipMA         *pma                = new CPipMA(inpHistSize,inpRegression,inpSMA,inpAggSize);
+  CPipMA         *pma                = new CPipMA(inpHistRetention,inpLinearRegr,intPolyRegr,inpSMA,inpTickAgg);
   COrder         *order              = new COrder(Discount,Hold,Hold);
   
   //--- Data Collections
@@ -64,38 +65,56 @@ void ManageLong(void)
   {
     
   }
+
 //+------------------------------------------------------------------+
 //| ManageShort - Verifies position integrity, adjusts, closures     |
 //+------------------------------------------------------------------+
 void ManageShort(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    static OrderRequest request;
     
-    eRequest.Requestor      = "Shorts Manager";
-    eRequest.Memo           = "Price Fill Test";
+    if (IsEqual(pma.Master().Bias,OP_SELL))
+      if (pma[NewBias])
+      {
+        request                = order.BlankRequest();
+        request.Requestor      = "Shorts Manager";
+        request.Memo           = "[Seg:"+(string)pma[0].Segment+"]";
+
+        request.Type           = OP_SELL;
+        request.Price          = pma.Master().High;
+        request.TakeProfit     = 0.00;
+        request.Price          = 0.00;
+        
+        Print(order.RequestStr(request));
+      }
     
-    order.SetRiskLimits(OP_SELL,80,80,2);
+    order.SetRiskLimits(OP_SELL,80,60,2.5);
       
     //--- Queue Order Test
-    if (IsEqual(order[OP_SELL].Count,0))
-    {
-      eRequest.Pend.Type       = OP_SELLSTOP;
-      eRequest.Pend.Limit      = 17.982;
-      eRequest.Pend.Step       = 2;
-      eRequest.Pend.Cancel     = 18.112;
-      eRequest.Type            = OP_SELL;
-      eRequest.Price           = 0.00;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
+    if (IsEqual(request.Type,OP_SELL))
+      if (IsEqual(pma.Master().Bias,pma.Tick().Bias))
+        if (IsHigher(Bid,request.Price))
+        {
+          request.Pend.Type       = OP_NO_ACTION;
+          request.Pend.Step       = 2;
+          request.Pend.Limit      = Bid-point(inpDefaultTarget);
+          request.Pend.Cancel     = Bid+point(10);
+          request.Expiry          = TimeCurrent()+(Period()*(60*12));
      
-      if (order.Submitted(eRequest))
-      {
-        Print(order.QueueStr());
-        Print(pma.OHLCStr(0));
-      }
-      else order.PrintLog();
-    }
+          if (order.Submitted(request))
+          {
+            request.Type          = OP_NO_ACTION;
+
+            //Print(order.QueueStr());
+            //Print(pma.OHLCStr(0));
+          }
+          else order.PrintLog();
+        }
+
+    string text   = "";
+    for (int id=0;id<order.PL(OP_SELL,Profit).Count;id++)
+      Append(text,"["+(string)order.PL(OP_SELL,Profit).Ticket[id]+"]");
+    if (text!="") Print("\n\n"+text);
   }
 
 //+------------------------------------------------------------------+
@@ -105,8 +124,7 @@ void UpdateOrders(void)
   {
     int Tickets[];
     
-    if (IsEqual(Close[0],18.076))
-      ManageShort();
+    ManageShort();
       
     order.Execute(Tickets,true);
   }
@@ -116,12 +134,19 @@ void UpdateOrders(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    static int segment = 3;
-    static bool fired  = false;
+    static int count  = 0;
     
-//    if (pma[NewBias])
-//      segment  = pma[0].Segment;
+    if (order[Net].Count<count)
+    {
+//      Print(order.OrderStr());
+      count--;
+    }
+//    if (pma[NewHigh])
+//      Print(pma.MasterStr());
+//      Print(pma.OHLCStr(0));
 //      
+//    if (IsBetween(pma[0].Segment,11,12))
+//      Print(pma.TickStr());
 //    if (IsEqual(segment,pma[0].Segment))
 //      Print(pma.OHLCStr(0));
 //      Print(pma.TriggerStr());
@@ -132,7 +157,7 @@ void Execute(void)
 //    Print("|Trigger|"+pma.TriggerStr());
    //if (IsEqual(pma.Trigger().Event,NewHigh))
    //  Pause("New High","Trigger Event");
-//      UpdateOrders();
+      UpdateOrders();
 
 //    if (pma[NewTick])
 //      Print((string)pma[0].Segment);

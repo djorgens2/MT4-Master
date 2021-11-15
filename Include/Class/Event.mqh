@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2018, Dennis Jorgenson"
 #property link      "http://www.mql5.com"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 #include <std_utility.mqh>
@@ -74,11 +74,12 @@ protected:
                   NewHour,
                   EventTypes
                 };
-                
+
 private:
 
       bool           eEvents[EventTypes];
       
+      EventType      eLastEvent;
       AlertLevelType eAlerts[EventTypes];
       AlertLevelType eMaxAlert;
 
@@ -94,12 +95,14 @@ public:
       AlertLevelType HighAlert(void)                   {return (eMaxAlert);}
 
       string         ActiveEventText(bool WithHeader=true);
+      string         EventStr(void);
       
       //---  General use events
       bool           Event(EventType Event)            {return (eEvents[Event]);}
       bool           Event(EventType Event, AlertLevelType AlertLevel)
                                                        {return (eAlerts[Event]==AlertLevel);}
-      bool           ActiveEvent(void)                 {return(!eEvents[NoEvent]);}
+      bool           ActiveEvent(void)                 {return (!eEvents[NoEvent]);}
+      EventType      LastEvent(void)                   {return (eLastEvent);};
 
       bool           operator[](const EventType Event) {return(eEvents[Event]);}
   };
@@ -112,11 +115,11 @@ void CEvent::SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
     if (IsEqual(Event,NoEvent))
       return;
 
-    eEvents[NoEvent]         = false;
-    eEvents[Event]           = true;
-    eAlerts[Event]           = fmax(AlertLevel,eAlerts[Event]);
-
-    eMaxAlert                = fmax(AlertLevel,eMaxAlert);
+    eEvents[NoEvent]        = false;
+    eEvents[Event]          = true;
+    eAlerts[Event]          = fmax(AlertLevel,eAlerts[Event]);
+    eMaxAlert               = fmax(AlertLevel,eMaxAlert);
+    eLastEvent              = Event;
   }
   
 //+------------------------------------------------------------------+
@@ -127,16 +130,16 @@ void CEvent::ClearEvent(EventType Event)
     if (Event==NoEvent)
       return;
 
-    eEvents[NoEvent]         = true;
-    eEvents[Event]           = false;
-    eAlerts[Event]           = NoAlert;
-    eMaxAlert                = NoAlert;
+    eEvents[NoEvent]        = true;
+    eEvents[Event]          = false;
+    eAlerts[Event]          = NoAlert;
+    eMaxAlert               = NoAlert;
     
     for (EventType event=NewDirection;event<EventTypes;event++)
       if (eEvents[event])
       {
-        eEvents[NoEvent]     = false;
-        eMaxAlert            = fmax(eAlerts[event],eMaxAlert);
+        eEvents[NoEvent]    = false;
+        eMaxAlert           = fmax(eAlerts[event],eMaxAlert);
       }
   }
   
@@ -148,12 +151,13 @@ void CEvent::ClearEvents(void)
     ArrayInitialize(eEvents,false);    
     ArrayInitialize(eAlerts,NoAlert);
     
-    eEvents[NoEvent]         = true;
-    eMaxAlert                = NoAlert;
+    eEvents[NoEvent]        = true;
+    eMaxAlert               = NoAlert;
+    eLastEvent              = NoEvent;
   }
   
 //+------------------------------------------------------------------+
-//| ActiveEvents - String of active events formatted for display     |
+//| ActiveEventText - String of active events formatted for display  |
 //+------------------------------------------------------------------+
 string CEvent::ActiveEventText(bool WithHeader=true)
   {
@@ -171,6 +175,24 @@ string CEvent::ActiveEventText(bool WithHeader=true)
     else Append(aeActiveEvents, "No Active Events", "\n");
     
     return (aeActiveEvents);
+  }
+
+//+------------------------------------------------------------------+
+//| EventStr - String of active events formatted for Log             |
+//+------------------------------------------------------------------+
+string CEvent::EventStr(void)
+  {
+    string text   = "";
+    
+    if (this.ActiveEvent())
+    {
+      for (EventType event=NewDirection;event<EventTypes;event++)
+        if (eEvents[event])
+          Append(text, EnumToString(eAlerts[event])+":"+EnumToString(event),"|");
+    }
+    else Append(text,"No Active Events");
+    
+    return (text);
   }
 
 //+------------------------------------------------------------------+
@@ -203,3 +225,50 @@ bool IsEqual(EventType Event1, EventType Event2)
   {
     return (Event1==Event2);
   }
+  
+const string EventText[EventTypes] =
+             {
+               "No Event",
+               "New Direction",
+               "New Tick",
+               "New Fractal",
+               "New Fibonacci",
+               "New Pivot",
+               "New Std Dev",
+               "New FOC",
+               "New State",
+               "New Action",
+               "New Action State",
+               "New Bias",
+               "New Range",
+               "New Origin",
+               "New Trend",
+               "New Term",
+               "New Base",
+               "New Divergence",
+               "New Convergence",
+               "New Expansion",
+               "New Contraction",
+               "New Retrace",
+               "New Correction",
+               "New Recovery",
+               "New Poly",
+               "New Poly Trend",
+               "New Poly Boundary",
+               "New Poly State",
+               "New High",
+               "New Low",
+               "New Boundary",
+               "New Breakout",
+               "New Reversal",
+               "New Rally",
+               "New Pullback",
+               "New Trap",
+               "New Idle",
+               "New Wax",
+               "New Wane",
+               "Session Open",
+               "Session Close",
+               "New Day",
+               "New Hour"
+             };
