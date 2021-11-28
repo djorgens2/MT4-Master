@@ -31,6 +31,7 @@ protected:
                 {
                   NoEvent,
                   NewDirection,
+                  NewSegment,
                   NewTick,
                   NewFractal,
                   NewFibonacci,
@@ -230,6 +231,7 @@ const string EventText[EventTypes] =
              {
                "No Event",
                "New Direction",
+               "New Segment",
                "New Tick",
                "New Fractal",
                "New Fibonacci",
