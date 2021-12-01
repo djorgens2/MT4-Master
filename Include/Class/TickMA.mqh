@@ -59,6 +59,7 @@ private:
            {
              int          Direction;
              int          Bias;
+             double       Root;             
              EventType    Event;
              OHLCRec      Fast;
              OHLCRec      Slow;
@@ -82,6 +83,7 @@ private:
     void             UpdateTick(void);
     void             UpdateSegment(void);
     void             UpdateRange(void);
+    void             UpdateSMA(void);
     void             UpdatePoly(void);
     void             UpdateLine(void);
 
@@ -360,6 +362,24 @@ void CTickMA::NewSegment(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateTick - Calc tick bounds and update tick history            |
+//+------------------------------------------------------------------+
+void CTickMA::UpdateTick(void)
+  {
+    if (fabs(tr[0].Open-Close[0])>=trTickAgg)
+      NewTick();
+
+    if (IsHigher(Close[0],tr[0].High))
+      SetEvent(NewHigh,Notify);
+
+    if (IsLower(Close[0],tr[0].Low))
+      SetEvent(NewLow,Notify);
+
+    tr[0].Close          = Close[0];
+    tr[0].Count++;
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateSegment - Calc segment bounds and update segment history   |
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSegment(void)
@@ -379,31 +399,10 @@ void CTickMA::UpdateSegment(void)
 
     if (IsLower(Close[0],sr[0].Price.Low))
       SetEvent(NewLow,Nominal);
-      
+
     sr[0].Price.Close         = Close[0];
 
-    CalcSMA(sma.Fast,trSMAFast);
-    CalcSMA(sma.Slow,trSMASlow);
-    
     SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Price.Close-sr[0].Price.Open),InDirection)),NewBias),Nominal);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateTick - Calc tick bounds and update tick history            |
-//+------------------------------------------------------------------+
-void CTickMA::UpdateTick(void)
-  {
-    if (fabs(tr[0].Open-Close[0])>=trTickAgg)
-      NewTick();
-
-    if (IsHigher(Close[0],tr[0].High))
-      SetEvent(NewHigh,Notify);
-
-    if (IsLower(Close[0],tr[0].Low))
-      SetEvent(NewLow,Notify);
-
-    tr[0].Close          = Close[0];
-    tr[0].Count++;
   }
 
 //+------------------------------------------------------------------+
@@ -460,6 +459,15 @@ void CTickMA::UpdateRange(void)
     }
 
     SetEvent(range.Event,Major);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateSMA - Calc SMA bounds and simple SMA Regression            |
+//+------------------------------------------------------------------+
+void CTickMA::UpdateSMA(void)
+  {
+    CalcSMA(sma.Fast,trSMAFast);
+    CalcSMA(sma.Slow,trSMASlow);
   }
 
 //+------------------------------------------------------------------+
@@ -540,6 +548,7 @@ void CTickMA::Update(void)
     UpdateTick();
     UpdateSegment();
     UpdateRange();
+    UpdateSMA();
     UpdatePoly();
     UpdateLine();
   }
