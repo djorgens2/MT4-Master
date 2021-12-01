@@ -70,15 +70,15 @@
 #property indicator_style8 STYLE_SOLID
 #property indicator_width8 1
 
-//--- plot plOpenSlope
-#property indicator_label9 "plOpenSlope"
+//--- plot plOpenLine
+#property indicator_label9 "plOpenLine"
 #property indicator_type9  DRAW_SECTION
 #property indicator_color9 clrDodgerBlue
 #property indicator_style9 STYLE_SOLID
 #property indicator_width9 1
 
-//--- plot plCloseSlope
-#property indicator_label10 "plCloseSlope"
+//--- plot plCloseLine
+#property indicator_label10 "plCloseLine"
 #property indicator_type10  DRAW_SECTION
 #property indicator_color10 clrDodgerBlue
 #property indicator_style10 STYLE_DASH
@@ -103,8 +103,8 @@ double         plSMAHighBuffer[];
 double         plSMALowBuffer[];
 double         plPolyOpenBuffer[];
 double         plPolyCloseBuffer[];
-double         plSlopeOpenBuffer[];
-double         plSlopeCloseBuffer[];
+double         plLineOpenBuffer[];
+double         plLineCloseBuffer[];
 
 double         plSMAOpen[1];
 double         plSMAClose[1];
@@ -116,6 +116,14 @@ CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpSMA,inpAg
 
 //--- Object defs
 //double
+
+//+------------------------------------------------------------------+
+//| RefreshScreen - Repaints Indicator labels                        |
+//+------------------------------------------------------------------+
+void RefreshScreen(void)
+  {
+    UpdateLabel("tmaRangeState",EnumToString(t.Range().State),clrDarkGray,12);
+  }
 
 //+------------------------------------------------------------------+
 //| ResetBuffer - Reset Buffer on bar change                         |
@@ -138,7 +146,7 @@ void UpdateBuffer(double &Source[], double Price)
   }
 
 //+------------------------------------------------------------------+
-//| UpdatePipMA - refreshes indicator data                           |
+//| UpdateTickMA - refreshes indicator data                          |
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
@@ -146,23 +154,27 @@ void UpdateTickMA(void)
 
     t.Update();
     
+    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
+    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
+    SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
+
     UpdateBuffer(plSMAOpen,t.SMA().Slow.Open);
     UpdateBuffer(plSMAHigh,t.SMA().Fast.High);
     UpdateBuffer(plSMALow,t.SMA().Fast.Low);
     UpdateBuffer(plSMAClose,t.SMA().Slow.Close);
 
-    if (IsChanged(bars,Bars)||t[NewSegment])
+    if (IsChanged(bars,Bars)||t[NewTick])
     {
       ResetBuffer(plSMAOpenBuffer,plSMAOpen);
       ResetBuffer(plSMACloseBuffer,plSMAClose);
       ResetBuffer(plSMAHighBuffer,plSMAHigh);
       ResetBuffer(plSMALowBuffer,plSMALow);
-    }
 
-    //ResetBuffer(plPolyOpenBuffer,t.Poly.Open,pma[0].Segment);
-    //ResetBuffer(plPolyCloseBuffer,t.Poly.Close,pma[0].Segment);
-    //ResetBuffer(plSlopeOpenBuffer,t.Slope.Open,pma[0].Segment);
-    //ResetBuffer(plSlopeCloseBuffer,t.Slope.Close,pma[0].Segment);
+      ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
+      ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
+      ResetBuffer(plLineOpenBuffer,t.Line().Open);
+      ResetBuffer(plLineCloseBuffer,t.Line().Close);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -171,7 +183,6 @@ void UpdateTickMA(void)
 void UpdateNode(string NodeName, int Node, double Price1, double Price2)
   {
     ObjectSet(NodeName+(string)Node,OBJPROP_COLOR,Color(t.Segment(Node).Price.Close-t.Segment(Node).Price.Open));
-//    ObjectSet(NodeName+(string)Node,OBJPROP_COLOR,Color(t.Segment(Node).Direction));
     ObjectSet(NodeName+(string)Node,OBJPROP_PRICE1,Price1);
     ObjectSet(NodeName+(string)Node,OBJPROP_PRICE2,Price2);
     ObjectSet(NodeName+(string)Node,OBJPROP_TIME1,Time[Node]);
@@ -189,7 +200,7 @@ void UpdateSegment(void)
       ArrayInitialize(plLowBuffer,0.00);
     }
 
-    for (int node=0;node<fmin(t.Segments(),inpPeriods);node++)
+    for (int node=0;node<inpPeriods;node++)
     {
       UpdateNode("tmaHL:",node,t.Segment(node).Price.High,t.Segment(node).Price.Low);
       UpdateNode("tmaOC:",node,t.Segment(node).Price.Open,t.Segment(node).Price.Close);
@@ -216,6 +227,8 @@ int OnCalculate(const int rates_total,
     UpdateTickMA();
     UpdateSegment();
 
+    RefreshScreen();
+
     return(rates_total);
   }
 
@@ -237,8 +250,8 @@ int OnInit()
     SetIndexBuffer(5,plSMACloseBuffer);
     SetIndexBuffer(6,plPolyOpenBuffer);
     SetIndexBuffer(7,plPolyCloseBuffer);
-    SetIndexBuffer(8,plSlopeOpenBuffer);
-    SetIndexBuffer(9,plSlopeCloseBuffer);
+    SetIndexBuffer(8,plLineOpenBuffer);
+    SetIndexBuffer(9,plLineCloseBuffer);
 
     SetIndexEmptyValue(0,0.00);
     SetIndexEmptyValue(1,0.00);
@@ -262,7 +275,9 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)obj,OBJPROP_RAY,false);
       ObjectSet("tmaOC:"+(string)obj,OBJPROP_WIDTH,3);
     }
-    
+
+    NewLabel("tmaRangeState","",5,5,clrDarkGray,SCREEN_UR,IndWinId);
+
     return(INIT_SUCCEEDED);
   }
 
