@@ -566,7 +566,6 @@ int Operation(int Action, bool Contrarian=false)
 //+------------------------------------------------------------------+
 int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
   {
-    const int NoAction        = 0;
     const int dInverseState   = 3;
     int       dContrarian     = BoolToInt(Contrarian,-1,1);
     
@@ -591,7 +590,7 @@ int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
     if (IsLower(DirectionNone,Value))  return (OP_BUY);
     if (IsHigher(DirectionNone,Value)) return (OP_SELL);
     
-    return (NoAction);
+    return (NoValue);
   }
 
 //+------------------------------------------------------------------+

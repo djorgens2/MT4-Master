@@ -243,6 +243,14 @@ string ActionText(int Action, int Format=IN_ACTION)
   }
 
 //+------------------------------------------------------------------+
+//| NewBias - Updates Bias on change; includes OP_NO_ACTION          |
+//+------------------------------------------------------------------+
+bool NewBias(int &Change, int Compare, bool Update=true)
+  {
+    return (IsChanged(Change,Compare,Update));
+  }
+
+//+------------------------------------------------------------------+
 //| NewAction - Updates Action on change; filters OP_NO_ACTION       |
 //+------------------------------------------------------------------+
 bool NewAction(int &Change, int Compare, bool Update=true)
@@ -250,10 +258,7 @@ bool NewAction(int &Change, int Compare, bool Update=true)
     if (Compare==OP_NO_ACTION)
       return (false);
       
-    if (IsChanged(Change,Compare,Update))
-      return (true);
-      
-    return (false);
+    return (IsChanged(Change,Compare,Update));
   }
 
 //+------------------------------------------------------------------+
@@ -431,6 +436,7 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
                            return (clrDarkGray);
     case IN_ACTION:        if (Action(Value,InAction)==OP_BUY)  return (clrLawnGreen);
                            if (Action(Value,InAction)==OP_SELL) return (clrRed);
+                           return (clrYellow);
     case IN_CHART_ACTION:  if (Action(Value,InAction)==OP_BUY)  return (clrYellow);
                            if (Action(Value,InAction)==OP_SELL) return (clrRed);
   }

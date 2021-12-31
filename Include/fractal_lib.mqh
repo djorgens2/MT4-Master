@@ -110,7 +110,7 @@ static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
 
 //+------------------------------------------------------------------+
-//| FractalEvent - Returns the event associated by Fractal Event     |
+//| FractalEvent - Returns the Fractal Event on change in State      |
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
   {
@@ -118,7 +118,7 @@ EventType FractalEvent(FractalState State)
   }
 
 //+------------------------------------------------------------------+
-//| FractalEvent - Returns the event associated by Fractal Event     |
+//| FractalEvent - Returns the Fractal Event on change in Type       |
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalType Type)
   {
@@ -279,6 +279,24 @@ double FiboPercent(int Level, int Format=InPoints, bool Signed=true)
       return (NormalizeDouble(FiboLevels[Level],3)*fpSign);
       
     return (NormalizeDouble(FiboLevels[Level]*100,1)*fpSign);
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Returns true on change to a Fractal State             |
+//+------------------------------------------------------------------+
+bool NewState(FractalState &State, FractalState ChangeState)
+  {
+    if (ChangeState==NoState)
+      return(false);
+
+    if (State==NoState)
+      State                       = ChangeState;
+
+    if (ChangeState==Breakout)
+      if (State==Reversal)
+        return(false);
+
+    return(IsChanged(State,ChangeState));
   }
 
 //+------------------------------------------------------------------+

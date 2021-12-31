@@ -17,20 +17,28 @@ class CTickMA : public CEvent
 private:
     enum   PriceType
            {
-             ptOpen,
-             ptHigh,
-             ptLow,
-             ptClose,
-             PriceTypes
+             ptOpen,      // Open
+             ptHigh,      // High
+             ptLow,       // Low
+             ptClose,     // Close
+             PriceTypes   // None
            };
 
-    struct OHLCRec
+    struct TickRec
            {
              int          Count;
              double       Open;
              double       High;
              double       Low;
              double       Close;
+           };
+
+    struct SegmentRec
+           {
+             int          Direction;
+             int          Bias;
+             EventType    Event;
+             TickRec      Price;
            };
 
     struct RangeRec
@@ -44,6 +52,39 @@ private:
              double       Retrace;
            };
 
+    struct PegRec
+           {
+             //-- 1:Price[0] between Retrace/Expansion; set Retrace; 2:Price[0] between Retrace/Recovery; Set Recovery; 3:Once set, bounds set Breakout/Reversal;
+             bool         IsPegged;
+             double       High;
+             double       Low;
+             double       Retrace;
+             double       Recovery;
+           };
+
+    struct FractalRec
+           {
+             int          Direction;
+             int          Bias;
+             EventType    Event;
+             FractalState State;
+             double       Price[];
+             double       Point[FractalPoints];
+             PegRec       Peg;
+           };
+
+    struct SMARec
+           {
+             int          Direction;
+             int          Bias;
+             EventType    Event;
+             FractalState State;
+             FractalRec   Open;
+             FractalRec   High;
+             FractalRec   Low;
+             FractalRec   Close;
+           };
+
     struct RegressionRec
            {
              int          Direction;
@@ -55,25 +96,10 @@ private:
              double       Close[];
            };
 
-    struct SMARec
-           {
-             int          Direction;
-             int          Bias;
-             double       Root;             
-             EventType    Event;
-             OHLCRec      Fast;
-             OHLCRec      Slow;
-           };
+    void             InitFractal(FractalRec &Fractal);
 
-    struct SegmentRec
-           {
-             int          Direction;
-             int          Bias;
-             EventType    Event;
-             OHLCRec      Price;
-           };
-
-    void             CalcSMA(OHLCRec &SMA, int Factor);
+    void             CalcFractal(FractalRec &SMA, AlertLevel Level);
+    void             CalcSMA(int Bar=0);
     void             CalcPoly(double &Poly[], PriceType Type);
     void             CalcLine(double &Source[], double &Target[]);
 
@@ -87,17 +113,20 @@ private:
     void             UpdatePoly(void);
     void             UpdateLine(void);
 
-    int              trPeriods;
-    int              trDegree;
-    int              trSMASlow;
-    int              trSMAFast;
-    double           trTickAgg;
+    int              tmaPeriods;
+    int              tmaDegree;
+    int              tmaSMASlow;
+    int              tmaSMAFast;
+    int              tmaSMAKeep;
+    double           tmaTickAgg;
+
+    int              tmaSegmentDir;
     
     //-- Aggregation Structures
-    OHLCRec          tr[];          //-- Tick Record
+    TickRec          tr[];          //-- Tick Record
     SegmentRec       sr[];          //-- Segment Record
     RangeRec         range;         //-- Range Record
-    SMARec           sma;           //-- SMA Record
+    SMARec           sma;           //-- SMA Master Record
     RegressionRec    poly;          //-- Poly Regr Record
     RegressionRec    line;          //-- Linear Regr Record
 
@@ -106,7 +135,7 @@ public:
 
     void             Update(void);
 
-    OHLCRec          Tick(int Node)     { return(tr[Node]); };
+    TickRec          Tick(int Node)     { return(tr[Node]); };
     SegmentRec       Segment(int Node)  { return(sr[Node]); };
     RangeRec         Range(void)        { return(range); };
     SMARec           SMA(void)          { return(sma); };
@@ -116,7 +145,7 @@ public:
     int              Ticks(void)        { return(ArraySize(tr)); };
     int              Segments(void)     { return(ArraySize(sr)); };
 
-                     CTickMA(int RegrPeriods, int RegrDegree, int SMA, double AggrTick);
+                     CTickMA(int Periods, int Degree, double Aggregate);
                     ~CTickMA();
 
     //-- Format strings
@@ -125,31 +154,174 @@ public:
     string           SegmentStr(int Node);
     string           SegmentHistoryStr(int Count=0);
     string           SegmentTickStr(int Node);
+    string           FractalStr(PriceType Type);
+    string           SMAStr(void);
     string           PolyStr(void);
     string           RangeStr(void);
   };
 
 //+------------------------------------------------------------------+
-//| CalcSMA - Computes the SMA of an OHLC array                      |
+//| InitFractal - Initialize Fractal Rec on price[0]                 |
 //+------------------------------------------------------------------+
-void CTickMA::CalcSMA(OHLCRec &SMA, int Factor)
+void CTickMA::InitFractal(FractalRec &Fractal)
   {
-    OHLCRec smainit       = {0,0.00,0.00,0.00,0.00};
-    
-    SMA                   = smainit;
-    
-    for (int node=0;node<fmin(Segments(),Factor);node++)
+    Fractal.Direction       = DirectionNone;
+    Fractal.Bias            = OP_NO_ACTION;
+    Fractal.Event           = NoEvent;
+    Fractal.State           = NoState;
+
+    ArrayInitialize(Fractal.Point,Fractal.Price[0]);
+    ArrayInitialize(Fractal.Point,Fractal.Price[0]);;
+  }
+
+//+------------------------------------------------------------------+
+//| CalcFractal - Computes the Fractal Bias,Dir,Event,State,Points   |
+//+------------------------------------------------------------------+
+void CTickMA::CalcFractal(FractalRec &Fractal, AlertLevel Level)
+  {
+    int          direction  = Direction(Fractal.Price[0]-Fractal.Price[1]);
+
+    FractalState state      = NoState;
+    Fractal.Event           = NoEvent;
+
+    if (Event(NewTick))
     {
-      SMA.Open           += sr[node].Price.Open;
-      SMA.High           += sr[node].Price.High;
-      SMA.Low            += sr[node].Price.Low;
-      SMA.Close          += sr[node].Price.Close;
+      if (NewBias(Fractal.Bias,Action(direction)))
+        Fractal.Event       = NewBias;
+
+      if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Digits))
+      {
+        //-- Handle SMA Flats
+        if (IsEqual(Fractal.Bias,OP_NO_ACTION))
+          return;
+        else
+
+        //-- Handle Retrace
+        if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpBase],Digits))
+          state             = Retrace;
+        else
+
+        //-- Handle Recovery
+        if (IsEqual(Fractal.State,Retrace)||IsEqual(Fractal.State,Recovery))
+          state             = Recovery;
+        else
+
+        //-- Handle Rally/Pullback
+          state             = (FractalState)BoolToInt(IsEqual(Fractal.Bias,OP_NO_ACTION),Fractal.State,
+                                            BoolToInt(IsEqual(Fractal.Bias,OP_BUY),Rally,Pullback));
+
+        if (IsBetween(Fractal.Price[0],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Digits))
+          if (IsBetween(Fractal.Price[0],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Digits))
+            if (IsChanged(Fractal.Peg.IsPegged,true))
+            {
+              Fractal.Peg.High       = fmax(Fractal.Point[fpRoot],Fractal.Point[fpExpansion]);
+              Fractal.Peg.Low        = fmin(Fractal.Point[fpRoot],Fractal.Point[fpExpansion]);
+              Fractal.Peg.Retrace    = Fractal.Point[fpRetrace];
+              Fractal.Peg.Recovery   = Fractal.Point[fpRecovery];
+            }
+
+        if (Fractal.Peg.IsPegged)
+          if (!IsBetween(Fractal.Price[0],Fractal.Peg.Retrace,Fractal.Peg.Recovery,Digits))
+          {
+            state           = (FractalState)BoolToInt(NewDirection(Fractal.Direction,direction),Reversal,Breakout);
+
+            Fractal.Peg.IsPegged         = false;
+
+            if (IsEqual(state,Reversal))
+              Fractal.Point[fpOrigin]    = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                             fmin(Fractal.Peg.High,Fractal.Peg.Low),
+                                             fmax(Fractal.Peg.High,Fractal.Peg.Low),Digits);
+
+            Fractal.Point[fpBase]        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                             fmax(Fractal.Peg.Retrace,Fractal.Peg.Recovery),
+                                             fmin(Fractal.Peg.Retrace,Fractal.Peg.Recovery),Digits);
+
+            Fractal.Point[fpRoot]        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                             fmin(Fractal.Peg.Retrace,Fractal.Peg.Recovery),
+                                             fmax(Fractal.Peg.Retrace,Fractal.Peg.Recovery),Digits);
+
+            Fractal.Point[fpExpansion]   = Fractal.Price[0];
+          }
+
+          if (IsChanged(Fractal.Point[fpRetrace],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                             fmin(Fractal.Point[fpRetrace],Fractal.Price[0]),
+                                             fmax(Fractal.Point[fpRetrace],Fractal.Price[0]),Digits)))
+            Fractal.Point[fpRecovery]    = Fractal.Point[fpRetrace];
+          else
+            Fractal.Point[fpRecovery]    = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                             fmax(Fractal.Point[fpRecovery],Fractal.Price[0]),
+                                             fmin(Fractal.Point[fpRecovery],Fractal.Price[0]),Digits);
+      }
+      else
+
+      //-- Handle Breakout/Reversal
+      {
+        if (NewDirection(Fractal.Direction,direction))
+        {
+          state             = Reversal;
+
+          Fractal.Point[fpOrigin]        = Fractal.Point[fpExpansion];
+          Fractal.Point[fpBase]          = Fractal.Point[fpRoot];
+          Fractal.Point[fpRoot]          = Fractal.Point[fpExpansion];
+        }
+        else
+        {
+          state             = (FractalState)BoolToInt(IsEqual(Fractal.State,Reversal),Reversal,Breakout);
+
+          if (!IsEqual(Fractal.State,Breakout)&&!IsEqual(Fractal.State,Reversal))  //-- Not on continuing Breakout/Reversal
+          {
+            Fractal.Point[fpBase]        = Fractal.Point[fpExpansion];
+            Fractal.Point[fpRoot]        = Fractal.Point[fpRetrace];
+          }
+        }
+
+        Fractal.Point[fpExpansion]       = Fractal.Price[0];
+        Fractal.Point[fpRetrace]         = Fractal.Price[0];
+        Fractal.Point[fpRecovery]        = Fractal.Price[0];
+
+        Fractal.Peg.IsPegged             = false;
+      }
+
+      if (IsChanged(Fractal.State,state))
+      {
+        Fractal.Event                    = BoolToEvent(IsEqual(Fractal.Event,NewBias),Fractal.Event,FractalEvent[state]);
+
+        SetEvent(FractalEvent[state]);
+      }
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| CalcSMA - Calc SMA on supplied segment (bar)                     |
+//+------------------------------------------------------------------+
+void CTickMA::CalcSMA(int Bar=0)
+  {
+    TickRec calcsma       = {0,0.00,0.00,0.00,0.00};
+
+    if (Event(NewSegment)||Bar>0)
+    {
+      ArrayCopy(sma.Open.Price,sma.Open.Price,1,0,tmaSMAKeep-1);
+      ArrayCopy(sma.High.Price,sma.High.Price,1,0,tmaSMAKeep-1);
+      ArrayCopy(sma.Low.Price,sma.Low.Price,1,0,tmaSMAKeep-1);
+      ArrayCopy(sma.Close.Price,sma.Close.Price,1,0,tmaSMAKeep-1);
     }
 
-    SMA.Open              = fdiv(SMA.Open,Factor);
-    SMA.High              = fdiv(SMA.High,Factor);
-    SMA.Low               = fdiv(SMA.Low,Factor);
-    SMA.Close             = fdiv(SMA.Close,Factor);
+    for (int node=0;node<tmaSMASlow;node++)
+    {
+      if (node<tmaSMAFast)
+      {
+        calcsma.High     += sr[node+Bar].Price.High;
+        calcsma.Low      += sr[node+Bar].Price.Low;
+      }
+
+      calcsma.Open       += sr[node+Bar].Price.Open;
+      calcsma.Close      += sr[node+Bar].Price.Close;
+    }
+
+    sma.Open.Price[0]     = fdiv(calcsma.Open,tmaSMASlow);
+    sma.High.Price[0]     = fdiv(calcsma.High,tmaSMAFast);
+    sma.Low.Price[0]      = fdiv(calcsma.Low,tmaSMAFast);
+    sma.Close.Price[0]    = fdiv(calcsma.Close,tmaSMASlow);
   }
 
 //+------------------------------------------------------------------+
@@ -166,15 +338,15 @@ void CTickMA::CalcPoly(double &Poly[], PriceType Type)
 
     double src;
 
-    sx[1]  = trPeriods+1;
-    nn     = trDegree+1;
+    sx[1]  = tmaPeriods+1;
+    nn     = tmaDegree+1;
 
     //----------------------sx-------------
     for(mi=1;mi<=nn*2-2;mi++)
     {
       sum=0;
 
-      for(n=0;n<=trPeriods;n++)
+      for(n=0;n<=tmaPeriods;n++)
         sum+=pow(n,mi);
 
       sx[mi+1]=sum;
@@ -187,7 +359,7 @@ void CTickMA::CalcPoly(double &Poly[], PriceType Type)
     {
       sum=0.00000;
 
-      for(n=0;n<=trPeriods;n++)
+      for(n=0;n<=tmaPeriods;n++)
       {
         src    = BoolToDouble(IsEqual(Type,ptOpen),sr[n].Price.Open,
                  BoolToDouble(IsEqual(Type,ptClose),sr[n].Price.Close,
@@ -270,11 +442,11 @@ void CTickMA::CalcPoly(double &Poly[], PriceType Type)
     //===============Final=================
     ArrayInitialize(Poly,0.00);
 
-    for(n=0;n<=trPeriods-1;n++)
+    for(n=0;n<=tmaPeriods-1;n++)
     {
       sum=0;
 
-      for(kk=1;kk<=trDegree;kk++)
+      for(kk=1;kk<=tmaDegree;kk++)
         sum+=x[kk+1]*pow(n,kk);
 
       Poly[n]=x[1]+sum;
@@ -293,7 +465,7 @@ void CTickMA::CalcLine(double &Source[], double &Target[])
     double sumx           = 0.00;
     double sumy           = 0.00;
     
-    for (int idx=0;idx<trPeriods;idx++)
+    for (int idx=0;idx<tmaPeriods;idx++)
     {
       sumx += idx+1;
       sumy += Source[idx];
@@ -302,13 +474,13 @@ void CTickMA::CalcLine(double &Source[], double &Target[])
       m[3] += pow(idx+1,2);                   // E(x^2)
     }
     
-    m[2]    = fdiv(sumx*sumy,trPeriods);     // (Ex*Ey)/n
-    m[4]    = fdiv(pow(sumx,2),trPeriods);   // [(Ex)^2]/n
+    m[2]    = fdiv(sumx*sumy,tmaPeriods);     // (Ex*Ey)/n
+    m[4]    = fdiv(pow(sumx,2),tmaPeriods);   // [(Ex)^2]/n
     
     m[0]    = (m[1]-m[2])/(m[3]-m[4]);
-    b       = (sumy-m[0]*sumx)/trPeriods;
+    b       = (sumy-m[0]*sumx)/tmaPeriods;
 
-    for (int idx=0;idx<trPeriods;idx++)
+    for (int idx=0;idx<tmaPeriods;idx++)
       Target[idx]    = (m[0]*(idx+1))+b;    //--- y=mx+b
   }
 
@@ -341,11 +513,11 @@ void CTickMA::NewSegment(void)
     ArrayResize(sr,ArraySize(sr)+1,32768);
     ArrayCopy(sr,sr,1,0,ArraySize(sr)-1);
 
-    sr[0].Direction           = Direction(sr[0].Price.Close-sr[0].Price.Open);
-    sr[0].Bias                = Action(sr[0].Direction,InDirection);
-    sr[0].Event               = BoolToEvent(IsEqual(sr[0].Direction,DirectionUp),NewRally,NewPullback);
     sr[0].Price               = tr[1];
     sr[0].Price.Open          = Close[0];
+
+    sr[0].Direction           = Direction(sr[0].Price.Open-sr[0].Price.Close);
+    sr[0].Event               = BoolToEvent(IsEqual(sr[0].Direction,DirectionUp),NewRally,NewPullback);
     sr[0].Price.Count         = 0;
 
     if (IsEqual(sr[1].Price.Count,TickHold))
@@ -353,9 +525,6 @@ void CTickMA::NewSegment(void)
       sr[0].Price.High      = fmax(sr[0].Price.High,sr[1].Price.High);
       sr[0].Price.Low       = fmin(sr[0].Price.Low,sr[1].Price.Low);
     }
-
-    if (NewDirection(sr[1].Direction,sr[0].Direction))
-      SetEvent(NewDirection);
 
     SetEvent(NewSegment,Nominal);
     SetEvent(sr[0].Event,Nominal);
@@ -366,7 +535,7 @@ void CTickMA::NewSegment(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateTick(void)
   {
-    if (fabs(tr[0].Open-Close[0])>=trTickAgg)
+    if (fabs(tr[0].Open-Close[0])>=tmaTickAgg)
       NewTick();
 
     if (IsHigher(Close[0],tr[0].High))
@@ -384,11 +553,9 @@ void CTickMA::UpdateTick(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSegment(void)
   {
-    static int direction        = DirectionChange;
-
     if (Event(NewTick))
     {
-      if (NewDirection(direction,Direction(tr[1].Close-tr[1].Open)))
+      if (NewDirection(tmaSegmentDir,Direction(Close[0]-tr[1].Open)))
         NewSegment();
 
       sr[0].Price.Count++;
@@ -423,7 +590,7 @@ void CTickMA::UpdateRange(void)
     else
     if (Event(NewTick))
     {
-      for (int node=0;node<fmin(ArraySize(sr),trPeriods);node++)
+      for (int node=0;node<fmin(ArraySize(sr),tmaPeriods);node++)
       {
         rangehigh         = fmax(rangehigh,sr[node].Price.High);
         rangelow          = fmin(rangelow,sr[node].Price.Low);
@@ -466,17 +633,12 @@ void CTickMA::UpdateRange(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSMA(void)
   {
-    CalcSMA(sma.Fast,trSMAFast);
-    CalcSMA(sma.Slow,trSMASlow);
-  }
+    CalcSMA();
 
-//+------------------------------------------------------------------+
-//| UpdateLinear - Calc linear regression from Poly Regression       |
-//+------------------------------------------------------------------+
-void CTickMA::UpdateLine(void)
-  {
-    CalcLine(poly.Open,line.Open);
-    CalcLine(poly.Close,line.Close);
+    CalcFractal(sma.Open,Minor);
+    CalcFractal(sma.High,Minor);
+    CalcFractal(sma.Low,Minor);
+    CalcFractal(sma.Close,Minor);
   }
 
 //+------------------------------------------------------------------+
@@ -489,45 +651,84 @@ void CTickMA::UpdatePoly(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateLine - Calc linear regression from Poly Regression         |
+//+------------------------------------------------------------------+
+void CTickMA::UpdateLine(void)
+  {
+    CalcLine(poly.Open,line.Open);
+    CalcLine(poly.Close,line.Close);
+  }
+
+//+------------------------------------------------------------------+
 //| TickMA Class Constructor                                         |
 //+------------------------------------------------------------------+
-CTickMA::CTickMA(int RegrPeriods, int RegrDegree, int SMA, double AggrTick)
+CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
   {
-    trPeriods               = RegrPeriods;
-    trDegree                = RegrDegree;
-    trSMASlow               = SMA;
-    trSMAFast               = SMA-1;
-    trTickAgg               = point(AggrTick);
+    tmaPeriods                 = Periods;
+    tmaDegree                  = Degree;
+    tmaSMAFast                 = 2;
+    tmaSMASlow                 = 3;
+    tmaSMAKeep                 = 4;
+    tmaTickAgg                 = point(Aggregate);
+    tmaSegmentDir              = DirectionChange;    
 
-    ArrayResize(sr,trPeriods+trDegree);
+    ArrayResize(sr,tmaPeriods+tmaDegree);
 
-    ArrayResize(poly.Open,trPeriods);
-    ArrayResize(poly.Close,trPeriods);
-    
-    ArrayResize(line.Open,trPeriods);
-    ArrayResize(line.Close,trPeriods);
+    ArrayResize(poly.Open,tmaPeriods);
+    ArrayResize(poly.Close,tmaPeriods);
+
+    ArrayResize(line.Open,tmaPeriods);
+    ArrayResize(line.Close,tmaPeriods);
 
     //-- Preload Segments (Initialize)
-    for (int node=0;node<trPeriods+trDegree;node++)
+    for (int node=0;node<tmaPeriods+tmaDegree;node++)
     {
       sr[node].Price.Open      = Open[node];
       sr[node].Price.High      = High[node];
       sr[node].Price.Low       = Low[node];
       sr[node].Price.Close     = Close[node];
     }
-    
+
     //-- Preload Range (Initialize)
-    range.Direction            = Direction(iLowest(Symbol(),Period(),MODE_LOW,trPeriods)-
-                                           iHighest(Symbol(),Period(),MODE_HIGH,trPeriods));
-    range.High                 = High[iHighest(Symbol(),Period(),MODE_HIGH,trPeriods)];
-    range.Low                  = Low[iLowest(Symbol(),Period(),MODE_LOW,trPeriods)];
+    range.Direction            = Direction(iLowest(Symbol(),Period(),MODE_LOW,tmaPeriods)-
+                                           iHighest(Symbol(),Period(),MODE_HIGH,tmaPeriods));
+    range.High                 = High[iHighest(Symbol(),Period(),MODE_HIGH,tmaPeriods)];
+    range.Low                  = Low[iLowest(Symbol(),Period(),MODE_LOW,tmaPeriods)];
     range.Mean                 = fdiv(range.High+range.Low,2);
     range.Retrace              = BoolToDouble(IsEqual(range.Direction,DirectionUp),
-                                    Low[iLowest(Symbol(),Period(),MODE_LOW,iHighest(Symbol(),Period(),MODE_HIGH,trPeriods))],
-                                    High[iHighest(Symbol(),Period(),MODE_HIGH,iLowest(Symbol(),Period(),MODE_LOW,trPeriods))]);
+                                    Low[iLowest(Symbol(),Period(),MODE_LOW,iHighest(Symbol(),Period(),MODE_HIGH,tmaPeriods))],
+                                    High[iHighest(Symbol(),Period(),MODE_HIGH,iLowest(Symbol(),Period(),MODE_LOW,tmaPeriods))]);
     range.State                = (FractalState)BoolToInt(IsEqual(range.Direction,Direction(range.Retrace-range.Mean)),Breakout,Retrace);
-    
+
     NewTick();
+
+    //-- Precalc SMA Fractals
+    bool initialized           = false;
+
+    ArrayResize(sma.Open.Price,tmaSMAKeep);
+    ArrayResize(sma.High.Price,tmaSMAKeep);
+    ArrayResize(sma.Low.Price,tmaSMAKeep);
+    ArrayResize(sma.Close.Price,tmaSMAKeep);
+
+    for (int node=tmaPeriods+tmaSMASlow;node>0;node--)
+    {
+      CalcSMA(node);
+
+      if (IsChanged(initialized,true))
+      {
+        InitFractal(sma.Open);
+        InitFractal(sma.High);
+        InitFractal(sma.Low);
+        InitFractal(sma.Close);
+      }
+
+      CalcFractal(sma.Open,Minor);
+      CalcFractal(sma.High,Minor);
+      CalcFractal(sma.Low,Minor);
+      CalcFractal(sma.Close,Minor);
+
+      if (Event(NewTick)) Print(SMAStr());
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -658,6 +859,58 @@ string CTickMA::RangeStr(void)
   }
 
 //+------------------------------------------------------------------+
+//| FractalStr - Returns Master formatted SMA text, prices, Fractal  |
+//+------------------------------------------------------------------+
+string CTickMA::FractalStr(PriceType Type)
+  {
+    string       text  = StringSubstr(EnumToString(Type),2);
+    FractalRec   fr;
+
+    if (IsEqual(Type,ptOpen))    fr = sma.Open;
+    if (IsEqual(Type,ptHigh))    fr = sma.High;
+    if (IsEqual(Type,ptLow))     fr = sma.Low;
+    if (IsEqual(Type,ptClose))   fr = sma.Close;
+
+    Append(text,DirText(fr.Direction),"|");
+    Append(text,ActionText(fr.Bias),"|");
+    Append(text,EnumToString(fr.State),"|");
+    Append(text,EnumToString(fr.Event),"|");
+
+    for (int node=0;node<tmaSMAKeep;node++)
+      Append(text,DoubleToStr(fr.Price[node],Digits),"|");
+
+    for (FractalPoint fp=fpOrigin;fp<FractalPoints;fp++)
+      Append(text,DoubleToStr(fr.Point[fp],Digits),"|");
+
+    Append(text,BoolToStr(fr.Peg.IsPegged,"Pegged","Unpegged"),"|");
+    Append(text,DoubleToStr(fr.Peg.High,Digits),"|");
+    Append(text,DoubleToStr(fr.Peg.Low,Digits),"|");
+    Append(text,DoubleToStr(fr.Peg.Retrace,Digits),"|");
+    Append(text,DoubleToStr(fr.Peg.Recovery,Digits),"|");
+
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| SMAStr - Returns Master formatted SMA text, prices, Fractal      |
+//+------------------------------------------------------------------+
+string CTickMA::SMAStr(void)
+  {
+    string text      = "SMA";
+
+    Append(text,DirText(sma.Direction),"|");
+    Append(text,ActionText(sma.Bias),"|");
+    Append(text,EnumToString(sma.State),"|");
+    Append(text,EnumToString(sma.Event),"|");
+    Append(text,FractalStr(ptOpen),"|");
+    Append(text,FractalStr(ptHigh),"|");
+    Append(text,FractalStr(ptLow),"|");
+    Append(text,FractalStr(ptClose),"|");
+
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
 //| PolyStr - Returns formatted poly text and prices                 |
 //+------------------------------------------------------------------+
 string CTickMA::PolyStr(void)
@@ -672,7 +925,7 @@ string CTickMA::PolyStr(void)
     Append(text,DoubleToStr(poly.High,Digits),"|");
     Append(text,DoubleToStr(poly.Low,Digits),"|");
 
-    for (int node=0;node<trPeriods;node++)
+    for (int node=0;node<tmaPeriods;node++)
     {
       Append(textopen,DoubleToStr(poly.Open[node],Digits),"|");
       Append(textclose,DoubleToStr(poly.Close[node],Digits),"|");

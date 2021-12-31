@@ -85,13 +85,12 @@
 #property indicator_width10 1
 
 //--- input parameters
-input int      inpPeriods             =  90;   // Retention
+input int      inpPeriods             =  80;   // Retention
 input int      inpDegree              =   6;   // Poiy Regression Degree
-input int      inpSMA                 =   3;   // SMA Smoothing
 input double   inpAgg                 = 2.5;   // Tick Aggregation
 
 //--- Indicator defs
-string         ShortName          = "TickMA-v2: "+(string)inpPeriods+":"+(string)inpDegree+":"+(string)inpSMA+":"+(string)inpAgg;
+string         ShortName          = "TickMA-v1: "+(string)inpPeriods+":"+(string)inpDegree+":"+(string)inpAgg;
 int            IndWinId  = -1;
 
 //--- Indicator buffers
@@ -112,17 +111,16 @@ double         plSMAHigh[1];
 double         plSMALow[1];
 
 //--- Class defs
-CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpSMA,inpAgg);
-
-//--- Object defs
-//double
+CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdateLabel("tmaRangeState",EnumToString(t.Range().State),clrDarkGray,12);
+    UpdateLabel("tmaRangeState",EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
+    UpdateLabel("tmaSegmentState","Segment ["+(string)t.Segment(0).Price.Count+"]: "+
+                  proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
   }
 
 //+------------------------------------------------------------------+
@@ -158,10 +156,10 @@ void UpdateTickMA(void)
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
-    UpdateBuffer(plSMAOpen,t.SMA().Slow.Open);
-    UpdateBuffer(plSMAHigh,t.SMA().Fast.High);
-    UpdateBuffer(plSMALow,t.SMA().Fast.Low);
-    UpdateBuffer(plSMAClose,t.SMA().Slow.Close);
+    UpdateBuffer(plSMAOpen,t.SMA().Open.Price[0]);
+    UpdateBuffer(plSMAHigh,t.SMA().High.Price[0]);
+    UpdateBuffer(plSMALow,t.SMA().Low.Price[0]);
+    UpdateBuffer(plSMAClose,t.SMA().Close.Price[0]);
 
     if (IsChanged(bars,Bars)||t[NewTick])
     {
@@ -276,7 +274,8 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)obj,OBJPROP_WIDTH,3);
     }
 
-    NewLabel("tmaRangeState","",5,5,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaRangeState","",5,2,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentState","",5,20,clrDarkGray,SCREEN_UR,IndWinId);
 
     return(INIT_SUCCEEDED);
   }

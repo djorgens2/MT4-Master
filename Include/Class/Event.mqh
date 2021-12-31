@@ -16,7 +16,7 @@
 class CEvent
   {
 protected:
-       enum     AlertLevelType
+       enum     AlertLevel
                 {
                   NoAlert,
                   Notify,
@@ -81,27 +81,27 @@ private:
       bool           eEvents[EventTypes];
       
       EventType      eLastEvent;
-      AlertLevelType eAlerts[EventTypes];
-      AlertLevelType eMaxAlert;
+      AlertLevel     eAlerts[EventTypes];
+      AlertLevel     eMaxAlert;
 
 public:
                      CEvent(){ClearEvents();};
                     ~CEvent(){};
 
-      void           SetEvent(EventType Event, AlertLevelType AlertLevel=Notify);
+      void           SetEvent(EventType Event, AlertLevel Level=Notify);
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
 
-      AlertLevelType AlertLevel(EventType Event)       {return (eAlerts[Event]);}
-      AlertLevelType HighAlert(void)                   {return (eMaxAlert);}
+      AlertLevel     AlertLevel(EventType Event)       {return (eAlerts[Event]);}
+      AlertLevel     HighAlert(void)                   {return (eMaxAlert);}
 
       string         ActiveEventText(bool WithHeader=true);
       string         EventStr(void);
       
       //---  General use events
       bool           Event(EventType Event)            {return (eEvents[Event]);}
-      bool           Event(EventType Event, AlertLevelType AlertLevel)
-                                                       {return (eAlerts[Event]==AlertLevel);}
+      bool           Event(EventType Event, AlertLevel Level)
+                                                       {return (eAlerts[Event]==Level);}
       bool           ActiveEvent(void)                 {return (!eEvents[NoEvent]);}
       EventType      LastEvent(void)                   {return (eLastEvent);};
 
@@ -111,15 +111,15 @@ public:
 //+------------------------------------------------------------------+
 //| SetEvent - Sets the triggering event to true                     |
 //+------------------------------------------------------------------+
-void CEvent::SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
+void CEvent::SetEvent(EventType Event, AlertLevel Level=Notify)
   {
     if (IsEqual(Event,NoEvent))
       return;
 
     eEvents[NoEvent]        = false;
     eEvents[Event]          = true;
-    eAlerts[Event]          = fmax(AlertLevel,eAlerts[Event]);
-    eMaxAlert               = fmax(AlertLevel,eMaxAlert);
+    eAlerts[Event]          = fmax(Level,eAlerts[Event]);
+    eMaxAlert               = fmax(Level,eMaxAlert);
     eLastEvent              = Event;
   }
   
