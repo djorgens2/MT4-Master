@@ -82,10 +82,10 @@ public:
              int              SessionHour(int Measure=Now);
              bool             IsOpen(void);
              
-             bool             Event(EventType Type,AlertLevelType AlertLevel)
-                                                               {return (sEvent.Event(Type,AlertLevel));}
+             bool             Event(EventType Type,AlertLevel Level)
+                                                               {return (sEvent.Event(Type,Level));}
              bool             Event(EventType Type)            {return (sEvent[Type]);}
-             AlertLevelType   AlertLevel(EventType Type)       {return (sEvent.AlertLevel(Type));}
+             AlertLevel       AlertLevel(EventType Type)       {return (sEvent.AlertLevel(Type));}
              bool             ActiveEvent(void)                {return (sEvent.ActiveEvent());}
              string           ActiveEventText(const bool WithHeader=true)
                                                                {return (sEvent.ActiveEventText(WithHeader));};
@@ -245,11 +245,11 @@ bool CSession::NewState(FractalState &State, FractalState ChangeState, EventType
     { 
       switch (State)
       {
-        case Reversal:    sEvent.SetEvent(NewFractal,(AlertLevelType)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
+        case Reversal:    sEvent.SetEvent(NewFractal,(AlertLevel)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
                                                                      BoolToInt(IsEqual(EventTrigger,NewTrend),Major,Minor)));
                           sEvent.SetEvent(NewReversal,Major);
                           break;
-        case Breakout:    sEvent.SetEvent(NewFractal,(AlertLevelType)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
+        case Breakout:    sEvent.SetEvent(NewFractal,(AlertLevel)BoolToInt(IsEqual(EventTrigger,NewOrigin),Critical,
                                                                      BoolToInt(IsEqual(EventTrigger,NewTrend),Major,Minor)));
                           sEvent.SetEvent(NewBreakout,Major);
                           break;

@@ -87,7 +87,7 @@ class CPipMA : public CEvent
       double         CalcSMA(OHLCRec &OHLC[], RegressionMethod Method, int Segments);
       double         CalcPoly(OHLCRec &OHLC[], double &Poly[], RegressionMethod Method);
       double         CalcSlope(double &Source[], double &Destination[]);
-      void           CalcRegression(RegrRec &Regr, AlertLevelType Level);
+      void           CalcRegression(RegrRec &Regr, AlertLevel Level);
 
       void           UpdateMaster(void);
       void           UpdateTick(TickRec &Tick);
@@ -333,7 +333,7 @@ double CPipMA::CalcSMA(OHLCRec &OHLC[], RegressionMethod Method, int SMA)
 //+------------------------------------------------------------------+
 //| UpdateRegression - Completes the Tick Regression Analysis        |
 //+------------------------------------------------------------------+
-void CPipMA::CalcRegression(RegrRec &Regr, AlertLevelType Level)
+void CPipMA::CalcRegression(RegrRec &Regr, AlertLevel Level)
   {
     
   }

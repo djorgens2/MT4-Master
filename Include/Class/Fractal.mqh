@@ -129,9 +129,9 @@ public:
        bool             Is(FractalType Type, int Method);
        
        bool             Event(const EventType Type)     { return (fEvent[Type]); }                        //-- Returns TF for supplied event
-       bool             Event(EventType Event, AlertLevelType AlertLevel)
-                                                        { return (fEvent.Event(Event,AlertLevel)); }      //-- Returns TF for supplied event/alert level
-       AlertLevelType   AlertLevel(EventType Type)      { return (fEvent.AlertLevel(Type)); }              //-- Returns the Alert Level for supplied Event
+       bool             Event(EventType Event, AlertLevel Level)
+                                                        { return (fEvent.Event(Event,Level)); }           //-- Returns TF for supplied event/alert level
+       AlertLevel       AlertLevel(EventType Type)      { return (fEvent.AlertLevel(Type)); }             //-- Returns the Alert Level for supplied Event
 
        bool             ActiveEvent(void)               { return (fEvent.ActiveEvent()); }
        string           ActiveEventText(const bool WithHeader=true)
@@ -275,7 +275,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
 
     if (IsChanged(State,(FractalState)BoolToInt(IsEqual(state,NoState),State,state)))
     {
-      AlertLevelType alertlevel         = (AlertLevelType)BoolToInt(IsEqual(Type,Origin),Critical,
+      AlertLevel alertlevel           = (AlertLevel)BoolToInt(IsEqual(Type,Origin),Critical,
                                                           BoolToInt(IsEqual(Type,Trend),Major,
                                                           BoolToInt(IsEqual(Type,Term),Minor,
                                                           BoolToInt(IsEqual(Type,Base),Warning,Notify))));

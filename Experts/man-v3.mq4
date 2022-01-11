@@ -15,7 +15,6 @@
 
   int Tick                 = 0;
 
-  AccountMetrics Account;
   int            Tickets[];
   OrderSummary   NodeNow[2];
   int            IndexNow[2];
@@ -28,7 +27,7 @@ void GetData(void)
   {
     static int index[2]  = {0,0};
     
-    order.Update(Account);
+    order.Update();
     
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
@@ -54,7 +53,7 @@ void GetData(void)
 void RefreshScreen(void)
   {
 
-    UpdateLine("czDCA:"+(string)OP_BUY,Account.DCA[OP_SELL],STYLE_SOLID,clrYellow);  
+    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_SELL),STYLE_SOLID,clrYellow);  
   }
 
 //+------------------------------------------------------------------+
@@ -90,13 +89,16 @@ void Test1(void)
       {
         case 4:  order.SetStopLoss(OP_BUY,0.00,20,false);
                  order.SetTakeProfit(OP_BUY,0.00,20,false);
+                 order.SetOrderMethod(OP_BUY,Full);
                  break;
         case 5:  order.SetStopLoss(OP_BUY,17.40,0,false);
                  order.SetTakeProfit(OP_BUY,18.75,30,false);
+                 order.SetDetailMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
                  break;
         case 6:  order.SetStopLoss(OP_BUY,17.8,70,false);
                  order.SetTakeProfit(OP_BUY,18.20,70,false);
                  order.Submitted(eRequest);
+                 order.SetDetailMethod(OP_BUY,Hold,0,ByZone);
                  break;
         case 7:  order.SetStopLoss(OP_BUY,0.00,0,false);
                  order.SetTakeProfit(OP_BUY,0.00,0,false);
@@ -135,6 +137,8 @@ void Test1(void)
                  order.Submitted(eRequest);
                  break;
       }
+      for (int ord=0;ord<order[OP_BUY].Count;ord++)
+        Print(order.OrderDetailStr(order.Ticket(order[OP_BUY].Ticket[ord])));
     }
     
 //    if (Tick>8)
@@ -370,7 +374,7 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 2
+    #define Test 1
 
     Comment("Tick: "+(string)++Tick);
     
@@ -393,8 +397,10 @@ void Execute(void)
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
-    order.Execute(Tickets,true);
-
+    order.ExecuteOrders(OP_BUY);
+    order.ExecuteOrders(OP_SELL);
+    order.ExecuteRequests();
+ 
 //    if (Tick==5) Print (">>>After:"+order.OrderStr());
     
     //if (order.Fulfilled())

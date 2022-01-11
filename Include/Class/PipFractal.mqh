@@ -284,7 +284,7 @@ void CPipFractal::ResetRetrace(FractalType Type, FractalPoint Fractal, EventType
       pf[Type].Price[point]      = Price(Type,Fractal);
     }
 
-    SetEvent(Event,(AlertLevelType)BoolToInt(Type==Term,Minor,BoolToInt(Type==Trend,Major,Critical)));
+    SetEvent(Event,(AlertLevel)BoolToInt(Type==Term,Minor,BoolToInt(Type==Trend,Major,Critical)));
   }
 
 //+------------------------------------------------------------------+

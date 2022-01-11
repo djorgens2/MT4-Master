@@ -31,8 +31,8 @@ public:
 
        //--- Event methods
        bool     Event(EventType Event)      { return (prEvents[Event]); }         //-- returns the event signal for the specified event
-       bool     Event(EventType Event, AlertLevelType AlertLevel)            //-- returns the event signal for the specified event & alert level
-                                            { return (prEvents.Event(Event,AlertLevel)); }
+       bool     Event(EventType Event, AlertLevel Level)            //-- returns the event signal for the specified event & alert level
+                                            { return (prEvents.Event(Event,Level)); }
        bool     ActiveEvent(void)           { return (prEvents.ActiveEvent()); }  //-- returns true on active event
        string   ActiveEventText(const bool WithHeader=true)
                                             { return  (prEvents.ActiveEventText(WithHeader));}  //-- returns the string of active events
@@ -60,8 +60,8 @@ protected:
        
        
        //--- Event methods
-       void             SetEvent(EventType Event, AlertLevelType AlertLevel=Notify)
-                                                    { prEvents.SetEvent(Event,AlertLevel); }   //-- sets the event condition
+       void             SetEvent(EventType Event, AlertLevel Level=Notify)
+                                                    { prEvents.SetEvent(Event,Level); }   //-- sets the event condition
        void             ClearEvent(EventType Event) { prEvents.ClearEvent(Event); }            //-- clears the event condition
 
        //--- input parameters

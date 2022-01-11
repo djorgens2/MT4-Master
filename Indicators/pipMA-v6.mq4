@@ -66,15 +66,15 @@ input PipFractalType inpShowFractal       = PipFractalTypes;   // Show fractal l
 //+------------------------------------------------------------------+
 //| UpdateEvent - Reports event changes retaining the last event     |
 //+------------------------------------------------------------------+
-void UpdateEvent(string EventText, int EventColor)
+void UpdateEvent(string Text, int EventColor)
   {
     static string ueLastEvent    = "No Event";
     
-    if (EventText=="No Event")
+    if (Text=="No Event")
       UpdateLabel("lrEvent",ueLastEvent,clrGray,16);
     else
-    if (IsChanged(ueLastEvent,EventText))
-      UpdateLabel("lrEvent",EventText,EventColor,16);
+    if (IsChanged(ueLastEvent,Text))
+      UpdateLabel("lrEvent",Text,EventColor,16);
     else
       UpdateLabel("lrEvent",ueLastEvent,clrYellow,16);
   }
