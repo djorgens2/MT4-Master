@@ -59,7 +59,9 @@ protected:
                         //-- Order Open States
                         Fulfilled,
                         Working,
+                        Processing,
                         //-- Order Close States
+                        Processed,
                         Closed,
                         Completed,
                         //-- Submit Error
@@ -156,7 +158,6 @@ private:
                         double          Lots;
                         double          Profit;
                         double          Swap;
-                        bool            Split;
                         double          TakeProfit;
                         double          StopLoss;
                         string          Memo;
@@ -179,7 +180,7 @@ private:
                         OrderMethod    Method;                //-- Order Processing Method by Action
                         //-- Profit Management
                         double         EquityTarget;          //-- Principal equity target
-                        double         MinEquity;             //-- Minimum profit target
+                        double         EquityMin;             //-- Minimum profit target
                         double         DCATarget;             //-- Minimum Equity target for DCA
                         //-- Risk Management
                         double         MaxRisk;               //-- Max Principle Risk
@@ -232,13 +233,13 @@ private:
           void         UpdateMaster(void);
           void         UpdateOrder(OrderDetail &Order, QueueStatus Status);
 
-          OrderDetail  MergeRequest(OrderRequest &Request, bool Split=false);
           OrderRequest SubmitOrder(OrderRequest &Request, bool Resubmit=false);
+          OrderDetail  MergeRequest(OrderRequest &Request, bool Split=false);
           void         MergeOrder(int Action, int Ticket);
-
+          void         MergeSplit(OrderDetail &Order);
           bool         OrderApproved(OrderRequest &Request);
           bool         OrderOpened(OrderRequest &Request);
-          bool         OrderClosed(OrderDetail &Order, double Lots=0.00);
+          bool         OrderClosed(OrderDetail &Order);
 
           void         ProcessRequests(void);
           void         ProcessOrders(void);
@@ -282,10 +283,13 @@ public:
           bool         Expired(int Type=OP_NO_ACTION)                        {return(Status(Expired,Type));};
           bool         Rejected(int Type=OP_NO_ACTION)                       {return(Status(Rejected,Type));};
           bool         Canceled(int Type=OP_NO_ACTION)                       {return(Status(Canceled,Type));};
-          bool         Closed(int Type=OP_NO_ACTION)                         {return(Status(Closed,Type));};
           bool         Fulfilled(int Type=OP_NO_ACTION)                      {return(Status(Fulfilled,Type));};
           bool         Pending(int Type=OP_NO_ACTION)                        {return(Status(Pending,Type));};
+          bool         Processing(int Type=OP_NO_ACTION)                     {return(Status(Processing,Type));};
+          bool         Processed(int Type=OP_NO_ACTION)                      {return(Status(Processed,Type));};
+          bool         Closed(int Type=OP_NO_ACTION)                         {return(Status(Closed,Type));};
           bool         Submitted(OrderRequest &Request);
+          
 
           //-- Array Property Interfaces
           OrderRequest BlankRequest(void);
@@ -308,7 +312,7 @@ public:
           void         SetOrderMethod(int Action, OrderMethod Method, bool UpdateExisting=true);
           void         SetStopLoss(int Action, double StopLoss, double DefaultStop, bool HideStop, bool FromClose=true);
           void         SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, bool HideTarget, bool FromClose=true);
-          void         SetEquityTargets(int Action, double EquityTarget, double MinEquity);
+          void         SetEquityTargets(int Action, double EquityTarget, double EquityMin);
           void         SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double LotScale=0.00);
           void         SetDefaults(int Action, double DefaultLotSize, double DefaultStop, double DefaultTarget);
           void         SetZoneStep(int Action, double Step, double MaxZoneMargin);
@@ -393,7 +397,7 @@ void COrder::InitMaster(int Action, OrderMethod Method)
     Master[Action].Method          = Method;
     Master[Action].TradeEnabled    = !IsEqual(Master[Action].Method,Halt);
     Master[Action].EquityTarget    = 0.00;
-    Master[Action].MinEquity       = 0.00;
+    Master[Action].EquityMin       = 0.00;
     Master[Action].DCATarget       = 0.00;
     Master[Action].MaxRisk         = 0.00;
     Master[Action].LotScale        = 0.00;
@@ -466,7 +470,7 @@ void COrder::UpdatePanel(void)
       UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].Method),"Disabled"),
                      BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
       UpdateLabel("lbvOC-"+ActionText(action)+"-EqTarget",center(DoubleToStr(Master[action].EquityTarget,1)+"%",7),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].MinEquity,1)+"%",6),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].EquityMin,1)+"%",6),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action,0.00),Digits),9),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-DfltTarget","Default "+DoubleToStr(Master[action].TakeProfit,Digits)+" ("+DoubleToStr(Master[action].DefaultTarget,1)+"p)",clrDarkGray,8);
       UpdateLabel("lbvOC-"+ActionText(action)+"-MaxRisk",center(DoubleToStr(Master[action].MaxRisk,1)+"%",6),clrDarkGray,10);
@@ -951,7 +955,6 @@ OrderDetail COrder::MergeRequest(OrderRequest &Request, bool Split=false)
     Master[Request.Action].Order[detail].Lots         = Request.Lots;
     Master[Request.Action].Order[detail].Profit       = OrderProfit();
     Master[Request.Action].Order[detail].Swap         = OrderSwap();
-    Master[Request.Action].Order[detail].Split        = Split;
     Master[Request.Action].Order[detail].TakeProfit   = Price(Profit,OrderType(),Request.TakeProfit,OrderOpenPrice());
     Master[Request.Action].Order[detail].StopLoss     = Price(Loss,OrderType(),Request.StopLoss,OrderOpenPrice());
     Master[Request.Action].Order[detail].Memo         = Request.Memo;
@@ -995,12 +998,46 @@ void COrder::MergeOrder(int Action, int Ticket)
     Master[Action].Order[detail].Lots         = OrderLots();
     Master[Action].Order[detail].Profit       = OrderProfit();
     Master[Action].Order[detail].Swap         = OrderSwap();
-    Master[Action].Order[detail].Split        = OrderLots()<=fdiv(LotSize(Action),2);
     Master[Action].Order[detail].TakeProfit   = OrderTakeProfit();
     Master[Action].Order[detail].StopLoss     = OrderStopLoss();
     Master[Action].Order[detail].Memo         = OrderComment();
 
     AppendLog(NoValue,Ticket,"[Order["+(string)Ticket+"]:Merged");
+  }
+
+//+------------------------------------------------------------------+
+//| MergeSplit - Merge order splits into Master                      |
+//+------------------------------------------------------------------+
+void COrder::MergeSplit(OrderDetail &Order)
+  {
+    int detail                                = ArraySize(Master[Order.Action].Order);
+    
+    //-- Find new split order
+    if (OrderSelect(OrdersTotal()-1,SELECT_BY_POS))
+      if (IsBetween(Order.Method,Split,Retain))
+      {
+        //-- Add New split Order
+        ArrayResize(Master[Order.Action].Order,detail+1,1000);
+
+        if (OrderLots()<LotSize(Order.Action))
+          Master[Order.Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Order.Method,Split),Full,Hold);
+        else
+          Master[Order.Action].Order[detail].Method     = Order.Method;
+         
+        Master[Order.Action].Order[detail].Status       = Fulfilled;
+        Master[Order.Action].Order[detail].Ticket       = OrderTicket();
+        Master[Order.Action].Order[detail].Key          = NoValue;
+        Master[Order.Action].Order[detail].Action       = Order.Action;
+        Master[Order.Action].Order[detail].Price        = OrderOpenPrice();
+        Master[Order.Action].Order[detail].Lots         = OrderLots();
+        Master[Order.Action].Order[detail].Profit       = OrderProfit();
+        Master[Order.Action].Order[detail].Swap         = OrderSwap();
+        Master[Order.Action].Order[detail].TakeProfit   = OrderTakeProfit();
+        Master[Order.Action].Order[detail].StopLoss     = OrderStopLoss();
+        Master[Order.Action].Order[detail].Memo         = OrderComment();
+
+        AppendLog(NoValue,OrderTicket(),"[Split["+(string)Order.Ticket+"]:"+(string)OrderTicket());
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -1061,7 +1098,7 @@ OrderRequest COrder::SubmitOrder(OrderRequest &Request, bool Resubmit=false)
     Queue[request].Key                = ++key;
     Queue[request].Ticket             = NoValue;
     Queue[request].Status             = Rejected;
-
+    
     //-- Handle Resubmits
     if (Resubmit)
       if (IsBetween(Operation(Request.Pend.Type),OP_BUY,OP_SELL))
@@ -1081,7 +1118,7 @@ OrderRequest COrder::SubmitOrder(OrderRequest &Request, bool Resubmit=false)
       Queue[request].Status           = Pending;
       Queue[request].Action           = Operation(Queue[request].Type);
       Queue[request].Requestor        = BoolToStr(StringLen(Queue[request].Requestor)==0,"No Requestor",Queue[request].Requestor);
-      Queue[request].Lots             = BoolToDouble(IsEqual(Queue[request].Lots,0.00),Queue[request].Lots,LotSize(Queue[request].Action));
+      Queue[request].Lots             = BoolToDouble(IsEqual(Queue[request].Lots,0.00),LotSize(Queue[request].Action),Queue[request].Lots);
       Queue[request].TakeProfit       = fmax(Queue[request].TakeProfit,0.00);
       Queue[request].StopLoss         = fmax(Queue[request].StopLoss,0.00);      
 
@@ -1166,33 +1203,47 @@ bool COrder::OrderOpened(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| OrderClosed - Closes the number of supplied Lots of an Order     |
 //+------------------------------------------------------------------+
-bool COrder::OrderClosed(OrderDetail &Order, double Lots=0.00)
+bool COrder::OrderClosed(OrderDetail &Order) 
   {
-    int error                   = NoValue;
+    int    error                  = NoValue;
+    double split                  = fdiv(LotSize(Order.Action),2,Account.LotPrecision);
+    double lots                   = BoolToDouble(IsBetween(Order.Method,Split,Retain),                                //-- If Split/Retain
+                                      LotSize(Order.Action,fmin(fdiv(Order.Lots,2),fmax(split,fdiv(Order.Lots,2)))),  //--   Calculate Split Lots
+                                      Order.Lots,Account.LotPrecision);                                               //-- else use Order Lots
     
-    RefreshRates();
-
-    if (OrderClose(Order.Ticket,
-                     BoolToDouble(IsEqual(Lots,0.00),fmin(LotSize(Order.Action,Lots),Order.Lots),fmin(Lots,Order.Lots),Account.LotPrecision),
-                     BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits),
-                     Account.MaxSlippage*20,Red))
+    if (IsEqual(Order.Status,Processing))
     {
-      Order.Status              = Closed;
-      return (true);          
-    }
-    else
+      if (IsBetween(Order.Method,Split,Retain))
+        if (IsEqual(lots,Order.Lots))
+          Order.Method            = (OrderMethod)BoolToInt(IsEqual(Split,Order.Method),Full,Hold);
 
-      switch (IsChanged(error,GetLastError()))
+      RefreshRates();
+
+      if (OrderClose(Order.Ticket,
+                     NormalizeDouble(lots,Account.LotPrecision),
+                     BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits),
+                     Account.MaxSlippage*20,clrRed))
       {
-        case 129:   Order.Memo  = "Invalid Price(129): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
-                    break;
-        case 138:   Order.Memo  = "Requote(138): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
-                    break;
-        default:    Order.Memo  = "Unknown Error("+(string)error+"): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+        if (IsBetween(Order.Method,Split,Retain))
+          MergeSplit(Order);
+
+        Order.Status              = Processed;
+        return (true);          
       }
+      else
+
+        switch (IsChanged(error,GetLastError()))
+        {
+          case 129:   Order.Memo  = "Invalid Price(129): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+                      break;
+          case 138:   Order.Memo  = "Requote(138): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+                      break;
+          default:    Order.Memo  = "Unknown Error("+(string)error+"): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+        }
+    }
+    else Order.Memo               = "Invalid State ["+EnumToString(Order.Status)+"]: Not Processing";
 
     AppendLog(Order.Key,Order.Ticket,Order.Memo);
-
     return (false);
   }
 
@@ -1279,22 +1330,61 @@ void COrder::ProcessRequests(void)
 //+------------------------------------------------------------------+
 void COrder::ProcessProfits(int Action)
   {
-    int Batch[];
+    double netEquity     = 0.00;
+    double netDCA        = 0.00;
+    double netRecapture  = 0.00;
 
-//    for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
-//      switch (Master[Action].Order[ticket].Method)
-//      {
-//        case Retain:
-//        case Split:
-//        case Full:      if (IsEqual(Price(Profit,Action,Master[Action].Order[ticket].TakeProfit),0.00,Digits))
-//                        {
-//                          if (Master[Action].Summary[Profit].Equity>=Master[Action].EquityTarget)
-//                            if (Master[Action].Order[ticket].Profit>=Master[Action].MinEquity)
-//                              AddToBatch
-//      }
-//
-//
+    //-- Calculate Profit Taking Measures
+    for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
+    {
+      switch (Master[Action].Order[ticket].Method)
+      {
+        case Retain:
+        case Split:
+        case Full:        if (IsHigher(Equity(Master[Action].Order[ticket].Profit,InPercent),Master[Action].EquityMin,NoUpdate,3))
+                            if (IsEqual(Master[Action].Order[ticket].TakeProfit,0.00,Digits))
+                              Master[Action].Order[ticket].Status  = Processing;
+                            else
+                            if (IsEqual(Action,OP_BUY)&&IsHigher(Bid,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
+                              Master[Action].Order[ticket].Status  = Processing;
+                            else
+                            if (IsEqual(Action,OP_SELL)&&IsLower(Ask,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
+                              Master[Action].Order[ticket].Status  = Processing;
 
+                          if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+                            netEquity     += Master[Action].Order[ticket].Profit;
+                          break;
+
+        case Recapture:   Master[Action].Order[ticket].Status      = Processing;
+                          netRecapture    += Master[Action].Order[ticket].Profit;
+                          break;
+
+        case DCA:         if (IsLower(0.00,Master[Action].Order[ticket].Profit,NoUpdate,2))
+                            Master[Action].Order[ticket].Status    = Processing;
+
+                          netDCA          += Master[Action].Order[ticket].Profit;
+                          break;
+      }
+    }
+    
+    for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
+      if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+        switch (Master[Action].Order[ticket].Method)
+        {
+          case Retain:
+          case Split:
+          case Full:      if (IsHigher(Equity(netEquity),Master[Action].EquityTarget,NoUpdate,3))
+                            if (OrderClosed(Master[Action].Order[ticket]))
+                              UpdateSnapshot();
+                          break;
+
+          case DCA:       if (IsHigher(Equity(netDCA),Master[Action].EquityMin,NoUpdate,3))
+                            if (OrderClosed(Master[Action].Order[ticket]))
+                              UpdateSnapshot();
+                          break;
+                          
+          case Recapture: break;
+        }
   }
 
 //+------------------------------------------------------------------+
@@ -1302,7 +1392,25 @@ void COrder::ProcessProfits(int Action)
 //+------------------------------------------------------------------+
 void COrder::ProcessLosses(int Action)
   {
-    for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++);
+    int    Batch[];
+
+    double netEquity   = 0.00;
+    double netDCA      = 0.00;
+
+    //-- 
+    for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
+      switch (Master[Action].Order[ticket].Method)
+      {
+        case Retain:
+        case Split:
+        case Full:      if (IsEqual(Master[Action].Order[ticket].TakeProfit,0.00,Digits))
+                          netEquity   += BoolToDouble(IsLower(0.00,Master[Action].Order[ticket].Profit,NoUpdate,Digits),
+                                                                   Master[Action].Order[ticket].Profit);
+                        break;
+        case Recapture:
+        case DCA:       netDCA        += Master[Action].Order[ticket].Profit;
+                        break;
+      };
 
 //      if (Master[action].Summary[Net].Equity<=Master[action].MaxRisk)
   }
@@ -1376,9 +1484,6 @@ void COrder::ExecuteOrders(int Action)
 
     ProcessProfits(Action);
     ProcessLosses(Action);
-
-    if (Closed(Action))
-      Update();
   }
 
 //+------------------------------------------------------------------+
@@ -1701,10 +1806,10 @@ void COrder::SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, 
 //+------------------------------------------------------------------+
 //| SetEquityTargets - Configures profit/equity management options   |
 //+------------------------------------------------------------------+
-void COrder::SetEquityTargets(int Action, double EquityTarget, double MinEquity)
+void COrder::SetEquityTargets(int Action, double EquityTarget, double EquityMin)
   {
      Master[Action].EquityTarget        = fmax(0.00,EquityTarget);
-     Master[Action].MinEquity           = fmax(0.00,MinEquity);
+     Master[Action].EquityMin           = fmax(0.00,EquityMin);
   }
 
 //+------------------------------------------------------------------+
@@ -1776,10 +1881,10 @@ string COrder::OrderDetailStr(OrderDetail &Order)
     Append(text,"Open Price: "+DoubleToStr(Order.Price,Digits));
     Append(text,"Lots: "+DoubleToStr(Order.Lots,Account.LotPrecision));
     Append(text,"Profit: "+DoubleToStr(Order.Profit,2));
+    Append(text,"Equity: "+DoubleToStr(Equity(Order.Profit,InPercent),1));
     Append(text,"Swap: "+DoubleToStr(Order.Swap,2));
     Append(text,"TP: "+DoubleToStr(Order.TakeProfit,Digits));
     Append(text,"Stop: "+DoubleToStr(Order.StopLoss,Digits));
-    Append(text,BoolToStr(Order.Split,"Split"));
     Append(text,Order.Memo);
 
     return (text);
@@ -1916,7 +2021,7 @@ string COrder::MasterStr(int Action)
     Append(text,"Trade:          "+BoolToStr(Master[Action].TradeEnabled,"Enabled","Disabled"),"\n");
     Append(text,"LotSize:        "+DoubleToStr(LotSize(Action),Account.LotPrecision),"\n");
     Append(text,"EquityTarget:   "+DoubleToStr(Master[Action].EquityTarget,1),"\n");
-    Append(text,"MinEquity:      "+DoubleToStr(Master[Action].MinEquity,1),"%\n");
+    Append(text,"EquityMin:      "+DoubleToStr(Master[Action].EquityMin,1),"%\n");
     Append(text,"MaxRisk:        "+DoubleToStr(Master[Action].MaxRisk,1),"%\n");
     Append(text,"LotScale:       "+DoubleToStr(Master[Action].LotScale,1),"%\n");
     Append(text,"MaxMargin:      "+DoubleToStr(Master[Action].MaxMargin,1),"\n");
