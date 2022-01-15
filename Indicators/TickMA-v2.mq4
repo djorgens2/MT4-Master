@@ -132,7 +132,7 @@ void RefreshScreen(void)
     const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
     double f[];
     
-    if (!IsEqual(inpShowFractal,PriceTypes))
+    if (!IsEqual(inpShowFractal,NoShow))
     {
       if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
       if (inpShowFractal==SMAHigh)   ArrayCopy(f,t.SMA().High.Point);
@@ -256,12 +256,7 @@ int OnCalculate(const int rates_total,
   {
     UpdateTickMA();
     UpdateSegment();
-int tick               = 0;
-if (tick<inpPeriods)
-{
-  if (t[NewTick]) Print(t.SegmentStr(1)+"|"+t.SMAStr());
-  tick++;  
-}
+
     RefreshScreen();
 
     return(rates_total);
@@ -311,7 +306,7 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
     }
 
-    if (!IsEqual(inpShowFractal,PriceTypes))
+    if (!IsEqual(inpShowFractal,NoShow))
       for (FractalPoint fp=0;fp<FractalPoints;fp++)
         NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
 

@@ -32,16 +32,13 @@ input double        inpMaxRisk         = 5.0;         // Maximum Risk%
 input double        inpMaxMargin       = 60.0;        // Maximum Margin
 input double        inpLotFactor       = 2.00;        // Lot Risk% of Balance
 input double        inpLotSize         = 0.00;        // Lot size override
-input double        inpMinLotSize      = 0.25;        // Minimum Lot Size
-input double        inpMaxLotSize      = 30.00;       // Maximum Lot Size
 input int           inpDefaultStop     = 50;          // Default Stop Loss (pips)
 input int           inpDefaultTarget   = 50;          // Default Take Profit (pips)
-input int           inpSlipFactor      = 3;           // Slip Factor (pips)
 
 CTickMA       *tick                    = new CTickMA(inpPeriods,inpDegree,inpAgg);
 COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong,inpMethodShort);
 
-bool           PauseOn                 = true;
+bool           PauseOn                 = false;
 int            Tick                    = 0;
 
 int            Tickets[];
@@ -125,7 +122,7 @@ void Test1(void)
 //    order.DisableTrade(OP_BUY);
     order.SetRiskLimits(OP_BUY,80,80,2);
   
- //--- Stop/Limit Test
+    //--- Stop/Limit Test
     if (OrdersTotal()<3)
     {
       eRequest.Lots            = order.LotSize(OP_BUY);
@@ -158,7 +155,7 @@ void Test1(void)
                  eRequest.TakeProfit   = 18.16;
                  order.Submitted(eRequest);
                  break;
-        case 8:  order.SetStopLoss(OP_BUY,0.00,20,Hide);
+        case 8:  order.SetStopLoss(OP_BUY,0.00,20,NoHide,false);
                  order.SetTakeProfit(OP_BUY,0.00,0,Hide);
                  order.Submitted(eRequest);
                  break;
@@ -435,8 +432,10 @@ void Test7(void)
     eRequest.Memo           = "Test 7-Split/Retain";
     
 //    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,80,80,2);
+    order.SetRiskLimits(OP_BUY,5,80,2);
+    order.SetRiskLimits(OP_SELL,10,80,2);
     order.SetOrderMethod(OP_BUY,Split,NoUpdate);
+    order.SetOrderMethod(OP_SELL,Hold,NoUpdate);
   
     //--- Split/Retain Test
     if (Tick<4)
@@ -459,6 +458,11 @@ void Test7(void)
                       order.SetDetailMethod(OP_BUY,Full,3,ByTicket);
                       break;
         case 3900:    eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 5240:    eRequest.Type            = OP_SELL;
+                      eRequest.Lots            = order.LotSize(OP_SELL)*4;
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
                       order.Submitted(eRequest);
                       break;
@@ -502,10 +506,10 @@ void Execute(void)
 //      Print(order.QueueStr());
 
     order.ExecuteOrders(OP_BUY);
-        if (order[Processed].Type[OP_BUY].Count>0)
+        if (order[Closed].Type[OP_BUY].Count>0)
           Pause("Order closed (processed)","Snapshot Check");
     order.ExecuteOrders(OP_SELL);
-        if (order[Processed].Type[OP_SELL].Count>0)
+        if (order[Closed].Type[OP_SELL].Count>0)
           Pause("Order closed (processed)","Snapshot Check");
     order.ExecuteRequests();
  

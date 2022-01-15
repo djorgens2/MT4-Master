@@ -5,135 +5,244 @@
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
 #property link      ""
-#property version   "2.00"
+#property version   "3.00"
 #property strict
 #property indicator_separate_window
-#property indicator_buffers 8
-#property indicator_plots   8
+#property indicator_buffers 10
+#property indicator_plots   10
 
-#include <Class\PipMA.mqh>
+#include <Class\TickMA.mqh>
 #include <std_utility.mqh>
 
-int       IndWinId = -1;
-string    ShortName             = "CPanel-v3";
-string    cpSessionTypes[4]     = {"Daily","Asia","Europe","US"};
-
-//--- plot plOpen
-#property indicator_label1  "plOpen"
+//--- plot plHigh
+#property indicator_label1  "plHigh"
 #property indicator_type1   DRAW_SECTION
-#property indicator_color1  clrForestGreen
-#property indicator_style1  STYLE_SOLID
-#property indicator_width1  2
+#property indicator_color1  clrNONE
+#property indicator_style1  STYLE_DOT
+#property indicator_width1  0
 
-//--- plot plClose
-#property indicator_label2  "plClose"
+//--- plot plLow
+#property indicator_label2  "plLow"
 #property indicator_type2   DRAW_SECTION
-#property indicator_color2  clrFireBrick
-#property indicator_style2  STYLE_SOLID
-#property indicator_width2  2
+#property indicator_color2  clrNONE
+#property indicator_style2  STYLE_DOT
+#property indicator_width2  0
 
-//--- plot plSlope
-#property indicator_label3  "plHigh"
+//--- plot plOpenSMA
+#property indicator_label3  "plOpenSMA"
 #property indicator_type3   DRAW_SECTION
-#property indicator_color3  clrSilver
-#property indicator_style3  STYLE_SOLID
+#property indicator_color3  clrForestGreen
+#property indicator_style3  STYLE_DOT
 #property indicator_width3  1
 
-//--- plot plMA
-#property indicator_label4  "plLow"
+//--- plot plHighSMA
+#property indicator_label4  "plHighSMA"
 #property indicator_type4   DRAW_SECTION
 #property indicator_color4  clrGoldenrod
 #property indicator_style4  STYLE_SOLID
 #property indicator_width4  1
 
-//--- plot plOpen
-#property indicator_label5  "plOpenSMA"
+//--- plot plLowSMA
+#property indicator_label5  "plLowSMA"
 #property indicator_type5   DRAW_SECTION
-#property indicator_color5  clrForestGreen
+#property indicator_color5  clrSilver
 #property indicator_style5  STYLE_SOLID
 #property indicator_width5  1
 
-//--- plot plClose
+//--- plot plCloseSMA
 #property indicator_label6  "plCloseSMA"
 #property indicator_type6   DRAW_SECTION
 #property indicator_color6  clrFireBrick
-#property indicator_style6  STYLE_SOLID
+#property indicator_style6  STYLE_DOT
 #property indicator_width6  1
 
-//--- plot plSlope
-#property indicator_label7  "plHighSMA"
-#property indicator_type7   DRAW_SECTION
-#property indicator_color7  clrSilver
-#property indicator_style7  STYLE_DOT
+//--- plot plOpenPoly
+#property indicator_label7  "plOpenPoly"
+#property indicator_type7   DRAW_LINE
+#property indicator_color7  clrForestGreen
+#property indicator_style7  STYLE_SOLID
 #property indicator_width7  1
 
-//--- plot plMA
-#property indicator_label8  "plLowSMA"
-#property indicator_type8   DRAW_SECTION
-#property indicator_color8  clrGoldenrod
-#property indicator_style8  STYLE_DOT
-#property indicator_width8  1
+//--- plot plClosePoly
+#property indicator_label8 "plClosePoly"
+#property indicator_type8  DRAW_LINE
+#property indicator_color8 clrFireBrick
+#property indicator_style8 STYLE_SOLID
+#property indicator_width8 1
+
+//--- plot plOpenLine
+#property indicator_label9 "plOpenLine"
+#property indicator_type9  DRAW_SECTION
+#property indicator_color9 clrDodgerBlue
+#property indicator_style9 STYLE_SOLID
+#property indicator_width9 1
+
+//--- plot plCloseLine
+#property indicator_label10 "plCloseLine"
+#property indicator_type10  DRAW_SECTION
+#property indicator_color10 clrDodgerBlue
+#property indicator_style10 STYLE_DASH
+#property indicator_width10 1
+
+//--- Enum Fractal Show Options
+enum ShowOptions 
+     {
+       NoShow,      // Hide Fractals
+       SMAOpen,     // SMA (Open)
+       SMAHigh,     // SMA (High)
+       SMALow,      // SMA (Low)
+       SMAClose     // SMA (Close)
+     };
 
 //--- input parameters
-input int      inpRetention           =  90;   // Retention
-input int      inpRegr                =   9;   // Regression Periods
-input int      inpSMA                 =   3;   // SMA Smoothing
-input double   inpAgg                 = 2.5;   // Tick Aggregation
+input int          inpPeriods        =  80;         // Retention
+input int          inpDegree         =   6;         // Poiy Regression Degree
+input double       inpAgg            = 2.5;         // Tick Aggregation
+input ShowOptions  inpShowFractal    = NoShow;      // Show Fractal
 
-//--- indicator buffers
-double         plOpenBuffer[];
-double         plCloseBuffer[];
+//--- Indicator defs
+int            IndWinId = -1;
+string         ShortName             = "CPanel-v3";
+string         cpSessionTypes[4]     = {"Daily","Asia","Europe","US"};
+
+
+//--- Indicator buffers
 double         plHighBuffer[];
 double         plLowBuffer[];
-double         plOpenSMABuffer[];
-double         plCloseSMABuffer[];
-double         plHighSMABuffer[];
-double         plLowSMABuffer[];
+double         plSMAOpenBuffer[];
+double         plSMACloseBuffer[];
+double         plSMAHighBuffer[];
+double         plSMALowBuffer[];
+double         plPolyOpenBuffer[];
+double         plPolyCloseBuffer[];
+double         plLineOpenBuffer[];
+double         plLineCloseBuffer[];
 
-CPipMA        *pma           = new CPipMA(inpRetention,inpRegr,inpSMA,inpAgg);
+double         plSMAOpen[1];
+double         plSMAClose[1];
+double         plSMAHigh[1];
+double         plSMALow[1];
+
+//--- Class defs
+CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
 
 //+------------------------------------------------------------------+
-//| RefreshScreen - Repaint indicator display                        |
+//| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
+    double f[];
+    
+    if (!IsEqual(inpShowFractal,NoShow))
+    {
+      if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
+      if (inpShowFractal==SMAHigh)   ArrayCopy(f,t.SMA().High.Point);
+      if (inpShowFractal==SMALow)    ArrayCopy(f,t.SMA().Low.Point);
+      if (inpShowFractal==SMAClose)  ArrayCopy(f,t.SMA().Close.Point);
+
+      for (FractalPoint fp=0;fp<FractalPoints;fp++)
+        UpdatePriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),f[fp],labelcolor[fp]);
+    }
+
+    UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
+    UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
+                  proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
+    UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
+                  BoolToStr(IsEqual(t.SMA().High.Bias,OP_NO_ACTION),"No Bias",BoolToStr(IsEqual(t.SMA().High.Bias,OP_BUY),"Buy","Sell"))+" "+
+                  EnumToString(t.SMA().High.State)+" "+EventText[t.SMA().High.Event],
+                  BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
+    UpdateLabel("tmaLinearState"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
+                   DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
+    UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),20);
+    
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
   }
 
 //+------------------------------------------------------------------+
-//| LoadBuffer - Insert Regression buffer value                      |
+//| ResetBuffer - Reset Buffer on bar change                         |
 //+------------------------------------------------------------------+
-void LoadBuffer(double &Buffer[], double Price)
+void ResetBuffer(double &Buffer[], double &Source[])
   {
-    double copy[];
-    
-    ArrayCopy(copy,Buffer,1,0,inpRetention-1);
     ArrayInitialize(Buffer,0.00);
-    ArrayCopy(Buffer,copy,0,0,inpRetention);
-    
-    Buffer[0]          = Price;
+    ArrayCopy(Buffer,Source,0,0,inpPeriods);
   }
 
 //+------------------------------------------------------------------+
-//| UpdatePipMA - refreshes indicator data                           |
+//| LoadBuffer - Insert Regression buffer value                      |
 //+------------------------------------------------------------------+
-void UpdatePipMA(void)
+void UpdateBuffer(double &Source[], double Price)
   {
-    pma.Update();
+    if (t[NewSegment])
+      ArrayCopy(Source,Source,1,0,inpPeriods-1);
     
-    if (pma[NewTick])
-      if (pma[0].Segment>inpSMA)
-      {
-        LoadBuffer(plOpenBuffer,pma.Master().History[0].Open);
-        LoadBuffer(plCloseBuffer,pma.Master().History[1].Close);
-        LoadBuffer(plHighBuffer,pma.Master().History[1].High);
-        LoadBuffer(plLowBuffer,pma.Master().History[1].Low);
-        LoadBuffer(plOpenSMABuffer,pma.Master().SMA.Open);
-        LoadBuffer(plCloseSMABuffer,pma.Master().SMA.Close);
-        LoadBuffer(plHighSMABuffer,pma.Master().SMA.High);
-        LoadBuffer(plLowSMABuffer,pma.Master().SMA.Low);
-      }
+    Source[0]          = Price;
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTickMA - refreshes indicator data                          |
+//+------------------------------------------------------------------+
+void UpdateTickMA(void)
+  {
+    static int bars;
+
+    t.Update();
+    
+    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
+    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
+    SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
+
+    UpdateBuffer(plSMAOpen,t.SMA().Open.Price[0]);
+    UpdateBuffer(plSMAHigh,t.SMA().High.Price[0]);
+    UpdateBuffer(plSMALow,t.SMA().Low.Price[0]);
+    UpdateBuffer(plSMAClose,t.SMA().Close.Price[0]);
+
+    if (IsChanged(bars,Bars)||t[NewTick])
+    {
+      ResetBuffer(plSMAOpenBuffer,plSMAOpen);
+      ResetBuffer(plSMACloseBuffer,plSMAClose);
+      ResetBuffer(plSMAHighBuffer,plSMAHigh);
+      ResetBuffer(plSMALowBuffer,plSMALow);
+
+      ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
+      ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
+      ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
+      ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateNode - Repaints Node Bars                                  |
+//+------------------------------------------------------------------+
+void UpdateNode(string NodeName, int Node, double Price1, double Price2)
+  {
+    ObjectSet(NodeName+(string)Node,OBJPROP_COLOR,Color(t.Segment(Node).Price.Close-t.Segment(Node).Price.Open));
+    ObjectSet(NodeName+(string)Node,OBJPROP_PRICE1,Price1);
+    ObjectSet(NodeName+(string)Node,OBJPROP_PRICE2,Price2);
+    ObjectSet(NodeName+(string)Node,OBJPROP_TIME1,Time[Node]);
+    ObjectSet(NodeName+(string)Node,OBJPROP_TIME2,Time[Node]);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateSegment - Repaints visuals                                 |
+//+------------------------------------------------------------------+
+void UpdateSegment(void)
+  {
+    if (t[NewSegment])
+    {
+      ArrayInitialize(plHighBuffer,0.00);
+      ArrayInitialize(plLowBuffer,0.00);
+    }
+
+    for (int node=0;node<inpPeriods;node++)
+    {
+      UpdateNode("tmaHL:"+(string)IndWinId+"-",node,t.Segment(node).Price.High,t.Segment(node).Price.Low);
+      UpdateNode("tmaOC:"+(string)IndWinId+"-",node,t.Segment(node).Price.Open,t.Segment(node).Price.Close);
+    }
+
+    plHighBuffer[0]        = t.Range().High;
+    plLowBuffer[0]         = t.Range().Low;
   }
 
 //+------------------------------------------------------------------+
@@ -215,9 +324,9 @@ int OnInit()
 
     //-- App Comms
     NewLabel("lbhAC-Trade","Trading",365,7,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbhAC-Option","Options",445,7,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAC-Option","Options",456,7,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbvAC-Trading","Trade",408,7,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbvAC-Options","Options",490,7,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbvAC-Options","Options",500,7,clrDarkGray,SCREEN_UL,IndWinId);
 
     //-- Order Config
     DrawBox("bxfOC-Long",5,174,352,144,C'0,42,0',BORDER_FLAT,IndWinId);
@@ -371,19 +480,45 @@ int OnInit()
       NewLabel("lbvRQ-"+(string)row+"-Memo","1234567890123456789012345678901234567",1092,44+(row*11),clrDarkGray,SCREEN_UL,IndWinId);
     }
 
+    //--- Create Display Visuals
+    for (int obj=0;obj<inpPeriods;obj++)
+    {
+      ObjectCreate("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJ_TREND,IndWinId,0,0);
+      ObjectSet("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,1);
+
+      ObjectCreate("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJ_TREND,IndWinId,0,0);
+      ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
+    }
+
+    if (!IsEqual(inpShowFractal,NoShow))
+      for (FractalPoint fp=0;fp<FractalPoints;fp++)
+        NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
+
+    NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAState"+(string)IndWinId,"",5,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaPolyState"+(string)IndWinId,"",5,56,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearState"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBias"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
+
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
 
     //--- indicator buffers mapping
-    SetIndexBuffer(0,plOpenBuffer);
-    SetIndexBuffer(1,plCloseBuffer);
-    SetIndexBuffer(2,plHighBuffer);
-    SetIndexBuffer(3,plLowBuffer);
-    SetIndexBuffer(4,plOpenSMABuffer);
-    SetIndexBuffer(5,plCloseSMABuffer);
-    SetIndexBuffer(6,plHighSMABuffer);
-    SetIndexBuffer(7,plLowSMABuffer);
-    
+    //--- Initialize Buffers
+    SetIndexBuffer(0,plHighBuffer);
+    SetIndexBuffer(1,plLowBuffer);
+    SetIndexBuffer(2,plSMAOpenBuffer);
+    SetIndexBuffer(3,plSMAHighBuffer);
+    SetIndexBuffer(4,plSMALowBuffer);
+    SetIndexBuffer(5,plSMACloseBuffer);
+    SetIndexBuffer(6,plPolyOpenBuffer);
+    SetIndexBuffer(7,plPolyCloseBuffer);
+    SetIndexBuffer(8,plLineOpenBuffer);
+    SetIndexBuffer(9,plLineCloseBuffer);
+
     SetIndexEmptyValue(0,0.00);
     SetIndexEmptyValue(1,0.00);
     SetIndexEmptyValue(2,0.00);
@@ -392,7 +527,9 @@ int OnInit()
     SetIndexEmptyValue(5,0.00);
     SetIndexEmptyValue(6,0.00);
     SetIndexEmptyValue(7,0.00);
-  
+    SetIndexEmptyValue(8,0.00);
+    SetIndexEmptyValue(9,0.00);
+
     return(INIT_SUCCEEDED);
   }
 
@@ -410,8 +547,11 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    UpdatePipMA();
+    UpdateTickMA();
+    UpdateSegment();
+
     RefreshScreen();
+
 
     return(rates_total);
   }
@@ -421,5 +561,5 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete pma;
+    delete t;
   }
