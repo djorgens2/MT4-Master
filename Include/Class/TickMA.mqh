@@ -64,8 +64,7 @@ private:
            {
              //-- 1:Price[0] between Retrace/Expansion; set Retrace; 2:Price[0] between Retrace/Recovery; Set Recovery; 3:Once set, bounds set Breakout/Reversal;
              bool         IsPegged;
-             double       High;
-             double       Low;
+             double       Expansion;
              double       Retrace;
              double       Recovery;
            };
@@ -202,8 +201,7 @@ void CTickMA::InitFractal(FractalRec &Fractal, double Price)
     Fractal.State           = NoState;
 
     Fractal.Peg.IsPegged    = false;
-    Fractal.Peg.High        = 0.00;       
-    Fractal.Peg.Low         = 0.00;
+    Fractal.Peg.Expansion   = 0.00;       
     Fractal.Peg.Retrace     = 0.00;
     Fractal.Peg.Recovery    = 0.00;
 
@@ -255,112 +253,118 @@ void CTickMA::CalcFractal(FOCRec &FOC, AlertLevel Level)
 //+------------------------------------------------------------------+
 void CTickMA::CalcFractal(FractalRec &Fractal, AlertLevel Level)
   {
-    int          direction  = Direction(Fractal.Price[0]-Fractal.Price[1]);
+    int          direction  = Direction(Fractal.Price[0]-Fractal.LastPrice);
 
     FractalState state      = NoState;
+    
     Fractal.Event           = NoEvent;
+    Fractal.LastPrice       = Fractal.Price[0];
 
-    if (Event(NewTick))
-      if (IsChanged(Fractal.LastPrice,Fractal.Price[0]))          //-- Handle SMA Flats
-      {
-        if (NewBias(Fractal.Bias,Action(direction)))
-          Fractal.Event       = NewBias;
+    //-- Filter SMA Flats
+    if (IsEqual(direction,DirectionNone))
+      return;
 
-        if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Digits))
+    //-- Handle SMA Change
+    if (NewBias(Fractal.Bias,Action(direction)))
+      Fractal.Event         = NewBias;
+
+    //-- Handle Interior States
+    if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Digits))
+    {
+      //-- Handle Retrace
+      if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpBase],Digits))
+        state               = Retrace;
+      else
+
+      //-- Handle Recovery
+      if (IsEqual(Fractal.State,Retrace)||IsEqual(Fractal.State,Recovery))
+        state               = Recovery;
+      else
+
+      //-- Handle Rally/Pullback
+        state                 = (FractalState)BoolToInt(IsEqual(Fractal.Bias,OP_BUY),Rally,Pullback);
+
+      //-- Handle Convergences
+      if (IsBetween(Fractal.Price[0],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Digits))
+        if (IsChanged(Fractal.Peg.IsPegged,true))
         {
-          //-- Handle Retrace
-          if (IsBetween(Fractal.Price[0],Fractal.Point[fpRoot],Fractal.Point[fpBase],Digits))
-            state             = Retrace;
-          else
-
-          //-- Handle Recovery
-          if (IsEqual(Fractal.State,Retrace)||IsEqual(Fractal.State,Recovery))
-            state             = Recovery;
-          else
-
-          //-- Handle Rally/Pullback
-            state             = (FractalState)BoolToInt(IsEqual(Fractal.Bias,OP_NO_ACTION),Fractal.State,
-                                              BoolToInt(IsEqual(Fractal.Bias,OP_BUY),Rally,Pullback));
-
-//        if (IsBetween(Fractal.Price[0],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Digits))
-          if (IsBetween(Fractal.Price[0],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Digits))
-            if (IsChanged(Fractal.Peg.IsPegged,true))
-            {
-              Fractal.Peg.High       = fmax(Fractal.Point[fpRoot],Fractal.Point[fpExpansion]);
-              Fractal.Peg.Low        = fmin(Fractal.Point[fpRoot],Fractal.Point[fpExpansion]);
-              Fractal.Peg.Retrace    = Fractal.Point[fpRetrace];
-              Fractal.Peg.Recovery   = Fractal.Point[fpRecovery];
-            }
-
-          if (Fractal.Peg.IsPegged)
-            if (!IsBetween(Fractal.Price[0],Fractal.Peg.Retrace,Fractal.Peg.Recovery,Digits))
-            {
-              state           = (FractalState)BoolToInt(NewDirection(Fractal.Direction,direction),Reversal,Breakout);
-
-              Fractal.Peg.IsPegged         = false;
-
-              if (IsEqual(state,Reversal))
-                Fractal.Point[fpOrigin]    = Fractal.Point[fpExpansion];
-
-              Fractal.Point[fpBase]        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
-                                               fmax(Fractal.Peg.Retrace,Fractal.Peg.Recovery),
-                                               fmin(Fractal.Peg.Retrace,Fractal.Peg.Recovery),Digits);
-
-              Fractal.Point[fpRoot]        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
-                                               fmin(Fractal.Peg.Retrace,Fractal.Peg.Recovery),
-                                               fmax(Fractal.Peg.Retrace,Fractal.Peg.Recovery),Digits);
-
-              Fractal.Point[fpExpansion]   = Fractal.Price[0];
-              Fractal.Point[fpRetrace]     = Fractal.Price[0];
-              Fractal.Point[fpRecovery]    = Fractal.Price[0];
-            }
-
-          if (IsChanged(Fractal.Point[fpRetrace],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
-                                                   fmin(Fractal.Point[fpRetrace],Fractal.Price[0]),
-                                                   fmax(Fractal.Point[fpRetrace],Fractal.Price[0]),Digits)))
-            Fractal.Point[fpRecovery]      = Fractal.Point[fpRetrace];
-          else
-            Fractal.Point[fpRecovery]      = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
-                                               fmax(Fractal.Point[fpRecovery],Fractal.Price[0]),
-                                               fmin(Fractal.Point[fpRecovery],Fractal.Price[0]),Digits);
+          Fractal.Peg.Expansion     = Fractal.Point[fpExpansion];
+          Fractal.Peg.Retrace       = Fractal.Point[fpRetrace];
+          Fractal.Peg.Recovery      = Fractal.Point[fpRecovery];
         }
-        else
 
-        //-- Handle Breakout/Reversal
+      if (Fractal.Peg.IsPegged)
+        if (!IsBetween(Fractal.Price[0],Fractal.Peg.Expansion,Fractal.Peg.Retrace,Digits))
         {
-          if (NewDirection(Fractal.Direction,direction))
-          {
-            state             = Reversal;
+          state           = (FractalState)BoolToInt(NewDirection(Fractal.Direction,direction),Reversal,Breakout);
 
-            Fractal.Point[fpOrigin]        = Fractal.Point[fpExpansion];
-            Fractal.Point[fpBase]          = Fractal.Point[fpRoot];
-            Fractal.Point[fpRoot]          = Fractal.Point[fpExpansion];
-          }
-          else
+          if (IsEqual(state,Reversal))
           {
-            state             = (FractalState)BoolToInt(IsEqual(Fractal.State,Reversal),Reversal,Breakout);
+            Fractal.Point[fpOrigin]    = Fractal.Point[fpExpansion];
+            Fractal.Point[fpBase]      = Fractal.Point[fpRetrace];
+            Fractal.Point[fpRoot]      = Fractal.Point[fpRecovery];
+          }
           
-            if (!IsEqual(Fractal.State,Breakout)&&!IsEqual(Fractal.State,Reversal))  //-- Not on continuing Breakout/Reversal
-            {
-              Fractal.Point[fpBase]        = Fractal.Point[fpExpansion];
-              Fractal.Point[fpRoot]        = Fractal.Point[fpRetrace];
-            }
+          else
+          {
+            Fractal.Point[fpBase]      = Fractal.Point[fpExpansion];
+            Fractal.Point[fpRoot]      = Fractal.Point[fpRetrace];
           }
 
-          Fractal.Point[fpExpansion]       = Fractal.Price[0];
-          Fractal.Point[fpRetrace]         = Fractal.Price[0];
-          Fractal.Point[fpRecovery]        = Fractal.Price[0];
+          Fractal.Point[fpExpansion]   = Fractal.Price[0];
+          Fractal.Point[fpRetrace]     = Fractal.Price[0];
+          Fractal.Point[fpRecovery]    = Fractal.Price[0];
 
-          Fractal.Peg.IsPegged             = false;
+          Fractal.Peg.IsPegged         = false;
         }
 
-        if (IsChanged(Fractal.State,state))
-        {
-          Fractal.Event       = BoolToEvent(IsEqual(Fractal.Event,NewBias),Fractal.Event,FractalEvent[state]);
+      if (IsChanged(Fractal.Point[fpRetrace],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                               fmin(Fractal.Point[fpRetrace],Fractal.Price[0]),
+                                               fmax(Fractal.Point[fpRetrace],Fractal.Price[0]),Digits)))
+        Fractal.Point[fpRecovery]      = Fractal.Point[fpRetrace];
+      else
+        Fractal.Point[fpRecovery]      = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),
+                                           fmax(Fractal.Point[fpRecovery],Fractal.Price[0]),
+                                           fmin(Fractal.Point[fpRecovery],Fractal.Price[0]),Digits);
+    }
+    else
 
-          SetEvent(FractalEvent[state]);
+    //-- Handle Breakout/Reversal
+    {
+      if (NewDirection(Fractal.Direction,direction))
+      {
+        state             = Reversal;
+
+        Fractal.Point[fpOrigin]        = Fractal.Point[fpExpansion];
+        Fractal.Point[fpBase]          = Fractal.Point[fpRoot];
+        Fractal.Point[fpRoot]          = Fractal.Point[fpExpansion];
+      }
+      
+      else
+      {
+        state             = (FractalState)BoolToInt(IsEqual(Fractal.State,Reversal),Reversal,Breakout);
+          
+//        if (!IsEqual(Fractal.State,Breakout)&&!IsEqual(Fractal.State,Reversal))  //-- Not on continuing Breakout/Reversal
+        if (!IsEqual(Fractal.State,state))  //-- Set on new Breakout/Reversal
+        {
+          Fractal.Point[fpBase]        = Fractal.Point[fpExpansion];
+          Fractal.Point[fpRoot]        = Fractal.Point[fpRetrace];
         }
       }
+
+      Fractal.Point[fpExpansion]       = Fractal.Price[0];
+      Fractal.Point[fpRetrace]         = Fractal.Price[0];
+      Fractal.Point[fpRecovery]        = Fractal.Price[0];
+
+      Fractal.Peg.IsPegged             = false;
+    }
+
+    if (IsChanged(Fractal.State,state))
+    {
+      Fractal.Event       = BoolToEvent(IsEqual(Fractal.Event,NewBias),Fractal.Event,FractalEvent[state]);
+
+      SetEvent(FractalEvent[state]);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -618,7 +622,8 @@ void CTickMA::UpdateTick(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSegment(void)
   {
-//    sr[0].Event               = NoEvent;
+    if (Count(Segments)>1)
+      sr[0].Event               = NoEvent;
 
     if (NewDirection(tmaSegmentDir,Direction(tr[0].Open-tr[1].Close)))
       NewSegment();
@@ -742,7 +747,7 @@ void CTickMA::UpdateSMA(void)
       sma.State   = (FractalState)BoolToInt(IsEqual(sma.Direction,DirectionUp),sma.High.State,sma.Low.State);
     }
     
-    if (Event(NewTick)) Print((string)Count(Ticks)+"|"+SegmentStr(0)+"|"+FractalStr(sma.High,2));
+//    if (Event(NewTick)) Print((string)Count(Ticks)+"|"+SegmentStr(0)+"|"+FractalStr(sma.High,2));
   }
 
 //+------------------------------------------------------------------+
@@ -963,6 +968,7 @@ string CTickMA::FractalStr(FractalRec &Fractal, int HistoryCount=0)
     Append(text,ActionText(Fractal.Bias),"|");
     Append(text,EnumToString(Fractal.State),"|");
     Append(text,EnumToString(Fractal.Event),"|");
+    Append(text,DoubleToStr(Fractal.LastPrice,Digits),"|");
 
     for (int node=0;node<HistoryCount;node++)
       Append(text,DoubleToStr(Fractal.Price[node],Digits),"|");
@@ -971,8 +977,7 @@ string CTickMA::FractalStr(FractalRec &Fractal, int HistoryCount=0)
       Append(text,DoubleToStr(Fractal.Point[fp],Digits),"|");
 
     Append(text,BoolToStr(Fractal.Peg.IsPegged,"Pegged","Unpegged"),"|");
-    Append(text,DoubleToStr(Fractal.Peg.High,Digits),"|");
-    Append(text,DoubleToStr(Fractal.Peg.Low,Digits),"|");
+    Append(text,DoubleToStr(Fractal.Peg.Expansion,Digits),"|");
     Append(text,DoubleToStr(Fractal.Peg.Retrace,Digits),"|");
     Append(text,DoubleToStr(Fractal.Peg.Recovery,Digits),"|");
 
