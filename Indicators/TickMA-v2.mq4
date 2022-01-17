@@ -147,9 +147,9 @@ void RefreshScreen(void)
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
                   proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
     UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
-                  BoolToStr(IsEqual(t.SMA().High.Bias,OP_NO_ACTION),"No Bias",BoolToStr(IsEqual(t.SMA().High.Bias,OP_BUY),"Buy","Sell"))+" "+
-                  EnumToString(t.SMA().High.State)+" "+EventText[t.SMA().High.Event],
+                  EnumToString(t.SMA().High.State)+" "+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"",EventText[t.SMA().High.Event]),
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
+    UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),20);
     UpdateLabel("tmaLinearState"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
                    DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
     UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),20);
@@ -165,46 +165,25 @@ void ResetBuffer(double &Buffer[], double &Source[])
   }
 
 //+------------------------------------------------------------------+
-//| LoadBuffer - Insert Regression buffer value                      |
-//+------------------------------------------------------------------+
-void UpdateBuffer(double &Source[], double Price)
-  {
-    if (t[NewSegment])
-      ArrayCopy(Source,Source,1,0,inpPeriods-1);
-    
-    Source[0]          = Price;
-  }
-
-//+------------------------------------------------------------------+
 //| UpdateTickMA - refreshes indicator data                          |
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int bars;
-
     t.Update();
     
     SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
-    UpdateBuffer(plSMAOpen,t.SMA().Open.Price[0]);
-    UpdateBuffer(plSMAHigh,t.SMA().High.Price[0]);
-    UpdateBuffer(plSMALow,t.SMA().Low.Price[0]);
-    UpdateBuffer(plSMAClose,t.SMA().Close.Price[0]);
+    ResetBuffer(plSMAOpenBuffer,t.SMA().Open.Price);
+    ResetBuffer(plSMACloseBuffer,t.SMA().Close.Price);
+    ResetBuffer(plSMAHighBuffer,t.SMA().High.Price);
+    ResetBuffer(plSMALowBuffer,t.SMA().Low.Price);
 
-    if (IsChanged(bars,Bars)||t[NewTick])
-    {
-      ResetBuffer(plSMAOpenBuffer,plSMAOpen);
-      ResetBuffer(plSMACloseBuffer,plSMAClose);
-      ResetBuffer(plSMAHighBuffer,plSMAHigh);
-      ResetBuffer(plSMALowBuffer,plSMALow);
-
-      ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
-      ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
-      ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
-      ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
-    }
+    ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
+    ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
+    ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
+    ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
   }
 
 //+------------------------------------------------------------------+
@@ -312,7 +291,8 @@ int OnInit()
 
     NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAState"+(string)IndWinId,"",5,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaPolyState"+(string)IndWinId,"",5,56,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearState"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBias"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);

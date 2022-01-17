@@ -149,9 +149,9 @@ void RefreshScreen(void)
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
                   proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
     UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
-                  BoolToStr(IsEqual(t.SMA().High.Bias,OP_NO_ACTION),"No Bias",BoolToStr(IsEqual(t.SMA().High.Bias,OP_BUY),"Buy","Sell"))+" "+
-                  EnumToString(t.SMA().High.State)+" "+EventText[t.SMA().High.Event],
+                  EnumToString(t.SMA().High.State)+" "+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"",EventText[t.SMA().High.Event]),
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
+    UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),20);
     UpdateLabel("tmaLinearState"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
                    DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
     UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),20);
@@ -185,31 +185,21 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int bars;
-
     t.Update();
     
     SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
-    UpdateBuffer(plSMAOpen,t.SMA().Open.Price[0]);
-    UpdateBuffer(plSMAHigh,t.SMA().High.Price[0]);
-    UpdateBuffer(plSMALow,t.SMA().Low.Price[0]);
-    UpdateBuffer(plSMAClose,t.SMA().Close.Price[0]);
+    ResetBuffer(plSMAOpenBuffer,t.SMA().Open.Price);
+    ResetBuffer(plSMACloseBuffer,t.SMA().Close.Price);
+    ResetBuffer(plSMAHighBuffer,t.SMA().High.Price);
+    ResetBuffer(plSMALowBuffer,t.SMA().Low.Price);
 
-    if (IsChanged(bars,Bars)||t[NewTick])
-    {
-      ResetBuffer(plSMAOpenBuffer,plSMAOpen);
-      ResetBuffer(plSMACloseBuffer,plSMAClose);
-      ResetBuffer(plSMAHighBuffer,plSMAHigh);
-      ResetBuffer(plSMALowBuffer,plSMALow);
-
-      ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
-      ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
-      ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
-      ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
-    }
+    ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
+    ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
+    ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
+    ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
   }
 
 //+------------------------------------------------------------------+
@@ -243,6 +233,30 @@ void UpdateSegment(void)
 
     plHighBuffer[0]        = t.Range().High;
     plLowBuffer[0]         = t.Range().Low;
+  }
+
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+  {
+    UpdateTickMA();
+    UpdateSegment();
+
+    RefreshScreen();
+
+
+    return(rates_total);
   }
 
 //+------------------------------------------------------------------+
@@ -340,7 +354,7 @@ int OnInit()
       NewLabel("lbhOC-"+ActionText(action)+"-EQMin","Min",78,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-EQPrice","T/P",130,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-Risk","---------  Risk  ----------",204,(146*(action+1))+44,clrGold,SCREEN_UL,IndWinId);
-      NewLabel("lbhOC-"+ActionText(action)+"-RKBalance","Target",190,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
+      NewLabel("lbhOC-"+ActionText(action)+"-RKBalance","Max",198,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-RKMaxMargin","Margin",240,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-RKPrice","S/L",296,(146*(action+1))+70,clrGold,SCREEN_UL,IndWinId);
       
@@ -498,7 +512,8 @@ int OnInit()
 
     NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAState"+(string)IndWinId,"",5,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaPolyState"+(string)IndWinId,"",5,56,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearState"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBias"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
@@ -506,7 +521,10 @@ int OnInit()
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
 
-    //--- indicator buffers mapping
+    if (!IsEqual(inpShowFractal,NoShow))
+      for (FractalPoint fp=0;fp<FractalPoints;fp++)
+        NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
+
     //--- Initialize Buffers
     SetIndexBuffer(0,plHighBuffer);
     SetIndexBuffer(1,plLowBuffer);
@@ -531,29 +549,6 @@ int OnInit()
     SetIndexEmptyValue(9,0.00);
 
     return(INIT_SUCCEEDED);
-  }
-
-//+------------------------------------------------------------------+
-//| Custom indicator iteration function                              |
-//+------------------------------------------------------------------+
-int OnCalculate(const int rates_total,
-                const int prev_calculated,
-                const datetime &time[],
-                const double &open[],
-                const double &high[],
-                const double &low[],
-                const double &close[],
-                const long &tick_volume[],
-                const long &volume[],
-                const int &spread[])
-  {
-    UpdateTickMA();
-    UpdateSegment();
-
-    RefreshScreen();
-
-
-    return(rates_total);
   }
 
 //+------------------------------------------------------------------+

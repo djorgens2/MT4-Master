@@ -59,6 +59,7 @@ protected:
                         //-- Order Open States
                         Fulfilled,
                         Working,
+                        Qualified,
                         Processing,
                         //-- Order Close States
                         Processed,
@@ -203,6 +204,8 @@ private:
                         int            TicketMin;             //-- Ticket w/Least Profit
                         //-- Summarized Data & Arrays
                         double         DCA;                   //-- Calculated live DCA
+                        double         EquityLow;             //-- Live Equity Low
+                        double         EquityHigh;            //-- Live Equity High
                         OrderDetail    Order[];               //-- Order details by ticket/action
                         OrderSummary   Zone[];                //-- Aggregate order detail by order zone
                         OrderSummary   Summary[Total];        //-- Order Summary by Action
@@ -373,22 +376,22 @@ double COrder::Calc(MarginType Metric, double Lots, int Format=InPercent)
   {
     switch (Metric)
     {
+      case MarginLong:     if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Long variance
+                             return (Calc(Margin,fmax(0.00,Lots-Master[OP_SELL].Summary[Net].Lots)+
+                               (fmin(Lots,Master[OP_SELL].Summary[Net].Lots)*Account.MarginHedged),Format));
+                           return (Calc(Margin,Master[OP_BUY].Summary[Net].Lots,Format));
+
+      case MarginShort:    if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Short variance
+                             return (Calc(Margin,fmax(0.00,Lots-Master[OP_BUY].Summary[Net].Lots)+
+                               (fmin(Lots,Master[OP_BUY].Summary[Net].Lots)*Account.MarginHedged),Format));
+                           return (Calc(Margin,Master[OP_SELL].Summary[Net].Lots,Format));
+
       case Margin:         switch (Format)
                            {
                              case InDecimal: return (NormalizeDouble(fdiv(Lots,Account.LotSizeMin)*Account.LotMargin/Account.EquityBalance,3));
                              case InPercent: return (NormalizeDouble(fdiv(Lots,Account.LotSizeMin)*Account.LotMargin/Account.EquityBalance*100,1));
                              case InDollar:  return (NormalizeDouble(Lots*Account.LotMargin,2));
                            }
-                           break;
-      case MarginLong:     if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Long variance
-                             return (Calc(Margin,fmax(0.00,Lots-Master[OP_SELL].Summary[Net].Lots)+
-                               (fmin(Lots,Master[OP_SELL].Summary[Net].Lots)*Account.MarginHedged),Format));
-                           return (Calc(Margin,Master[OP_BUY].Summary[Net].Lots,Format));
-                           break;
-      case MarginShort:    if (IsEqual(Account.MarginModel,Discount)) //-- Shared burden on trunk; majority burden on excess Short variance
-                             return (Calc(Margin,fmax(0.00,Lots-Master[OP_BUY].Summary[Net].Lots)+
-                               (fmin(Lots,Master[OP_BUY].Summary[Net].Lots)*Account.MarginHedged),Format));
-                           return (Calc(Margin,Master[OP_SELL].Summary[Net].Lots,Format));
     };
 
     return (0.00);
@@ -416,6 +419,8 @@ void COrder::InitMaster(int Action, OrderMethod Method)
     Master[Action].HideStop        = false;
     Master[Action].HideTarget      = false;
     Master[Action].Step            = 0.00;
+    Master[Action].EquityLow       = 0.00;
+    Master[Action].EquityHigh      = 0.00;
   }
 
 //+------------------------------------------------------------------+
@@ -820,6 +825,27 @@ void COrder::UpdateSummary(void)
       }
     }
 
+    //-- Calc Equity Recapture/Loss Rate Bases
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+      if (IsEqual(Master[action].Summary[Net].Count,0.00))
+      {
+        Master[action].EquityHigh                  = 0.00;
+        Master[action].EquityLow                   = 0.00;
+      }
+      else
+      {
+        if (Direction(Master[action].Summary[Net].Equity,DirectionUp))
+          if (IsHigher(Master[action].Summary[Net].Equity,Master[action].EquityHigh))
+            Master[action].EquityLow               = Master[action].EquityHigh;
+
+        if (Direction(Master[action].Summary[Net].Equity,DirectionDown))
+          if (IsLower(Master[action].Summary[Net].Equity,Master[action].EquityLow))
+            Master[action].EquityHigh              = Master[action].EquityLow;
+
+        Master[action].EquityHigh                  = fmin(Master[action].EquityHigh,Master[action].Summary[Net].Equity);
+        Master[action].EquityLow                   = fmax(Master[action].EquityLow,Master[action].Summary[Net].Equity);
+      }
+
     //-- Calc P/L Aggregates
     for (MeasureType measure=0;measure<Total;measure++)
     {
@@ -1214,43 +1240,43 @@ bool COrder::OrderOpened(OrderRequest &Request)
 //+------------------------------------------------------------------+
 bool COrder::OrderClosed(OrderDetail &Order) 
   {
-    int    error                  = NoValue;
-    double split                  = fdiv(LotSize(Order.Action),2,Account.LotPrecision);
-    double lots                   = BoolToDouble(IsBetween(Order.Method,Split,Retain),                                //-- If Split/Retain
-                                      LotSize(Order.Action,fmin(fdiv(Order.Lots,2),fmax(split,fdiv(Order.Lots,2)))),  //--   Calculate Split Lots
-                                      Order.Lots,Account.LotPrecision);                                               //-- else use Order Lots
+    int    error                = NoValue;
+    double split                = fdiv(LotSize(Order.Action),2,Account.LotPrecision);
+    double lots                 = BoolToDouble(IsBetween(Order.Method,Split,Retain),                                //-- If Split/Retain
+                                    LotSize(Order.Action,fmin(fdiv(Order.Lots,2),fmax(split,fdiv(Order.Lots,2)))),  //--   Calculate Split Lots
+                                    Order.Lots,Account.LotPrecision);                                               //-- else use Order Lots
     
-    if (IsEqual(Order.Status,Processing))
+    if (IsBetween(Order.Method,Split,Retain))
+      if (IsEqual(lots,Order.Lots))
+        Order.Method            = (OrderMethod)BoolToInt(IsEqual(Split,Order.Method),Full,Hold);
+
+    RefreshRates();
+
+    if (OrderClose(Order.Ticket,
+                   NormalizeDouble(lots,Account.LotPrecision),
+                   BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits),
+                   Account.MaxSlippage*20,clrRed))
     {
       if (IsBetween(Order.Method,Split,Retain))
-        if (IsEqual(lots,Order.Lots))
-          Order.Method            = (OrderMethod)BoolToInt(IsEqual(Split,Order.Method),Full,Hold);
+        MergeSplit(Order);
 
-      RefreshRates();
+      Order.Status              = Processed;
 
-      if (OrderClose(Order.Ticket,
-                     NormalizeDouble(lots,Account.LotPrecision),
-                     BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits),
-                     Account.MaxSlippage*20,clrRed))
-      {
-        if (IsBetween(Order.Method,Split,Retain))
-          MergeSplit(Order);
-
-        Order.Status              = Processed;
-        return (true);          
-      }
-      else
-
-        switch (IsChanged(error,GetLastError()))
-        {
-          case 129:   Order.Memo  = "Invalid Price(129): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
-                      break;
-          case 138:   Order.Memo  = "Requote(138): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
-                      break;
-          default:    Order.Memo  = "Unknown Error("+(string)error+"): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
-        }
+      return (true);          
     }
-    else Order.Memo               = "Invalid State ["+EnumToString(Order.Status)+"]: Not Processing";
+    else
+    {  
+      Order.Status              = Rejected;
+
+      switch (IsChanged(error,GetLastError()))
+      {
+        case 129:   Order.Memo  = "Invalid Price(129): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+                    break;
+        case 138:   Order.Memo  = "Requote(138): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+                    break;
+        default:    Order.Memo  = "Unknown Error("+(string)error+"): "+DoubleToStr(BoolToDouble(IsEqual(Order.Action,OP_BUY),Bid,Ask,Digits));
+      }
+    }
 
     AppendLog(Order.Key,Order.Ticket,Order.Memo);
 
@@ -1363,7 +1389,7 @@ void COrder::ProcessProfits(int Action)
     //-- Calculate Profit Taking Measures
     for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
     {
-      if (IsBetween(Master[Action].Order[ticket].Status,Working,Processing))
+      if (IsEqual(Master[Action].Order[ticket].Status,Working))
       {
         switch (Master[Action].Order[ticket].Method)
         {
@@ -1371,24 +1397,24 @@ void COrder::ProcessProfits(int Action)
           case Split:
           case Full:        if (IsHigher(Equity(Master[Action].Order[ticket].Profit,InPercent),Master[Action].EquityMin,NoUpdate,3))
                               if (IsEqual(Master[Action].Order[ticket].TakeProfit,0.00,Digits))
-                                Master[Action].Order[ticket].Status  = Processing;
+                                Master[Action].Order[ticket].Status  = Qualified;
                               else
                               if (IsEqual(Action,OP_BUY)&&IsHigher(Bid,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
-                                Master[Action].Order[ticket].Status  = Processing;
+                                Master[Action].Order[ticket].Status  = Qualified;
                               else
                               if (IsEqual(Action,OP_SELL)&&IsLower(Ask,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
-                                Master[Action].Order[ticket].Status  = Processing;
+                                Master[Action].Order[ticket].Status  = Qualified;
 
-                            if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+                            if (IsEqual(Master[Action].Order[ticket].Status,Qualified))
                               netEquity     += Master[Action].Order[ticket].Profit;
                             break;
 
-          case Recapture:   Master[Action].Order[ticket].Status      = Processing;
+          case Recapture:   Master[Action].Order[ticket].Status      = Qualified;
                             netRecapture    += Master[Action].Order[ticket].Profit;
                             break;
 
           case DCA:         if (IsLower(0.00,Master[Action].Order[ticket].Profit,NoUpdate,2))
-                              Master[Action].Order[ticket].Status    = Processing;
+                              Master[Action].Order[ticket].Status    = Qualified;
 
                             netDCA          += Master[Action].Order[ticket].Profit;
                             break;
@@ -1397,23 +1423,31 @@ void COrder::ProcessProfits(int Action)
     }
     
     for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
-      if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+      if (IsEqual(Master[Action].Order[ticket].Status,Qualified))
+      {
         switch (Master[Action].Order[ticket].Method)
         {
           case Retain:
           case Split:
           case Full:      if (IsHigher(Equity(netEquity),Master[Action].EquityTarget,NoUpdate,3))
-                            if (OrderClosed(Master[Action].Order[ticket]))
-                              UpdateSnapshot();
+                            Master[Action].Order[ticket].Status      = Processing;
                           break;
 
           case DCA:       if (IsHigher(Equity(netDCA),Master[Action].EquityMin,NoUpdate,3))
-                            if (OrderClosed(Master[Action].Order[ticket]))
-                              UpdateSnapshot();
+                            Master[Action].Order[ticket].Status      = Processing;
                           break;
 
           case Recapture: break;
         }
+        
+        if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+          if (OrderClosed(Master[Action].Order[ticket]))
+            UpdateSnapshot();
+          else
+            Master[Action].Order[ticket].Status                      = Working;
+        else
+          Master[Action].Order[ticket].Status                        = Working;
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -1421,30 +1455,43 @@ void COrder::ProcessProfits(int Action)
 //+------------------------------------------------------------------+
 void COrder::ProcessLosses(int Action)
   {
-    double netEquity   = 0.00;
-    double netDCA      = 0.00;
+    double maxrisk                = -(Master[Action].MaxRisk);
 
-    //-- Handle Kills first
     for (int ticket=0;ticket<Master[Action].Summary[Net].Count;ticket++)
-      switch (Master[Action].Order[ticket].Method)
-      {
-        case Kill:        Master[Action].Order[ticket].Status  = Processing;
-        
-                          if (OrderClosed(Master[Action].Order[ticket]))
-                            UpdateSnapshot();
-      }
-    //    case Retain:
-    //    case Split:
-    //    case Full:      if (IsEqual(Master[Action].Order[ticket].TakeProfit,0.00,Digits))
-    //                      netEquity   += BoolToDouble(IsLower(0.00,Master[Action].Order[ticket].Profit,NoUpdate,Digits),
-    //                                                               Master[Action].Order[ticket].Profit);
-    //                    break;
-    //    case Recapture:
-    //    case DCA:       netDCA        += Master[Action].Order[ticket].Profit;
-    //                    break;
-    //  };
+    {
+      //-- Handle Kills first
+      if (IsEqual(Master[Action].Order[ticket].Method,Kill))
+        Master[Action].Order[ticket].Status  = Processing;
+      else
+      
+      //-- Handle Adverse Tickets (No Stop)
+      if (IsEqual(Master[Action].Order[ticket].StopLoss,0.00,Digits))
+        Master[Action].Order[ticket].Status  = (QueueStatus)BoolToInt(IsLower(Equity(Master[Action].Order[ticket].Profit),maxrisk),Processing,Master[Action].Order[ticket].Status);
+      else
 
-//      if (Master[action].Summary[Net].Equity<=Master[action].MaxRisk)
+        //-- Handle Stops
+        switch (Master[Action].Order[ticket].Method)
+        {
+          case Retain:
+          case Split:
+          case Full:     if (IsEqual(Action,OP_BUY))
+                           if (IsLower(Bid,Master[Action].Order[ticket].StopLoss,NoUpdate,Digits))
+                             Master[Action].Order[ticket].Status  = Processing;
+
+                         if (IsEqual(Action,OP_SELL))
+                           if (IsHigher(Ask,Master[Action].Order[ticket].StopLoss,NoUpdate,Digits))
+                             Master[Action].Order[ticket].Status  = Processing;
+                          break;
+        }
+        
+      if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+        if (OrderClosed(Master[Action].Order[ticket]))
+          UpdateSnapshot();
+        else
+          Master[Action].Order[ticket].Status                     = Working;
+      else
+        Master[Action].Order[ticket].Status                       = Working;
+    }
   }
 
 //+------------------------------------------------------------------+

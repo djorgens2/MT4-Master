@@ -545,7 +545,8 @@ void OnTick()
                    "\n"+EnumToString(tick.SMA().High.Event));
     }
 
-
+//    if (tick.Event(NewHigh,Nominal))
+//      Pause
     //if (tick[NewSegment])
     //  Print(tick.SMAStr());
     //if (IsChanged(state,tick.Range().State))
