@@ -146,13 +146,17 @@ void RefreshScreen(void)
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
                   proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
-    UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
+    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
                   EnumToString(t.SMA().High.State)+" "+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"",EventText[t.SMA().High.Event]),
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
-    UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),20);
+    UpdateDirection("tmaSMABiasHi"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),18);
+    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,proper(DirText(t.SMA().Low.Direction))+" "+
+                  EnumToString(t.SMA().Low.State)+" "+BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),"",EventText[t.SMA().Low.Event]),
+                  BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().Low.Bias,InAction))),12);
+    UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
     UpdateLabel("tmaLinearState"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
                    DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
-    UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),20);
+    UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),18);
   }
 
 //+------------------------------------------------------------------+
@@ -291,11 +295,13 @@ int OnInit()
 
     NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaPolyState"+(string)IndWinId,"",5,56,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaLinearState"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaLinearBias"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateHi"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,56,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaPolyState"+(string)IndWinId,"",5,74,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearState"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBias"+(string)IndWinId,"",5,88,clrDarkGray,SCREEN_UR,IndWinId);
 
     return(INIT_SUCCEEDED);
   }

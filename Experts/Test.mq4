@@ -95,6 +95,19 @@ void RefreshScreen(void)
     }
     
     UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
+    
+    if (tick.ActiveEvent())
+    {
+      string text = "";
+
+      for (EventType event=1;event<EventTypes;event++)
+        if (tick[event])
+        {
+          Append(text,EventText[event],"\n");
+          Append(text,EnumToString(tick.AlertLevel(event)));
+        }
+      Comment(text);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -432,8 +445,8 @@ void Test7(void)
     eRequest.Memo           = "Test 7-Split/Retain";
     
 //    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,5,80,2);
-    order.SetRiskLimits(OP_SELL,10,80,2);
+    order.SetRiskLimits(OP_BUY,10,80,2);
+    order.SetRiskLimits(OP_SELL,15,80,2);
     order.SetOrderMethod(OP_BUY,Split,NoUpdate);
     order.SetOrderMethod(OP_SELL,Hold,NoUpdate);
   
@@ -481,8 +494,8 @@ void Test7(void)
 void Execute(void)
   {
     #define Test 7
-
-    Comment("Tick: "+(string)++Tick);
+    ++Tick;
+//    Comment("Tick: "+(string)++Tick);
     
     switch (Test)
     {

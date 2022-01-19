@@ -247,7 +247,7 @@ private:
           bool         OrderOpened(OrderRequest &Request);
           bool         OrderClosed(OrderDetail &Order);
 
-          void         AdverseEventHandler(void);
+          void         AdverseEquityHandler(void);
 
           void         ProcessRequests(void);
           void         ProcessProfits(int Action);
@@ -293,6 +293,7 @@ public:
           bool         Canceled(int Type=OP_NO_ACTION)                       {return(Status(Canceled,Type));};
           bool         Fulfilled(int Type=OP_NO_ACTION)                      {return(Status(Fulfilled,Type));};
           bool         Pending(int Type=OP_NO_ACTION)                        {return(Status(Pending,Type));};
+          bool         Qualified(int Type=OP_NO_ACTION)                      {return(Status(Qualified,Type));};
           bool         Processing(int Type=OP_NO_ACTION)                     {return(Status(Processing,Type));};
           bool         Processed(int Type=OP_NO_ACTION)                      {return(Status(Processed,Type));};
           bool         Closed(int Type=OP_NO_ACTION)                         {return(Status(Closed,Type));};
@@ -1284,9 +1285,9 @@ bool COrder::OrderClosed(OrderDetail &Order)
   }
 
 //+------------------------------------------------------------------+
-//| AdverseEventHandler - Kills and halts system                     |
+//| AdverseEquityHandler - Kills and halts system                     |
 //+------------------------------------------------------------------+
-void COrder::AdverseEventHandler(void)
+void COrder::AdverseEquityHandler(void)
   {
     double maxrisk                = -(Account.MaxRisk);
 
@@ -1540,7 +1541,7 @@ void COrder::Update(void)
     UpdateSummary();
     UpdateSnapshot();
     
-    AdverseEventHandler();
+    AdverseEquityHandler();
     
     UpdatePanel();
   }
@@ -1715,14 +1716,10 @@ void COrder::Cancel(OrderRequest &Request, QueueStatus Status, string Reason="")
 bool COrder::Status(QueueStatus State, int Type=OP_NO_ACTION)
   {
     if (IsEqual(Type,OP_NO_ACTION))
-    {
       for (int type=OP_BUY;type<=OP_SELLSTOP;type++)
-        if (Snapshot[State].Type[type].Count>0)
-          return(true);
-    }
-    else return (Snapshot[State].Type[Type].Count>0);
+        return (Snapshot[State].Type[type].Count>0);
 
-    return (false);
+    return (Snapshot[State].Type[Type].Count>0);
   }
 
 //+------------------------------------------------------------------+
