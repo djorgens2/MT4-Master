@@ -1,10 +1,9 @@
 //+------------------------------------------------------------------+
-//|                                                         Test.mq4 |
+//|                                                       man-v4.mq4 |
 //|                                                 Dennis Jorgenson |
-//|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
-#property link      "https://www.mql5.com"
+//#property link      "https://www.mql5.com"
 #property version   "1.00"
 #property strict
 
@@ -16,7 +15,7 @@
 #include <Class/TickMA.mqh>
 
 //--- input parameters
-input string        ordRegrConfig      = "";          // +--- Regression Config ---+
+input string        regrHeader         = "";          // +--- Regression Config ---+
 input int           inpPeriods         = 80;          // Retention
 input int           inpDegree          = 6;           // Poiy Regression Degree
 input double        inpAgg             = 2.5;         // Tick Aggregation
@@ -30,10 +29,12 @@ input double        inpMinTarget       = 5.0;         // Equity% Target
 input double        inpMinProfit       = 0.8;         // Minimum take profit%
 input double        inpMaxRisk         = 5.0;         // Maximum Risk%
 input double        inpMaxMargin       = 60.0;        // Maximum Margin
-input double        inpLotFactor       = 2.00;        // Lot Risk% of Balance
+input double        inpLotFactor       = 2.00;        // Lot Size Risk% of Balance
 input double        inpLotSize         = 0.00;        // Lot size override
 input int           inpDefaultStop     = 50;          // Default Stop Loss (pips)
 input int           inpDefaultTarget   = 50;          // Default Take Profit (pips)
+input double        inpZoneStep        = 2.5;         // Zone Step (pips)
+input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin 
 
 CTickMA       *tick                    = new CTickMA(inpPeriods,inpDegree,inpAgg);
 COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong,inpMethodShort);
@@ -96,9 +97,8 @@ void CallPause(string Message)
 //+------------------------------------------------------------------+
 void Test1(void)
   {    
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[1] Market");
     
-    eRequest.Requestor      = "Test[1] Market";
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 1-General Functionality";
     
@@ -122,16 +122,16 @@ void Test1(void)
       {
         case 4:  order.SetStopLoss(OP_BUY,0.00,20,NoHide);
                  order.SetTakeProfit(OP_BUY,0.00,20,NoHide);
-                 order.SetOrderMethod(OP_BUY,Full);
+                 order.SetDefaultMethod(OP_BUY,Full);
                  break;
         case 5:  order.SetStopLoss(OP_BUY,17.40,0,NoHide);
                  order.SetTakeProfit(OP_BUY,18.75,30,NoHide);
-                 order.SetDetailMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
+                 order.SetOrderMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
                  break;
         case 6:  order.SetStopLoss(OP_BUY,17.8,70,NoHide);
                  order.SetTakeProfit(OP_BUY,18.20,70,NoHide);
                  order.Submitted(eRequest);
-                 order.SetDetailMethod(OP_BUY,Hold,0,ByZone);
+                 order.SetOrderMethod(OP_BUY,Hold,0,ByZone);
                  break;
         case 7:  order.SetStopLoss(OP_BUY,0.00,0,NoHide);
                  order.SetTakeProfit(OP_BUY,0.00,0,NoHide);
@@ -185,9 +185,8 @@ void Test1(void)
 void Test2(void)
   {
     int req                 = 0;
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[2] Resub");
     
-    eRequest.Requestor      = "Test[2] Resub";
     eRequest.Memo           = "Test 2-Pend/Recur Test";
     
     static bool fill   = false;
@@ -249,9 +248,8 @@ void Test2(void)
 //+------------------------------------------------------------------+
 void Test3(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[3] Shorts");
     
-    eRequest.Requestor      = "Test[3] Shorts";
     eRequest.Memo           = "Test 3-Short Pend/Recur Test";
     
     order.SetRiskLimits(OP_BUY,80,80,2);
@@ -281,9 +279,8 @@ void Test3(void)
 //+------------------------------------------------------------------+
 void Test4(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[4] Dups");
     
-    eRequest.Requestor      = "Test[4] Dups";
     eRequest.Memo           = "Test 4-Lotsa Dups";
     
     order.SetRiskLimits(OP_BUY,80,80,2);
@@ -309,10 +306,7 @@ void Test4(void)
 //+------------------------------------------------------------------+
 void Test5(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[5] Margin";
-    
+    OrderRequest eRequest   = order.BlankRequest("Test[5] Margin");
     
     order.SetRiskLimits(OP_BUY,80,80,2);
     order.SetRiskLimits(OP_SELL,80,80,5);
@@ -351,10 +345,7 @@ void Test5(void)
 //+------------------------------------------------------------------+
 void Test6(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[6] Margin";
-    
+    OrderRequest eRequest   = order.BlankRequest("Test[6] Margin");
     
     order.SetRiskLimits(OP_BUY,80,80,2);
     order.SetRiskLimits(OP_SELL,80,15,5);
@@ -408,69 +399,96 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Test7(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[7] Splits");
     
-    eRequest.Requestor      = "Test[7] Splits";
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 7-Split/Retain";
     
 //    order.DisableTrade(OP_BUY);
     order.SetRiskLimits(OP_BUY,10,80,2);
     order.SetRiskLimits(OP_SELL,15,80,2);
-    order.SetOrderMethod(OP_BUY,Split,NoUpdate);
-    order.SetOrderMethod(OP_SELL,Hold,NoUpdate);
+    order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
+    order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
   
     //--- Split/Retain Test
-    if (Tick<4)
-    {
-      eRequest.Lots            = order.LotSize(OP_BUY)*4;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+    eRequest.Lots            = order.LotSize(OP_BUY)*4;
+    eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
 
-      order.Submitted(eRequest);
-    }
-    else
-    {
-      eRequest.Memo            = "Test-Tick["+(string)Tick+"]";
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
+    order.Submitted(eRequest);
+  }
 
-      switch(Tick)
-      {
-        case 4:       order.SetStopLoss(OP_BUY,0.00,0,Hide);
-                      order.SetTakeProfit(OP_BUY,0.00,0,Hide);
-                      order.SetDetailMethod(OP_BUY,Retain,2,ByTicket);
-                      order.SetDetailMethod(OP_BUY,Full,3,ByTicket);
-                      break;
-        case 3900:    eRequest.Lots            = order.LotSize(OP_BUY)*4;
-                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
-                      order.Submitted(eRequest);
-                      break;
-        case 5240:    eRequest.Type            = OP_SELL;
-                      eRequest.Lots            = order.LotSize(OP_SELL)*4;
-                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
-                      order.Submitted(eRequest);
-                      break;
-        case 11460:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
-                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
-                      order.Submitted(eRequest);
-                      break;
-        case 11461:   order.SetOrderMethod(OP_BUY,DCA);
-                      break;
-      }
-    }
-  }
 //+------------------------------------------------------------------+
-//| UpdateTick - Updates TickMA data                                 |
-//+------------------------------------------------------------------+`
-void UpdateTick(void)
-  {
-  }
-//+------------------------------------------------------------------+
-//| GetData                                                          |
+//| ManageLong - Manages the Long Order Processing                   |
 //+------------------------------------------------------------------+`
 void ManageLong(void)
   {
-    if (tick.NewSegment(DirectionDown))
-      CallPause("New Long Trigger");
+    static bool trigger    = false;
+
+    FractalRec   exit      = tick.SMA().High;
+    FractalRec   entry     = tick.SMA().Low;
+
+    OrderRequest request   = order.BlankRequest("Long Auto Manager");
+
+    order.SetRiskLimits(OP_BUY,10,80,2);
+    order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
+
+    switch (tick.SMA().State)
+    {
+      case Consolidation:  switch (tick.SMA().Direction)
+                           {
+                             case DirectionUp:   //if (IsChanged(trigger,true))
+                                                 //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+                                                   break;
+                             case DirectionDown: if (IsChanged(trigger,true))
+                                                 {
+                                                   request.Type           = OP_BUYLIMIT;
+                                                   request.Memo           = "In-Trend Consolidation";
+ 
+                                                   request.Price          = Close[0];
+                                                   request.Lots           = 0.00;
+                                                   request.Expiry         = TimeCurrent()+(Period()*(60*2));
+
+                                                   if (order.Submitted(request))
+                                                   {};
+                                                 }
+                                                 break;
+                           }
+                           break;
+      default:             trigger   = false;
+    }
+    
+    order.ExecuteOrders(OP_BUY);
+  }
+
+//+------------------------------------------------------------------+
+//| ManageShort - Manages the Short Order Processing                 |
+//+------------------------------------------------------------------+`
+void ManageShort(void)
+  {
+    FractalRec exit        = tick.SMA().High;
+    FractalRec entry       = tick.SMA().Low;
+
+    static bool trigger    = false;
+    
+    order.SetRiskLimits(OP_SELL,15,80,2);
+    order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
+
+    switch (tick.SMA().State)
+    {
+      case Consolidation:  switch (tick.SMA().Direction)
+                           {
+                             case DirectionUp:   if (IsChanged(trigger,true));
+
+                                                 break;
+                             case DirectionDown: if (IsChanged(trigger,true));
+
+                                                 break;
+                           }
+                           break;
+      default:             trigger   = false;
+    }
+
+    order.ExecuteOrders(OP_SELL);
   }
 
 //+------------------------------------------------------------------+
@@ -478,7 +496,13 @@ void ManageLong(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
+//    if (tick[NewTick]) Print(tick.TickStr(1)+"|"+tick.SegmentStr(1)+"|"+tick.SMAStr(2));
+
     ManageLong();
+    
+    order.ExecuteRequests();
+//    if (tick[NewParabolic])
+//      CallPause("New Parabolic");
   }
 
 //+------------------------------------------------------------------+
@@ -511,7 +535,7 @@ int OnInit()
       order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetZoneStep(action,2.5,60.0);
+      order.SetZoneStep(action,inpZoneStep,inpMaxZoneMargin);
     }
 
     NewLine("czDCA:0");

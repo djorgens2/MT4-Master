@@ -32,14 +32,14 @@ protected:
   //-- Trade Manager States
   enum                OrderMethod
                       {
-                        Hold,          //-- Hold til max risk exceeded
-                        Full,          //-- Close full orders
-                        Split,         //-- Close half orders 
-                        Retain,        //-- Close half orders and hold
-                        DCA,           //-- Close profit on DCA
-                        Recapture,     //-- Close on position equity advance
-                        Kill,          //-- Close on market
-                        Halt,          //-- Suspend trading
+                        Hold,          // Hold (unless max risk)
+                        Full,          // Close whole orders
+                        Split,         // Close half orders 
+                        Retain,        // Close half orders and hold
+                        DCA,           // Close profit on DCA
+                        Recapture,     // Close on position equity advance
+                        Kill,          // Close on market
+                        Halt,          // Suspend trading
                         OrderMethods
                       };
 
@@ -167,7 +167,7 @@ private:
 
   struct              OrderSummary
                       {
-                        int            Index;                 //-- Zone Node (Zone summaries only)
+                        int            Zone;                  //-- Zone #
                         int            Count;                 //-- Open Order Count
                         double         Lots;                  //-- Lots by Pos, Neg, Net
                         double         Value;                 //-- Order value by Pos, Neg, Net
@@ -231,7 +231,7 @@ private:
 
           void         UpdatePanel(void);
           void         UpdateSnapshot(void);
-          void         UpdateNode(int Action, OrderSummary &Node);
+          void         UpdateZone(int Action, OrderSummary &Zone);
           void         UpdateSummary(void);
           void         UpdateAccount(void);
           void         UpdateMaster(void);
@@ -301,24 +301,24 @@ public:
           
 
           //-- Array Property Interfaces
-          OrderRequest BlankRequest(void);
+          OrderRequest BlankRequest(string Requestor);
           OrderRequest Request(int Key, int Ticket=NoValue);
           OrderDetail  Ticket(int Ticket);
           OrderDetail  Ticket(int Action, ReservedWords Measure)             {if (IsEqual(Measure,Min)) 
                                                                                 return(Ticket(Master[Action].TicketMin)); 
                                                                                 return(Ticket(Master[Action].TicketMax));};
-          OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
+//          OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
           OrderSummary PL(int Action, MeasureType Measure) {return(Master[Action].Summary[Measure]);};
 
-          void         GetNode(int Action, int Index, OrderSummary &Node);
-          int          Nodes(int Action) {return (ArraySize(Master[Action].Zone));};
-          int          Index(int Action, double Price=0.00) {return((int)ceil(fdiv(BoolToDouble(IsEqual(Price,0.00),
+          void         GetZone(int Action, int Zone, OrderSummary &Node);
+          int          Zones(int Action) {return (ArraySize(Master[Action].Zone));};
+          int          Zone(int Action, double Price=0.00) {return((int)ceil(fdiv(BoolToDouble(IsEqual(Price,0.00),
                                    BoolToDouble(IsEqual(Operation(Action),OP_BUY),Bid,Ask),Price)-(Master[Action].DCA+Account.Spread),
                                    point(Master[Action].Step),Digits)));};
 
           //-- Configuration methods
-          void         SetDetailMethod(int Action, OrderMethod Method, int Batch, int ByType);
-          void         SetOrderMethod(int Action, OrderMethod Method, bool UpdateExisting=true);
+          void         SetOrderMethod(int Action, OrderMethod Method, int ByValue, int ByType);
+          void         SetDefaultMethod(int Action, OrderMethod Method, bool UpdateExisting=true);
           void         SetStopLoss(int Action, double StopLoss, double DefaultStop, bool HideStop, bool FromClose=true);
           void         SetTakeProfit(int Action, double TakeProfit, double DefaultTarget, bool HideTarget, bool FromClose=true);
           void         SetEquityTargets(int Action, double EquityTarget, double EquityMin);
@@ -427,9 +427,9 @@ void COrder::InitMaster(int Action, OrderMethod Method)
 //+------------------------------------------------------------------+
 //| InitSummary - Zeroes an Order Summary Record                     |
 //+------------------------------------------------------------------+
-void COrder::InitSummary(OrderSummary &Line, int Index=NoValue)
+void COrder::InitSummary(OrderSummary &Line, int Zone=NoValue)
   {
-    Line.Index                     = Index;
+    Line.Zone                      = Zone;
     Line.Count                     = 0;
     Line.Lots                      = 0.00;
     Line.Value                     = 0.00;
@@ -501,7 +501,7 @@ void COrder::UpdatePanel(void)
                                                    "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%"),clrDarkGray,8);
       UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneNow",center(DoubleToStr(Index(action),0),5),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneNow",center(DoubleToStr(Zone(action),0),5),clrDarkGray,10);
     }
     
     //-- Order Zone metrics by Action
@@ -515,10 +515,9 @@ void COrder::UpdatePanel(void)
       {
         if (node<ArraySize(Master[action].Zone)&&IsEqual(ticket,0))
         {
-          int index     = Index(action);
-          int nodecolor = BoolToInt(IsEqual(Master[action].Zone[node].Index,index),clrYellow,clrDarkGray);
+          int nodecolor = BoolToInt(IsEqual(Master[action].Zone[node].Zone,Zone(action)),clrYellow,clrDarkGray);
           
-          UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"Z",IntegerToString(Master[action].Zone[node].Index,3),nodecolor,9,"Consolas");
+          UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"Z",IntegerToString(Master[action].Zone[node].Zone,3),nodecolor,9,"Consolas");
           UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"#",IntegerToString(Master[action].Zone[node].Count,2),nodecolor,9,"Consolas");
           UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"L",center(DoubleToString(Master[action].Zone[node].Lots,Account.LotPrecision),7),nodecolor,9,"Consolas");
           UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"V",dollar(Master[action].Zone[node].Value,14),nodecolor,9,"Consolas");
@@ -681,14 +680,14 @@ void COrder::UpdateSnapshot(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateNode - Applies Node changes to the Master Zone             |
+//| UpdateZone - Applies Node changes to the Master Zone             |
 //+------------------------------------------------------------------+
-void COrder::UpdateNode(int Action, OrderSummary &Node)
+void COrder::UpdateZone(int Action, OrderSummary &Zone)
   {
     int   node;
 
     for (node=0;node<ArraySize(Master[Action].Zone);node++)
-      if (IsEqual(Master[Action].Zone[node].Index,Node.Index))
+      if (IsEqual(Master[Action].Zone[node].Zone,Zone.Zone))
         break;
 
     if (IsEqual(node,ArraySize(Master[Action].Zone)))
@@ -697,12 +696,12 @@ void COrder::UpdateNode(int Action, OrderSummary &Node)
 
       while (node>0)
       {
-        if (Node.Index<Master[Action].Zone[node-1].Index)
+        if (Zone.Zone<Master[Action].Zone[node-1].Zone)
           break;
         else
         {
           InitSummary(Master[Action].Zone[node]);
-          Master[Action].Zone[node] = Master[Action].Zone[node-1];
+          Master[Action].Zone[node]      = Master[Action].Zone[node-1];
         }
 
         node--;
@@ -710,7 +709,7 @@ void COrder::UpdateNode(int Action, OrderSummary &Node)
     }
 
     InitSummary(Master[Action].Zone[node]);
-    Master[Action].Zone[node]           = Node;
+    Master[Action].Zone[node]            = Zone;
   }
 
 //+------------------------------------------------------------------+
@@ -718,7 +717,7 @@ void COrder::UpdateNode(int Action, OrderSummary &Node)
 //+------------------------------------------------------------------+
 void COrder::UpdateSummary(void)
   {
-    OrderSummary node;
+    OrderSummary zone;
 
     double usProfitMin                   = 0.00;
     double usProfitMax                   = 0.00;
@@ -794,14 +793,14 @@ void COrder::UpdateSummary(void)
           }
 
           //-- Build Zone Summary Nodes By Action
-          GetNode(action,Index(action,Master[action].Order[detail].Price),node);
+          GetZone(action,Zone(action,Master[action].Order[detail].Price),zone);
 
-          ArrayResize(node.Ticket,++node.Count,100);
-          node.Lots                               += Master[action].Order[detail].Lots;
-          node.Value                              += Master[action].Order[detail].Profit;
-          node.Ticket[node.Count-1]                = Master[action].Order[detail].Ticket;
+          ArrayResize(zone.Ticket,++zone.Count,100);
+          zone.Lots                               += Master[action].Order[detail].Lots;
+          zone.Value                              += Master[action].Order[detail].Profit;
+          zone.Ticket[zone.Count-1]                = Master[action].Order[detail].Ticket;
 
-          UpdateNode(action,node);
+          UpdateZone(action,zone);
         }
     }
     
@@ -1122,7 +1121,7 @@ void COrder::MergeSplit(OrderDetail &Order)
         //-- Add New split Order
         ArrayResize(Master[Order.Action].Order,detail+1,1000);
 
-        if (OrderLots()<fdiv(LotSize(Order.Action),2))
+        if (OrderLots()<=fdiv(LotSize(Order.Action),2))
           Master[Order.Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Order.Method,Split),Full,Hold);
         else
           Master[Order.Action].Order[detail].Method     = Order.Method;
@@ -1150,6 +1149,8 @@ bool COrder::OrderApproved(OrderRequest &Request)
   {
     #define MarginTolerance    1
     
+    OrderSummary zone;
+
     if (Enabled(Request))
     {
       switch (Request.Status)
@@ -1165,13 +1166,25 @@ bool COrder::OrderApproved(OrderRequest &Request)
                                                LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
                         break;
 
-        case Immediate: if (IsLower(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
+        case Immediate: Request.Status    = Declined;
+        
+                        if (IsLower(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
                                       LotSize(Request.Action,Request.Lots),InPercent)-MarginTolerance,
                                       Master[Request.Action].MaxMargin,NoUpdate))
-                          return (IsChanged(Request.Status,Approved));
-
-                        Request.Status    = Declined;
-                        Request.Memo      = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
+                          if (IsEqual(Master[Request.Action].Summary[Net].Count,0))
+                            return (IsChanged(Request.Status,Approved));
+                          else
+                          {
+                          GetZone(Request.Action,Zone(Request.Action,BoolToDouble(IsEqual(Request.Action,OP_BUY),Ask,Bid,Digits)),zone);
+                          Print(zone.Zone);
+                          if (IsLower(zone.Margin,Master[Request.Action].MaxZoneMargin,NoUpdate))
+                            return (IsChanged(Request.Status,Approved));
+                          else
+                            Request.Memo  = "Margin Zone limit "+DoubleToStr(Master[Request.Action].MaxZoneMargin,1)+"% exceeded ["+
+                                               DoubleToStr(zone.Margin,1)+"%]";
+                          }
+                        else
+                          Request.Memo    = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
                                                DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
                                                LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
                         break;
@@ -1736,7 +1749,7 @@ bool COrder::Submitted(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| BlankRequest - Returns a blank Request                           |
 //+------------------------------------------------------------------+
-OrderRequest COrder::BlankRequest(void)
+OrderRequest COrder::BlankRequest(string Requestor)
   {
     OrderRequest Request;
     
@@ -1745,7 +1758,7 @@ OrderRequest COrder::BlankRequest(void)
     Request.Ticket           = NoValue;
     Request.Type             = OP_NO_ACTION;
     Request.Action           = OP_NO_ACTION;
-    Request.Requestor        = "";
+    Request.Requestor        = Requestor;
     Request.Price            = 0.00;
     Request.Lots             = 0.00;
     Request.TakeProfit       = 0.00;
@@ -1790,46 +1803,45 @@ OrderDetail COrder::Ticket(int Ticket)
 //+------------------------------------------------------------------+
 OrderRequest COrder::Request(int Key, int Ticket=NoValue)
   {
-    OrderRequest search      = BlankRequest();
+    OrderRequest search      = BlankRequest("Search");
 
     for (int request=0;request<ArraySize(Queue);request++)
       if (IsEqual(Key,Queue[request].Key)&&IsEqual(Ticket,Queue[request].Ticket))
         return (Queue[request]);
 
     search.Status            = Invalid;
-    search.Requestor         = "Search Request";
     search.Memo              = "Request not found: "+IntegerToString(Key,10,'-');
 
     return (search);
   }
 
 //+------------------------------------------------------------------+
-//| GetNode - Returns Node Summary by Action/Index                   |
+//| GetZone - Returns Zone Summary Node by Action/Zone #             |
 //+------------------------------------------------------------------+
-void COrder::GetNode(int Action, int Index, OrderSummary &Node)
+void COrder::GetZone(int Action, int Zone, OrderSummary &Node)
   {
-    InitSummary(Node,Index);
+    InitSummary(Node,Zone);
 
     for (int node=0;node<ArraySize(Master[Action].Zone);node++)
-      if (IsEqual(Master[Action].Zone[node].Index,Index))
+      if (IsEqual(Master[Action].Zone[node].Zone,Zone))
         Node         = Master[Action].Zone[node];
   }
 
 //+------------------------------------------------------------------+
-//| SetDetailMethod - Sets Profit strategy by Action/[Ticket|Zone}   |
+//| SetOrderMethod - Sets Profit strategy by Action/[Ticket|Zone}    |
 //+------------------------------------------------------------------+
-void COrder::SetDetailMethod(int Action, OrderMethod Method, int Index, int ByType)
+void COrder::SetOrderMethod(int Action, OrderMethod Method, int ByValue, int ByType)
   {
-    OrderSummary node;
+    OrderSummary zone;
     int          ticket[];
     
     switch (ByType)
     {
-      case ByZone:    GetNode(Action,Index,node);
-                      ArrayCopy(ticket,node.Ticket);      
+      case ByZone:    GetZone(Action,ByValue,zone);
+                      ArrayCopy(ticket,zone.Ticket);      
                       break;
       case ByTicket:  ArrayResize(ticket,1,100);
-                      ticket[0]                 = Index;
+                      ticket[0]                 = ByValue;
                       break;
     }
 
@@ -1840,9 +1852,9 @@ void COrder::SetDetailMethod(int Action, OrderMethod Method, int Index, int ByTy
   }
 
 //+------------------------------------------------------------------+
-//| SetOrderMethod - Sets default Profit Taking strategy by Action   |
+//| SetDefaultMethod - Sets default Profit Taking strategy by Action |
 //+------------------------------------------------------------------+
-void COrder::SetOrderMethod(int Action, OrderMethod Method, bool UpdateExisting=true)
+void COrder::SetDefaultMethod(int Action, OrderMethod Method, bool UpdateExisting=true)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
@@ -2167,7 +2179,7 @@ string COrder::ZoneSummaryStr(int Action=OP_NO_ACTION)
           Append(text,"===== "+proper(ActionText(action))+" Master Zone Detail =====","\n");
 
           for (int node=0;node<ArraySize(Master[action].Zone);node++)
-            Append(text,SummaryLineStr("Zone["+IntegerToString(Master[action].Zone[node].Index,3)+"]",Master[action].Zone[node]),"\n");
+            Append(text,SummaryLineStr("Zone["+IntegerToString(Master[action].Zone[node].Zone,3)+"]",Master[action].Zone[node]),"\n");
         }
 
     return (text);

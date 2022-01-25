@@ -16,6 +16,14 @@ class CTickMA : public CEvent
 
 private:
 
+    enum   SMAState
+           {
+             Convergence,      // Trending
+             Parabolic,        // Reversing
+             Consolidation,    // Consolidating
+             Flatline          // Flatline
+           };
+
     enum   PriceType
            {
              ptOpen,      // Open
@@ -86,7 +94,7 @@ private:
              int          Direction;
              int          Bias;
              EventType    Event;
-             FractalState State;
+             SMAState     State;
              FractalRec   Open;
              FractalRec   High;
              FractalRec   Low;
@@ -192,6 +200,8 @@ public:
     string           SMAStr(int HistoryCount=0);
     string           PolyStr(void);
     string           RangeStr(void);
+    string           FOCStr(FOCRec &FOC);
+    string           LineStr(int HistoryCount=0);
   };
 
 //+------------------------------------------------------------------+
@@ -226,35 +236,35 @@ void CTickMA::CalcFractal(FOCRec &FOC, AlertLevel Level)
     //--- compute FOC metrics
     if (Event(NewTick))
     {
-    FOC.Now                 = (atan(fdiv(pip(FOC.Price[0]-FOC.Price[tmaPeriods-1]),tmaPeriods))*180)/M_PI;
-    FOC.Event               = NoEvent;
+      FOC.Now               = (atan(fdiv(pip(FOC.Price[0]-FOC.Price[tmaPeriods-1]),tmaPeriods))*180)/M_PI;
+      FOC.Event             = NoEvent;
 
-    if (NewDirection(FOC.Direction,Direction(FOC.Price[0]-FOC.Price[1])))
-    {
-      FOC.Min               = FOC.Now;
-      FOC.Max               = FOC.Now;
-      FOC.Event             = NewDirection;
+      if (NewDirection(FOC.Direction,Direction(FOC.Price[0]-FOC.Price[1])))
+      {
+        FOC.Min             = FOC.Now;
+        FOC.Max             = FOC.Now;
+        FOC.Event           = NewDirection;
 
-      bias                  = Action(FOC.Direction);
-    }
-    else
-    if (IsHigher(fabs(FOC.Now),maxFOC,NoUpdate,3))
-    {
-      FOC.Min               = FOC.Now;
-      FOC.Max               = FOC.Now;
-      FOC.Event             = NewExpansion;
+        bias                = Action(FOC.Direction);
+      }
+      else
+      if (IsHigher(fabs(FOC.Now),maxFOC,NoUpdate,3))
+      {
+        FOC.Min             = FOC.Now;
+        FOC.Max             = FOC.Now;
+        FOC.Event           = NewExpansion;
 
-      bias                  = Action(FOC.Direction);
-    }
-    else
-    if (IsLower(fabs(FOC.Now),minFOC,NoUpdate,3))
-    {
-      FOC.Min               = FOC.Now;
-      FOC.Event             = NewRetrace;
+        bias                = Action(FOC.Direction);
+      }
+      else
+      if (IsLower(fabs(FOC.Now),minFOC,NoUpdate,3))
+      {
+        FOC.Min             = FOC.Now;
+        FOC.Event           = NewRetrace;
 
-      bias                  = Action(FOC.Direction,InDirection,InContrarian);
-    }    
-    
+        bias                = Action(FOC.Direction,InDirection,InContrarian);
+      }    
+
       SetEvent(BoolToEvent(IsChanged(FOC.Bias,bias),NewBias),Level);
       SetEvent(FOC.Event,Level);
     }
@@ -265,12 +275,12 @@ void CTickMA::CalcFractal(FOCRec &FOC, AlertLevel Level)
 //+------------------------------------------------------------------+
 void CTickMA::CalcFractal(FractalRec &Fractal, AlertLevel Level)
   {
-    int          direction  = Direction(Fractal.Price[1]-Fractal.LastPrice);
+    int direction         = Direction(Fractal.Price[1]-Fractal.LastPrice);
 
-    FractalState state      = NoState;
+    FractalState state    = NoState;
     
-    Fractal.Event           = NoEvent;
-    Fractal.LastPrice       = Fractal.Price[1];
+    Fractal.Event         = NoEvent;
+    Fractal.LastPrice     = Fractal.Price[1];
 
     //-- Filter SMA Flats
     if (IsEqual(direction,DirectionNone))
@@ -278,23 +288,23 @@ void CTickMA::CalcFractal(FractalRec &Fractal, AlertLevel Level)
 
     //-- Handle SMA Change
     if (NewBias(Fractal.Bias,Action(direction)))
-      Fractal.Event         = NewBias;
+      Fractal.Event       = NewBias;
 
     //-- Handle Interior States
     if (IsBetween(Fractal.Price[1],Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Digits))
     {
       //-- Handle Retrace
       if (IsBetween(Fractal.Price[1],Fractal.Point[fpRoot],Fractal.Point[fpBase],Digits))
-        state               = Retrace;
+        state             = Retrace;
       else
 
       //-- Handle Recovery
       if (IsEqual(Fractal.State,Retrace)||IsEqual(Fractal.State,Recovery))
-        state               = Recovery;
+        state             = (FractalState)BoolToInt(IsEqual(Direction(Fractal.Price[1]-Fractal.Price[2]),Fractal.Direction),Recovery,Retrace);
       else
 
       //-- Handle Rally/Pullback
-        state                 = (FractalState)BoolToInt(IsEqual(Fractal.Bias,OP_BUY),Rally,Pullback);
+        state             = (FractalState)BoolToInt(IsEqual(Fractal.Bias,OP_BUY),Rally,Pullback);
 
       //-- Handle Convergences
       if (IsBetween(Fractal.Price[1],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Digits))
@@ -542,7 +552,7 @@ void CTickMA::CalcPoly(double &Poly[], PriceType Type)
   }
 
 //+------------------------------------------------------------------+
-//| CalcLine - Calculate Linear Regression                           |
+//| CalcLinear - Calculate Linear Regression                         |
 //+------------------------------------------------------------------+
 void CTickMA::CalcLinear(double &Source[], double &Target[])
   {
@@ -726,40 +736,69 @@ void CTickMA::UpdateRange(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSMA(void)
   {
+    SMAState  state  = NoValue;
+    EventType event  = NoEvent;
+
     CalcSMA();
 
     CalcFractal(sma.Open,Minor);    
     CalcFractal(sma.High,Minor);
     CalcFractal(sma.Low,Minor);
     CalcFractal(sma.Close,Minor);
-    
+
     //-- Prep SMA variables
-    sma.Event     = NoEvent;
-    sma.Bias      = Action(sma.Close.Price[0]-sma.Open.Price[0]);
-    
+    int dirHigh      = Direction(sma.High.Price[0]-sma.High.Price[1]);
+    int dirLow       = Direction(sma.Low.Price[0]-sma.Low.Price[1]);
+
+    sma.Event        = NoEvent;
+    sma.Bias         = Action(sma.Close.Price[0]-sma.Open.Price[0]);
+
     //-- Handle convergences
-    if (IsEqual(sma.High.Direction,sma.Low.Direction))
+    if (IsEqual(dirHigh,dirLow))
     {
-      sma.Event   = BoolToEvent(NewDirection(sma.Direction,sma.High.Direction),BoolToEvent(IsEqual(sma.Direction,DirectionUp),sma.High.Event,sma.Low.Event));
-      sma.State   = (FractalState)BoolToInt(IsEqual(sma.Direction,DirectionUp),sma.High.State,sma.Low.State);
+      if (NewDirection(sma.Direction,dirHigh))
+        event        = NewDirection;
+      else
+        event        = BoolToEvent(IsEqual(sma.Direction,DirectionUp),sma.High.Event,sma.Low.Event);
+
+      state          = Convergence;
     }
     else
-    
+
     //-- Handle parabolics
-    if (IsEqual(sma.High.Direction,DirectionUp))
+    if (IsEqual(dirHigh,DirectionUp)&&IsEqual(dirLow,DirectionDown))
     {
-      sma.Event   = NewParabolic;
-      sma.State   = (FractalState)BoolToInt(IsEqual(Direction(sma.Bias,InAction),DirectionUp),sma.High.State,sma.Low.State);
+      sma.Direction  = sr[0].Direction;
+      event          = NewParabolic;
+      state          = Parabolic;
     }
+    else
 
     //-- Handle consolidations
-    else
+    if (IsEqual(dirHigh,DirectionDown)&&IsEqual(dirLow,DirectionUp))
     {
-      sma.Event   = NewContraction;
-      sma.State   = (FractalState)BoolToInt(IsEqual(sma.Direction,DirectionUp),sma.High.State,sma.Low.State);
+      event          = NewContraction;
+      state          = Consolidation;
     }
+    else
     
+    //-- Handle Flatlines
+    if (IsEqual(dirHigh,DirectionNone)&&IsEqual(dirLow,DirectionNone))
+    {
+      event          = NewFlatline;
+      state          = Flatline;
+    }
+
+    if (NewState(sma.State,state))
+    {
+      sma.Event      = event;
+
+      SetEvent(NewState,Notify);
+      SetEvent(sma.Event,Nominal);
+    }
+//      Print(TickStr(1)+"|"+SegmentStr(1)+"|"+SMAStr(2));
 //    if (Event(NewTick)) Print(TickStr(1)+"|"+SegmentStr(1)+"|"+FractalStr(sma.High,2));
+//    if (Event(NewTick)) Print(TickStr(1)+"|"+SegmentStr(1)+"|"+SMAStr(2));
   }
 
 //+------------------------------------------------------------------+
@@ -776,6 +815,8 @@ void CTickMA::UpdatePoly(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
+    int bias                   = OP_NO_ACTION;
+
     CalcLinear(poly.Open,line.Open.Price);
     CalcLinear(poly.Close,line.Close.Price);
 
@@ -786,7 +827,18 @@ void CTickMA::UpdateLinear(void)
     line.Event                 = NoEvent;
 
     if (Event(NewTick))
-      line.Event               = BoolToEvent(IsChanged(line.Bias,Action(Direction(line.Close.Price[0]-line.Open.Price[0]))),NewBias);
+    {
+      //-- Handle Zero Deviation
+      if (IsEqual(line.Open.Min,line.Open.Max,Digits)||IsEqual(line.Open.Min,line.Open.Now,Digits))
+        bias                   = Action(line.Close.Now-line.Open.Now);
+      //else
+      //if (IsEqual(line.Open.Min,line.Open.Now,Digits))
+      //  bias                   = Action(line.Close.Now-line.Open.Now);
+      else
+        bias                   = Action(line.Close.Now-line.Open.Min);
+
+      line.Event               = BoolToEvent(NewAction(line.Bias,bias),NewBias);
+    }
       
     SetEvent(line.Event,Major);
   }
@@ -1003,7 +1055,7 @@ string CTickMA::SMAStr(int HistoryCount=0)
   {
     string text      = "SMA";
 
-    Append(text,DirText(sma.Direction),"|");
+     Append(text,DirText(sma.Direction),"|");
     Append(text,ActionText(sma.Bias),"|");
     Append(text,EnumToString(sma.State),"|");
     Append(text,EnumToString(sma.Event),"|");
@@ -1040,4 +1092,65 @@ string CTickMA::PolyStr(void)
     Append(text,textclose,"\n");
     
     return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| FOCStr - Returns formatted FOC text & prices for supplied FOCRec |
+//+------------------------------------------------------------------+
+string CTickMA::FOCStr(FOCRec &FOC)
+  {
+    string text     = "";
+
+    Append(text,DirText(FOC.Direction),"|");
+    Append(text,ActionText(FOC.Bias),"|");
+    Append(text,EnumToString(FOC.Event),"|");
+    Append(text,DoubleToStr(FOC.Min,Digits),"|");
+    Append(text,DoubleToStr(FOC.Max,Digits),"|");
+    Append(text,DoubleToStr(FOC.Now,Digits),"|");
+
+    return (text);
+  }
+
+//+------------------------------------------------------------------+
+//| LineStr - Returns formatted Linear Regression/FOC text & prices  |
+//+------------------------------------------------------------------+
+string CTickMA::LineStr(int HistoryCount=0)
+  {
+    string text      = "Line";
+    string textopen  = "Open";
+    string textclose = "Close";
+
+    Append(text,DirText(line.Direction),"|");
+    Append(text,ActionText(line.Bias),"|");
+    Append(text,EnumToString(line.Event),"|");
+    Append(textopen,FOCStr(line.Open),"|");
+    Append(textclose,FOCStr(line.Close),"|");
+
+    for (int node=0;node<HistoryCount;node++)
+    {
+      Append(textopen,DoubleToStr(line.Open.Price[node],Digits),"|");
+      Append(textclose,DoubleToStr(line.Close.Price[node],Digits),"|");
+    }
+
+    Append(text,textopen,"|");
+    Append(text,textclose,"|");
+    
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Identifies State changes to SMA's                     |
+//+------------------------------------------------------------------+
+bool NewState(SMAState &State, SMAState Change, bool Update=true)
+  {
+    if (IsEqual(Change,NoValue))
+      return (false);
+      
+    if (IsEqual(State,Change))
+      return (false);
+      
+    if (Update)
+      State           = Change;
+      
+    return (true);
   }

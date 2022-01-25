@@ -41,7 +41,6 @@ protected:
                   NewFOC,
                   NewState,
                   NewAction,
-                  NewActionState,
                   NewBias,
                   NewRange,
                   NewOrigin,
@@ -70,6 +69,7 @@ protected:
                   NewIdle,
                   NewWax,
                   NewWane,
+                  NewFlatline,
                   SessionOpen,
                   SessionClose,
                   NewDay,
@@ -202,6 +202,9 @@ string CEvent::EventStr(void)
 //+------------------------------------------------------------------+
 bool IsChanged(EventType &Compare, EventType Value)
   {
+    if (Compare==NoEvent)
+      return (false);
+
     if (Compare==Value)
       return (false);
       
@@ -242,7 +245,6 @@ const string EventText[EventTypes] =
                "New FOC",
                "New State",
                "New Action",
-               "New Action State",
                "New Bias",
                "New Range",
                "New Origin",
@@ -271,6 +273,7 @@ const string EventText[EventTypes] =
                "New Idle",
                "New Wax",
                "New Wane",
+               "New Flatline",
                "Session Open",
                "Session Close",
                "New Day",

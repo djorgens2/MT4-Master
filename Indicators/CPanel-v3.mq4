@@ -148,6 +148,10 @@ void RefreshScreen(void)
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
                   proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
+    UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().Direction))+" "+
+                  EnumToString(t.SMA().State)+" "+BoolToStr(IsEqual(t.SMA().Event,NoEvent),"",EventText[t.SMA().Event]),
+                  Color(t.SMA().Direction),12);
+    UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
     UpdateLabel("tmaSMAStateHi"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
                   EnumToString(t.SMA().High.State)+" "+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"",EventText[t.SMA().High.Event]),
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
@@ -156,9 +160,13 @@ void RefreshScreen(void)
                   EnumToString(t.SMA().Low.State)+" "+BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),"",EventText[t.SMA().Low.Event]),
                   BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().Low.Bias,InAction))),12);
     UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
-    UpdateLabel("tmaLinearState"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
+    UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,DoubleToStr(t.Line().Open.Now,Digits)+" "+DoubleToStr(t.Line().Open.Max,Digits)+" "+
+                   DoubleToStr(t.Line().Open.Min,Digits),Color(t.Line().Open.Direction),12);
+    UpdateDirection("tmaLinearBiasOpen"+(string)IndWinId,Direction(t.Line().Open.Bias,InAction),Color(Direction(t.Line().Open.Bias,InAction)),18);
+    UpdateLabel("tmaLinearStateClose"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
                    DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
-    UpdateDirection("tmaLinearBias"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),18);
+    UpdateDirection("tmaLinearBiasClose"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),18);
+    UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Line().Bias,InAction),Color(Direction(t.Line().Bias,InAction)),24);
     
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
@@ -516,13 +524,18 @@ int OnInit()
 
     NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAStateHi"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,56,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaPolyState"+(string)IndWinId,"",5,74,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaLinearState"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaLinearBias"+(string)IndWinId,"",5,88,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateHi"+(string)IndWinId,"",32,56,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
+//    NewLabel("tmaPolyState"+(string)IndWinId,"",5,74,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearStateOpen"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasOpen"+(string)IndWinId,"",5,88,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearStateClose"+(string)IndWinId,"",32,110,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasClose"+(string)IndWinId,"",5,106,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasNet"+(string)IndWinId,"",210,96,clrDarkGray,SCREEN_UR,IndWinId);
 
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);

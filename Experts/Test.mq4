@@ -38,7 +38,7 @@ input int           inpDefaultTarget   = 50;          // Default Take Profit (pi
 CTickMA       *tick                    = new CTickMA(inpPeriods,inpDegree,inpAgg);
 COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong,inpMethodShort);
 
-bool           PauseOn                 = false;
+bool           PauseOn                 = true;
 int            Tick                    = 0;
 
 int            Tickets[];
@@ -57,8 +57,8 @@ void GetData(void)
     
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      IndexNow[action]    = order.Index(action);
-      order.GetNode(action,IndexNow[action],NodeNow[action]);
+      IndexNow[action]    = order.Zone(action);
+      order.GetZone(action,IndexNow[action],NodeNow[action]);
 
       //if (IsChanged(index[action],IndexNow[action]))
       //  Print(order.ZoneSummaryStr(action));
@@ -126,9 +126,8 @@ void CallPause(string Message)
 //+------------------------------------------------------------------+
 void Test1(void)
   {    
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[1] Market");
     
-    eRequest.Requestor      = "Test[1] Market";
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 1-General Functionality";
     
@@ -152,16 +151,16 @@ void Test1(void)
       {
         case 4:  order.SetStopLoss(OP_BUY,0.00,20,NoHide);
                  order.SetTakeProfit(OP_BUY,0.00,20,NoHide);
-                 order.SetOrderMethod(OP_BUY,Full);
+                 order.SetDefaultMethod(OP_BUY,Full);
                  break;
         case 5:  order.SetStopLoss(OP_BUY,17.40,0,NoHide);
                  order.SetTakeProfit(OP_BUY,18.75,30,NoHide);
-                 order.SetDetailMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
+                 order.SetOrderMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
                  break;
         case 6:  order.SetStopLoss(OP_BUY,17.8,70,NoHide);
                  order.SetTakeProfit(OP_BUY,18.20,70,NoHide);
                  order.Submitted(eRequest);
-                 order.SetDetailMethod(OP_BUY,Hold,0,ByZone);
+                 order.SetOrderMethod(OP_BUY,Hold,0,ByZone);
                  break;
         case 7:  order.SetStopLoss(OP_BUY,0.00,0,NoHide);
                  order.SetTakeProfit(OP_BUY,0.00,0,NoHide);
@@ -215,9 +214,8 @@ void Test1(void)
 void Test2(void)
   {
     int req                 = 0;
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[2] Resub");
     
-    eRequest.Requestor      = "Test[2] Resub";
     eRequest.Memo           = "Test 2-Pend/Recur Test";
     
     static bool fill   = false;
@@ -279,9 +277,8 @@ void Test2(void)
 //+------------------------------------------------------------------+
 void Test3(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[3] Shorts");
     
-    eRequest.Requestor      = "Test[3] Shorts";
     eRequest.Memo           = "Test 3-Short Pend/Recur Test";
     
     order.SetRiskLimits(OP_BUY,80,80,2);
@@ -311,9 +308,8 @@ void Test3(void)
 //+------------------------------------------------------------------+
 void Test4(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[4] Dups");
     
-    eRequest.Requestor      = "Test[4] Dups";
     eRequest.Memo           = "Test 4-Lotsa Dups";
     
     order.SetRiskLimits(OP_BUY,80,80,2);
@@ -339,10 +335,7 @@ void Test4(void)
 //+------------------------------------------------------------------+
 void Test5(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[5] Margin";
-    
+    OrderRequest eRequest   = order.BlankRequest("Test[5] Margin");
     
     order.SetRiskLimits(OP_BUY,80,80,2);
     order.SetRiskLimits(OP_SELL,80,80,5);
@@ -381,10 +374,7 @@ void Test5(void)
 //+------------------------------------------------------------------+
 void Test6(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[6] Margin";
-    
+    OrderRequest eRequest   = order.BlankRequest("Test[6] Margin");
     
     order.SetRiskLimits(OP_BUY,80,80,2);
     order.SetRiskLimits(OP_SELL,80,15,5);
@@ -438,17 +428,16 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Test7(void)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest eRequest   = order.BlankRequest("Test[7] Splits");
     
-    eRequest.Requestor      = "Test[7] Splits";
     eRequest.Type           = OP_BUY;
     eRequest.Memo           = "Test 7-Split/Retain";
     
 //    order.DisableTrade(OP_BUY);
     order.SetRiskLimits(OP_BUY,10,80,2);
     order.SetRiskLimits(OP_SELL,15,80,2);
-    order.SetOrderMethod(OP_BUY,Split,NoUpdate);
-    order.SetOrderMethod(OP_SELL,Hold,NoUpdate);
+    order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
+    order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
   
     //--- Split/Retain Test
     if (Tick<4)
@@ -467,8 +456,8 @@ void Test7(void)
       {
         case 4:       order.SetStopLoss(OP_BUY,0.00,0,Hide);
                       order.SetTakeProfit(OP_BUY,0.00,0,Hide);
-                      order.SetDetailMethod(OP_BUY,Retain,2,ByTicket);
-                      order.SetDetailMethod(OP_BUY,Full,3,ByTicket);
+                      order.SetOrderMethod(OP_BUY,Retain,2,ByTicket);
+                      order.SetOrderMethod(OP_BUY,Full,3,ByTicket);
                       break;
         case 3900:    eRequest.Lots            = order.LotSize(OP_BUY)*4;
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
@@ -483,17 +472,27 @@ void Test7(void)
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
                       order.Submitted(eRequest);
                       break;
-        case 11461:   order.SetOrderMethod(OP_BUY,DCA);
+        case 11461:   order.SetDefaultMethod(OP_BUY,DCA);
                       break;
       }
     }
   }
+
+//+------------------------------------------------------------------+
+//| FOC Data Dump Analysis                                           |
+//+------------------------------------------------------------------+
+void Test8(void)
+  {
+    if (tick[NewTick])
+      Print(tick.TickStr(1)+"|"+tick.LineStr());
+  }
+
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 7
+    #define Test 8
     ++Tick;
 //    Comment("Tick: "+(string)++Tick);
     
@@ -512,6 +511,8 @@ void Execute(void)
       case 6:  Test6();
                break;
       case 7:  Test7();
+               break;
+      case 8:  Test8();
                break;
     }
     
@@ -552,10 +553,10 @@ void OnTick()
     if (IsEqual(tick.SMA().High.Event,NewBias))
     {
 //      Print(tick.SMAStr());
-      CallPause("New Bias: "+proper(ActionText(tick.SMA().High.Bias))+"\nState: "+
-                   proper(DirText(tick.SMA().High.Direction))+
-                   " "+EnumToString(tick.SMA().High.State)+
-                   "\n"+EnumToString(tick.SMA().High.Event));
+//      CallPause("New Bias: "+proper(ActionText(tick.SMA().High.Bias))+"\nState: "+
+//                   proper(DirText(tick.SMA().High.Direction))+
+//                   " "+EnumToString(tick.SMA().High.State)+
+//                   "\n"+EnumToString(tick.SMA().High.Event));
     }
 
 //    if (tick.Event(NewHigh,Nominal))
