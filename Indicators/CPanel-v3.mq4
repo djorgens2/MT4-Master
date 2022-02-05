@@ -133,7 +133,23 @@ void RefreshScreen(void)
   {
     const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
     double f[];
-    
+//    static int id            = 1;
+//    
+//    static bool top, bottom;
+//
+//    if (IsEqual(t.Linear().Open.Direction,DirectionUp))
+//      if (IsChanged(top,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
+//        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+//
+    //if (IsEqual(t.Linear().Open.Direction,DirectionDown))
+    //  if (IsChanged(bottom,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
+    //    NewArrow("FOCBias"+(string)id++,BoolToInt(bottom,SYMBOL_ARROWDOWN,SYMBOL_ARROWUP),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+        
+    //if (t[NewTick])
+    //  Print(t.TickStr(1)+"|"+t.SegmentStr(0));
+    //if (t[NewSegment])
+    //  Print(t.SegmentStr(1)+"|"+BoolToStr(IsEqual(t.Segment(1).Direction,Direction(t.Segment(1).Bias,InAction)),"---","BAD"));
+
     if (!IsEqual(inpShowFractal,NoShow))
     {
       if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
@@ -148,25 +164,24 @@ void RefreshScreen(void)
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
                   proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
-    UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().Direction))+" "+
-                  EnumToString(t.SMA().State)+" "+BoolToStr(IsEqual(t.SMA().Event,NoEvent),"",EventText[t.SMA().Event]),
-                  Color(t.SMA().Direction),12);
+    UpdateLabel("tmaSMAState"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Event,NoEvent),
+                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),Color(t.SMA().Direction),12);
     UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
-    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
-                  EnumToString(t.SMA().High.State)+" "+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"",EventText[t.SMA().High.Event]),
+    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),
+                  proper(DirText(t.SMA().High.Direction))+" "+EnumToString(t.SMA().High.State),EventText[t.SMA().High.Event]),
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
     UpdateDirection("tmaSMABiasHi"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),18);
-    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,proper(DirText(t.SMA().Low.Direction))+" "+
-                  EnumToString(t.SMA().Low.State)+" "+BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),"",EventText[t.SMA().Low.Event]),
+    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),
+                  proper(DirText(t.SMA().Low.Direction))+" "+EnumToString(t.SMA().Low.State),EventText[t.SMA().Low.Event]),
                   BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().Low.Bias,InAction))),12);
     UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
-    UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,DoubleToStr(t.Line().Open.Now,Digits)+" "+DoubleToStr(t.Line().Open.Max,Digits)+" "+
-                   DoubleToStr(t.Line().Open.Min,Digits),Color(t.Line().Open.Direction),12);
-    UpdateDirection("tmaLinearBiasOpen"+(string)IndWinId,Direction(t.Line().Open.Bias,InAction),Color(Direction(t.Line().Open.Bias,InAction)),18);
-    UpdateLabel("tmaLinearStateClose"+(string)IndWinId,DoubleToStr(t.Line().Close.Now,Digits)+" "+DoubleToStr(t.Line().Close.Max,Digits)+" "+
-                   DoubleToStr(t.Line().Close.Min,Digits),Color(t.Line().Close.Direction),12);
-    UpdateDirection("tmaLinearBiasClose"+(string)IndWinId,Direction(t.Line().Close.Bias,InAction),Color(Direction(t.Line().Close.Bias,InAction)),18);
-    UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Line().Bias,InAction),Color(Direction(t.Line().Bias,InAction)),24);
+    UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,NegLPad(t.Linear().Open.Now,Digits)+" "+NegLPad(t.Linear().Open.Max,Digits)+" "+
+                   NegLPad(t.Linear().Open.Min,Digits),Color(t.Linear().Open.Direction),12);
+    UpdateDirection("tmaLinearBiasOpen"+(string)IndWinId,Direction(t.Linear().Open.Bias,InAction),Color(Direction(t.Linear().Open.Bias,InAction)),18);
+    UpdateLabel("tmaLinearStateClose"+(string)IndWinId,NegLPad(t.Linear().Close.Now,Digits)+" "+NegLPad(t.Linear().Close.Max,Digits)+" "+
+                   NegLPad(t.Linear().Close.Min,Digits),Color(t.Linear().Close.Direction),12);
+    UpdateDirection("tmaLinearBiasClose"+(string)IndWinId,Direction(t.Linear().Close.Bias,InAction),Color(Direction(t.Linear().Close.Bias,InAction)),18);
+    UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),24);
     
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
@@ -197,10 +212,28 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    t.Update();
+    static ReservedWords bound      = Default;
     
+    t.Update();
+
+    if (t[NewTick])
+      if (t.Segment(0).Price.Count>1)
+    {
+      if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Max))
+      {
+        if (IsChanged(bound,Max))
+          Flag("Max",clrYellow);
+      }
+      else
+      if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Now))
+        if (IsChanged(bound,Min))
+          Flag("Min",clrRed);
+
+//      Pause("NewTick","NewTick()");
+    }
+
     SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
-    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
+    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open.Price);
@@ -210,8 +243,8 @@ void UpdateTickMA(void)
 
     ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
     ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
-    ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
-    ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
+    ResetBuffer(plLineOpenBuffer,t.Linear().Open.Price);
+    ResetBuffer(plLineCloseBuffer,t.Linear().Close.Price);
   }
 
 //+------------------------------------------------------------------+
@@ -530,12 +563,13 @@ int OnInit()
     NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
-//    NewLabel("tmaPolyState"+(string)IndWinId,"",5,74,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearStateOpen"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBiasOpen"+(string)IndWinId,"",5,88,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearStateClose"+(string)IndWinId,"",32,110,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBiasClose"+(string)IndWinId,"",5,106,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBiasNet"+(string)IndWinId,"",210,96,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaPolyState"+(string)IndWinId,"",32,128,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaPolyBias"+(string)IndWinId,"",5,124,clrDarkGray,SCREEN_UR,IndWinId);
 
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);

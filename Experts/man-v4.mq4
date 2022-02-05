@@ -9,7 +9,6 @@
 
 #define Hide       true
 #define NoHide     false
-#define NoQueue    false
 
 #include <Class/Order.mqh>
 #include <Class/TickMA.mqh>
@@ -36,7 +35,7 @@ input int           inpDefaultTarget   = 50;          // Default Take Profit (pi
 input double        inpZoneStep        = 2.5;         // Zone Step (pips)
 input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin 
 
-CTickMA       *tick                    = new CTickMA(inpPeriods,inpDegree,inpAgg);
+CTickMA       *t                       = new CTickMA(inpPeriods,inpDegree,inpAgg);
 COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong,inpMethodShort);
 
 bool           PauseOn                 = true;
@@ -56,10 +55,10 @@ void RefreshScreen(void)
     
     if (!IsEqual(inpShowFractal,PriceTypes))
     {
-      if (inpShowFractal==ptOpen)   ArrayCopy(f,tick.SMA().Open.Point);
-      if (inpShowFractal==ptHigh)   ArrayCopy(f,tick.SMA().High.Point);
-      if (inpShowFractal==ptLow)    ArrayCopy(f,tick.SMA().Low.Point);
-      if (inpShowFractal==ptClose)  ArrayCopy(f,tick.SMA().Close.Point);
+      if (inpShowFractal==ptOpen)   ArrayCopy(f,t.SMA().Open.Point);
+      if (inpShowFractal==ptHigh)   ArrayCopy(f,t.SMA().High.Point);
+      if (inpShowFractal==ptLow)    ArrayCopy(f,t.SMA().Low.Point);
+      if (inpShowFractal==ptClose)  ArrayCopy(f,t.SMA().Close.Point);
 
       for (FractalPoint fp=0;fp<FractalPoints;fp++)
         UpdateLine("tmaSMAFractal:"+StringSubstr(EnumToString(fp),2),f[fp],STYLE_SOLID,linecolor[fp]);
@@ -67,15 +66,15 @@ void RefreshScreen(void)
     
     UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
     
-    if (tick.ActiveEvent())
+    if (t.ActiveEvent())
     {
       string text = "";
 
       for (EventType event=1;event<EventTypes;event++)
-        if (tick[event])
+        if (t[event])
         {
           Append(text,EventText[event],"\n");
-          Append(text,EnumToString(tick.AlertLevel(event)));
+          Append(text,EnumToString(t.AlertLevel(event)));
         }
       Comment(text);
     }
@@ -418,46 +417,85 @@ void Test7(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateTick - Calculates position, trajectory, velocity on a tick |
+//+------------------------------------------------------------------+`
+void UpdateTick(void)
+  {
+    t.Update();
+
+    
+  }
+
+//+------------------------------------------------------------------+
 //| ManageLong - Manages the Long Order Processing                   |
 //+------------------------------------------------------------------+`
 void ManageLong(void)
   {
     static bool trigger    = false;
 
-    FractalRec   exit      = tick.SMA().High;
-    FractalRec   entry     = tick.SMA().Low;
+    FractalRec   exit      = t.SMA().High;
+    FractalRec   entry     = t.SMA().Low;
 
-    OrderRequest request   = order.BlankRequest("Long Auto Manager");
+    OrderRequest request   = order.BlankRequest("[Auto] Long");
 
     order.SetRiskLimits(OP_BUY,10,80,2);
     order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
 
-    switch (tick.SMA().State)
-    {
-      case Consolidation:  switch (tick.SMA().Direction)
-                           {
-                             case DirectionUp:   //if (IsChanged(trigger,true))
-                                                 //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
-                                                   break;
-                             case DirectionDown: if (IsChanged(trigger,true))
-                                                 {
-                                                   request.Type           = OP_BUYLIMIT;
-                                                   request.Memo           = "In-Trend Consolidation";
- 
-                                                   request.Price          = Close[0];
-                                                   request.Lots           = 0.00;
-                                                   request.Expiry         = TimeCurrent()+(Period()*(60*2));
+    if (IsEqual(t.Linear().Bias,OP_BUY))
+      switch (t.SMA().State)
+      {
+        case Consolidation:  
+               switch (t.SMA().Direction)
+               {
+                 case DirectionUp:   //if (IsChanged(trigger,true))
+                                     //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+                                     break;
 
-                                                   if (order.Submitted(request))
-                                                   {};
-                                                 }
-                                                 break;
-                           }
-                           break;
-      default:             trigger   = false;
-    }
-    
+                 case DirectionDown: if (IsChanged(trigger,true))
+                                     {
+                                       request.Type           = OP_BUYLIMIT;
+                                       request.Memo           = "In-Trend Consolidation";
+ 
+                                       request.Price          = Bid;
+                                       request.Lots           = 0.00;
+                                       request.Expiry         = TimeCurrent()+(Period()*(60*2));
+                                       
+//                                       request.Pend.Step      = 2.0;
+//                                       request.Pend.Type      = OP_BUYSTOP;
+
+                                       if (!order.Submitted(request))
+                                         CallPause(order.RequestStr(request));
+                                     }
+                                     break;
+               }
+               break;
+
+        default:  trigger   = false;
+      }
+
     order.ExecuteOrders(OP_BUY);
+
+//    static int id            = 1;    
+//    static bool top, bottom;
+//
+//    if (IsEqual(t.Linear().Open.Direction,DirectionUp))
+//      if (IsChanged(top,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
+//        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),BoolToInt(top,clrYellow,clrRed));
+////        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+//
+//    static bool pending   = false;
+//    static bool fulfilled = false;
+//
+//    if (order.Pending(OP_BUYLIMIT))   pending   = true;
+//    if (order.Fulfilled(OP_BUYLIMIT)) fulfilled = true;
+//
+//    if (t[NewTick])
+//    {
+//      Print(t.TickStr(1)+"|"+t.SegmentStr(0)+"|"+BoolToStr(pending,"Pend")+"|"+BoolToStr(fulfilled,"Open"));
+//
+//      pending      = false;
+//      fulfilled    = false;
+//    }
   }
 
 //+------------------------------------------------------------------+
@@ -465,17 +503,17 @@ void ManageLong(void)
 //+------------------------------------------------------------------+`
 void ManageShort(void)
   {
-    FractalRec exit        = tick.SMA().High;
-    FractalRec entry       = tick.SMA().Low;
+    FractalRec exit        = t.SMA().High;
+    FractalRec entry       = t.SMA().Low;
 
     static bool trigger    = false;
     
     order.SetRiskLimits(OP_SELL,15,80,2);
     order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
 
-    switch (tick.SMA().State)
+    switch (t.SMA().State)
     {
-      case Consolidation:  switch (tick.SMA().Direction)
+      case Consolidation:  switch (t.SMA().Direction)
                            {
                              case DirectionUp:   if (IsChanged(trigger,true));
 
@@ -496,12 +534,13 @@ void ManageShort(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-//    if (tick[NewTick]) Print(tick.TickStr(1)+"|"+tick.SegmentStr(1)+"|"+tick.SMAStr(2));
+//    if (t[NewTick]) Print(t.TickStr(1)+"|"+t.SegmentStr(1)+"|"+t.SMAStr(2));
 
     ManageLong();
+    ManageShort();
     
     order.ExecuteRequests();
-//    if (tick[NewParabolic])
+//    if (t[NewParabolic])
 //      CallPause("New Parabolic");
   }
 
@@ -510,9 +549,10 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void OnTick()
   {
-    tick.Update();
+    UpdateTick();
+
     order.Update();
-    
+
     Execute();
     
     RefreshScreen();
@@ -548,6 +588,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete tick;
+    delete t;
     delete order;
   }

@@ -9,7 +9,7 @@
 #property strict
 
 #include <Class\Order.mqh>
-#include <Class\PipMA.mqh>
+#include <Class\TickMA.mqh>
 
   //--- User Config
   input string        OrderConfig        = "";     //+------ Order Config ------+
@@ -24,29 +24,24 @@
   input int           inpDefaultStop     = 50;     // Default Stop Loss (pips)
   input int           inpDefaultTarget   = 50;     // Default Take Profit (pips)
 
-  input string        PipMAConfig        = "";     //+------ PipMA Config ------+
-  input int           inpHistRetention   = 80;     // History Retention
-  input int           inpLinearRegr      = 9;      // Linear Regression Periods
-  input int           intPolyRegr        = 6;      // Polynomial Regression Degree
-  input int           inpSMA             = 2;      // SMA Factor
+  input string        PipMAConfig        = "";     //+------ TickMA Config ------+
+  input int           inpRetention       = 80;     // History Retention
+  input int           intDegree          = 6;      // Polynomial Regression Degree
   input double        inpTickAgg         = 2.5;    // Tick Aggregation Range
 
   //-- Structure Defs
 
   //--- Class Defs
-  CPipMA         *pma                = new CPipMA(inpHistRetention,inpLinearRegr,intPolyRegr,inpSMA,inpTickAgg);
+  CTickMA        *t                  = new CTickMA(inpRetention,intDegree,inpTickAgg);
   COrder         *order              = new COrder(Discount,Hold,Hold);
-  
-  //--- Data Collections
-  AccountMetrics  am;
  
 //+------------------------------------------------------------------+
 //| GetData                                                          |
 //+------------------------------------------------------------------+
 void GetData(void)
   {
-    pma.Update();
-    order.Update(am);
+    t.Update();
+    order.Update();
   }
 
 //+------------------------------------------------------------------+
@@ -63,36 +58,25 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 void ManageLong(void)
   {
-    
-  }
-
-//+------------------------------------------------------------------+
-//| ManageShort - Verifies position integrity, adjusts, closures     |
-//+------------------------------------------------------------------+
-void ManageShort(void)
-  {
     static OrderRequest request;
-    
-    if (IsEqual(pma.Master().Bias,OP_SELL))
-      if (pma[NewBias])
-      {
-        request                = order.BlankRequest();
-        request.Requestor      = "Shorts Manager";
-        request.Memo           = "[Seg:"+(string)pma[0].Segment+"]";
 
-        request.Type           = OP_SELL;
-        request.Price          = pma.Master().High;
+    if (IsEqual(t.Linear().Bias,OP_BUY))
+      if (t[NewBias])
+      {
+        request                = order.BlankRequest("[Auto] Long");
+        request.Memo           = "[Seg:"+(string)t.Count(Segments)+"]";
+
+        request.Type           = OP_BUY;
+        request.Price          = t.Linear().Open.Price[0];
         request.TakeProfit     = 0.00;
-        request.Price          = 0.00;
-        
-        Print(order.RequestStr(request));
+        request.StopLoss       = 0.00;
       }
     
-    order.SetRiskLimits(OP_SELL,80,60,2.5);
+    order.SetRiskLimits(OP_BUY,80,60,2.5);
       
     //--- Queue Order Test
-    if (IsEqual(request.Type,OP_SELL))
-      if (IsEqual(pma.Master().Bias,pma.Tick().Bias))
+    if (IsEqual(request.Type,OP_BUY))
+      if (IsEqual(t.Linear().Bias,t.Segment(0).Bias))
         if (IsHigher(Bid,request.Price))
         {
           request.Pend.Type       = OP_NO_ACTION;
@@ -102,19 +86,51 @@ void ManageShort(void)
           request.Expiry          = TimeCurrent()+(Period()*(60*12));
      
           if (order.Submitted(request))
-          {
             request.Type          = OP_NO_ACTION;
+          else order.PrintLog();
+        }
+    
+    order.ExecuteOrders(OP_BUY);
+  }
 
-            //Print(order.QueueStr());
-            //Print(pma.OHLCStr(0));
-          }
+//+------------------------------------------------------------------+
+//| ManageShort - Verifies position integrity, adjusts, closures     |
+//+------------------------------------------------------------------+
+void ManageShort(void)
+  {
+    static OrderRequest request;
+    
+    if (IsEqual(t.Linear().Bias,OP_SELL))
+      if (t[NewBias])
+      {
+        request                = order.BlankRequest("[Auto] Short");
+        request.Memo           = "[Seg:"+(string)t.Count(Segments)+"]";
+
+        request.Type           = OP_SELL;
+        request.Price          = t.Linear().Open.Price[0];
+        request.TakeProfit     = 0.00;
+        request.StopLoss       = 0.00;
+      }
+    
+    order.SetRiskLimits(OP_SELL,80,60,2.5);
+      
+    //--- Queue Order Test
+    if (IsEqual(request.Type,OP_SELL))
+      if (IsEqual(t.Linear().Bias,t.Segment(0).Bias))
+        if (IsHigher(Bid,request.Price))
+        {
+          request.Pend.Type       = OP_NO_ACTION;
+          request.Pend.Step       = 2;
+          request.Pend.Limit      = Bid-point(inpDefaultTarget);
+          request.Pend.Cancel     = Bid+point(10);
+          request.Expiry          = TimeCurrent()+(Period()*(60*12));
+     
+          if (order.Submitted(request))
+            request.Type          = OP_NO_ACTION;
           else order.PrintLog();
         }
 
-    string text   = "";
-    for (int id=0;id<order.PL(OP_SELL,Profit).Count;id++)
-      Append(text,"["+(string)order.PL(OP_SELL,Profit).Ticket[id]+"]");
-    if (text!="") Print("\n\n"+text);
+    order.ExecuteOrders(OP_SELL);
   }
 
 //+------------------------------------------------------------------+
@@ -122,11 +138,10 @@ void ManageShort(void)
 //+------------------------------------------------------------------+
 void UpdateOrders(void)
   {
-    int Tickets[];
-    
+    ManageLong();
     ManageShort();
       
-    order.Execute(Tickets,true);
+    order.ExecuteRequests();
   }
 
 //+------------------------------------------------------------------+
@@ -204,6 +219,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete pma;
+    delete t;
     delete order;
   }

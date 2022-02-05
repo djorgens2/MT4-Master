@@ -484,7 +484,7 @@ void Test7(void)
 void Test8(void)
   {
     if (tick[NewTick])
-      Print(tick.TickStr(1)+"|"+tick.LineStr());
+      Print(tick.TickStr(1)+"|"+tick.LinearStr());
   }
 
 //+------------------------------------------------------------------+

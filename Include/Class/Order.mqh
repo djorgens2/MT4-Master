@@ -307,7 +307,7 @@ public:
           OrderDetail  Ticket(int Action, ReservedWords Measure)             {if (IsEqual(Measure,Min)) 
                                                                                 return(Ticket(Master[Action].TicketMin)); 
                                                                                 return(Ticket(Master[Action].TicketMax));};
-//          OrderSummary Zone(int Action, int Node) {return (Master[Action].Zone[Node]);};
+
           OrderSummary PL(int Action, MeasureType Measure) {return(Master[Action].Summary[Measure]);};
 
           void         GetZone(int Action, int Zone, OrderSummary &Node);
@@ -818,10 +818,10 @@ void COrder::UpdateSummary(void)
         Master[action].Summary[measure].Margin     = Margin(action,Master[action].Summary[measure].Lots,InPercent);
       }
 
-      for (int index=0;index<ArraySize(Master[action].Zone);index++)
+      for (int node=0;node<ArraySize(Master[action].Zone);node++)
       {
-        Master[action].Zone[index].Equity          = Equity(Master[action].Zone[index].Value,InPercent);
-        Master[action].Zone[index].Margin          = fdiv(Master[action].Zone[index].Lots,Master[action].Summary[Net].Lots)*Master[action].Summary[Net].Margin;
+        Master[action].Zone[node].Equity           = Equity(Master[action].Zone[node].Value,InPercent);
+        Master[action].Zone[node].Margin           = fdiv(Master[action].Zone[node].Lots,Master[action].Summary[Net].Lots)*Master[action].Summary[Net].Margin;
       }
     }
 
@@ -1121,22 +1121,19 @@ void COrder::MergeSplit(OrderDetail &Order)
         //-- Add New split Order
         ArrayResize(Master[Order.Action].Order,detail+1,1000);
 
-        if (OrderLots()<=fdiv(LotSize(Order.Action),2))
-          Master[Order.Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Order.Method,Split),Full,Hold);
-        else
-          Master[Order.Action].Order[detail].Method     = Order.Method;
-         
-        Master[Order.Action].Order[detail].Status       = Fulfilled;
-        Master[Order.Action].Order[detail].Ticket       = OrderTicket();
-        Master[Order.Action].Order[detail].Key          = NoValue;
-        Master[Order.Action].Order[detail].Action       = Order.Action;
-        Master[Order.Action].Order[detail].Price        = OrderOpenPrice();
-        Master[Order.Action].Order[detail].Lots         = OrderLots();
-        Master[Order.Action].Order[detail].Profit       = OrderProfit();
-        Master[Order.Action].Order[detail].Swap         = OrderSwap();
-        Master[Order.Action].Order[detail].TakeProfit   = OrderTakeProfit();
-        Master[Order.Action].Order[detail].StopLoss     = OrderStopLoss();
-        Master[Order.Action].Order[detail].Memo         = OrderComment();
+        Master[Order.Action].Order[detail].Method     = (OrderMethod)BoolToInt(OrderLots()<LotSize(Order.Action),
+                                                                     BoolToInt(IsEqual(Order.Method,Split),Full,Hold),Order.Method);
+        Master[Order.Action].Order[detail].Status     = Fulfilled;
+        Master[Order.Action].Order[detail].Ticket     = OrderTicket();
+        Master[Order.Action].Order[detail].Key        = NoValue;
+        Master[Order.Action].Order[detail].Action     = Order.Action;
+        Master[Order.Action].Order[detail].Price      = OrderOpenPrice();
+        Master[Order.Action].Order[detail].Lots       = OrderLots();
+        Master[Order.Action].Order[detail].Profit     = OrderProfit();
+        Master[Order.Action].Order[detail].Swap       = OrderSwap();
+        Master[Order.Action].Order[detail].TakeProfit = OrderTakeProfit();
+        Master[Order.Action].Order[detail].StopLoss   = OrderStopLoss();
+        Master[Order.Action].Order[detail].Memo       = OrderComment();
 
         AppendLog(NoValue,OrderTicket(),"[Split["+(string)Order.Ticket+"]:"+(string)OrderTicket());
       }
@@ -1155,45 +1152,43 @@ bool COrder::OrderApproved(OrderRequest &Request)
     {
       switch (Request.Status)
       {
-        case Pending:   if (IsLower(Margin(Request.Action,Snapshot[Pending].Type[Request.Action].Lots+
+        case Pending:   Request.Status     = Declined;
+
+                        if (IsLower(Margin(Request.Action,Snapshot[Pending].Type[Request.Action].Lots+
                                       LotSize(Request.Action,Request.Lots),InPercent)-MarginTolerance,
                                       Master[Request.Action].MaxMargin,NoUpdate))
                           return (IsChanged(Request.Status,Approved));
 
-                        Request.Status    = Declined;
-                        Request.Memo      = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
-                                               DoubleToStr(Margin(Request.Action,Snapshot[Pending].Type[Request.Action].Lots+
-                                               LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
+                        Request.Memo       = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
+                                                DoubleToStr(Margin(Request.Action,Snapshot[Pending].Type[Request.Action].Lots+
+                                                LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
                         break;
 
-        case Immediate: Request.Status    = Declined;
+        case Immediate: Request.Status     = Declined;
         
                         if (IsLower(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
                                       LotSize(Request.Action,Request.Lots),InPercent)-MarginTolerance,
                                       Master[Request.Action].MaxMargin,NoUpdate))
-                          if (IsEqual(Master[Request.Action].Summary[Net].Count,0))
-                            return (IsChanged(Request.Status,Approved));
-                          else
-                          {
+                        {
                           GetZone(Request.Action,Zone(Request.Action,BoolToDouble(IsEqual(Request.Action,OP_BUY),Ask,Bid,Digits)),zone);
-                          Print(zone.Zone);
+
                           if (IsLower(zone.Margin,Master[Request.Action].MaxZoneMargin,NoUpdate))
                             return (IsChanged(Request.Status,Approved));
-                          else
-                            Request.Memo  = "Margin Zone limit "+DoubleToStr(Master[Request.Action].MaxZoneMargin,1)+"% exceeded ["+
-                                               DoubleToStr(zone.Margin,1)+"%]";
-                          }
+
+                          Request.Memo     = "Margin Zone limit "+DoubleToStr(Master[Request.Action].MaxZoneMargin,1)+"% exceeded ["+
+                                                DoubleToStr(zone.Margin,1)+"%]";
+                        }
                         else
-                          Request.Memo    = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
-                                               DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
-                                               LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
+                          Request.Memo     = "Margin limit "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+
+                                                DoubleToStr(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
+                                                LotSize(Request.Action,Request.Lots),InPercent),1)+"%]";
                         break;
 
-        default:        Request.Status    = Rejected;
-                        Request.Memo      = "Request not pending ["+EnumToString(Request.Status)+"]";
+        default:        Request.Status     = Rejected;
+                        Request.Memo       = "Request not pending ["+EnumToString(Request.Status)+"]";
       }
     }
-    else Request.Status                   = Rejected;
+    else Request.Status                    = Rejected;
 
     AppendLog(Request.Key,NoValue,"[Approval]"+Request.Memo);
 
@@ -1581,6 +1576,7 @@ void COrder::ExecuteOrders(int Action)
     ProcessProfits(Action);
     ProcessLosses(Action);
 
+    //-- Order close processed
     if (Processed(Action))
       Update();
   }
