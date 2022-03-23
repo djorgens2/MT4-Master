@@ -127,28 +127,23 @@ double         plSMALow[1];
 CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
 
 //+------------------------------------------------------------------+
+//| CallPause                                                        |
+//+------------------------------------------------------------------+
+void CallPause(string Message, bool Pause)
+  {
+    if (Pause)
+      Pause(Message,AccountCompany()+" Event Trapper");
+    else
+      Print(Message);
+  }
+
+//+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
     const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
     double f[];
-//    static int id            = 1;
-//    
-//    static bool top, bottom;
-//
-//    if (IsEqual(t.Linear().Open.Direction,DirectionUp))
-//      if (IsChanged(top,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
-//        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
-//
-    //if (IsEqual(t.Linear().Open.Direction,DirectionDown))
-    //  if (IsChanged(bottom,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
-    //    NewArrow("FOCBias"+(string)id++,BoolToInt(bottom,SYMBOL_ARROWDOWN,SYMBOL_ARROWUP),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
-        
-    //if (t[NewTick])
-    //  Print(t.TickStr(1)+"|"+t.SegmentStr(0));
-    //if (t[NewSegment])
-    //  Print(t.SegmentStr(1)+"|"+BoolToStr(IsEqual(t.Segment(1).Direction,Direction(t.Segment(1).Bias,InAction)),"---","BAD"));
 
     if (!IsEqual(inpShowFractal,NoShow))
     {
@@ -168,11 +163,11 @@ void RefreshScreen(void)
                   proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),Color(t.SMA().Direction),12);
     UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
     UpdateLabel("tmaSMAStateHi"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),
-                  proper(DirText(t.SMA().High.Direction))+" "+EnumToString(t.SMA().High.State),EventText[t.SMA().High.Event]),
+                  proper(DirText(t.SMA().High.Direction))+" "+EnumToString(t.SMA().High.State),EventText[t.SMA().High.Event])+" ["+NegLPad(t.Momentum(t.SMA().High),Digits)+"]",
                   BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
     UpdateDirection("tmaSMABiasHi"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),18);
     UpdateLabel("tmaSMAStateLo"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),
-                  proper(DirText(t.SMA().Low.Direction))+" "+EnumToString(t.SMA().Low.State),EventText[t.SMA().Low.Event]),
+                  proper(DirText(t.SMA().Low.Direction))+" "+EnumToString(t.SMA().Low.State),EventText[t.SMA().Low.Event])+" ["+NegLPad(t.Momentum(t.SMA().Low),Digits)+"]",
                   BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().Low.Bias,InAction))),12);
     UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
     UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,NegLPad(t.Linear().Open.Now,Digits)+" "+NegLPad(t.Linear().Open.Max,Digits)+" "+
@@ -212,25 +207,43 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static ReservedWords bound      = Default;
+    static ReservedWords bound   = Default;
+    static int           bias    = OP_NO_ACTION;
+    static int  lastSegCount     = 0;
     
     t.Update();
-
-    if (t[NewTick])
-      if (t.Segment(0).Price.Count>1)
+    
+    if (IsChanged(lastSegCount,t.Segment(0).Price.Count))
     {
-      if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Max))
-      {
-        if (IsChanged(bound,Max))
-          Flag("Max",clrYellow);
-      }
-      else
-      if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Now))
-        if (IsChanged(bound,Min))
-          Flag("Min",clrRed);
-
-//      Pause("NewTick","NewTick()");
+      //Flag("SegChg",Color(t.Segment(0).Direction,IN_CHART_DIR));
+      //CallPause("Segment Change["+(string)t.Segment(0).Price.Count+"]: "+proper(ActionText(Action(t.Segment(0).Direction,InDirection))),Always);
     }
+
+//    if (NewAction(bias,(int)t.Linear().Close.Bias))
+//      Flag("Bias",Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
+    //if (NewAction(bias,(int)t.Linear().Open.Bias))
+    //{
+    //  Flag("Bias",Color(Direction(t.Linear().Open.Bias,InAction),IN_CHART_DIR));
+    //  CallPause("Open Bias Change: "+proper(ActionText(t.Linear().Open.Bias)),Always);
+    //}
+    
+    //if (t[NewTick])
+    //  if (t.Event(NewBias,Critical))
+    //    Flag("Bias",Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+//    if (t[NewTick])
+//      if (t.Segment(0).Price.Count>1)
+//        if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Max))
+//        {
+//          if (IsChanged(bound,Max))
+//            Flag("Max",Color(t.Linear().Open.Direction,IN_CHART_DIR));
+//        }
+//        else
+//        if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Now))
+//          if (IsChanged(bound,Min))
+//            Flag("Min",Color(t.Linear().Open.Direction*DirectionInverse,IN_CHART_DIR));
+//
+    //if (t[NewTick])
+    //  CallPause("NewTick\n"+t.TickHistoryStr(2),t[NewTick]);
 
     SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));

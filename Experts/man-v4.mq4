@@ -12,6 +12,7 @@
 
 #include <Class/Order.mqh>
 #include <Class/TickMA.mqh>
+#include <Class/Session.mqh>
 
 //--- input parameters
 input string        regrHeader         = "";          // +--- Regression Config ---+
@@ -22,8 +23,8 @@ input PriceType     inpShowFractal     = PriceTypes;  // Show Fractal
 
 input string        ordHeader          = "";          // +----- Order Options -----+
 input BrokerModel   inpBrokerModel     = Discount;    // Brokerage Leverage Model
-input OrderMethod   inpMethodLong      = Hold;        // Buy Method        
-input OrderMethod   inpMethodShort     = Hold;        // Sell Method        
+input OrderMethod   inpMethodLong      = Hold;        // Buy Method
+input OrderMethod   inpMethodShort     = Hold;        // Sell Method
 input double        inpMinTarget       = 5.0;         // Equity% Target
 input double        inpMinProfit       = 0.8;         // Minimum take profit%
 input double        inpMaxRisk         = 5.0;         // Maximum Risk%
@@ -33,15 +34,24 @@ input double        inpLotSize         = 0.00;        // Lot size override
 input int           inpDefaultStop     = 50;          // Default Stop Loss (pips)
 input int           inpDefaultTarget   = 50;          // Default Take Profit (pips)
 input double        inpZoneStep        = 2.5;         // Zone Step (pips)
-input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin 
+input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin
+
+//--- Operational Inputs
+input int            inpAsiaOpen     = 1;            // Asia Session Opening Hour
+input int            inpAsiaClose    = 10;           // Asia Session Closing Hour
+input int            inpEuropeOpen   = 8;            // Europe Session Opening Hour
+input int            inpEuropeClose  = 18;           // Europe Session Closing Hour
+input int            inpUSOpen       = 14;           // US Session Opening Hour
+input int            inpUSClose      = 23;           // US Session Closing Hour
+input int            inpGMTOffset    = 0;            // Offset from GMT+3
 
 CTickMA       *t                       = new CTickMA(inpPeriods,inpDegree,inpAgg);
+CSession      *s[SessionTypes];
 COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong,inpMethodShort);
 
 bool           PauseOn                 = true;
 int            Tick                    = 0;
 
-int            Tickets[];
 OrderSummary   NodeNow[2];
 int            IndexNow[2];
 
@@ -83,347 +93,52 @@ void RefreshScreen(void)
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
 //+------------------------------------------------------------------+
-void CallPause(string Message)
+void CallPause(string Message, bool Pause)
   {
-    if (PauseOn)
+    if (Pause)
       Pause(Message,AccountCompany()+" Event Trapper");
     else
       Print(Message);
   }
 
 //+------------------------------------------------------------------+
-//| Stop/TP Test                                                     |
+//| UpdateSession - Updates Session Fractal Data                     |
 //+------------------------------------------------------------------+
-void Test1(void)
-  {    
-    OrderRequest eRequest   = order.BlankRequest("Test[1] Market");
-    
-    eRequest.Type           = OP_BUY;
-    eRequest.Memo           = "Test 1-General Functionality";
-    
-//    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,80,80,2);
-  
-    //--- Stop/Limit Test
-    if (OrdersTotal()<3)
-    {
-      eRequest.Lots            = order.LotSize(OP_BUY);
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-     
-      order.Submitted(eRequest);
-    }
-    else
-    {
-      eRequest.Memo            = "Test-Tick["+(string)Tick+"]";
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-
-      switch(Tick)
-      {
-        case 4:  order.SetStopLoss(OP_BUY,0.00,20,NoHide);
-                 order.SetTakeProfit(OP_BUY,0.00,20,NoHide);
-                 order.SetDefaultMethod(OP_BUY,Full);
-                 break;
-        case 5:  order.SetStopLoss(OP_BUY,17.40,0,NoHide);
-                 order.SetTakeProfit(OP_BUY,18.75,30,NoHide);
-                 order.SetOrderMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
-                 break;
-        case 6:  order.SetStopLoss(OP_BUY,17.8,70,NoHide);
-                 order.SetTakeProfit(OP_BUY,18.20,70,NoHide);
-                 order.Submitted(eRequest);
-                 order.SetOrderMethod(OP_BUY,Hold,0,ByZone);
-                 break;
-        case 7:  order.SetStopLoss(OP_BUY,0.00,0,NoHide);
-                 order.SetTakeProfit(OP_BUY,0.00,0,NoHide);
-                 eRequest.TakeProfit   = 18.16;
-                 order.Submitted(eRequest);
-                 break;
-        case 8:  order.SetStopLoss(OP_BUY,0.00,20,NoHide,false);
-                 order.SetTakeProfit(OP_BUY,0.00,0,Hide);
-                 order.Submitted(eRequest);
-                 break;
-        case 9:  order.SetStopLoss(OP_BUY,17.2,0,Hide);
-                 order.SetTakeProfit(OP_BUY,18.20,0,Hide);
-                 break;
-        case 10: order.SetStopLoss(OP_BUY,17.2,0,Hide);
-                 order.SetTakeProfit(OP_BUY,18.11,0,Hide);
-                 break;
-        case 11: order.SetRiskLimits(OP_SELL,80,80,4);
-                 order.SetStopLoss(OP_SELL,0.00,30,NoHide);
-                 order.SetTakeProfit(OP_SELL,0.00,30,NoHide);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 12: order.SetStopLoss(OP_SELL,18.40,0,NoHide);
-                 order.SetTakeProfit(OP_SELL,17.50,0,NoHide);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 13: order.SetStopLoss(OP_SELL,18.40,20,NoHide);
-                 order.SetTakeProfit(OP_SELL,0.00,20,NoHide);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 14: order.SetStopLoss(OP_SELL,0.00,50,Hide);
-                 order.SetTakeProfit(OP_SELL,0.00,30,NoHide);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-      }
-      Print("Break");
-      for (int ord=0;ord<order[OP_BUY].Count;ord++)
-        Print(order.OrderDetailStr(order.Ticket(order[OP_BUY].Ticket[ord])));
-    }
-    
-//    if (Tick>8)
-//     Print(order.QueueStr());
-  }
-
-//+------------------------------------------------------------------+
-//| Long Queue Orders (Limit/Stop) + Zone Summary tests              |
-//+------------------------------------------------------------------+
-void Test2(void)
+void UpdateSession(void)
   {
-    int req                 = 0;
-    OrderRequest eRequest   = order.BlankRequest("Test[2] Resub");
-    
-    eRequest.Memo           = "Test 2-Pend/Recur Test";
-    
-    static bool fill   = false;
-
-    order.SetRiskLimits(OP_BUY,80,80,2);
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      s[type].Update();
       
-    //--- Queue Order Test
-      if (!fill) 
-      {
-        eRequest.Pend.Type       = OP_BUYSTOP;
-        eRequest.Pend.Limit      = 17.970;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 18.112;
-
-        eRequest.Type            = OP_BUYLIMIT;
-        eRequest.Price           = 17.994;
-        eRequest.TakeProfit      = 18.12;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    
-//        Print(order.RequestStr(eRequest));
-        if (order.Submitted(eRequest))
-//          Print(order.RequestStr(eRequest));
-          fill=true;
-          
-        eRequest.Pend.Type       = OP_SELLSTOP;
-        eRequest.Pend.Limit      = 18.160;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 17.765;
-
-        eRequest.Type            = OP_SELLLIMIT;
-        eRequest.Price           = 18.116;
-        eRequest.TakeProfit      = 17.765;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-
-        if (order.Submitted(eRequest))
-//          Print(order.RequestStr(eRequest));
-          fill=true;
-      }
-
-      if (Tick==1260)
-        order.SetStopLoss(OP_BUY,0.00,25,false);
-      if (Tick==1300)
-        order.SetStopLoss(OP_BUY,0.00,50,false,false);
-//      if (order[OP_BUY].Count>0)
-//        Print(order.ZoneSummaryStr());
-//
-
-      if (order.Fulfilled())
-      {
-//        Print("Fulfilled: "+order.ZoneSummaryStr(order.Zone(OP_BUY,order.NodeIndex(OP_BUY)).Count));
-//        Print(order.OrderStr());
-      } 
-
-//      Print(order.QueueStr());
-  }
-
-//+------------------------------------------------------------------+
-//| Short Queue Orders (Limit/Stop) + Zone Summary tests             |
-//+------------------------------------------------------------------+
-void Test3(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest("Test[3] Shorts");
-    
-    eRequest.Memo           = "Test 3-Short Pend/Recur Test";
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-      
-    //--- Queue Order Test
-    if (IsEqual(order[OP_SELL].Count,0))
-      if (Close[0]>18.09)
-      {
-        eRequest.Pend.Type       = OP_SELLSTOP;
-        eRequest.Pend.Limit      = 17.982;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 18.112;
-        eRequest.Type            = OP_SELLLIMIT;
-        eRequest.Price           = 0.00;
-        eRequest.TakeProfit      = 18.12;
-        eRequest.Price           = 17.982;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-     
-        order.Submitted(eRequest);
-//        order.PrintLog();
-//        Print(order.QueueStr());
-      }      
-  }
-
-//+------------------------------------------------------------------+
-//| Duplicate EA request management                                  |
-//+------------------------------------------------------------------+
-void Test4(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest("Test[4] Dups");
-    
-    eRequest.Memo           = "Test 4-Lotsa Dups";
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-      
-    //--- Queue Order Test
-    if (Tick<20)
-    {
-      eRequest.Pend.Type       = OP_SELLSTOP;
-      eRequest.Pend.Limit      = 17.75;
-      eRequest.Pend.Step       = 2;
-      eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELLLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-     
-      order.Submitted(eRequest);
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| Margin management                                                |
-//+------------------------------------------------------------------+
-void Test5(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest("Test[5] Margin");
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-    order.SetRiskLimits(OP_SELL,80,80,5);
-      
-    //--- Queue Order Test
-    if (Tick<4)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_BUY;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    else
-    if (Tick<8)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELL;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));     
-    }
-    
-    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
-    order.Submitted(eRequest);
-  }
-
-//+------------------------------------------------------------------+
-//| Request Fulfilled/Reject/Expired signals                         |
-//+------------------------------------------------------------------+
-void Test6(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest("Test[6] Margin");
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-    order.SetRiskLimits(OP_SELL,80,15,5);
-      
-    //--- Queue Order Test
-    if (Tick<4)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_BUYLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.892;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    else
-    if (IsBetween(Tick,4,8))
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELLLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 18.14;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    
-    if (Tick<8)
-    {
-//      eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(Operation(eRequest.Type),Pending,InPercent),1)+"%";
-      order.Submitted(eRequest);
-    }
-    
-    if (order.Pending())
-      order.PrintSnapshotStr();
-
-    if (order.Fulfilled(OP_BUY))
-      Print(order.QueueStr());
-      
-    if (order.Rejected())
-      Print(order.QueueStr());
-      
-    if (order.Expired(OP_SELL))
-      Print(order.QueueStr());
-  }
-
-//+------------------------------------------------------------------+
-//| Stop/TP Split Retain Test                                        |
-//+------------------------------------------------------------------+
-void Test7(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest("Test[7] Splits");
-    
-    eRequest.Type           = OP_BUY;
-    eRequest.Memo           = "Test 7-Split/Retain";
-    
-//    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,10,80,2);
-    order.SetRiskLimits(OP_SELL,15,80,2);
-    order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
-    order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
-  
-    //--- Split/Retain Test
-    eRequest.Lots            = order.LotSize(OP_BUY)*4;
-    eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
-
-    order.Submitted(eRequest);
+    if (s[Asia].Event(NewTerm))
+      CallPause("New Asia Term",Always);
   }
 
 //+------------------------------------------------------------------+
 //| UpdateTick - Calculates position, trajectory, velocity on a tick |
-//+------------------------------------------------------------------+`
+//+------------------------------------------------------------------+
 void UpdateTick(void)
   {
+    static FractalState state = NoState;
+    string newstate           = "---";
+    
     t.Update();
 
-    
+    if (IsChanged(state,t.SMA().High.State))
+      newstate                = EnumToString(state);
+      
+    if (t.Event(NewHigh,Nominal))
+      if (NewDirection(direction,DirectionUp))
+        Flag("tma:"+(string)IndWinId,clrYellow);
+
+    if (t.Event(NewLow,Nominal))
+      if (NewDirection(direction,DirectionDown))
+        Flag("tma:"+(string)IndWinId,clrRed);
+
+
+//    if (t[NewTick])
+//      Print("|Open|"+t.FOCStr(t.Linear().Open)+"|Close|"+t.FOCStr(t.Linear().Close));
+      //Print(t.TickStr(1)+"|"+DoubleToStr(Bid,Digits)+"|"+DoubleToStr(Ask,Digits)+"|"+DirText(t.SMA().High.Direction)+"|"+newstate+
+      //       "|"+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"---",EnumToString(t.SMA().High.Event)));
   }
 
 //+------------------------------------------------------------------+
@@ -432,9 +147,52 @@ void UpdateTick(void)
 void ManageLong(void)
   {
     static bool trigger    = false;
+    static int  lastSeg    = 0;
+    
+//    if (t[NewTick])
+//    {
+//      if (t[NewLow])
+//        Print ("|Low|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
+//      else
+//      if (t[NewHigh])
+//        Print ("|High|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
+//      else
+//        Print ("|"+EnumToString(t.SMA().Event)+"|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
+//    }
+//
 
-    FractalRec   exit      = t.SMA().High;
-    FractalRec   entry     = t.SMA().Low;
+    //if (t[NewTick])
+    //{
+    //  if (t[NewLow])
+    //    Print ("|Low|"+t.TickStr(1)+"|"+t.SegmentStr(1));
+    //  else
+    //  if (t[NewHigh])
+    //    Print ("|High|"+t.TickStr(1)+"|"+t.SegmentStr(1));
+    //  else
+    //    Print ("|"+EnumToString(t.Segment(1).Event)+"|"+t.TickStr(1)+"|"+t.SegmentStr(1));
+    //}
+
+    if (!IsEqual(t.Segment(0).Event,NoEvent))
+      Print ("|"+EnumToString(t.Segment(0).Event)+"|"+t.TickStr(1)+"|"+t.SegmentStr(1));
+
+    //-- Hunt for Profit
+    if (IsChanged(lastSeg,t.Segment(0).Price.Count))
+    {
+//      Pause("Seg ["+(string)lastSeg+"]: "+DirText(t.Segment(0).Direction)+"\n"+
+//            "High: "+DoubleToStr(t.Momentum(t.SMA().High),Digits)+"\n"+
+//            "Low:  "+DoubleToStr(t.Momentum(t.SMA().Low),Digits),"Segment Check");
+
+      switch (lastSeg)
+      {
+        case 1:  //-- release holds
+                 //order.SetDefaultMethod(OP_BUY,Split);
+                 break;
+        case 2:  //-- set targets
+                 break;
+        default: //-- set Holds
+                 break;
+      }
+    }
 
     OrderRequest request   = order.BlankRequest("[Auto] Long");
 
@@ -444,34 +202,32 @@ void ManageLong(void)
     if (IsEqual(t.Linear().Bias,OP_BUY))
       switch (t.SMA().State)
       {
-        case Consolidation:  
-               switch (t.SMA().Direction)
-               {
-                 case DirectionUp:   //if (IsChanged(trigger,true))
-                                     //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
-                                     break;
+        case Consolidation:
+          switch (t.SMA().Direction)
+          {
+            case DirectionUp:     //if (IsChanged(trigger,true))
+                                  //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+                                  break;
 
-                 case DirectionDown: if (IsChanged(trigger,true))
-                                     {
-                                       request.Type           = OP_BUYLIMIT;
-                                       request.Memo           = "In-Trend Consolidation";
+            case DirectionDown:   request.Type           = OP_BUYLIMIT;
+                                  request.Memo           = "In-Trend Consolidation";
  
-                                       request.Price          = Bid;
-                                       request.Lots           = 0.00;
-                                       request.Expiry         = TimeCurrent()+(Period()*(60*2));
-                                       
-//                                       request.Pend.Step      = 2.0;
-//                                       request.Pend.Type      = OP_BUYSTOP;
+                                  request.Price          = Bid;
+                                  request.Lots           = 0.00;
+                                  request.Expiry         = TimeCurrent()+(Period()*(60*2));
 
-                                       if (!order.Submitted(request))
-                                         CallPause(order.RequestStr(request));
-                                     }
-                                     break;
-               }
-               break;
+                                  request.Pend.Step      = 2.0;
+                                  request.Pend.Type      = OP_BUYSTOP;
+                                  break;
+          }
+          break;
 
         default:  trigger   = false;
       }
+
+    //if (IsChanged(trigger,!IsEqual(request.Type,OP_NO_ACTION)))
+    //  if (!order.Submitted(request))
+    //    CallPause(order.RequestStr(request),PauseOn);
 
     order.ExecuteOrders(OP_BUY);
 
@@ -550,7 +306,8 @@ void Execute(void)
 void OnTick()
   {
     UpdateTick();
-
+    UpdateSession();
+    
     order.Update();
 
     Execute();
@@ -577,6 +334,11 @@ int OnInit()
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
       order.SetZoneStep(action,inpZoneStep,inpMaxZoneMargin);
     }
+
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
     NewLine("czDCA:0");
 

@@ -106,7 +106,7 @@ void RefreshScreen(void)
           Append(text,EventText[event],"\n");
           Append(text,EnumToString(tick.AlertLevel(event)));
         }
-      Comment(text);
+      Comment("Tick: "+(string)Tick+"\n"+text);
     }
   }
 
@@ -155,12 +155,12 @@ void Test1(void)
                  break;
         case 5:  order.SetStopLoss(OP_BUY,17.40,0,NoHide);
                  order.SetTakeProfit(OP_BUY,18.75,30,NoHide);
-                 order.SetOrderMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
+                 order.SetOrderMethod(OP_BUY,Hold,ByTicket,order.Ticket(OP_BUY,Max).Ticket);
                  break;
         case 6:  order.SetStopLoss(OP_BUY,17.8,70,NoHide);
                  order.SetTakeProfit(OP_BUY,18.20,70,NoHide);
                  order.Submitted(eRequest);
-                 order.SetOrderMethod(OP_BUY,Hold,0,ByZone);
+                 order.SetOrderMethod(OP_BUY,Hold,ByZone,0);
                  break;
         case 7:  order.SetStopLoss(OP_BUY,0.00,0,NoHide);
                  order.SetTakeProfit(OP_BUY,0.00,0,NoHide);
@@ -434,14 +434,15 @@ void Test7(void)
     eRequest.Memo           = "Test 7-Split/Retain";
     
 //    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,10,80,2);
-    order.SetRiskLimits(OP_SELL,15,80,2);
-    order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
-    order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
   
     //--- Split/Retain Test
     if (Tick<4)
     {
+      order.SetRiskLimits(OP_BUY,10,80,2);
+      order.SetRiskLimits(OP_SELL,15,80,2);
+      order.SetDefaultMethod(OP_BUY,Split,NoUpdate);
+      order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
+
       eRequest.Lots            = order.LotSize(OP_BUY)*4;
       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
 
@@ -456,19 +457,27 @@ void Test7(void)
       {
         case 4:       order.SetStopLoss(OP_BUY,0.00,0,Hide);
                       order.SetTakeProfit(OP_BUY,0.00,0,Hide);
-                      order.SetOrderMethod(OP_BUY,Retain,2,ByTicket);
-                      order.SetOrderMethod(OP_BUY,Full,3,ByTicket);
+                      order.SetOrderMethod(OP_BUY,Retain,ByTicket,2);
+                      order.SetOrderMethod(OP_BUY,Full,ByTicket,3);
                       break;
         case 3900:    eRequest.Lots            = order.LotSize(OP_BUY)*4;
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
                       order.Submitted(eRequest);
                       break;
         case 5240:    eRequest.Type            = OP_SELL;
-                      eRequest.Lots            = order.LotSize(OP_SELL)*4;
+                      eRequest.Lots            = order.LotSize(OP_SELL)*8;
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
                       order.Submitted(eRequest);
                       break;
-        case 11460:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+        case 11417:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 19469:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 22601:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
                       eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
                       order.Submitted(eRequest);
                       break;
@@ -479,12 +488,73 @@ void Test7(void)
   }
 
 //+------------------------------------------------------------------+
-//| FOC Data Dump Analysis                                           |
+//| Test 8 - Order Method changes                                    |
 //+------------------------------------------------------------------+
 void Test8(void)
   {
-    if (tick[NewTick])
-      Print(tick.TickStr(1)+"|"+tick.LinearStr());
+    OrderRequest eRequest   = order.BlankRequest("Test[8] Methods");
+    
+    eRequest.Type           = OP_BUY;
+    eRequest.Memo           = "Test 8-Methods";
+  
+    //--- Methods
+    if (Tick<4)
+    {
+      order.SetRiskLimits(OP_BUY,10,80,2);
+      order.SetRiskLimits(OP_SELL,15,80,2);
+      order.SetDefaultMethod(OP_BUY,Hold,NoUpdate);
+      order.SetDefaultMethod(OP_SELL,Hold,NoUpdate);
+
+      eRequest.Lots            = order.LotSize(OP_BUY)*4;
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+
+      order.Submitted(eRequest);
+    }
+    else
+    {
+      eRequest.Memo            = "Test-Tick["+(string)Tick+"]";
+      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
+
+      switch(Tick)
+      {
+        case 4:       order.SetStopLoss(OP_BUY,0.00,0,Hide);
+                      order.SetTakeProfit(OP_BUY,0.00,0,Hide);
+                      //order.SetOrderMethod(OP_BUY,Retain,ByTicket,2);
+                      //order.SetOrderMethod(OP_BUY,Full,ByTicket,3);
+                      break;
+        case 2098:    order.SetOrderMethod(OP_BUY,Split,ByAction);
+                      break;
+        case 2099:    order.SetOrderMethod(OP_BUY,Hold,ByAction);
+                      break;
+        case 3900:    eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 5240:    eRequest.Type            = OP_SELL;
+                      eRequest.Lots            = order.LotSize(OP_SELL)*8;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 5268:    order.SetOrderMethod(OP_BUY,Split,ByAction);
+                      break;
+        case 5269:    order.SetOrderMethod(OP_BUY,Hold,ByAction);
+                      break;
+        case 11417:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 19469:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 22601:   eRequest.Lots            = order.LotSize(OP_BUY)*4;
+                      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));     
+                      order.Submitted(eRequest);
+                      break;
+        case 11461:   order.SetDefaultMethod(OP_BUY,DCA);
+                      break;
+      }
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -494,7 +564,6 @@ void Execute(void)
   {
     #define Test 8
     ++Tick;
-//    Comment("Tick: "+(string)++Tick);
     
     switch (Test)
     {

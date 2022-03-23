@@ -91,9 +91,7 @@ enum ShowOptions
        SMAOpen,     // SMA (Open)
        SMAHigh,     // SMA (High)
        SMALow,      // SMA (Low)
-       SMAClose,    // SMA (Close)
-       LineOpen,    // Linear (Open)
-       LineClose    // Linear (Close)
+       SMAClose     // SMA (Close)
      };
 
 //--- input parameters
@@ -127,34 +125,95 @@ double         plSMALow[1];
 CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
 
 //+------------------------------------------------------------------+
+//| SetFlag - creates a left price label object for events           |
+//+------------------------------------------------------------------+
+void SetFlag(string Name, int Color)
+  {
+    static int fIdx  = 0;
+    
+    fIdx++;
+
+    ObjectCreate(Name+"-"+(string)fIdx,OBJ_ARROW_LEFT_PRICE,0,Time[0],Close[0]);
+    ObjectSet(Name+"-"+IntegerToString(fIdx),OBJPROP_COLOR,Color);
+  }
+
+//+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    static int bias          = DirectionNone;
+    static int id            = 1;
     const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
     double f[];
     
-    if (!IsEqual(inpShowFractal,PriceTypes))
+    //if (t.Event(NewBreakout,Major)||t.Event(NewReversal,Major))
+    //  NewArrow("Range:"+(string)id++,BoolToInt(IsEqual(t.Range().Direction,DirectionUp),SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(t.Range().Direction,IN_CHART_DIR));
+    //if (t.Event(NewRetrace,Major))
+    //  NewArrow("Range:"+(string)id++,SYMBOL_CHECKSIGN,Color(t.Range().Direction,IN_CHART_DIR));
+//    if (NewAction(bias,t.Linear().Bias))
+//    if (t.Event(NewBias,Critical))
+//      NewArrow("FOCBias"+(string)id++,BoolToInt(IsEqual(t.Linear().Bias,OP_BUY),SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+    
+    if (!IsEqual(inpShowFractal,NoShow))
     {
       if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
       if (inpShowFractal==SMAHigh)   ArrayCopy(f,t.SMA().High.Point);
       if (inpShowFractal==SMALow)    ArrayCopy(f,t.SMA().Low.Point);
       if (inpShowFractal==SMAClose)  ArrayCopy(f,t.SMA().Close.Point);
-      if (inpShowFractal==LineOpen)  ArrayCopy(f,t.Line().Open.Point);
-      if (inpShowFractal==LineClose) ArrayCopy(f,t.Line().Close.Point);
 
-      if (!IsEqual(inpShowFractal,NoShow))
       for (FractalPoint fp=0;fp<FractalPoints;fp++)
         UpdatePriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),f[fp],labelcolor[fp]);
     }
 
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
-                  proper(DirText(t.Segment(0).Direction)),Color(Direction(t.Segment(0).Bias,InAction)),12);
-    UpdateLabel("tmaSMAState"+(string)IndWinId,proper(DirText(t.SMA().High.Direction))+" "+
-                  BoolToStr(IsEqual(t.SMA().High.Bias,OP_NO_ACTION),"No Bias",BoolToStr(IsEqual(t.SMA().High.Bias,OP_BUY),"Buy","Sell"))+" "+
-                  EnumToString(t.SMA().High.State)+" "+EventText[t.SMA().High.Event],
-                  BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
+                  BoolToStr(IsEqual(t.Segment(0).Direction,t.Segment(0).ReversingDir),
+                  proper(DirText(t.Segment(0).Direction)),"Hedge"),Color(t.Segment(0).Direction),12);
+    UpdateDirection("tmaSegmentBias"+(string)IndWinId,Direction(t.Segment(0).Bias,InAction),Color(Direction(t.Segment(0).Bias,InAction)),18);
+    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).ReversingDir,Color(t.Segment(0).ReversingDir),18);
+    UpdateLabel("tmaSMAState"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Event,NoEvent),
+                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),Color(t.SMA().Direction),12);
+    UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
+    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),
+                  proper(DirText(t.SMA().High.Direction))+" "+EnumToString(t.SMA().High.State),EventText[t.SMA().High.Event]),
+                  BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(t.SMA().High.Direction)),12);
+    UpdateDirection("tmaSMABiasHi"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),18);
+    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),
+                  proper(DirText(t.SMA().Low.Direction))+" "+EnumToString(t.SMA().Low.State),EventText[t.SMA().Low.Event]),
+                  BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(t.SMA().Low.Direction)),12);
+    UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
+    UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,NegLPad(t.Linear().Open.Now,Digits)+" "+NegLPad(t.Linear().Open.Max,Digits)+" "+
+                   NegLPad(t.Linear().Open.Min,Digits),Color(t.Linear().Open.Direction),12);
+    UpdateDirection("tmaLinearBiasOpen"+(string)IndWinId,Direction(t.Linear().Open.Bias,InAction),Color(Direction(t.Linear().Open.Bias,InAction)),18);
+    UpdateLabel("tmaLinearStateClose"+(string)IndWinId,NegLPad(t.Linear().Close.Now,Digits)+" "+NegLPad(t.Linear().Close.Max,Digits)+" "+
+                   NegLPad(t.Linear().Close.Min,Digits),Color(t.Linear().Close.Direction),12);
+    UpdateDirection("tmaLinearBiasClose"+(string)IndWinId,Direction(t.Linear().Close.Bias,InAction),Color(Direction(t.Linear().Close.Bias,InAction)),18);
+    UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),24);
+    
+    UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
+
+//    static bool   trigger  = false;
+//    static double last     = 0.00;
+//
+//    switch (t.SMA().State)
+//    {
+//      case Consolidation:  switch (t.SMA().Direction)
+//                           {
+//                             case DirectionUp:   //if (Close[0]<last)
+//                                                   if (IsChanged(trigger,true))
+//                                                     SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+//                                                   break;
+//                             case DirectionDown: //if (Close[0]>last)
+//                                                   if (IsChanged(trigger,true))
+//                                                     SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+//                                                   break;
+//                           }
+//                           break;
+//      default:             trigger   = false;
+//    }
+//    last = Close[0];
   }
 
 //+------------------------------------------------------------------+
@@ -167,46 +226,40 @@ void ResetBuffer(double &Buffer[], double &Source[])
   }
 
 //+------------------------------------------------------------------+
-//| LoadBuffer - Insert Regression buffer value                      |
-//+------------------------------------------------------------------+
-void UpdateBuffer(double &Source[], double Price)
-  {
-    if (t[NewSegment])
-      ArrayCopy(Source,Source,1,0,inpPeriods-1);
-    
-    Source[0]          = Price;
-  }
-
-//+------------------------------------------------------------------+
 //| UpdateTickMA - refreshes indicator data                          |
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int bars;
+    static int direction   = DirectionChange;
 
     t.Update();
     
     SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
-    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Line().Direction,IN_CHART_DIR));
+    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
-    UpdateBuffer(plSMAOpen,t.SMA().Open.Price[0]);
-    UpdateBuffer(plSMAHigh,t.SMA().High.Price[0]);
-    UpdateBuffer(plSMALow,t.SMA().Low.Price[0]);
-    UpdateBuffer(plSMAClose,t.SMA().Close.Price[0]);
+    ResetBuffer(plSMAOpenBuffer,t.SMA().Open.Price);
+    ResetBuffer(plSMACloseBuffer,t.SMA().Close.Price);
+    ResetBuffer(plSMAHighBuffer,t.SMA().High.Price);
+    ResetBuffer(plSMALowBuffer,t.SMA().Low.Price);
 
-    if (IsChanged(bars,Bars)||t[NewTick])
-    {
-      ResetBuffer(plSMAOpenBuffer,plSMAOpen);
-      ResetBuffer(plSMACloseBuffer,plSMAClose);
-      ResetBuffer(plSMAHighBuffer,plSMAHigh);
-      ResetBuffer(plSMALowBuffer,plSMALow);
+    ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
+    ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
+    ResetBuffer(plLineOpenBuffer,t.Linear().Open.Price);
+    ResetBuffer(plLineCloseBuffer,t.Linear().Close.Price);
+    
+    if (t.Event(NewDirection,Nominal))
+      Flag("tma-d:"+(string)IndWinId,Color(t.Segment(0).ReversingDir,IN_CHART_DIR),OBJ_ARROW_RIGHT_PRICE);
 
-      ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
-      ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
-      ResetBuffer(plLineOpenBuffer,t.Line().Open.Price);
-      ResetBuffer(plLineCloseBuffer,t.Line().Close.Price);
-    }
+    if (t.Event(NewHigh,Nominal))
+      if (NewDirection(direction,DirectionUp))
+        Flag("tma:"+(string)IndWinId,clrYellow,OBJ_ARROW_STOP);
+
+    if (t.Event(NewLow,Nominal))
+      if (NewDirection(direction,DirectionDown))
+        Flag("tma:"+(string)IndWinId,clrRed,OBJ_ARROW_STOP);
+//      Print("New High|"+t.TickStr()+"|"+t.SegmentStr(0));
+    //  Pause("New Tick Nominal (Segment)", "New Tick Hold");
   }
 
 //+------------------------------------------------------------------+
@@ -308,13 +361,28 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
     }
 
-    if (!IsEqual(inpShowFractal,PriceTypes))
+    if (!IsEqual(inpShowFractal,NoShow))
       for (FractalPoint fp=0;fp<FractalPoints;fp++)
         NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
 
-    NewLabel("tmaRangeState"+(string)IndWinId,"",5,2,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSegmentState"+(string)IndWinId,"",5,20,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSMAState"+(string)IndWinId,"",5,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaRangeState"+(string)IndWinId,"",32,2,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentState"+(string)IndWinId,"",32,20,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentBias"+(string)IndWinId,"",5,16,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentDir"+(string)IndWinId,"",180,18,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateHi"+(string)IndWinId,"",32,56,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearStateOpen"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasOpen"+(string)IndWinId,"",5,88,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearStateClose"+(string)IndWinId,"",32,110,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasClose"+(string)IndWinId,"",5,106,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaLinearBiasNet"+(string)IndWinId,"",210,96,clrDarkGray,SCREEN_UR,IndWinId);
+
+    NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
+    NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
 
     return(INIT_SUCCEEDED);
   }

@@ -1111,15 +1111,15 @@ void CFractal::RefreshFlags(void)
       {
         if (Event(FractalEvent(type)))
           if (Event(NewReversal)&&IsChanged(event[NewReversal],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",segment[type],fShowFlags,fBarNow,fEventPrice[NewReversal]);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewReversal]);
 
         if (IsEqual(State(type),Breakout))
           if (Event(NewBreakout)&&IsChanged(event[NewBreakout],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",segment[type],fShowFlags,fBarNow,fEventPrice[NewBreakout]);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewBreakout]);
 
         if (IsEqual(State(type),Correction))
           if (Event(NewCorrection)&&IsChanged(event[NewCorrection],true))
-             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],fShowFlags,fBarNow,fEventPrice[NewCorrection]);
+             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewCorrection]);
 
         //if (IsEqual(State(type),Recovery))
         //  if (Event(NewRecovery)&&IsChanged(event[NewRecovery],true))
