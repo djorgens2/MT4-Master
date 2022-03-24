@@ -85,7 +85,6 @@ public:
              bool             Event(EventType Type,AlertLevel Level)
                                                                {return (sEvent.Event(Type,Level));}
              bool             Event(EventType Type)            {return (sEvent[Type]);}
-             AlertLevel       AlertLevel(EventType Type)       {return (sEvent.AlertLevel(Type));}
              bool             ActiveEvent(void)                {return (sEvent.ActiveEvent());}
              string           ActiveEventText(const bool WithHeader=true)
                                                                {return (sEvent.ActiveEventText(WithHeader));};

@@ -205,6 +205,7 @@ public:
     string           RangeStr(void);
     string           FOCStr(FOCRec &FOC);
     string           LinearStr(int Count=0);
+    string           EventStr(EventType Type);
   };
 
 //+------------------------------------------------------------------+
@@ -606,7 +607,7 @@ void CTickMA::NewTick()
     tr[0].Low                 = BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],Low[tmaSegmentBar]);
     tr[0].Close               = Close[tmaSegmentBar];
 
-    SetEvent(NewTick);
+    SetEvent(NewTick,Notify);
   }
 
 //+------------------------------------------------------------------+
@@ -622,13 +623,12 @@ void CTickMA::NewSegment(void)
     sr[0].Price               = tr[0];
     sr[0].Direction           = tmaSegmentDir;
     sr[0].ReversingDir        = tmaReversingDir;
-    sr[0].Event               = BoolToEvent(IsEqual(sr[0].Direction,DirectionUp),NewRally,NewPullback);
+    sr[0].Event               = NoEvent;
     sr[0].Price.Count         = 0;
     sr[0].Price.High          = fmax(sr[0].Price.High,tr[1].High);
     sr[0].Price.Low           = fmin(sr[0].Price.Low,tr[1].Low);
 
     SetEvent(NewSegment,Nominal);
-    SetEvent(sr[0].Event,Nominal);
   }
 
 //+------------------------------------------------------------------+
@@ -670,9 +670,6 @@ void CTickMA::UpdateTick(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSegment(void)
   {
-    if (Count(Segments)>1)
-      sr[0].Event         = NoEvent;
-
     if (NewDirection(tmaSegmentDir,Direction(tr[0].Open-tr[1].Close)))
       NewSegment();
 
@@ -702,6 +699,15 @@ void CTickMA::UpdateSegment(void)
     sr[0].Price.Count    += BoolToInt(Event(NewTick),1);
     
     SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Price.Close-sr[0].Price.Open),InDirection)),NewBias),Nominal);
+    
+    sr[0].Event           = BoolToEvent(Event(NewDirection,Nominal),  NewDirection,
+                              BoolToEvent(Event(NewPullback,Nominal), NewPullback,
+                              BoolToEvent(Event(NewRally,Nominal),    NewRally,
+                              BoolToEvent(Event(NewSegment,Nominal),  NewSegment,
+                              BoolToEvent(Event(NewLow,Nominal),      NewLow,
+                              BoolToEvent(Event(NewHigh,Nominal),     NewHigh,
+                              BoolToEvent(Event(NewBias,Nominal),     NewBias,NoEvent)))))));
+                              
   }
 
 //+------------------------------------------------------------------+
@@ -738,10 +744,14 @@ void CTickMA::UpdateRange(void)
       range.Mean          = fdiv(range.High+range.Low,2);
     }
 
-    if (IsEqual(range.Event,NewExpansion))
+    if (IsEqual(range.Event,NewExpansion)||tmaSegmentBar>0)
     {
       if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
-        SetEvent(BoolToEvent(IsChanged(range.State,Reversal),NewReversal),Critical);
+        if (IsChanged(range.State,Reversal))
+        {
+          SetEvent(NewReversal,Critical);
+          SetEvent(NewDirection,Critical);
+        }
 
       if (IsEqual(range.State,Retrace))
         SetEvent(BoolToEvent(IsChanged(range.State,Breakout),NewBreakout),Critical);
@@ -758,7 +768,7 @@ void CTickMA::UpdateRange(void)
         range.Event       = NewRetrace;
     }
 
-    SetEvent(range.Event,Major);
+    SetEvent(range.Event,Critical);
   }
 
 //+------------------------------------------------------------------+
@@ -823,8 +833,8 @@ void CTickMA::UpdateSMA(void)
     {
       sma.Event      = event;
 
-      SetEvent(NewState,Notify);
-      SetEvent(sma.Event,Notify);
+      SetEvent(NewState,Minor);
+      SetEvent(sma.Event,Minor);
     }
   }
 
@@ -1166,6 +1176,38 @@ string CTickMA::LinearStr(int Count=0)
     Append(text,textopen,"|");
     Append(text,textclose,"|");
     
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| EventStr - Returns text on all collections by supplied event     |
+//+------------------------------------------------------------------+
+string CTickMA::EventStr(EventType Type)
+  {
+    string text      = "|"+EnumToString(Type);
+
+    Append(text,EnumToString(EventAlertLevel(Type)),"|");
+    
+    if (Event(Type))
+    {
+      Append(text,EnumToString(sr[0].Event),"|");
+
+      Append(text,EnumToString(sma.Event),"|");
+      Append(text,EnumToString(sma.Open.Event),"|");
+      Append(text,EnumToString(sma.High.Event),"|");
+      Append(text,EnumToString(sma.Low.Event),"|");
+      Append(text,EnumToString(sma.Close.Event),"|");
+
+      Append(text,EnumToString(range.Event),"|");
+      Append(text,EnumToString(poly.Event),"|");
+
+      Append(text,EnumToString(line.Event),"|");
+      Append(text,EnumToString(line.Open.Event),"|");
+      Append(text,EnumToString(line.Close.Event),"|");
+
+      Append(text,EventStr(),"|");
+    }      
+
     return(text);
   }
 

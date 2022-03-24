@@ -84,7 +84,7 @@ void RefreshScreen(void)
         if (t[event])
         {
           Append(text,EventText[event],"\n");
-          Append(text,EnumToString(t.AlertLevel(event)));
+          Append(text,EnumToString(t.EventAlertLevel(event)));
         }
       Comment(text);
     }
@@ -126,19 +126,18 @@ void UpdateTick(void)
     if (IsChanged(state,t.SMA().High.State))
       newstate                = EnumToString(state);
       
-    if (t.Event(NewHigh,Nominal))
-      if (NewDirection(direction,DirectionUp))
-        Flag("tma:"+(string)IndWinId,clrYellow);
-
-    if (t.Event(NewLow,Nominal))
-      if (NewDirection(direction,DirectionDown))
-        Flag("tma:"+(string)IndWinId,clrRed);
-
+//    if (t.Event(NewHigh,Nominal))
+//      if (NewDirection(direction,DirectionUp))
+//        Flag("tma:"+(string)IndWinId,clrYellow);
+//
+//    if (t.Event(NewLow,Nominal))
+//      if (NewDirection(direction,DirectionDown))
+//        Flag("tma:"+(string)IndWinId,clrRed);
 
 //    if (t[NewTick])
 //      Print("|Open|"+t.FOCStr(t.Linear().Open)+"|Close|"+t.FOCStr(t.Linear().Close));
-      //Print(t.TickStr(1)+"|"+DoubleToStr(Bid,Digits)+"|"+DoubleToStr(Ask,Digits)+"|"+DirText(t.SMA().High.Direction)+"|"+newstate+
-      //       "|"+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"---",EnumToString(t.SMA().High.Event)));
+//      Print(t.TickStr(1)+"|"+DoubleToStr(Bid,Digits)+"|"+DoubleToStr(Ask,Digits)+"|"+DirText(t.SMA().High.Direction)+"|"+newstate+
+//             "|"+BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),"---",EnumToString(t.SMA().High.Event)));
   }
 
 //+------------------------------------------------------------------+
@@ -149,32 +148,6 @@ void ManageLong(void)
     static bool trigger    = false;
     static int  lastSeg    = 0;
     
-//    if (t[NewTick])
-//    {
-//      if (t[NewLow])
-//        Print ("|Low|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
-//      else
-//      if (t[NewHigh])
-//        Print ("|High|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
-//      else
-//        Print ("|"+EnumToString(t.SMA().Event)+"|"+t.TickStr(1)+"|"+t.SMAStr(3)+"|"+t.LinearStr(3));
-//    }
-//
-
-    //if (t[NewTick])
-    //{
-    //  if (t[NewLow])
-    //    Print ("|Low|"+t.TickStr(1)+"|"+t.SegmentStr(1));
-    //  else
-    //  if (t[NewHigh])
-    //    Print ("|High|"+t.TickStr(1)+"|"+t.SegmentStr(1));
-    //  else
-    //    Print ("|"+EnumToString(t.Segment(1).Event)+"|"+t.TickStr(1)+"|"+t.SegmentStr(1));
-    //}
-
-    if (!IsEqual(t.Segment(0).Event,NoEvent))
-      Print ("|"+EnumToString(t.Segment(0).Event)+"|"+t.TickStr(1)+"|"+t.SegmentStr(1));
-
     //-- Hunt for Profit
     if (IsChanged(lastSeg,t.Segment(0).Price.Count))
     {
@@ -194,6 +167,10 @@ void ManageLong(void)
       }
     }
 
+    //-- Position Management
+    if (t[NewDirection])
+      Print(t.EventStr(NewDirection));
+      
     OrderRequest request   = order.BlankRequest("[Auto] Long");
 
     order.SetRiskLimits(OP_BUY,10,80,2);
@@ -231,27 +208,6 @@ void ManageLong(void)
 
     order.ExecuteOrders(OP_BUY);
 
-//    static int id            = 1;    
-//    static bool top, bottom;
-//
-//    if (IsEqual(t.Linear().Open.Direction,DirectionUp))
-//      if (IsChanged(top,IsEqual(t.Linear().Open.Min,t.Linear().Open.Max)))
-//        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),BoolToInt(top,clrYellow,clrRed));
-////        NewArrow("FOCBias"+(string)id++,BoolToInt(top,SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
-//
-//    static bool pending   = false;
-//    static bool fulfilled = false;
-//
-//    if (order.Pending(OP_BUYLIMIT))   pending   = true;
-//    if (order.Fulfilled(OP_BUYLIMIT)) fulfilled = true;
-//
-//    if (t[NewTick])
-//    {
-//      Print(t.TickStr(1)+"|"+t.SegmentStr(0)+"|"+BoolToStr(pending,"Pend")+"|"+BoolToStr(fulfilled,"Open"));
-//
-//      pending      = false;
-//      fulfilled    = false;
-//    }
   }
 
 //+------------------------------------------------------------------+
@@ -352,4 +308,7 @@ void OnDeinit(const int reason)
   {
     delete t;
     delete order;
+    
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
   }

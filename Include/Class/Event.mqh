@@ -93,8 +93,8 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
 
-      AlertLevel     AlertLevel(EventType Event)       {return (eAlerts[Event]);}
       AlertLevel     HighAlert(void)                   {return (eMaxAlert);}
+      AlertLevel     EventAlertLevel(EventType Event)  {return (eAlerts[Event]);}
 
       string         ActiveEventText(bool WithHeader=true);
       string         EventStr(void);
