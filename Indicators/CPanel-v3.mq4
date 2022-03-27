@@ -614,6 +614,17 @@ int OnInit()
     SetIndexEmptyValue(8,0.00);
     SetIndexEmptyValue(9,0.00);
 
+    SetIndexLabel (0, ""); 
+    SetIndexLabel (1, ""); 
+    SetIndexLabel (2, ""); 
+    SetIndexLabel (3, ""); 
+    SetIndexLabel (4, ""); 
+    SetIndexLabel (5, ""); 
+    SetIndexLabel (6, ""); 
+    SetIndexLabel (7, ""); 
+    SetIndexLabel (8, ""); 
+    SetIndexLabel (9, ""); 
+
     return(INIT_SUCCEEDED);
   }
 

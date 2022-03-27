@@ -202,7 +202,7 @@ void RefreshScreen(int Bar=0)
     }
     
     if (inpShowSession!=SessionTypes)
-      session[inpShowSession].RefreshScreen();
+      Comment(session[inpShowSession].CommentStr());
   }
  
 //+------------------------------------------------------------------+

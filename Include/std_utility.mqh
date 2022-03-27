@@ -48,6 +48,7 @@
 #define IN_CHART_ACTION       13
 #define IN_DARK_PANEL         14
 
+#define clrBoxOff             C'60,60,60'
 
 //---- Screen Locations
 #define SCREEN_UL              0

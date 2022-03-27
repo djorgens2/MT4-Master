@@ -76,6 +76,16 @@ void RefreshScreen(void)
     
     UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
     
+    //-- Update Control Panel (Session)
+    for (SessionType type=0;type<SessionTypes;type++)
+    {
+      if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s[type].Event(NewFractal)||s[type].Event(NewHour))
+      {
+        UpdateBox("bxhAI-Session"+EnumToString(type),Color(s[type].Fractal(Term).Direction,IN_DARK_DIR));
+        UpdateBox("bxbAI-OpenInd"+EnumToString(type),BoolToInt(s[type].IsOpen(),clrYellow,clrBoxOff));
+      }
+    }
+
     if (t.ActiveEvent())
     {
       string text = "";
@@ -246,8 +256,10 @@ void ManageShort(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-//    if (t[NewTick]) Print(t.TickStr(1)+"|"+t.SegmentStr(1)+"|"+t.SMAStr(2));
-
+//    if (s[Asia].ActiveEvent())
+    if (s[Daily][NewFractal])
+      CallPause(s[Daily].CommentStr(), Always);
+    
     ManageLong();
     ManageShort();
     
