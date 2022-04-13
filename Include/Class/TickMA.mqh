@@ -19,7 +19,7 @@ private:
     enum   SMAState
            {
              Convergence,      // Trending
-             Parabolic,        // Reversing
+             Parabolic,        // Active
              Consolidation,    // Consolidating
              Flatline          // Flatline
            };
@@ -51,7 +51,7 @@ private:
     struct SegmentRec
            {
              int          Direction;
-             int          ReversingDir;
+             int          ActiveDir;
              int          Bias;
              EventType    Event;
              TickRec      Price;
@@ -62,6 +62,7 @@ private:
              int          Direction;
              FractalState State;
              EventType    Event;
+             int          Age;
              double       High;
              double       Low;
              double       Now;
@@ -96,6 +97,7 @@ private:
              int          Bias;        //-- Open/Close cross
              EventType    Event;       //-- Aggregate event
              SMAState     State;       //-- Aggregate state
+             int          Hold;        //-- SMA Boundary Direction
              FractalRec   Open;
              FractalRec   High;
              FractalRec   Low;
@@ -130,6 +132,7 @@ private:
              int          Direction;
              int          Bias;
              EventType    Event;
+             int          Zone;
              FOCRec       Open;
              FOCRec       Close;
            };
@@ -159,7 +162,7 @@ private:
     int              tmaSMAKeep;
     double           tmaTickAgg;
 
-    int              tmaReversingDir;
+    int              tmaActiveDir;
     int              tmaSegmentDir;
     int              tmaSegmentBar;
     
@@ -622,7 +625,7 @@ void CTickMA::NewSegment(void)
 
     sr[0].Price               = tr[0];
     sr[0].Direction           = tmaSegmentDir;
-    sr[0].ReversingDir        = tmaReversingDir;
+    sr[0].ActiveDir           = tmaActiveDir;
     sr[0].Event               = NoEvent;
     sr[0].Price.Count         = 0;
     sr[0].Price.High          = fmax(sr[0].Price.High,tr[1].High);
@@ -683,15 +686,15 @@ void CTickMA::UpdateSegment(void)
     {
       if (Event(NewHigh,Nominal))
         if (IsHigher(sr[0].Price.High,sr[1].Price.High,NoUpdate,Digits))
-          if (NewDirection(tmaReversingDir,DirectionUp))
+          if (NewDirection(tmaActiveDir,DirectionUp))
             SetEvent(NewRally,Nominal);
 
       if (Event(NewLow,Nominal))
         if (IsLower(sr[0].Price.Low,sr[1].Price.Low,NoUpdate,Digits))
-          if (NewDirection(tmaReversingDir,DirectionDown))
+          if (NewDirection(tmaActiveDir,DirectionDown))
             SetEvent(NewPullback,Nominal);
             
-      if (NewDirection(sr[0].ReversingDir,tmaReversingDir))
+      if (NewDirection(sr[0].ActiveDir,tmaActiveDir))
         SetEvent(NewDirection,Nominal);
     }
 
@@ -719,6 +722,7 @@ void CTickMA::UpdateRange(void)
     double rangelow       = Close[tmaSegmentBar];
 
     range.Event           = NoEvent;
+    range.Age            += BoolToInt(Event(NewSegment),1);
 
     if (IsHigher(Close[tmaSegmentBar],range.High))
       range.Event         = NewExpansion;
@@ -757,6 +761,7 @@ void CTickMA::UpdateRange(void)
         SetEvent(BoolToEvent(IsChanged(range.State,Breakout),NewBreakout),Critical);
 
       range.Retrace       = Close[tmaSegmentBar];
+      range.Age           = 0;
     }
     else
     {
@@ -792,6 +797,7 @@ void CTickMA::UpdateSMA(void)
 
     sma.Event        = NoEvent;
     sma.Bias         = Action(sma.Close.Price[0]-sma.Open.Price[0]);
+    sma.Hold         = BoolToInt(tr[0].High>sma.High.Price[0],OP_BUY,BoolToInt(tr[0].Low<sma.Low.Price[0],OP_SELL,OP_NO_ACTION));
 
     //-- Handle convergences
     if (IsEqual(dirHigh,dirLow))
@@ -874,6 +880,11 @@ void CTickMA::UpdateLinear(void)
       else
       if (Event(NewBias,Major))
         bias                   = line.Close.Bias;
+        
+      if (IsEqual(line.Close.Direction,DirectionUp))
+        line.Zone              = BoolToInt(IsHigher(tr[0].Open,range.Mean,NoUpdate),1)+BoolToInt(IsHigher(tr[0].Open,line.Close.Price[0],NoUpdate),1);
+      else
+        line.Zone              = BoolToInt(IsLower(tr[0].Open,range.Mean,NoUpdate),-1)+BoolToInt(IsLower(tr[0].Open,line.Close.Price[0],NoUpdate),-1);
 
       line.Event               = BoolToEvent(NewAction(line.Bias,bias),NewBias);
 
@@ -892,7 +903,7 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     tmaSMASlow                 = 3;
     tmaSMAKeep                 = Periods;
     tmaTickAgg                 = point(Aggregate);
-    tmaReversingDir            = DirectionChange;
+    tmaActiveDir            = DirectionChange;
     tmaSegmentDir              = DirectionChange;
     tmaSegmentBar              = Bars-1;
 

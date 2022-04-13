@@ -21,6 +21,7 @@
                      Breakout,        //-- Fractal Breakout
                      Reversal,        //-- Fractal Reversal
                      Snap,            //-- Sharp uni-directional move
+                     Idle,            //-- Idle; No Momentum
                      Wane,            //-- Weakening trend momentum
                      Wax,             //-- Increasing trend momentum
                      FractalStates

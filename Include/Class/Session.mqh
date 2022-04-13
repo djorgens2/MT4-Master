@@ -62,7 +62,7 @@ public:
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
             ~CSession();
 
-             SessionType      Type(void)                       {return (sType);}
+             SessionType      Type(void)                         {return (sType);}
 
              void             Update(void);
              void             Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
@@ -73,7 +73,7 @@ public:
              
              double           Pivot(const PeriodType Type);
              int              Bias(double Price);
-             int              Age(void)                         {return(sBarFE);}   //--- Number of periods since the last fractal event
+             int              Age(void)                          {return(sBarFE);}   //--- Number of periods since the last fractal event
              
              double           Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace
              double           Expansion(FractalType Type, int Measure, int Format=InDecimal);     //--- returns fibonacci expansion
@@ -82,8 +82,8 @@ public:
              string           FractalStr(void);
              string           SessionStr(PeriodType Type);
 
-             SessionRec       Fractal(const FractalType Type)   {return(sfractal[Type]);}
-             SessionRec       operator[](const PeriodType Type) {return(srec[Type]);}
+             SessionRec       operator[](const FractalType Type) {return(sfractal[Type]);}
+             SessionRec       operator[](const PeriodType Type)  {return(srec[Type]);}
                                  
 private:
 

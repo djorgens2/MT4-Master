@@ -487,7 +487,7 @@ void COrder::UpdatePanel(void)
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       UpdateLabel("lbvOC-"+ActionText(action)+"-Enabled",BoolToStr(Master[action].TradeEnabled,"Enabled "+EnumToString(Master[action].Method),"Disabled"),
-                     BoolToInt(Master[action].TradeEnabled,clrWhite,clrDarkGray));
+                     BoolToInt(Master[action].TradeEnabled,clrLawnGreen,clrDarkGray));
       UpdateLabel("lbvOC-"+ActionText(action)+"-EqTarget",center(DoubleToStr(Master[action].EquityTarget,1)+"%",7),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].EquityMin,1)+"%",6),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action,0.00),Digits),9),clrDarkGray,10);

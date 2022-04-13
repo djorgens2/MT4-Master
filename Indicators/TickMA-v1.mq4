@@ -146,7 +146,17 @@ void RefreshScreen(void)
     static int id            = 1;
     const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
     double f[];
+
+    const  int smacolor[2][7]   = {{clrNONE,clrDarkGray,clrGoldenrod,clrYellow,clrForestGreen,clrLawnGreen,clrWhite},
+                                   {clrNONE,clrDarkGray,clrGoldenrod,clrYellow,clrFireBrick,clrRed,clrWhite}};
+    static int action           = OP_NO_ACTION;
+
     
+    NewAction(action,t.SMA().Bias);
+    
+    UpdatePriceLabel("tmaNewLow",BoolToDouble(t[NewLow],Close[0],0.00),smacolor[action][t.EventAlertLevel(NewLow)]);
+    UpdatePriceLabel("tmaNewHigh",BoolToDouble(t[NewHigh],Close[0],0.00),smacolor[action][t.EventAlertLevel(NewHigh)]);
+
     //if (t.Event(NewBreakout,Major)||t.Event(NewReversal,Major))
     //  NewArrow("Range:"+(string)id++,BoolToInt(IsEqual(t.Range().Direction,DirectionUp),SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(t.Range().Direction,IN_CHART_DIR));
     //if (t.Event(NewRetrace,Major))
@@ -154,7 +164,7 @@ void RefreshScreen(void)
 //    if (NewAction(bias,t.Linear().Bias))
 //    if (t.Event(NewBias,Critical))
 //      NewArrow("FOCBias"+(string)id++,BoolToInt(IsEqual(t.Linear().Bias,OP_BUY),SYMBOL_ARROWUP,SYMBOL_ARROWDOWN),Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
-    
+
     if (!IsEqual(inpShowFractal,NoShow))
     {
       if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
@@ -168,10 +178,10 @@ void RefreshScreen(void)
 
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State),Color(Direction(t.Range().Direction)),12);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
-                  BoolToStr(IsEqual(t.Segment(0).Direction,t.Segment(0).ReversingDir),
+                  BoolToStr(IsEqual(t.Segment(0).Direction,t.Segment(0).ActiveDir),
                   proper(DirText(t.Segment(0).Direction)),"Hedge"),Color(t.Segment(0).Direction),12);
     UpdateDirection("tmaSegmentBias"+(string)IndWinId,Direction(t.Segment(0).Bias,InAction),Color(Direction(t.Segment(0).Bias,InAction)),18);
-    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).ReversingDir,Color(t.Segment(0).ReversingDir),18);
+    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).ActiveDir,Color(t.Segment(0).ActiveDir),18);
     UpdateLabel("tmaSMAState"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Event,NoEvent),
                   proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),Color(t.SMA().Direction),12);
     UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
@@ -231,10 +241,11 @@ void ResetBuffer(double &Buffer[], double &Source[])
 void UpdateTickMA(void)
   {
     static int direction   = DirectionChange;
+    static int smadir[2]   = {DirectionChange,DirectionChange};
 
     t.Update();
     
-    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
+    SetLevelValue(1,t.Range().Mean);
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
@@ -248,16 +259,18 @@ void UpdateTickMA(void)
     ResetBuffer(plLineOpenBuffer,t.Linear().Open.Price);
     ResetBuffer(plLineCloseBuffer,t.Linear().Close.Price);
     
-    if (t.Event(NewDirection,Nominal))
-      Flag("tma-d:"+(string)IndWinId,Color(t.Segment(0).ReversingDir,IN_CHART_DIR),OBJ_ARROW_RIGHT_PRICE);
+    if (t.Event(NewReversal,Minor))
+      Flag("tma-d:"+(string)IndWinId,BoolToInt(IsEqual(t.SMA().Low.Direction,t.SMA().High.Direction),Color(t.SMA().Low.Direction,IN_CHART_DIR),clrWhite),OBJ_ARROW_RIGHT_PRICE);
+    //if (t.Event(NewDirection,Nominal))
+    //  Flag("tma-d:"+(string)IndWinId,Color(t.Segment(0).ActiveDir,IN_CHART_DIR),OBJ_ARROW_RIGHT_PRICE);
 
-    if (t.Event(NewHigh,Nominal))
-      if (NewDirection(direction,DirectionUp))
-        Flag("tma:"+(string)IndWinId,clrYellow,OBJ_ARROW_STOP);
-
-    if (t.Event(NewLow,Nominal))
-      if (NewDirection(direction,DirectionDown))
-        Flag("tma:"+(string)IndWinId,clrRed,OBJ_ARROW_STOP);
+//    if (t.Event(NewHigh,Nominal))
+//      if (NewDirection(direction,DirectionUp))
+//        Flag("tma:"+(string)IndWinId,clrYellow,OBJ_ARROW_STOP);
+//
+//    if (t.Event(NewLow,Nominal))
+//      if (NewDirection(direction,DirectionDown))
+//        Flag("tma:"+(string)IndWinId,clrRed,OBJ_ARROW_STOP);
 //      Print("New High|"+t.TickStr()+"|"+t.SegmentStr(0));
     //  Pause("New Tick Nominal (Segment)", "New Tick Hold");
   }
@@ -348,6 +361,9 @@ int OnInit()
     SetIndexEmptyValue(7,0.00);
     SetIndexEmptyValue(8,0.00);
     SetIndexEmptyValue(9,0.00);
+
+    NewPriceLabel("tmaNewLow");
+    NewPriceLabel("tmaNewHigh");
 
     //--- Create Display Visuals
     for (int obj=0;obj<inpPeriods;obj++)
