@@ -239,7 +239,7 @@ string ActionText(int Action, int Format=IN_ACTION)
       case OP_RISK          : return("RISK");          //--- Contrarian action identified
       case OP_HEDGE         : return("HEDGE");         //--- Contrarian action opportunity
     
-      default            : return("BAD ACTION CODE");
+      default              : return("BAD ACTION CODE");
     }
   }
 
@@ -395,20 +395,6 @@ string DirText(int Value, bool Contrarian=false)
 }
 
 //+------------------------------------------------------------------+
-//| DirColor - returns the color based on the supplied Value         |
-//+------------------------------------------------------------------+
-int DirColor(int Value, int DirUp=clrLawnGreen, int DirDown=clrRed, int DirNone=clrDarkGray)
-{
-  switch(Value)
-  {
-    case DIR_UP:    return(DirUp);
-    case DIR_DOWN:  return(DirDown);
-    case DIR_NONE:  return(DirNone);
-    default:        return(-1);
-  }
-}
-
-//+------------------------------------------------------------------+
 //| Color - returns the color based on the supplied Value            |
 //+------------------------------------------------------------------+
 color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
@@ -443,86 +429,6 @@ color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
   }
   
   return (clrDarkGray);
-}
-
-//+------------------------------------------------------------------+
-//| DirAction - returns the Action based on supplied direction       |
-//+------------------------------------------------------------------+
-int DirAction(int Dir, bool Contrarian=false)
-{
-  switch(Dir)
-  {
-    case DIR_NONE:      return(OP_NO_ACTION);
-
-    case DIR_LCORR:      
-    case DIR_LREV:      
-    case DIR_RALLY:     
-    case DIR_UP:        if (Contrarian)
-                          return(OP_SELL);
-                        else
-                          return(OP_BUY);
-    case DIR_DOWN:      
-    case DIR_PULLBACK:  
-    case DIR_SREV:
-    case DIR_SCORR:     if (Contrarian)
-                          return(OP_BUY);
-                        else
-                          return(OP_SELL);
-                          
-    default:            return(-1);
-  }
-}
-
-//+------------------------------------------------------------------+
-//| ActionDir - returns the Direction based on supplied action       |
-//+------------------------------------------------------------------+
-int ActionDir(int Action, bool Contrarian=false)
-{
-  switch(Action)
-  {
-    case OP_BUY:        
-    case OP_BUYLIMIT:   
-    case OP_BUYSTOP:    if (Contrarian)
-                          return (DIR_DOWN);
-                        else
-                          return (DIR_UP);
-    
-    case OP_SELL:
-    case OP_SELLLIMIT:   
-    case OP_SELLSTOP:   if (Contrarian)
-                          return (DIR_UP);
-                        else
-                          return (DIR_DOWN);
-                          
-    default:            return(DIR_NONE);
-  }
-}
-
-//+------------------------------------------------------------------+
-//| dir - returns the direction based on the supplied Value          |
-//+------------------------------------------------------------------+
-int dir(double Value)
-{
-  if (Value>0.00) return (DIR_UP);
-  if (Value<0.00) return (DIR_DOWN);
-  
-  return (DIR_NONE);
-}
-
-//+------------------------------------------------------------------+
-//| dir - returns the direction based on the supplied price array    |
-//+------------------------------------------------------------------+
-int dir(int Current, double &Buffer[], int Range=3, int Shift=0)
-{
-  double agg = 0.00;
-  
-  for (int idx=0; idx<Range; idx++)
-    agg += Buffer[idx+Shift]-Buffer[idx+Shift+1];
-  
-  if (pip(agg)>0.00) return (DIR_UP);
-  if (pip(agg)<0.00) return (DIR_DOWN);
-  
-  return (Current);
 }
 
 //+------------------------------------------------------------------+
@@ -627,34 +533,6 @@ void NewLabel(string LabelName, string Text, int PosX, int PosY, int Color=White
   }
 
 //+------------------------------------------------------------------+
-//| NewBarNote                                                       |
-//+------------------------------------------------------------------+
-string NewBarNote(string Text, int Color=clrWhite)
-  {
-    static int nbnIdx    = 0;
-    string     nbnKey    = "bn:"+(string)++nbnIdx;
-    
-    ObjectCreate(0,nbnKey,OBJ_TEXT,0,Time[0],Close[0]);
-    ObjectSetInteger(0,nbnKey,OBJPROP_COLOR,Color);
-    ObjectSetString(0,nbnKey,OBJPROP_TEXT,Text);
-    
-    return (nbnKey);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateBarNote                                                    |
-//+------------------------------------------------------------------+
-void UpdateBarNote(string LabelName, double Price=0.00, int Color=clrWhite)
-  {
-    if (Price==0.00)
-      Price         = Close[0];
-      
-    ObjectSetInteger(0,LabelName,OBJPROP_COLOR,Color);
-    ObjectSetDouble(0,LabelName,OBJPROP_PRICE,Price);
-    ObjectSet(LabelName,OBJPROP_TIME1,Time[0]);
-  }
-
-//+------------------------------------------------------------------+
 //| UpdatePriceTag                                                   |
 //+------------------------------------------------------------------+
 void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int Down=8)
@@ -752,28 +630,15 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
   }
   
 //+------------------------------------------------------------------+
-//| Default - returns a default when value == check                  |
-//+------------------------------------------------------------------+
-double Default(double Value, double Override, int Check=NoValue, int Precision=NoValue)
-  {
-    Precision                 = BoolToInt(Precision==NoValue,Digits,0);
-    
-    if (IsEqual(Value,Check))
-      return (NormalizeDouble(Override,Precision));
-      
-    return (NormalizeDouble(Value,Precision));
-  }
-
-//+------------------------------------------------------------------+
 //| Flag - creates a right price label object                        |
 //+------------------------------------------------------------------+
-void Flag(string Name, int Color, int Style=OBJ_ARROW_RIGHT_PRICE, bool ShowFlag=Always, int Bar=0, double Price=NoValue)
+void Flag(string Name, int Color, int Style=OBJ_ARROW_RIGHT_PRICE, bool ShowFlag=Always, int Bar=0)
   {
     static int fIdx  = 0;
     
     if (ShowFlag)
     {
-      while (!ObjectCreate(Name+"-"+(string)fIdx,Style,0,Time[Bar],Default(Price,Close[Bar])))
+      while (!ObjectCreate(Name+"-"+(string)fIdx,Style,0,Time[Bar],Close[Bar]))
         if (GetLastError()==4200) //-- Object Exists
           fIdx++;
         else

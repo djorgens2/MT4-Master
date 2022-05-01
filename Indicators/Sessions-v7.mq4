@@ -175,8 +175,8 @@ void RefreshScreen(int Bar=0)
                   " "+BoolToStr(session[type][ActiveSession].Bias==Action(session[type][ActiveSession].Direction,InDirection),"Hold","Hedge"),
                   BoolToInt(session[type].IsOpen(),clrWhite,clrDarkGray),16);
 
-      UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,DirColor(session[type][ActiveSession].Direction),20);
-      UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,DirColor(session[type][ActiveSession].BreakoutDir));
+      UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,Color(session[type][ActiveSession].Direction),20);
+      UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,Color(session[type][ActiveSession].BreakoutDir));
       
       if (inpShowMidLines!=PeriodTypes)
         UpdateLine("lnMid"+EnumToString(type),session[type].Pivot(inpShowMidLines),STYLE_SOLID,SessionColor(type));

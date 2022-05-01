@@ -113,7 +113,9 @@ void RefreshScreen(void)
         UpdateLine("tmaSMAFractal:"+StringSubstr(EnumToString(fp),2),f[fp],STYLE_SOLID,linecolor[fp]);
     }
     
-    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
+    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_SOLID,clrForestGreen);
+    UpdateLine("crDAM:ActiveMid",s[Daily].Pivot(ActiveSession),STYLE_DOT,Color(s[Daily][Term].Direction));
+    UpdateLine("crDAM:PriorMid",s[Daily].Pivot(PriorSession),STYLE_DOT,Color(s[Daily][Term].Direction));
 
     if (t.ActiveEvent())
     {
@@ -157,16 +159,16 @@ void UpdateSession(void)
 //+------------------------------------------------------------------+
 void UpdateTick(void)
   {
-    const  int labelcolor[2][7]   = {{clrNONE,clrForestGreen,clrLawnGreen,clrLawnGreen,clrLawnGreen,clrLawnGreen,clrWhite},
-                                     {clrNONE,clrFireBrick,clrRed,clrRed,clrRed,clrRed,clrWhite}};
-    static int action             = OP_NO_ACTION;
+    const  int labelcolor[9]      = {clrOrange,clrOrangeRed,clrFireBrick,clrMaroon,clrLightGray,clrForestGreen,clrLimeGreen,clrYellowGreen,clrYellow};
+    static int state              = 4;
 
     t.Update();
     
-    NewAction(action,t.SMA().Bias);
-    
-    UpdatePriceLabel("tmaNewLow",BoolToDouble(t[NewLow],Close[0],0.00),labelcolor[action][t.EventAlertLevel(NewLow)]);
-    UpdatePriceLabel("tmaNewHigh",BoolToDouble(t[NewHigh],Close[0],0.00),labelcolor[action][t.EventAlertLevel(NewHigh)]);
+    if (t[NewLow])
+      if (IsBetween(t.Tick(0).Close,
+
+        
+    UpdatePriceLabel("tmaNewBoundary",BoolToDouble(t[NewLow],Close[0],0.00),labelcolor[action][t.EventAlertLevel(NewLow)]);
   }
 
 //+------------------------------------------------------------------+
@@ -203,10 +205,11 @@ bool NewStrategy(int Action)
 void ManageLong(void)
   {
     static bool trigger        = false;
+    static bool stacking       = false;
     
     if (NewStrategy(OP_BUY))
     {
-      CallPause("New Strategy",Always);
+      //CallPause("New Strategy",Always);
     }
     //{
     //  order.SetOrderMethod(OP_BUY,(OrderMethod)BoolToInt(mr[OP_BUY].Hold,Hold,Split),ByAction);
@@ -226,49 +229,6 @@ void ManageLong(void)
       case Evaluate:    break;
       case Capture:     break;
     }
-
-    //-- Hunt for Profit
-//    if (IsChanged(lastSeg,t.Segment(0).Price.Count))
-//    {
-//      Pause("Seg ["+(string)lastSeg+"]: "+DirText(t.Segment(0).Direction)+"\n"+
-//            "High: "+DoubleToStr(t.Momentum(t.SMA().High),Digits)+"\n"+
-//            "Low:  "+DoubleToStr(t.Momentum(t.SMA().Low),Digits),"Segment Check");
-
-    //  switch (lastSeg)
-    //  {
-    //    case 1:  //-- release holds
-    //             //order.SetDefaultMethod(OP_BUY,Split);
-    //             break;
-    //    case 2:  //-- set targets
-    //             break;
-    //    default: //-- set Holds
-    //             break;
-    //  }
-    //}
-
-    //-- Position Management
-//    if (t[NewDirection])
-//      Print(t.EventStr(NewDirection));
-
-    //if (t[NewTick])
-    //{
-    //    if (IsEqual(t.Segment(0).Direction,t.Segment(0).ActiveDir))
-    //    switch (t.Linear().
-    //    {
-    //    }
-    //  else
-    //  {
-    //  }
-    //}
-      
-      //if (IsEqual(t.Segment(0).Direction,t.Segment(0).ActiveDir))
-      ////-- Manage Convergence
-      //{
-      //}
-      //else
-      ////-- Manage Divergence
-      //{
-      //}
 
     OrderRequest request   = order.BlankRequest("[Auto] Long");
 
@@ -291,8 +251,11 @@ void ManageLong(void)
                                   request.Lots           = 0.00;
                                   request.Expiry         = TimeCurrent()+(Period()*(60*2));
 
-                                  request.Pend.Step      = 2.0;
-                                  request.Pend.Type      = OP_BUYSTOP;
+                                  if (stacking)
+                                  {
+                                    request.Pend.Step    = 2.0;
+                                    request.Pend.Type    = OP_BUYSTOP;
+                                  }
                                   break;
           }
           break;
@@ -356,16 +319,31 @@ void ManageShort(void)
 void Execute(void)
   {
     static int direction    = DirectionChange;
+           int action       = Action(Direction(order[Net].Lots));
 
-//    if (s[Asia].ActiveEvent())
-    if (s[Daily][NewFractal])
-      if (IsChanged(direction,s[Daily][Term].Direction))
-        CallPause(s[Daily].CommentStr(), Always);
-    
-    ManageLong();
-    ManageShort();
+    if (IsEqual(action,OP_NO_ACTION))
+      action                = Action(t.Segment(0).Direction[Trend]);
+
+    if (IsEqual(action,OP_BUY))
+    {
+      ManageLong();
+      ManageShort();
+    }
+    else
+    {
+      ManageShort();
+      ManageLong();
+    }
     
     order.ExecuteRequests();
+
+//    if (s[Asia].ActiveEvent())
+//    if (s[Daily][NewFractal])
+//      if (IsChanged(direction,s[Daily][Term].Direction))
+//        CallPause(s[Daily].CommentStr(), Always);
+//      if (IsEqual(t.Linear().Zone,0))
+
+      
 //    if (t[NewParabolic])
 //      CallPause("New Parabolic");
   }
@@ -413,6 +391,9 @@ int OnInit()
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
     NewLine("czDCA:0");
+    NewLine("crDAM:ActiveMid");
+    NewLine("crDAM:PriorMid");
+
     NewPriceLabel("tmaNewLow");
     NewPriceLabel("tmaNewHigh");
 

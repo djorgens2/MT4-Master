@@ -71,8 +71,8 @@ public:
              int              SessionHour(int Measure=Now);
              bool             IsOpen(void);
              
-             double           Pivot(const PeriodType Type);
-             int              Bias(double Price);
+             double           Pivot(const PeriodType Type);                          //--- Mid/Mean by Period Type
+             int              Bias(double Price);                                    //--- Active Bias 
              int              Age(void)                          {return(sBarFE);}   //--- Number of periods since the last fractal event
              
              double           Retrace(FractalType Type, int Measure, int Format=InDecimal);       //--- returns fibonacci retrace

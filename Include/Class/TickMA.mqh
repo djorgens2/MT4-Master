@@ -50,8 +50,7 @@ private:
 
     struct SegmentRec
            {
-             int          Direction;
-             int          ActiveDir;
+             int          Direction[FractalTypes];
              int          Bias;
              EventType    Event;
              TickRec      Price;
@@ -139,7 +138,7 @@ private:
 
     void             InitFractal(FractalRec &Fractal, double Price);
 
-    void             CalcFractal(FOCRec &FOC);
+    void             CalcFOC(FOCRec &FOC);
     void             CalcFractal(FractalRec &Fractal);
     void             CalcSMA(void);
     void             CalcPoly(double &Poly[], PriceType Type);
@@ -162,9 +161,11 @@ private:
     int              tmaSMAKeep;
     double           tmaTickAgg;
 
-    int              tmaActiveDir;
-    int              tmaSegmentDir;
-    int              tmaSegmentBar;
+    int              tmaDirection[FractalTypes];
+    double           tmaSupport;
+    double           tmaResistance;
+    double           tmaExpansion;
+    int              tmaBar;
     
     //-- Aggregation Structures
     TickRec          tr[];          //-- Tick Record
@@ -179,9 +180,6 @@ public:
 
     void             Update(void);
 
-    //-- Triggers
-    bool             NewSegment(int Direction)  { return(Event(NewSegment)&&IsEqual(sr[0].Direction,Direction)); };
-    
     //-- Data Collections
     TickRec          Tick(int Node)        { return(tr[Node]); };
     SegmentRec       Segment(int Node)     { return(sr[Node]); };
@@ -189,6 +187,9 @@ public:
     SMARec           SMA(void)             { return(sma); };
     PolyRec          Poly(void)            { return(poly); };
     LinearRec        Linear(void)          { return(line); };
+    double           Support(void)         { return(tmaSupport); };
+    double           Resistance(void)      { return(tmaResistance); };
+    double           Expansion(void)       { return(tmaExpansion); };
 
     double           Momentum(FractalRec &Fractal, ReservedWords Measure=Previous);
     int              Count(CountType Type) { return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr))); };
@@ -231,9 +232,9 @@ void CTickMA::InitFractal(FractalRec &Fractal, double Price)
   }
 
 //+------------------------------------------------------------------+
-//| CalcFractal - Computes Linear(FOC) Fractal states, events, points|
+//| CalcFOC - Computes Linear(FOC) Fractal states, events                |
 //+------------------------------------------------------------------+
-void CTickMA::CalcFractal(FOCRec &FOC)
+void CTickMA::CalcFOC(FOCRec &FOC)
   {
     int    bias             = FOC.Bias;
 
@@ -605,10 +606,10 @@ void CTickMA::NewTick()
       ArrayCopy(tr,tr,1,0,ArraySize(tr)-1);
 
     tr[0].Count               = 0;
-    tr[0].Open                = BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],Open[tmaSegmentBar]);
-    tr[0].High                = BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],High[tmaSegmentBar]);
-    tr[0].Low                 = BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],Low[tmaSegmentBar]);
-    tr[0].Close               = Close[tmaSegmentBar];
+    tr[0].Open                = BoolToDouble(IsEqual(tmaBar,0),Close[0],Open[tmaBar]);
+    tr[0].High                = BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar]);
+    tr[0].Low                 = BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]);
+    tr[0].Close               = Close[tmaBar];
 
     SetEvent(NewTick,Notify);
   }
@@ -623,9 +624,9 @@ void CTickMA::NewSegment(void)
     if (ArraySize(sr)>1)
       ArrayCopy(sr,sr,1,0,ArraySize(sr)-1);
 
+    ArrayCopy(sr[0].Direction,tmaDirection);
+
     sr[0].Price               = tr[0];
-    sr[0].Direction           = tmaSegmentDir;
-    sr[0].ActiveDir           = tmaActiveDir;
     sr[0].Event               = NoEvent;
     sr[0].Price.Count         = 0;
     sr[0].Price.High          = fmax(sr[0].Price.High,tr[1].High);
@@ -655,16 +656,16 @@ double CTickMA::Momentum(FractalRec &Fractal, ReservedWords Measure=Previous)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateTick(void)
   {
-    if (fabs(tr[0].Open-Close[tmaSegmentBar])>=tmaTickAgg)
+    if (fabs(tr[0].Open-Close[tmaBar])>=tmaTickAgg)
       NewTick();
 
-    if (IsHigher(BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],High[tmaSegmentBar]),tr[0].High))
+    if (IsHigher(BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar]),tr[0].High))
       SetEvent(NewHigh,Notify);
 
-    if (IsLower(BoolToDouble(IsEqual(tmaSegmentBar,0),Close[0],Low[tmaSegmentBar]),tr[0].Low))
+    if (IsLower(BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]),tr[0].Low))
       SetEvent(NewLow,Notify);
 
-    tr[0].Close           = Close[tmaSegmentBar];
+    tr[0].Close           = Close[tmaBar];
     tr[0].Count++;
   }
 
@@ -673,36 +674,57 @@ void CTickMA::UpdateTick(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateSegment(void)
   {
-    if (NewDirection(tmaSegmentDir,Direction(tr[0].Open-tr[1].Close)))
+    if (NewDirection(tmaDirection[Lead],Direction(tr[0].Open-tr[1].Close)))
       NewSegment();
 
     if (IsHigher(tr[0].High,sr[0].Price.High))
+    {
+      if (Count(Segments)>1)
+        if (IsHigher(sr[0].Price.High,sr[1].Price.High,NoUpdate,Digits))
+          if (NewDirection(tmaDirection[Term],DirectionUp))
+          {
+            tmaSupport     = tmaExpansion;
+            tmaExpansion   = sr[0].Price.High;
+
+            SetEvent(NewRally,Nominal);
+          }
+
+      if (IsEqual(tmaDirection[Term],DirectionUp))
+        tmaExpansion       = fmax(tmaExpansion,sr[0].Price.High);
+
       SetEvent(NewHigh,Nominal);
+    }
     
     if (IsLower(tr[0].Low,sr[0].Price.Low))
-      SetEvent(NewLow,Nominal);
-
-    if (Count(Segments)>1)
     {
-      if (Event(NewHigh,Nominal))
-        if (IsHigher(sr[0].Price.High,sr[1].Price.High,NoUpdate,Digits))
-          if (NewDirection(tmaActiveDir,DirectionUp))
-            SetEvent(NewRally,Nominal);
-
-      if (Event(NewLow,Nominal))
+      if (Count(Segments)>1)
         if (IsLower(sr[0].Price.Low,sr[1].Price.Low,NoUpdate,Digits))
-          if (NewDirection(tmaActiveDir,DirectionDown))
+          if (NewDirection(tmaDirection[Term],DirectionDown))
+          {
+            tmaResistance  = tmaExpansion;
+            tmaExpansion   = sr[0].Price.Low;
+
             SetEvent(NewPullback,Nominal);
-            
-      if (NewDirection(sr[0].ActiveDir,tmaActiveDir))
-        SetEvent(NewDirection,Nominal);
+          }
+
+      if (IsEqual(tmaDirection[Term],DirectionDown))
+        tmaExpansion       = fmin(tmaExpansion,sr[0].Price.Low);
+      
+      SetEvent(NewLow,Nominal);
     }
 
-    sr[0].Price.Close     = tr[0].Close;
+    if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))
+      SetEvent(NewTerm,Nominal);
+  
+    if (!IsBetween(tmaExpansion,tmaSupport,tmaResistance,Digits))
+      if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
+        SetEvent(NewTrend,Nominal);
+
+    sr[0].Price.Close       = tr[0].Close;
     sr[0].Price.Count    += BoolToInt(Event(NewTick),1);
-    
+
     SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Price.Close-sr[0].Price.Open),InDirection)),NewBias),Nominal);
-    
+
     sr[0].Event           = BoolToEvent(Event(NewDirection,Nominal),  NewDirection,
                               BoolToEvent(Event(NewPullback,Nominal), NewPullback,
                               BoolToEvent(Event(NewRally,Nominal),    NewRally,
@@ -710,7 +732,6 @@ void CTickMA::UpdateSegment(void)
                               BoolToEvent(Event(NewLow,Nominal),      NewLow,
                               BoolToEvent(Event(NewHigh,Nominal),     NewHigh,
                               BoolToEvent(Event(NewBias,Nominal),     NewBias,NoEvent)))))));
-                              
   }
 
 //+------------------------------------------------------------------+
@@ -718,16 +739,16 @@ void CTickMA::UpdateSegment(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateRange(void)
   {
-    double rangehigh      = Close[tmaSegmentBar];
-    double rangelow       = Close[tmaSegmentBar];
+    double rangehigh      = Close[tmaBar];
+    double rangelow       = Close[tmaBar];
 
     range.Event           = NoEvent;
     range.Age            += BoolToInt(Event(NewSegment),1);
 
-    if (IsHigher(Close[tmaSegmentBar],range.High))
+    if (IsHigher(Close[tmaBar],range.High))
       range.Event         = NewExpansion;
 
-    if (IsLower(Close[tmaSegmentBar],range.Low))
+    if (IsLower(Close[tmaBar],range.Low))
       range.Event         = NewExpansion;
 
     if (Event(NewTick))
@@ -748,7 +769,7 @@ void CTickMA::UpdateRange(void)
       range.Mean          = fdiv(range.High+range.Low,2);
     }
 
-    if (IsEqual(range.Event,NewExpansion)||tmaSegmentBar>0)
+    if (IsEqual(range.Event,NewExpansion)||tmaBar>0)
     {
       if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
         if (IsChanged(range.State,Reversal))
@@ -760,14 +781,14 @@ void CTickMA::UpdateRange(void)
       if (IsEqual(range.State,Retrace))
         SetEvent(BoolToEvent(IsChanged(range.State,Breakout),NewBreakout),Critical);
 
-      range.Retrace       = Close[tmaSegmentBar];
+      range.Retrace       = Close[tmaBar];
       range.Age           = 0;
     }
     else
     {
       range.Retrace       = BoolToDouble(IsEqual(range.Direction,DirectionUp),
-                              fmin(Close[tmaSegmentBar],range.Retrace),
-                              fmax(Close[tmaSegmentBar],range.Retrace));
+                              fmin(Close[tmaBar],range.Retrace),
+                              fmax(Close[tmaBar],range.Retrace));
 
       if (IsChanged(range.State,(FractalState)BoolToInt(IsEqual(range.Direction,Direction(range.Retrace-range.Mean)),range.State,Retrace)))
         range.Event       = NewRetrace;
@@ -814,7 +835,7 @@ void CTickMA::UpdateSMA(void)
     //-- Handle parabolics
     if (IsEqual(dirHigh,DirectionUp)&&IsEqual(dirLow,DirectionDown))
     {
-      sma.Direction  = sr[0].Direction;
+      sma.Direction  = sr[0].Direction[Lead];
       event          = NewParabolic;
       state          = Parabolic;
     }
@@ -863,8 +884,8 @@ void CTickMA::UpdateLinear(void)
     CalcLinear(poly.Open,line.Open.Price);
     CalcLinear(poly.Close,line.Close.Price);
 
-    CalcFractal(line.Open);
-    CalcFractal(line.Close);
+    CalcFOC(line.Open);
+    CalcFOC(line.Close);
 
     line.Direction             = line.Open.Direction;
     line.Event                 = NoEvent;
@@ -903,9 +924,9 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     tmaSMASlow                 = 3;
     tmaSMAKeep                 = Periods;
     tmaTickAgg                 = point(Aggregate);
-    tmaActiveDir            = DirectionChange;
-    tmaSegmentDir              = DirectionChange;
-    tmaSegmentBar              = Bars-1;
+    tmaBar              = Bars-1;
+
+    ArrayInitialize(tmaDirection,DirectionChange);
 
     ArrayResize(poly.Open,tmaPeriods);
     ArrayResize(poly.Close,tmaPeriods);
@@ -916,11 +937,11 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     NewTick();
     
     //-- Initialize Range
-    range.Direction           = Direction(Close[tmaSegmentBar]-Close[tmaSegmentBar]);
-    range.High                = High[tmaSegmentBar];
-    range.Low                 = Low[tmaSegmentBar];
+    range.Direction           = Direction(Close[tmaBar]-Close[tmaBar]);
+    range.High                = High[tmaBar];
+    range.Low                 = Low[tmaBar];
     range.Mean                = fdiv(range.High+range.Low,2,Digits);
-    range.Retrace             = Close[tmaSegmentBar];
+    range.Retrace             = Close[tmaBar];
     range.State               = NoState;
     
     //-- Preload SMA Price arrays
@@ -929,13 +950,17 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     ArrayResize(sma.Low.Price,tmaSMAKeep);
     ArrayResize(sma.Close.Price,tmaSMAKeep);
 
-    InitFractal(sma.Open,Open[tmaSegmentBar]);
-    InitFractal(sma.High,High[tmaSegmentBar]);
-    InitFractal(sma.Low,Low[tmaSegmentBar]);
-    InitFractal(sma.Close,Close[tmaSegmentBar]);
+    InitFractal(sma.Open,Open[tmaBar]);
+    InitFractal(sma.High,High[tmaBar]);
+    InitFractal(sma.Low,Low[tmaBar]);
+    InitFractal(sma.Close,Close[tmaBar]);
 
     //-- Preload History (Initialize)
-    for (tmaSegmentBar=Bars-1;tmaSegmentBar>0;tmaSegmentBar--)
+    tmaSupport                = Low[tmaBar];
+    tmaResistance             = High[tmaBar];
+    tmaExpansion              = Close[tmaBar];
+
+    for (tmaBar=Bars-1;tmaBar>0;tmaBar--)
       Update();
   }
 
@@ -1012,7 +1037,9 @@ string CTickMA::SegmentStr(int Node)
     if (Count(Segments)>Node)
     {
       Append(text,"Segment|"+(string)(ArraySize(sr)-(Node+1)));
-      Append(text,DirText(sr[Node].Direction),"|");
+      Append(text,DirText(sr[Node].Direction[Trend]),"|");
+      Append(text,DirText(sr[Node].Direction[Term]),"|");
+      Append(text,DirText(sr[Node].Direction[Lead]),"|");
       Append(text,ActionText(sr[Node].Bias),"|");
       Append(text,EnumToString(sr[Node].Event),"|");
 
