@@ -80,33 +80,8 @@
                    };             
 
   //-- Canonical Fractal Rec
-  struct           FiboCalcRec
-                   {
-                     int             ActiveDir;      //-- Price action direction
-                     FibonacciLevel  Level;          //-- Fibonacci Level Now
-                     double          High;           //-- Fibo boundary high
-                     double          Low;            //-- Fibo boundary low
-                     int             Momentum;       //-- Fibo change (+/-)
-                     EventType       Event;          //-- NewDirection|NewExpansion|NewRally|NewPullback
-                     double          Min;            //-- Lowest fibo %
-                     double          Max;            //-- Highest fibo %
-                     double          Now;            //-- Fibonacci % Now
-                   };
-  
-  struct           FractalDetail
-                   {
-                     FractalType     Type;
-                     FractalState    State;
-                     int             Direction;
-                     int             BreakoutDir;
-                     EventType       Event;
-                     int             Bias;
-                     double          Age;
-                     FiboCalcRec     Expansion;
-                     FiboCalcRec     Retrace;
-                     double          Points[FractalPoints];
-                   };
 
+static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
 
@@ -130,8 +105,11 @@ EventType FractalEvent(FractalType Type)
       case Term:         return(NewTerm);
       case Base:         return(NewBase);
       case Expansion:    return(NewExpansion);
-      case Convergent:   return(NewConvergence);
       case Divergent:    return(NewDivergence);
+      case Convergent:   return(NewConvergence);
+      case Inversion:    return(NewRetrace);
+      case Conversion:   return(NewRecovery);
+      case Lead:         return(NewLead);
     };
     
     return (NoEvent);

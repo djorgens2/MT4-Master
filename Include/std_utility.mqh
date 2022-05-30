@@ -384,7 +384,7 @@ string DirText(int Value, bool Contrarian=false)
     case DIR_LREV      : return("REVERSAL LONG");
     case DIR_RALLY     : return("RALLY");
     case DIR_UP        : return("LONG");
-    case DIR_NONE      : return("NONE");
+    case DIR_NONE      : return("FLAT");
     case DIR_DOWN      : return("SHORT");
     case DIR_PULLBACK  : return("PULLBACK");
     case DIR_SREV      : return("REVERSAL SHORT");

@@ -79,21 +79,7 @@ void GetData(void)
 //| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
-  {
-    const color linecolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
-    double f[];
-    
-    if (!IsEqual(inpShowFractal,PriceTypes))
-    {
-      if (inpShowFractal==ptOpen)   ArrayCopy(f,tick.SMA().Open.Point);
-      if (inpShowFractal==ptHigh)   ArrayCopy(f,tick.SMA().High.Point);
-      if (inpShowFractal==ptLow)    ArrayCopy(f,tick.SMA().Low.Point);
-      if (inpShowFractal==ptClose)  ArrayCopy(f,tick.SMA().Close.Point);
-
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        UpdateLine("tmaSMAFractal:"+StringSubstr(EnumToString(fp),2),f[fp],STYLE_SOLID,linecolor[fp]);
-    }
-    
+  {    
     UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
     
     if (tick.ActiveEvent())
@@ -104,7 +90,7 @@ void RefreshScreen(void)
         if (tick[event])
         {
           Append(text,EventText[event],"\n");
-          Append(text,EnumToString(tick.AlertLevel(event)));
+          Append(text,EnumToString(tick.EventAlertLevel(event)));
         }
       Comment("Tick: "+(string)Tick+"\n"+text);
     }
@@ -411,7 +397,7 @@ void Test6(void)
     }
     
     if (order.Pending())
-      order.PrintSnapshotStr();
+      Print(order.SnapshotStr());
 
     if (order.Fulfilled(OP_BUY))
       Print(order.QueueStr());
@@ -562,7 +548,7 @@ void Test8(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 8
+    #define Test 2
     ++Tick;
     
     switch (Test)
@@ -590,10 +576,14 @@ void Execute(void)
 
     order.ExecuteOrders(OP_BUY);
         if (order[Closed].Type[OP_BUY].Count>0)
-          Pause("Order closed (processed)","Snapshot Check");
+        {
+          Print(order[Closed].Type[OP_BUY].Count);
+          Print(order.SnapshotStr());
+          Pause("Buy Order closed (processed)","Snapshot Check");
+        }
     order.ExecuteOrders(OP_SELL);
         if (order[Closed].Type[OP_SELL].Count>0)
-          Pause("Order closed (processed)","Snapshot Check");
+          Pause("Sell Order closed (processed)","Snapshot Check");
     order.ExecuteRequests();
  
 //    if (Tick==5) Print (">>>After:"+order.OrderStr());
@@ -619,14 +609,14 @@ void OnTick()
     
     RefreshScreen();
 
-    if (IsEqual(tick.SMA().High.Event,NewBias))
-    {
+//    if (IsEqual(tick.SMA().High.Event,NewBias))
+//    {
 //      Print(tick.SMAStr());
 //      CallPause("New Bias: "+proper(ActionText(tick.SMA().High.Bias))+"\nState: "+
 //                   proper(DirText(tick.SMA().High.Direction))+
 //                   " "+EnumToString(tick.SMA().High.State)+
 //                   "\n"+EnumToString(tick.SMA().High.Event));
-    }
+//    }
 
 //    if (tick.Event(NewHigh,Nominal))
 //      Pause

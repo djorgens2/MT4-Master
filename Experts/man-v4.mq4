@@ -14,7 +14,11 @@
 #include <Class/TickMA.mqh>
 #include <Class/Session.mqh>
 
-//--- input parameters
+//--- Show Options
+input string        showHeader         = "";          // +--- Show Options ---+
+input int           inpShowZone        = 0;           // Show (n) Zone Lines
+
+//--- Regression parameters
 input string        regrHeader         = "";          // +--- Regression Config ---+
 input int           inpPeriods         = 80;          // Retention
 input int           inpDegree          = 6;           // Poiy Regression Degree
@@ -58,14 +62,15 @@ input int            inpGMTOffset    = 0;            // Offset from GMT+3
                    Position,
                    Release,
                    Build,
-                   Evaluate,
+                   Mitigate,
                    Capture
                  };
 
   struct         ManagerRec
                  {
                    StrategyType      Strategy;   //-- Action Strategy;
-                   OrderSummary      Zone;
+                   OrderSummary      NowZone;    //-- Current Zone Detail (rec)
+                   OrderSummary      NewZone;    //-- Entry Zone Detail (rec)
                  };
 
   ManagerRec     mr[2];
@@ -90,7 +95,7 @@ void RefreshPanel(void)
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy),BoolToInt(IsChanged(strategy[action],mr[action].Strategy),clrYellow,clrDarkGray));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray),16,"Wingdings");
+//      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray),16,"Wingdings");
     }
   }
 
@@ -99,23 +104,16 @@ void RefreshPanel(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    const color linecolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
-    double f[];
+    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_SOLID,clrYellow);
     
-    if (!IsEqual(inpShowFractal,PriceTypes))
+    for (int zone=0;zone<inpShowZone;zone++)
     {
-      if (inpShowFractal==ptOpen)   ArrayCopy(f,t.SMA().Open.Point);
-      if (inpShowFractal==ptHigh)   ArrayCopy(f,t.SMA().High.Point);
-      if (inpShowFractal==ptLow)    ArrayCopy(f,t.SMA().Low.Point);
-      if (inpShowFractal==ptClose)  ArrayCopy(f,t.SMA().Close.Point);
-
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        UpdateLine("tmaSMAFractal:"+StringSubstr(EnumToString(fp),2),f[fp],STYLE_SOLID,linecolor[fp]);
+      UpdateLine("crDAM:ZoneHi:"+(string)zone,order.DCA(OP_BUY)+fdiv(point(inpZoneStep),2)+(point(inpZoneStep)*zone),STYLE_DOT,clrForestGreen);
+      UpdateLine("crDAM:ZoneLo:"+(string)zone,order.DCA(OP_BUY)-fdiv(point(inpZoneStep),2)-(point(inpZoneStep)*zone),STYLE_DOT,clrFireBrick);
     }
-    
-    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_SOLID,clrForestGreen);
-    UpdateLine("crDAM:ActiveMid",s[Daily].Pivot(ActiveSession),STYLE_DOT,Color(s[Daily][Term].Direction));
-    UpdateLine("crDAM:PriorMid",s[Daily].Pivot(PriorSession),STYLE_DOT,Color(s[Daily][Term].Direction));
+//    UpdateLine("czDCA:"+(string)OP_SELL,order.DCA(OP_SELL),STYLE_SOLID,clrRed);
+//    UpdateLine("crDAM:ActiveMid",s[Daily].Pivot(ActiveSession),STYLE_DOT,Color(s[Daily][Term].Direction));
+//    UpdateLine("crDAM:PriorMid",s[Daily].Pivot(PriorSession),STYLE_DOT,Color(s[Daily][Term].Direction));
 
     if (t.ActiveEvent())
     {
@@ -155,20 +153,47 @@ void UpdateSession(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTick - Calculates position, trajectory, velocity on a tick |
+//| UpdateTick - Updates & Retrieves Tick data and fractals          |
 //+------------------------------------------------------------------+
 void UpdateTick(void)
   {
-    const  int labelcolor[9]      = {clrOrange,clrOrangeRed,clrFireBrick,clrMaroon,clrLightGray,clrForestGreen,clrLimeGreen,clrYellowGreen,clrYellow};
-    static int state              = 4;
-
-    t.Update();
+    static int direction[2];
     
-    if (t[NewLow])
-      if (IsBetween(t.Tick(0).Close,
+    t.Update();
 
-        
-    UpdatePriceLabel("tmaNewBoundary",BoolToDouble(t[NewLow],Close[0],0.00),labelcolor[action][t.EventAlertLevel(NewLow)]);
+    if (t.Event(NewTerm,Major))
+    {
+      if (IsChanged(direction[OP_BUY],t.Fractal().High.Direction[Term]))
+        Pause("Major New Long Term","TickMA Fractal SMA() Event");
+
+      if (IsChanged(direction[OP_SELL],t.Fractal().Low.Direction[Term]))
+        Pause("Major New Short Term","TickMA Fractal SMA() Event");
+    }
+    //else
+    //if (t.Event(NewTrend,Major))
+    //  Pause("Major New Term","TickMA Fractal SMA() Event");
+    //else
+    //if (t.Event(FractalEvent(frHigh.Type),Major))
+    //  Pause("Major New "+EnumToString(frHigh.Type),"TickMA Fractal SMA() Event");
+    
+    direction[OP_BUY]   = t.Fractal().High.Direction[Term];
+    direction[OP_SELL]  = t.Fractal().Low.Direction[Term];
+    //Print("SMA-High|",t.FractalStr(frHigh));
+    //Print("SMA-Low|",t.FractalStr(frLow));
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateOrder - Updates & Retrieves order data                     |
+//+------------------------------------------------------------------+
+void UpdateOrder(void)
+  {
+    order.Update();
+    
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+    {
+      order.GetZone(action,order.Zone(action,BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid)),mr[action].NewZone);
+      order.GetZone(action,order.Zone(action),mr[action].NowZone);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -192,10 +217,10 @@ bool NewStrategy(int Action)
     switch (t.Linear().Zone)
     {
       case -2:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Capture,Protect)));
-      case -1:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Evaluate,Position)));
-      case  1:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Position,Evaluate)));
+      case -1:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Mitigate,Build)));
+      case  1:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Build,Mitigate)));
       case  2:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Protect,Capture)));
-      default:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Release,Build)));
+      default:  return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Release,Position)));
     }
   }
 
@@ -204,66 +229,95 @@ bool NewStrategy(int Action)
 //+------------------------------------------------------------------+
 void ManageLong(void)
   {
-    static bool trigger        = false;
+    OrderRequest request       = order.BlankRequest("[Auto] Long");
+
     static bool stacking       = false;
-    
+
     if (NewStrategy(OP_BUY))
     {
-      //CallPause("New Strategy",Always);
+      switch (mr[OP_BUY].Strategy)
+      {
+        case Protect:     //order.SetRiskLimits(OP_BUY,10,80,2);
+                          break;
+        case Position:    break;
+        case Release:     break;
+        case Build:       break;
+        case Mitigate:    break;
+        case Capture:     break;
+      }
     }
-    //{
-    //  order.SetOrderMethod(OP_BUY,(OrderMethod)BoolToInt(mr[OP_BUY].Hold,Hold,Split),ByAction);
-    //  order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
-    //}
 
     switch (mr[OP_BUY].Strategy)
     {
 //      case Protect:     if (mr[OP_BUY].Hold)
 //                        {
-//
+//                          order.SetOrderMethod(OP_BUY,(OrderMethod)BoolToInt(mr[OP_BUY].Hold,Hold,Split),ByAction);
+//                          order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
 //                        }
 //                        break;
       case Position:    break;
       case Release:     break;
       case Build:       break;
-      case Evaluate:    break;
+      case Mitigate:    break;
       case Capture:     break;
     }
 
-    OrderRequest request   = order.BlankRequest("[Auto] Long");
-
-    order.SetRiskLimits(OP_BUY,10,80,2);
-
-    if (IsEqual(t.Linear().Bias,OP_BUY))
-      switch (t.SMA().State)
+    //-- Looking for Long Adds/Risk Mitigation
+    if (t[NewLow])
+    {
+      if (mr[OP_BUY].NewZone.Count>0)
       {
-        case Consolidation:
-          switch (t.SMA().Direction)
-          {
-            case DirectionUp:     //if (IsChanged(trigger,true))
-                                  //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
-                                  break;
-
-            case DirectionDown:   request.Type           = OP_BUYLIMIT;
-                                  request.Memo           = "In-Trend Consolidation";
- 
-                                  request.Price          = Bid;
-                                  request.Lots           = 0.00;
-                                  request.Expiry         = TimeCurrent()+(Period()*(60*2));
-
-                                  if (stacking)
-                                  {
-                                    request.Pend.Step    = 2.0;
-                                    request.Pend.Type    = OP_BUYSTOP;
-                                  }
-                                  break;
-          }
-          break;
-
-        default:  trigger   = false;
+        //-- do something; order/dca/position checks...
+      }  
+      else
+      {
+        switch (t.Fractal().Low.Type)
+        {
+          case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                           {
+                             request.Type           = OP_BUY;
+                             request.Memo           = "Divergent [Up]";
+                           }
+                           break;
+          case Convergent: break;
+          case Expansion:  break;
+        }
       }
+    }
+    
+    //-- Looking for Long Adds/Profit
+    if (t[NewLow])
+    {
+    }
 
-    if (IsChanged(trigger,!IsEqual(request.Type,OP_NO_ACTION)))
+//    if (IsEqual(t.Linear().Bias,OP_BUY))
+//      switch (t.SMA().State)
+//      {
+//        case Consolidation:
+//          switch (t.SMA().Direction)
+//          {
+//            case DirectionUp:     //if (IsChanged(trigger,true))
+//                                  //    SetFlag("Con",Color(t.SMA().Direction,IN_CHART_DIR));
+//                                  break;
+//
+//            case DirectionDown:   request.Type           = OP_BUYLIMIT;
+//                                  request.Memo           = "In-Trend Consolidation";
+// 
+//                                  request.Price          = Bid;
+//                                  request.Lots           = 0.00;
+//                                  request.Expiry         = TimeCurrent()+(Period()*(60*2));
+//
+//                                  if (stacking)
+//                                  {
+//                                    request.Pend.Step    = 2.0;
+//                                    request.Pend.Type    = OP_BUYSTOP;
+//                                  }
+//                                  break;
+//          }
+//          break;
+//      }
+
+    if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
       if (!order.Submitted(request))
         CallPause(order.RequestStr(request),PauseOn);
 
@@ -276,16 +330,13 @@ void ManageLong(void)
 //+------------------------------------------------------------------+
 void ManageShort(void)
   {
-    FractalRec exit        = t.SMA().High;
-    FractalRec entry       = t.SMA().Low;
-
     switch (mr[OP_SELL].Strategy)
     {
       case Protect:     break;
       case Position:    break;
       case Release:     break;
       case Build:       break;
-      case Evaluate:    break;
+      case Mitigate:    break;
       case Capture:     break;
     }
     
@@ -319,10 +370,7 @@ void ManageShort(void)
 void Execute(void)
   {
     static int direction    = DirectionChange;
-           int action       = Action(Direction(order[Net].Lots));
-
-    if (IsEqual(action,OP_NO_ACTION))
-      action                = Action(t.Segment(0).Direction[Trend]);
+           int action       = BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment(0).Direction[Trend]),Action(Direction(order[Net].Lots)));
 
     if (IsEqual(action,OP_BUY))
     {
@@ -355,8 +403,7 @@ void OnTick()
   {
     UpdateTick();
     UpdateSession();
-    
-    order.Update();
+    UpdateOrder();
 
     Execute();
     
@@ -369,10 +416,6 @@ void OnTick()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    if (!IsEqual(inpShowFractal,PriceTypes))
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        NewLine("tmaSMAFractal:"+StringSubstr(EnumToString(fp),2),0.00);
-
     order.Enable();
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
@@ -390,10 +433,18 @@ int OnInit()
     s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
-    NewLine("czDCA:0");
+    NewLine("czDCA:"+(string)OP_BUY);
+    NewLine("czDCA:"+(string)OP_SELL);
+
     NewLine("crDAM:ActiveMid");
     NewLine("crDAM:PriorMid");
 
+    for (int zone=0;zone<inpShowZone;zone++)
+    {
+      NewLine("crDAM:ZoneHi:"+(string)zone);
+      NewLine("crDAM:ZoneLo:"+(string)zone);
+    }
+          
     NewPriceLabel("tmaNewLow");
     NewPriceLabel("tmaNewHigh");
 

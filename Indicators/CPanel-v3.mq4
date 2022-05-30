@@ -84,21 +84,10 @@
 #property indicator_style10 STYLE_DASH
 #property indicator_width10 1
 
-//--- Enum Fractal Show Options
-enum ShowOptions 
-     {
-       NoShow,      // Hide Fractals
-       SMAOpen,     // SMA (Open)
-       SMAHigh,     // SMA (High)
-       SMALow,      // SMA (Low)
-       SMAClose     // SMA (Close)
-     };
-
 //--- input parameters
 input int          inpPeriods        =  80;         // Retention
 input int          inpDegree         =   6;         // Poiy Regression Degree
 input double       inpAgg            = 2.5;         // Tick Aggregation
-input ShowOptions  inpShowFractal    = NoShow;      // Show Fractal
 
 //--- Indicator defs
 int            IndWinId = -1;
@@ -142,46 +131,50 @@ void CallPause(string Message, bool Pause)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    const color labelcolor[] = {clrWhite,clrYellow,clrLawnGreen,clrRed,clrGoldenrod,clrSteelBlue};
-    double f[];
-
-    if (!IsEqual(inpShowFractal,NoShow))
-    {
-      if (inpShowFractal==SMAOpen)   ArrayCopy(f,t.SMA().Open.Point);
-      if (inpShowFractal==SMAHigh)   ArrayCopy(f,t.SMA().High.Point);
-      if (inpShowFractal==SMALow)    ArrayCopy(f,t.SMA().Low.Point);
-      if (inpShowFractal==SMAClose)  ArrayCopy(f,t.SMA().Close.Point);
-
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        UpdatePriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),f[fp],labelcolor[fp]);
-    }
-
+    //-- Range
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+" ["+string(t.Count(Ticks)-1)+":"+
                   string(t.Count(Segments)-1)+"] Z/A ["+(string)t.Linear().Zone+":"+(string)t.Range().Age+"]",Color(Direction(t.Range().Direction)),12);
-    UpdateLabel("tmaSegmentState"+(string)IndWinId,"Segment ["+(string)t.Segment(0).Price.Count+"]: "+
-                  BoolToStr(IsEqual(t.Segment(0).Direction,t.Segment(0).ActiveDir),
-                  proper(DirText(t.Segment(0).Direction)),"Hedge"),Color(t.Segment(0).Direction),12);
-    UpdateDirection("tmaSegmentBias"+(string)IndWinId,Direction(t.Segment(0).Bias,InAction),Color(Direction(t.Segment(0).Bias,InAction)),18);
-    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).ActiveDir,Color(t.Segment(0).ActiveDir),18);
+
+    //-- Segment
+    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).Direction[Trend],Color(t.Segment(0).Direction[Term]),18);
+    UpdateLabel("tmaSegmentState"+(string)IndWinId,proper(DirText(t.Segment(0).Direction[Term]))+" ["+(string)t.Segment(0).Price.Count+"]: "+
+                  BoolToStr(IsEqual(t.Segment(0).Direction[Term],t.Segment(0).Direction[Lead]),proper(ActionText(Action(t.Segment(0).Direction[Lead]))),"Hedge"),
+                  Color(t.Segment(0).Direction[Term]),12);
+    UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment(0).Direction[Term],Color(Direction(t.Segment(0).Bias,InAction)),18);
+
+    //-- Net Bias
+    UpdateDirection("tmaSMABiasNet"+(string)IndWinId,t.SMA().Direction,Color(t.SMA().Direction),18);
     UpdateLabel("tmaSMAState"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Event,NoEvent),
                   proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),Color(t.SMA().Direction),12);
     UpdateDirection("tmaSMABias"+(string)IndWinId,Direction(t.SMA().Bias,InAction),Color(Direction(t.SMA().Bias,InAction)),18);
-    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().High.Event,NoEvent),
-                  proper(DirText(t.SMA().High.Direction))+" "+EnumToString(t.SMA().High.State),EventText[t.SMA().High.Event])+" ["+NegLPad(t.Momentum(t.SMA().High),Digits)+"]",
-                  BoolToInt(t.SMA().High.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().High.Bias,InAction))),12);
-    UpdateDirection("tmaSMABiasHi"+(string)IndWinId,Direction(t.SMA().High.Bias,InAction),Color(Direction(t.SMA().High.Bias,InAction)),18);
-    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,BoolToStr(IsEqual(t.SMA().Low.Event,NoEvent),
-                  proper(DirText(t.SMA().Low.Direction))+" "+EnumToString(t.SMA().Low.State),EventText[t.SMA().Low.Event])+" ["+NegLPad(t.Momentum(t.SMA().Low),Digits)+"]",
-                  BoolToInt(t.SMA().Low.Peg.IsPegged,clrYellow,Color(Direction(t.SMA().Low.Bias,InAction))),12);
-    UpdateDirection("tmaSMABiasLo"+(string)IndWinId,Direction(t.SMA().Low.Bias,InAction),Color(Direction(t.SMA().Low.Bias,InAction)),18);
+
+    //-- High Bias
+    UpdateDirection("tmaSMAFractalHi"+(string)IndWinId,t.Fractal().High.Direction[Term],BoolToInt(IsEqual(t.Fractal().High.Direction[Term],t.Fractal().High.Direction[Trend]),
+                  Color(t.Fractal().High.Direction[Term]),clrYellow),18);
+    UpdateLabel("tmaSMAStateHi"+(string)IndWinId,proper(DirText(t.Direction(t.SMA().High)))+" "+FractalTag[t.Fractal().High.Type]+" "+
+                  BoolToStr(Close[0]>t.SMA().High[0],"Hold",BoolToStr(Close[0]>t.SMA().Close[0],"Rally","Pullback")),Color(t.Direction(t.SMA().High)),12);
+    UpdateDirection("tmaSMABiasHi"+(string)IndWinId,t.Direction(t.SMA().High),Color(t.Direction(t.SMA().High)),18);
+
+    //-- Low Bias
+    UpdateDirection("tmaSMAFractalLo"+(string)IndWinId,t.Fractal().Low.Direction[Term],BoolToInt(IsEqual(t.Fractal().Low.Direction[Term],t.Fractal().Low.Direction[Trend]),
+                  Color(t.Fractal().Low.Direction[Term]),clrYellow),18);
+    UpdateLabel("tmaSMAStateLo"+(string)IndWinId,proper(DirText(t.Direction(t.SMA().Low)))+" "+FractalTag[t.Fractal().Low.Type]+" "+
+                  BoolToStr(Close[0]<t.SMA().Low[0],"Hold",BoolToStr(Close[0]>t.SMA().Close[0],"Rally","Pullback")),Color(t.Direction(t.SMA().Low)),12);
+    UpdateDirection("tmaSMABiasLo"+(string)IndWinId,t.Direction(t.SMA().Low),Color(t.Direction(t.SMA().Low)),18);
+
+    //-- Linear
     UpdateLabel("tmaLinearStateOpen"+(string)IndWinId,NegLPad(t.Linear().Open.Now,Digits)+" "+NegLPad(t.Linear().Open.Max,Digits)+" "+
-                   NegLPad(t.Linear().Open.Min,Digits),Color(t.Linear().Open.Direction),12);
+                  NegLPad(t.Linear().Open.Min,Digits),Color(t.Linear().Open.Direction),12);
     UpdateDirection("tmaLinearBiasOpen"+(string)IndWinId,Direction(t.Linear().Open.Bias,InAction),Color(Direction(t.Linear().Open.Bias,InAction)),18);
     UpdateLabel("tmaLinearStateClose"+(string)IndWinId,NegLPad(t.Linear().Close.Now,Digits)+" "+NegLPad(t.Linear().Close.Max,Digits)+" "+
-                   NegLPad(t.Linear().Close.Min,Digits),Color(t.Linear().Close.Direction),12);
+                  NegLPad(t.Linear().Close.Min,Digits),Color(t.Linear().Close.Direction),12);
     UpdateDirection("tmaLinearBiasClose"+(string)IndWinId,Direction(t.Linear().Close.Bias,InAction),Color(Direction(t.Linear().Close.Bias,InAction)),18);
     UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),24);
     
+    //-- Fractal
+    UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
+    UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
+
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
   }
@@ -256,10 +249,10 @@ void UpdateTickMA(void)
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
-    ResetBuffer(plSMAOpenBuffer,t.SMA().Open.Price);
-    ResetBuffer(plSMACloseBuffer,t.SMA().Close.Price);
-    ResetBuffer(plSMAHighBuffer,t.SMA().High.Price);
-    ResetBuffer(plSMALowBuffer,t.SMA().Low.Price);
+    ResetBuffer(plSMAOpenBuffer,t.SMA().Open);
+    ResetBuffer(plSMACloseBuffer,t.SMA().Close);
+    ResetBuffer(plSMAHighBuffer,t.SMA().High);
+    ResetBuffer(plSMALowBuffer,t.SMA().Low);
 
     ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
     ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
@@ -574,18 +567,17 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
     }
 
-    if (!IsEqual(inpShowFractal,NoShow))
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
-
     NewLabel("tmaRangeState"+(string)IndWinId,"",32,2,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentState"+(string)IndWinId,"",32,20,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSegmentBias"+(string)IndWinId,"",5,16,clrDarkGray,SCREEN_UR,IndWinId);
-    NewLabel("tmaSegmentDir"+(string)IndWinId,"",180,18,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSegmentDir"+(string)IndWinId,"",180,16,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMABiasNet"+(string)IndWinId,"",180,34,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMAState"+(string)IndWinId,"",32,38,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMABias"+(string)IndWinId,"",5,34,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAFractalHi"+(string)IndWinId,"",180,52,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMAStateHi"+(string)IndWinId,"",32,56,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMABiasHi"+(string)IndWinId,"",5,52,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaSMAFractalLo"+(string)IndWinId,"",180,70,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMAStateLo"+(string)IndWinId,"",32,74,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaSMABiasLo"+(string)IndWinId,"",5,70,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearStateOpen"+(string)IndWinId,"",32,92,clrDarkGray,SCREEN_UR,IndWinId);
@@ -593,13 +585,11 @@ int OnInit()
     NewLabel("tmaLinearStateClose"+(string)IndWinId,"",32,110,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBiasClose"+(string)IndWinId,"",5,106,clrDarkGray,SCREEN_UR,IndWinId);
     NewLabel("tmaLinearBiasNet"+(string)IndWinId,"",210,96,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaFractalState"+(string)IndWinId,"",32,128,clrDarkGray,SCREEN_UR,IndWinId);
+    NewLabel("tmaFractalDir"+(string)IndWinId,"",5,124,clrDarkGray,SCREEN_UR,IndWinId);
 
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
-
-    if (!IsEqual(inpShowFractal,NoShow))
-      for (FractalPoint fp=0;fp<FractalPoints;fp++)
-        NewPriceLabel("tmaPL"+StringSubstr(EnumToString(inpShowFractal),2)+":"+StringSubstr(EnumToString(fp),2),0.00,false,IndWinId);
 
     //--- Initialize Buffers
     SetIndexBuffer(0,plHighBuffer);
