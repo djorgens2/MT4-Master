@@ -120,10 +120,11 @@ private:
              int          Bias;
              EventType    Event;
              double       Price[];
+             double       Lead;
+             double       Origin;
              double       Min;
              double       Max;
              double       Now;
-
            };
 
     struct LinearRec
@@ -134,6 +135,7 @@ private:
              int          Zone;
              FOCRec       Open;
              FOCRec       Close;
+             FOCRec       Prior;
            };
 
     void             CalcFOC(FOCRec &FOC);
@@ -189,9 +191,9 @@ public:
     double           Resistance(void)      { return(tmaResistance); };
     double           Expansion(void)       { return(tmaExpansion); };
 
-    double           Momentum(double &Price[], ReservedWords Measure=Previous);
     int              Count(CountType Type) { return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr))); };
     int              Direction(double &Price[], int Speed=Fast) { return(Direction(Price[0]-Price[Speed-1])); };
+    int              Zone(double Price);
 
                      CTickMA(int Periods, int Degree, double Aggregate);
                     ~CTickMA();
@@ -213,7 +215,7 @@ public:
   };
 
 //+------------------------------------------------------------------+
-//| CalcFOC - Computes Linear(FOC) Fractal states, events                |
+//| CalcFOC - Computes Linear(FOC) Fractal states, events            |
 //+------------------------------------------------------------------+
 void CTickMA::CalcFOC(FOCRec &FOC)
   {
@@ -226,11 +228,15 @@ void CTickMA::CalcFOC(FOCRec &FOC)
     //--- compute FOC metrics
     if (Event(NewTick))
     {
-      FOC.Now               = (atan(fdiv(pip(FOC.Price[0]-FOC.Price[tmaPeriods-1]),tmaPeriods))*180)/M_PI;
+      FOC.Lead              = FOC.Price[0];
+      FOC.Origin            = FOC.Price[tmaPeriods-1];
+      FOC.Now               = (atan(fdiv(pip(FOC.Lead-FOC.Origin),tmaPeriods))*180)/M_PI;
       FOC.Event             = NoEvent;
 
-      if (NewDirection(FOC.Direction,Direction(FOC.Price[0]-FOC.Price[1])))
+      if (NewDirection(FOC.Direction,Direction(FOC.Lead-FOC.Price[1])))
       {
+        line.Prior          = FOC;
+
         FOC.Min             = FOC.Now;
         FOC.Max             = FOC.Now;
         FOC.Event           = NewDirection;
@@ -548,7 +554,7 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
     fractal.Direction[Trend]      = fractal.Direction[Expansion];
 
     if (IsChanged(Fractal.Type,fractal.Type))
-      SetEvent(FractalEvent[Fractal.Type],Major);
+      SetEvent(FractalEvent(Fractal.Type),Major);
       
     if (IsChanged(Fractal.Direction[Term],fractal.Direction[Term]))
       SetEvent(NewTerm,Major);
@@ -557,22 +563,6 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
       SetEvent(NewTrend,Major);
 
     Fractal                         = fractal;
-  }
-
-//+------------------------------------------------------------------+
-//| Momentum - Computes Fractal Momentum                             |
-//+------------------------------------------------------------------+
-double CTickMA::Momentum(double &Price[], ReservedWords Measure=Previous)
-  {
-    int    measure    = BoolToInt(IsEqual(Measure,Previous),1,0);
-
-    double m1         = Price[measure]-Price[measure+1];
-    double m2         = Price[measure+1]-Price[measure+2];
-    
-    if (IsEqual(Direction(m1),Direction(m2)))
-      return (NormalizeDouble(fabs(m1)-fabs(m2),Digits));
-
-    return (NormalizeDouble(m1,Digits));
   }
 
 //+------------------------------------------------------------------+
@@ -819,12 +809,8 @@ void CTickMA::UpdateLinear(void)
       else
       if (Event(NewBias,Major))
         bias                   = line.Close.Bias;
-        
-      if (IsEqual(line.Close.Direction,DirectionUp))
-        line.Zone              = BoolToInt(IsHigher(tr[0].Open,range.Mean,NoUpdate),1)+BoolToInt(IsHigher(tr[0].Open,line.Close.Price[0],NoUpdate),1);
-      else
-        line.Zone              = BoolToInt(IsLower(tr[0].Open,range.Mean,NoUpdate),-1)+BoolToInt(IsLower(tr[0].Open,line.Close.Price[0],NoUpdate),-1);
 
+      line.Zone                = Zone(tr[0].Open);
       line.Event               = BoolToEvent(NewAction(line.Bias,bias),NewBias);
 
       SetEvent(line.Event,Critical);
@@ -832,7 +818,7 @@ void CTickMA::UpdateLinear(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateFractal - Updates Composite Fractal from supplied Fractal  |
+//| UpdateFractal - Updates Composite Fractal                        |
 //+------------------------------------------------------------------+
 void CTickMA::UpdateFractal(void)
   {
@@ -856,7 +842,9 @@ void CTickMA::UpdateFractal(void)
           if (NewState(fr.State,Breakout))
             fr.Event        = NewBreakout;
         }
-      }      
+        
+        SetEvent(fr.Event,Major);
+      }
     }
     else
     {
@@ -940,6 +928,17 @@ void CTickMA::Update(void)
       
       UpdateFractal();
     }
+  }
+
+//+------------------------------------------------------------------+
+//| Zone - Returns Zone by supplied Price                            |
+//+------------------------------------------------------------------+
+int CTickMA::Zone(double Price)
+  {
+      if (IsEqual(line.Close.Direction,DirectionUp))
+        return (BoolToInt(IsHigher(Price,range.Mean,NoUpdate),1)+BoolToInt(IsHigher(Price,line.Close.Price[0],NoUpdate),1));
+
+      return (BoolToInt(IsLower(Price,range.Mean,NoUpdate),-1)+BoolToInt(IsLower(Price,line.Close.Price[0],NoUpdate),-1));
   }
 
 //+------------------------------------------------------------------+
@@ -1058,8 +1057,6 @@ string CTickMA::SMAStr(int Count=0)
     Append(text,ActionText(sma.Bias),"|");
     Append(text,EnumToString(sma.State),"|");
     Append(text,EnumToString(sma.Event),"|");
-    Append(text,DoubleToStr(Momentum(sma.High),Digits)+"|"+DoubleToStr(Momentum(sma.High,Now),Digits),"|");
-    Append(text,DoubleToStr(Momentum(sma.Low),Digits)+"|"+DoubleToStr(Momentum(sma.Low,Now),Digits),"|");
 
     return(text);
   }

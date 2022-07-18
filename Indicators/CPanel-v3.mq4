@@ -88,6 +88,8 @@
 input int          inpPeriods        =  80;         // Retention
 input int          inpDegree         =   6;         // Poiy Regression Degree
 input double       inpAgg            = 2.5;         // Tick Aggregation
+input YesNoType    inpShowSegBounds  = Yes;         // Show Segment Boundary
+input YesNoType    inpShowFractal    = Yes;         // Show Fractal Rulers
 
 //--- Indicator defs
 int            IndWinId = -1;
@@ -175,6 +177,47 @@ void RefreshScreen(void)
     UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
     UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
 
+
+    if (inpShowSegBounds==Yes)
+    {
+      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Support(),clrLawnGreen);
+      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Resistance(),clrRed);
+      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Expansion(),clrYellow);
+      
+      if (t[NewHigh]||t[NewLow])
+        UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
+    }
+
+    if (inpShowFractal==Yes)
+    {
+      for (int bar=0;bar<inpPeriods;bar++)
+      {
+        ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
+        ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
+
+        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().High);
+        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().Low);
+
+        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
+        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);        
+      }
+      
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE1,t.Range().Mean);
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE2,t.Range().Mean);
+
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME1,Time[inpPeriods-1]);
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME2,Time[0]);
+
+      for (FractalType type=Origin;type<FractalTypes;type++)
+      {
+        if (type<=t.Fractal().High.Type)
+          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+
+        if (type<=t.Fractal().Low.Type)
+          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+      }
+    }
+
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
   }
@@ -245,7 +288,7 @@ void UpdateTickMA(void)
     //if (t[NewTick])
     //  CallPause("NewTick\n"+t.TickHistoryStr(2),t[NewTick]);
 
-    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
+//    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
@@ -450,7 +493,7 @@ int OnInit()
       NewLabel("lbvOC-"+ActionText(action)+"-DfltLotSize","Default 99.99",60,(146*(action+1))+155,clrDarkGray,SCREEN_UL,IndWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-ZoneStep","99.9",194,(146*(action+1))+130,clrDarkGray,SCREEN_UL,IndWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin","99.9%",236,(146*(action+1))+130,clrDarkGray,SCREEN_UL,IndWinId);
-      NewLabel("lbvOC-"+ActionText(action)+"-MaxZoneNow","-99",294,(146*(action+1))+130,clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-ZoneNow","-99",294,(146*(action+1))+130,clrDarkGray,SCREEN_UL,IndWinId);
     }
 
     //-- Zone Margin frames
@@ -590,6 +633,35 @@ int OnInit()
 
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,IndWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,IndWinId);
+
+    if (inpShowSegBounds==Yes)
+    {
+      NewPriceLabel("tmaPL(sp):"+(string)IndWinId,0.00,false,IndWinId);
+      NewPriceLabel("tmaPL(rs):"+(string)IndWinId,0.00,false,IndWinId);
+      NewPriceLabel("tmaPL(e):"+(string)IndWinId,0.00,false,IndWinId);
+      NewPriceLabel("tmaNewBoundary",0.00,false);
+    }
+
+    //--- Create Display Visuals
+    ObjectCreate("tmaRangeMid:"+(string)IndWinId,OBJ_TREND,IndWinId,0,0);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_RAY,true);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_WIDTH,1);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_STYLE,STYLE_DOT);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_COLOR,clrDarkGray);
+    
+    for (int obj=0;obj<inpPeriods;obj++)
+    {
+      ObjectCreate("tmaFrHi:"+(string)IndWinId+"-"+(string)obj,OBJ_TEXT,IndWinId,0,0);
+      ObjectCreate("tmaFrLo:"+(string)IndWinId+"-"+(string)obj,OBJ_TEXT,IndWinId,0,0);
+
+      ObjectCreate("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJ_TREND,IndWinId,0,0);
+      ObjectSet("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("tmaHL:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,1);
+
+      ObjectCreate("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJ_TREND,IndWinId,0,0);
+      ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
+    }
 
     //--- Initialize Buffers
     SetIndexBuffer(0,plHighBuffer);

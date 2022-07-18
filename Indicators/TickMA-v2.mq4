@@ -185,6 +185,12 @@ void RefreshScreen(void)
         ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
       }
 
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE1,t.Range().Mean);
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE2,t.Range().Mean);
+
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME1,Time[inpPeriods-1]);
+      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME2,Time[0]);
+
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (type<=t.Fractal().High.Type)
@@ -194,7 +200,7 @@ void RefreshScreen(void)
           ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],12,"Stencil",clrRed);
       }
     }
-    
+
     //-- General
     UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
@@ -247,9 +253,9 @@ void UpdateTickMA(void)
     if (t[NewHigh]||t[NewLow])
       UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
 
-    SetLevelValue(0,t.SMA().High[0]);
-    SetLevelValue(1,t.SMA().Low[0]);
-    SetLevelValue(2,t.Range().Mean);
+//    SetLevelValue(0,t.SMA().High[0]);
+//    SetLevelValue(1,t.SMA().Low[0]);
+//    SetLevelValue(2,t.Range().Mean);
 
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
@@ -377,6 +383,12 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_RAY,false);
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
     }
+
+    ObjectCreate("tmaRangeMid:"+(string)IndWinId,OBJ_TREND,IndWinId,0,0);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_RAY,true);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_WIDTH,1);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_STYLE,STYLE_DOT);
+    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_COLOR,clrDarkGray);
 
     if (inpSegBounds)
     {

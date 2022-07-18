@@ -289,9 +289,9 @@ double pip(double Value)
 //+------------------------------------------------------------------+
 //| point - returns the Value in points based on the current Symbol()|
 //+------------------------------------------------------------------+
-double point(double Value)
+double point(double Value, int Precision=0)
   {
-    return (NormalizeDouble(Value / pow(10, Digits-1), Digits));
+    return (NormalizeDouble(Value/pow(10,Digits-1),BoolToInt(IsEqual(Precision,0),Digits,Precision)));
   }
 
 //+------------------------------------------------------------------+

@@ -544,11 +544,74 @@ void Test8(void)
   }
 
 //+------------------------------------------------------------------+
+//| EquityHold Test by Action                                        |
+//+------------------------------------------------------------------+
+void Test9(void)
+  {
+    int req                 = 0;
+    OrderRequest eRequest   = order.BlankRequest("Test[9] Hold");
+    
+    eRequest.Memo           = "Test 9-Action Hold Test";
+    
+    static bool fill   = false;
+
+    order.SetRiskLimits(OP_BUY,80,80,2);
+    order.SetDefaults(OP_BUY,0,0,0);
+    order.SetDefaults(OP_SELL ,0,0,0);
+
+    if (Tick==1)
+      order.SetEquityHold(OP_BUY);
+    
+    if (Bid>18.12)
+      order.SetEquityHold(OP_SELL);
+      
+    if (Tick==11415)
+      order.SetEquityHold(OP_NO_ACTION);
+
+    if (Tick==18000)
+    {
+      order.SetEquityHold(OP_SELL);
+      order.SetOrderMethod(OP_SELL,Full,ByProfit);
+    }
+    
+    if (Bid<17.60)
+      order.SetEquityHold(OP_NO_ACTION);
+
+    //--- Queue Order Test
+      if (!fill) 
+      {        
+        eRequest.Pend.Type       = OP_BUYSTOP;
+        eRequest.Pend.Limit      = 17.970;
+        eRequest.Pend.Step       = 2;
+        eRequest.Pend.Cancel     = 18.112;
+
+        eRequest.Type            = OP_BUYLIMIT;
+        eRequest.Price           = 17.994;
+        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+    
+        if (order.Submitted(eRequest))
+          fill=true;
+          
+        eRequest.Pend.Type       = OP_SELLSTOP;
+        eRequest.Pend.Limit      = 18.160;
+        eRequest.Pend.Step       = 2;
+        eRequest.Pend.Cancel     = 17.765;
+
+        eRequest.Type            = OP_SELLLIMIT;
+        eRequest.Price           = 18.116;
+        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+
+        if (order.Submitted(eRequest))
+          fill=true;
+      }
+  }
+
+//+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 2
+    #define Test 9
     ++Tick;
     
     switch (Test)
@@ -569,24 +632,28 @@ void Execute(void)
                break;
       case 8:  Test8();
                break;
+      case 9:  Test9();
+               break;
     }
     
 //    if (order[OP_BUY].Count>0)
 //      Print(order.QueueStr());
 
     order.ExecuteOrders(OP_BUY);
-        if (order[Closed].Type[OP_BUY].Count>0)
-        {
-          Print(order[Closed].Type[OP_BUY].Count);
-          Print(order.SnapshotStr());
-          Pause("Buy Order closed (processed)","Snapshot Check");
-        }
+        //if (order[Closed].Type[OP_BUY].Count>0)
+        //{
+        //  Print(order[Closed].Type[OP_BUY].Count);
+        //  Print(order.SnapshotStr());
+        //  Pause("Buy Order closed (processed)","Snapshot Check");
+        //}
     order.ExecuteOrders(OP_SELL);
-        if (order[Closed].Type[OP_SELL].Count>0)
-          Pause("Sell Order closed (processed)","Snapshot Check");
+        //if (order[Closed].Type[OP_SELL].Count>0)
+        //  Pause("Sell Order closed (processed)","Snapshot Check");
     order.ExecuteRequests();
  
 //    if (Tick==5) Print (">>>After:"+order.OrderStr());
+    if (order.Declined(OP_BUYSTOP))
+      CallPause("Order Declined");
     
     //if (order.Fulfilled())
     //{
@@ -676,7 +743,7 @@ int OnInit()
       order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetZoneStep(action,2.5,60.0);
+      order.SetZoneLimits(action,2.0,2.0);
     }
 
     NewLine("czDCA:0");
