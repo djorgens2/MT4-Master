@@ -138,11 +138,11 @@ void RefreshScreen(void)
                   string(t.Count(Segments)-1)+"] Z/A ["+(string)t.Linear().Zone+":"+(string)t.Range().Age+"]",Color(Direction(t.Range().Direction)),12);
 
     //-- Segment
-    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).Direction[Trend],Color(t.Segment(0).Direction[Term]),18);
-    UpdateLabel("tmaSegmentState"+(string)IndWinId,proper(DirText(t.Segment(0).Direction[Term]))+" ["+(string)t.Segment(0).Price.Count+"]: "+
-                  BoolToStr(IsEqual(t.Segment(0).Direction[Term],t.Segment(0).Direction[Lead]),proper(ActionText(Action(t.Segment(0).Direction[Lead]))),"Hedge"),
-                  Color(t.Segment(0).Direction[Term]),12);
-    UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment(0).Direction[Term],Color(Direction(t.Segment(0).Bias,InAction)),18);
+    UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment().Direction[Trend],Color(t.Segment().Direction[Term]),18);
+    UpdateLabel("tmaSegmentState"+(string)IndWinId,proper(DirText(t.Segment().Direction[Term]))+" ["+(string)t.Segment().Price.Count+"]: "+
+                  BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Lead]),proper(ActionText(Action(t.Segment().Direction[Lead]))),"Hedge"),
+                  Color(t.Segment().Direction[Term]),12);
+    UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment().Direction[Term],Color(Direction(t.Segment().Bias,InAction)),18);
 
     //-- Net Bias
     UpdateDirection("tmaSMABiasNet"+(string)IndWinId,t.SMA().Direction,Color(t.SMA().Direction),18);
@@ -256,10 +256,10 @@ void UpdateTickMA(void)
     //if (t[NewTick])
     //  Pause("New Tick\n"+t.TickHistoryStr(2),"NewTick() Event");
     
-    if (IsChanged(lastSegCount,t.Segment(0).Price.Count))
+    if (IsChanged(lastSegCount,t.Segment().Price.Count))
     {
-      //Flag("SegChg",Color(t.Segment(0).Direction,IN_CHART_DIR));
-      //CallPause("Segment Change["+(string)t.Segment(0).Price.Count+"]: "+proper(ActionText(Action(t.Segment(0).Direction,InDirection))),Always);
+      //Flag("SegChg",Color(t.Segment().Direction,IN_CHART_DIR));
+      //CallPause("Segment Change["+(string)t.Segment().Price.Count+"]: "+proper(ActionText(Action(t.Segment().Direction,InDirection))),Always);
     }
 
 //    if (NewAction(bias,(int)t.Linear().Close.Bias))
@@ -274,7 +274,7 @@ void UpdateTickMA(void)
     //  if (t.Event(NewBias,Critical))
     //    Flag("Bias",Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
 //    if (t[NewTick])
-//      if (t.Segment(0).Price.Count>1)
+//      if (t.Segment().Price.Count>1)
 //        if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Max))
 //        {
 //          if (IsChanged(bound,Max))

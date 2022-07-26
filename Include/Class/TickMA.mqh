@@ -179,8 +179,8 @@ public:
     void             Update(void);
 
     //-- Data Collections
-    TickRec          Tick(int Node)        { return(tr[Node]); };
-    SegmentRec       Segment(int Node)     { return(sr[Node]); };
+    TickRec          Tick(int Node=0)      { return(tr[Node]); };
+    SegmentRec       Segment(int Node=0)   { return(sr[Node]); };
     RangeRec         Range(void)           { return(range); };
     SMARec           SMA(void)             { return(sma); };
     PolyRec          Poly(void)            { return(poly); };

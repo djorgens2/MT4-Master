@@ -14,26 +14,25 @@
 #include <std_utility.mqh>
 #include <fractal_lib.mqh>
 
-
 //+------------------------------------------------------------------+
 //| CFractal Class Methods and Properties                            |
 //+------------------------------------------------------------------+
-class CFractal
+class CFractal  : public CEvent
   {
 
 private:
 
-       struct FractalRec
+       struct CFractalRec
        {
          int           Direction;
          int           Bar;
          double        Price;
          bool          Peg;
          FractalState  State;
-         bool          NewState;
+         EventType     Event;
        };
        
-       struct OriginRec
+       struct COriginRec
        {
          int           Direction;           //--- Origin Direction
          int           Age;                 //--- Origin Age
@@ -42,15 +41,15 @@ private:
          double        Low;                 //--- Origin Long Root Price
        };
 
-       OriginRec       dOrigin;               //--- Derived origin data
-       FractalRec      f[FractalTypes];       //--- Fractal Array
+       COriginRec      dOrigin;             //--- Derived origin data
+       CFractalRec     f[FractalTypes];     //--- Fractal Array
 
        CArrayDouble   *fBuffer;
 
        //--- Private fractal methods
        void            InitFractal();                          //--- initializes the fractal
 
-       void            InsertFractal(FractalRec &Fractal);     //--- inserts a new fractal leg
+       void            InsertFractal(CFractalRec &Fractal);     //--- inserts a new fractal leg
 
        void            UpdateFractal(int Direction);           //--- Updates fractal leg direction changes
        void            UpdateRetrace(FractalType Type, int Bar, double Price=0.00);   //--- Updates interior fractal changes
@@ -76,6 +75,7 @@ private:
        double          fExpansion;            //--- Holds Prior Expansion for Minor Breakout Resolution
 
        double          fEventPrice[EventTypes];
+       FibonacciLevel  fEventFibo[FractalTypes];
 
        bool            fReversal;             //--- Reversal Flag
        bool            fBreakout;             //--- Breakout Flag
@@ -87,7 +87,6 @@ private:
        FractalType     fDominantTrend;        //--- Current dominant trend; largest fractal leg
        FractalType     fDominantTerm;         //--- Current dominant term; last leg greater than RangeMax
        
-       CEvent         *fEvent;
        bool            fShowFlags;
 
 public:
@@ -99,6 +98,7 @@ public:
        //--- Fractal refresh methods
        void             Update(void);
        void             UpdateBuffer(double &Fractal[]);
+
        void             RefreshScreen(bool WithEvents=false, bool LogOutput=false);
        void             RefreshFlags(void);
 
@@ -124,26 +124,14 @@ public:
                                                         }                                                 //--- enum typecast for the Prior element
        FractalType      Dominant(FractalType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }
        FractalType      Leg(int Measure);
+       FibonacciLevel   EventFibo(FractalType Type)     { return ((FibonacciLevel)(fEventFibo[Type]-1));};
 
-       bool             IsRange(FractalType Type, int Method, ReservedWords Measure=Max);
        bool             Is(FractalType Type, int Method);
        
-       bool             Event(const EventType Type)     { return (fEvent[Type]); }                        //-- Returns TF for supplied event
-       bool             Event(EventType Event, AlertLevel Level)
-                                                        { return (fEvent.Event(Event,Level)); }           //-- Returns TF for supplied event/alert level
-       AlertLevel       AlertLevel(EventType Type)      { return (fEvent.AlertLevel(Type)); }             //-- Returns the Alert Level for supplied Event
-
-       bool             ActiveEvent(void)               { return (fEvent.ActiveEvent()); }
-       string           ActiveEventText(const bool WithHeader=true)
-                                                        { return  (fEvent.ActiveEventText(WithHeader)); } //-- returns the string of active events
-
-       void             FractalPoints(FractalType Type, double &Points[]);
-
-       void             ShowFlags(const bool Show)      { fShowFlags=Show; }                               //-- Sets the shows flags switch
        string           FractalStr(void);
        string           PriceStr(FractalType Type=FractalTypes);
        
-       FractalRec operator[](const FractalType Type) const { return(f[Type]); }
+       CFractalRec operator[](const FractalType Type) const { return(f[Type]); }
   };
 
 //+------------------------------------------------------------------+
@@ -189,8 +177,12 @@ void CFractal::CalcOrigin(void)
 //+------------------------------------------------------------------+
 void CFractal::CalcState(FractalType Type, FractalState &State, double EventPrice=0.00)
   {
+    AlertLevel   alertlevel             = (AlertLevel)BoolToInt(IsEqual(Type,Origin),Critical,
+                                                      BoolToInt(IsEqual(Type,Trend),Major,
+                                                      BoolToInt(IsEqual(Type,Term),Minor,
+                                                      BoolToInt(IsEqual(Type,Base),Warning,Notify))));
     FractalState state                  = NoState;
-    f[Type].NewState                    = false;
+    f[Type].Event                       = NoEvent;
 
     //-- Handle Reversals
     if (fReversal)
@@ -231,7 +223,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     else
 
     //-- Handle Recovery on Max Expansion Fractals
-    if (IsRange(Type,Expansion,Max))
+    if (Is(Type,Max))
     {
       if (IsEqual(Type,Root)||IsEqual(Type,Prior))
         {
@@ -265,30 +257,37 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     if (IsEqual(f[fLegNow].Bar,0))
     {
       if (High[fBarNow]>High[fBarNow+1])
-        state                         = Rally;
+        state                           = Rally;
 
       if (Low[fBarNow]<Low[fBarNow+1])
-        state                         = Pullback;
+        state                           = Pullback;
     }
     else
-      state                           = (FractalState)BoolToInt(IsEqual(Direction(fLegNow),DirectionUp),Rally,Pullback);
+      state                             = (FractalState)BoolToInt(IsEqual(Direction(fLegNow),DirectionUp),Rally,Pullback);
 
     if (IsChanged(State,(FractalState)BoolToInt(IsEqual(state,NoState),State,state)))
     {
-      AlertLevel alertlevel           = (AlertLevel)BoolToInt(IsEqual(Type,Origin),Critical,
-                                                          BoolToInt(IsEqual(Type,Trend),Major,
-                                                          BoolToInt(IsEqual(Type,Term),Minor,
-                                                          BoolToInt(IsEqual(Type,Base),Warning,Notify))));
-      if (IsEqual(State,Reversal))
-        fEvent.SetEvent(FractalEvent(Type),alertlevel);
-
-      fEvent.SetEvent(FractalEvent(State),alertlevel);
+      //-- Set the event price of the new state
       fEventPrice[FractalEvent(State)]  = BoolToDouble(IsEqual(EventPrice,0.00),Close[fBarNow],EventPrice);
+      f[Type].Event                     = FractalEvent(State);
 
-      if (IsChanged(f[Type].NewState,true))
-      {
-      }
+      //-- Set New[Origin|Trend|Term] Event
+      if (IsEqual(State,Reversal))
+        SetEvent(FractalEvent(Type),alertlevel);
     }
+
+    //-- Test/Reset for Expansion Fibos/Events
+    if (fBreakout||fReversal||Event(NewBreakout)||Event(NewReversal)||Event(NewDivergence))
+      fEventFibo[Type]                  = fmax(FiboLevel(Fibonacci(Type,Expansion,Max))+1,Fibo161);
+
+    if (FiboLevels[fmin(fEventFibo[Type],Fibo823)]<Fibonacci(Type,Expansion,Now))
+    {
+      fEventFibo[Type]++;
+      f[Type].Event                   = NewFibonacci;        
+    }
+
+    //-- Set New[State|Fibonacci] Event
+    SetEvent(f[Type].Event,alertlevel);
   }
 
 //+------------------------------------------------------------------+
@@ -307,7 +306,7 @@ void CFractal::UpdateRetrace(FractalType Type, int Bar, double Price=0.00)
       f[type].Price               = 0.00;
 
       if (IsEqual(type,Expansion))
-        fEvent.SetEvent(NewExpansion);
+        SetEvent(NewExpansion);
       else
       {
         f[type].Peg               = false;
@@ -377,7 +376,7 @@ void CFractal::CalcRetrace(void)
       if (IsEqual(f[type].Bar,fBarNow)||IsEqual(type,Lead))
       {
         if (IsChanged(fLegNow,type))
-          fEvent.SetEvent(NewBoundary,Nominal);
+          SetEvent(NewBoundary,Nominal);
 
         if (IsEqual(Direction(fLegNow),DirectionUp))
           if (IsLower(Close[fBarNow],fRetrace))
@@ -397,23 +396,23 @@ void CFractal::CalcRetrace(void)
 
     //--- Calc fractal change events
     if (IsChanged(fLegMin,typemin))
-      fEvent.SetEvent(NewBoundary,Minor);
+      SetEvent(NewBoundary,Minor);
       
     if (IsChanged(fLegMax,typemax))
     {
-      fEvent.SetEvent(NewBoundary,Major);
+      SetEvent(NewBoundary,Major);
 
       if (IsEqual(fLegMax,Divergent))
         if (IsEqual(lastmax,Inversion))
-          fEvent.SetEvent(NewDivergence,Critical);
+          SetEvent(NewDivergence,Critical);
         else
-          fEvent.SetEvent(NewDivergence,Major);
+          SetEvent(NewDivergence,Major);
 
       if (IsEqual(fLegMax,Convergent))
         if (IsEqual(lastmax,Conversion))
-          fEvent.SetEvent(NewConvergence,Critical);
+          SetEvent(NewConvergence,Critical);
         else
-          fEvent.SetEvent(NewConvergence,Major);
+          SetEvent(NewConvergence,Major);
     }
   }
 
@@ -421,7 +420,7 @@ void CFractal::CalcRetrace(void)
 //+------------------------------------------------------------------+
 //| InsertFractal - inserts a new fractal node                       |
 //+------------------------------------------------------------------+
-void CFractal::InsertFractal(FractalRec &Fractal)
+void CFractal::InsertFractal(CFractalRec &Fractal)
   {
     Fractal.Peg            = false;
         
@@ -510,7 +509,7 @@ void CFractal::CalcFractal(void)
     int    lastBarLow     = fBarLow;
     
     //--- reset Events on the tick
-    fEvent.ClearEvents();
+    ClearEvents();
     
     ArrayInitialize(fEventPrice,0.00);
     
@@ -556,7 +555,7 @@ void CFractal::CalcFractal(void)
         //--- Check trend change
         if (IsEqual(fBarLow,fBarNow))
         {
-          fBuffer.SetValue(fBarNow,Low[fBarNow]);          
+          fBuffer.SetValue(fBarNow,Low[fBarNow]);
           UpdateFractal(DirectionDown);
         }
       }
@@ -617,7 +616,6 @@ CFractal::CFractal(int Range, int MinRange, bool ShowEventFlags)
     fBarLow                 = Bars-1;
     fBars                   = Bars;
 
-    fEvent                  = new CEvent();
     fShowFlags              = ShowEventFlags;
 
     //-- Clean Open Chart Objects
@@ -635,6 +633,9 @@ CFractal::CFractal(int Range, int MinRange, bool ShowEventFlags)
 
     //-- Initialize Fractal Nodes
     UpdateRetrace(Origin,NoValue);
+
+    //-- Initialize Fibo Alerts
+    ArrayInitialize(fEventFibo,Fibo161);
 
     f[Expansion].Peg        = false;
 
@@ -657,7 +658,6 @@ CFractal::CFractal(int Range, int MinRange, bool ShowEventFlags)
 CFractal::~CFractal(void)
   {
     delete fBuffer;
-    delete fEvent;
   }
   
 //+------------------------------------------------------------------+
@@ -724,6 +724,7 @@ bool CFractal::Is(FractalType Type, int Method)
                          {
                            case Divergent:     return (dOrigin.Direction!=f[Expansion].Direction);
                            case Convergent:    return (dOrigin.Direction==f[Expansion].Direction);
+                           default:            return (true);
                          }
                          break;
       case FractalTypes: return (false);
@@ -735,20 +736,6 @@ bool CFractal::Is(FractalType Type, int Method)
                            case Min:           return (fLegMin>=Type);
                          }
     }
-
-    return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| IsRange - True if Fractal Length from its Origin equals Measure  |
-//+------------------------------------------------------------------+
-bool CFractal::IsRange(FractalType Type, int Method, ReservedWords Measure=Max)
-  { 
-    if (IsHigher(fabs(BoolToDouble(IsEqual(Method,Expansion),Price(Type,fpRoot),Price(Type,fpRetrace))-Price(Type,fpExpansion)),fRange,NoUpdate))
-      return (Measure==Max);
-
-    if (IsBetween(fabs(BoolToDouble(IsEqual(Method,Expansion),Price(Type,fpRoot),Price(Type,fpRetrace))-Price(Type,fpExpansion)),fRange,fRangeMin))
-      return (Measure==Min);
 
     return (false);
   }
@@ -898,17 +885,6 @@ double CFractal::Range(FractalType Type, ReservedWords Measure=Max, int Format=I
   }
 
 //+------------------------------------------------------------------+
-//| FractalPoints - retrieves fractal points(prices) by supplied Type|
-//+------------------------------------------------------------------+
-void CFractal::FractalPoints(FractalType Type, double &Points[])
-  {
-    ArrayInitialize(Points,0.00);
-
-    for (FractalPoint fp=fpOrigin;fp<FractalPoints;fp++)
-      Points[fp]     = Price(Type,fp);
-  }
-
-//+------------------------------------------------------------------+
 //| Fibonacci - Calcuates fibo % for supplied type Type and Method   |
 //+------------------------------------------------------------------+
 double CFractal::Fibonacci(FractalType Type, int Method, ReservedWords Measure, int Format=InDecimal)
@@ -993,7 +969,7 @@ string CFractal::PriceStr(FractalType Type=FractalTypes)
         for (FractalPoint fp=fpOrigin;fp<FractalPoints;fp++)
           Append(text,EnumToString(fp)+":"+DoubleToStr(Price(type,fp),Digits)+"]","[");
 
-        if (IsRange(Type,Expansion,Max))
+        if (Is(Type,Max))
         {
           Append(text,"Forecasts");
           Append(text,"Correction:"+DoubleToStr(Forecast(type,Recovery,Fibo23),Digits)+"]","[");          
@@ -1107,19 +1083,19 @@ void CFractal::RefreshFlags(void)
     ArrayInitialize(event,false);
       
     for (FractalType type=Origin;type<FractalTypes;type++)
-      if (f[type].NewState)
+      if (f[type].Event!=NoEvent)
       {
         if (Event(FractalEvent(type)))
           if (Event(NewReversal)&&IsChanged(event[NewReversal],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewReversal]);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",segment[type],fBarNow,fEventPrice[NewReversal],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
         if (IsEqual(State(type),Breakout))
           if (Event(NewBreakout)&&IsChanged(event[NewBreakout],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewBreakout]);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",segment[type],fBarNow,fEventPrice[NewBreakout],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
         if (IsEqual(State(type),Correction))
           if (Event(NewCorrection)&&IsChanged(event[NewCorrection],true))
-             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],OBJ_ARROW_RIGHT_PRICE,fShowFlags,fBarNow,fEventPrice[NewCorrection]);
+             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],fBarNow,fEventPrice[NewCorrection],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
         //if (IsEqual(State(type),Recovery))
         //  if (Event(NewRecovery)&&IsChanged(event[NewRecovery],true))

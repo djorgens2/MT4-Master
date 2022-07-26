@@ -21,6 +21,7 @@ input bool        inpShowComment    = false;        // Show data in comment
 input bool        inpShowFibo       = false;        // Show Fibonacci Indicators
 input bool        inpShowPoints     = false;        // Show Fractal points
 input bool        inpShowFlags      = false;        // Show Fibonacci Events
+input bool        inpShowExpEvents  = false;        // Show Expansion Events
 input FractalType inpShowTypeLines  = FractalTypes; // Show Fibonacci Lines by Type
 input int         inpUpOffset       = 12;           // Upper tag offset
 input int         inpDownOffset     = 8;            // Lower tag offset
@@ -58,8 +59,6 @@ double    indFractalBuffer[];
 double    indDivergentBuffer[];
 double    indConvergentBuffer[];
 
-FibonacciLevel fFlag[FractalTypes];
-
 //+------------------------------------------------------------------+
 //| RefreshFibo - Update fibo objects                                |
 //+------------------------------------------------------------------+
@@ -93,18 +92,12 @@ void RefreshScreen(void)
   {
     const color rsFlagColor[5]  = {clrDarkOrange,clrGoldenrod,clrIndianRed,clrNONE,clrGray};
 
-    if (inpShowFlags)
-      if (f.Event(NewReversal)||f.Event(NewBreakout))
-        for (FractalType type=Origin;type<Root;type++)
-          fFlag[type] = fmax(FiboLevel(f.Fibonacci(type,Expansion,Max))+1,Fibo161);
-      else
+    if (inpShowExpEvents)
+      if (f.Event(NewFibonacci))
         for (FractalType type=Origin;type<Root;type++)
           if (type!=Prior)
-            if (FiboLevels[fFlag[type]]<f.Fibonacci(type,Expansion,Now))
-            {
-//              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(fFlag[type]),rsFlagColor[type],inpShowFlags,0,f.Forecast(type,Expansion,fFlag[type]));
-              fFlag[type]++;
-            }
+            if (f[type].Event==NewFibonacci)
+              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(f.EventFibo(type)),rsFlagColor[type],0,f.Forecast(type,Expansion,f.EventFibo(type)),inpShowFlags);
 
     if (inpShowComment)
       f.RefreshScreen(Always);
@@ -198,9 +191,6 @@ int OnInit()
     SetIndexEmptyValue(2,0.00);
     ArrayInitialize(indConvergentBuffer,0.00);
 
-    for (FractalType type=Origin;type<Root;type++)
-      fFlag[type] = fmax(FiboLevel(f.Fibonacci(type,Expansion,Max))+1,Fibo161);
-    
     if (inpShowPoints)
     {
       NewPriceTag("ptExpansion","(e)",clrRed,12);
@@ -229,8 +219,6 @@ int OnInit()
 //      NewLine("ftl:Correction");
 //      NewLine("ftl:Recovery");
     }
-    
-    f.ShowFlags(inpShowFlags);
 
     return(INIT_SUCCEEDED);    
   }

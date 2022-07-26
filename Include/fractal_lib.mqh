@@ -20,10 +20,6 @@
                      Trap,            //-- Fractal penetration into containment
                      Breakout,        //-- Fractal Breakout
                      Reversal,        //-- Fractal Reversal
-                     Snap,            //-- Sharp uni-directional move
-                     Idle,            //-- Idle; No Momentum
-                     Wane,            //-- Weakening trend momentum
-                     Wax,             //-- Increasing trend momentum
                      FractalStates
                    };
   
@@ -80,6 +76,15 @@
                    };             
 
   //-- Canonical Fractal Rec
+       //struct FractalRec
+       //{
+       //  int           Direction;
+       //  int           Bar;
+       //  double        Price;
+       //  bool          Peg;
+       //  FractalState  State;
+       //  bool          NewState;
+       //};
 
 static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};

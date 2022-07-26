@@ -13,10 +13,15 @@
 #include <Class/Order.mqh>
 #include <Class/TickMA.mqh>
 #include <Class/Session.mqh>
+#include <Class/Fractal.mqh>
 
 //--- Show Options
 input string        showHeader         = "";          // +--- Show Options ---+
 input int           inpShowZone        = 0;           // Show (n) Zone Lines
+
+input string        fractalHeader     = "";           //+----- Fractal inputs -----+
+input int           inpRange          = 120;          // Maximum fractal pip range
+input int           inpRangeMin       = 60;           // Minimum fractal pip range
 
 //--- Regression parameters
 input string        regrHeader         = "";          // +--- Regression Config ---+
@@ -38,7 +43,7 @@ input int           inpDefaultTarget   = 50;          // Default Take Profit (pi
 input double        inpZoneStep        = 2.5;         // Zone Step (pips)
 input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin
 
-//--- Operational Inputs
+//--- Session Inputs
 input int            inpAsiaOpen     = 1;            // Asia Session Opening Hour
 input int            inpAsiaClose    = 10;           // Asia Session Closing Hour
 input int            inpEuropeOpen   = 8;            // Europe Session Opening Hour
@@ -47,6 +52,7 @@ input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
 
+  CFractal      *f                   = new CFractal(inpRange,inpRangeMin,false);
   CTickMA       *t                   = new CTickMA(inpPeriods,inpDegree,inpAgg);
   COrder        *order               = new COrder(inpBrokerModel,Hold,Hold);
   CSession      *s[SessionTypes];
@@ -142,42 +148,6 @@ void CallPause(string Message, bool Pause)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateSession - Updates Session Fractal Data                     |
-//+------------------------------------------------------------------+
-void UpdateSession(void)
-  {
-    for (SessionType type=Daily;type<SessionTypes;type++)
-      s[type].Update();
-      
-    if (s[Asia].Event(NewTerm))
-      CallPause("New Asia Term",Always);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateTrigger - Tests and Updates Entry Triggers by Action       |
-//+------------------------------------------------------------------+
-void UpdateTrigger(void)
-  {
-    if (t[NewLow])
-    {
-      if (IsEqual(t.SMA().Hold,OP_SELL))
-        mr[OP_BUY].Hold           = true;
-      
-      if (IsChanged(mr[OP_SELL].Hold,false))
-        mr[OP_SELL].Pivot         = Bid;
-    }
-
-    if (t[NewHigh])
-    {
-      if (IsEqual(t.SMA().Hold,OP_BUY))
-        mr[OP_SELL].Hold          = true;
-
-      if (IsChanged(mr[OP_BUY].Hold,false))
-        mr[OP_BUY].Pivot          = Bid;
-    }
-  }
-
-//+------------------------------------------------------------------+
 //| UpdateTick - Updates & Retrieves Tick data and fractals          |
 //+------------------------------------------------------------------+
 void UpdateTick(void)
@@ -240,6 +210,26 @@ void UpdateTick(void)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateSession - Updates Session Fractal Data                     |
+//+------------------------------------------------------------------+
+void UpdateSession(void)
+  {
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      s[type].Update();
+      
+    if (s[Asia].Event(NewTerm))
+      CallPause("New Asia Term",Always);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateFractal - Update/Merge Fractal (macro/meso/micro) data     |
+//+------------------------------------------------------------------+
+void UpdateFractal(void)
+  {
+    f.Update();
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateOrder - Updates & Retrieves order data                     |
 //+------------------------------------------------------------------+
 void UpdateOrder(void)
@@ -278,10 +268,34 @@ bool IsChanged(StrategyType &Original, StrategyType Check)
   {
     if (Original==Check)
       return (false);
-      
+
     Original                 = Check;
-    
+
     return (true);   
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTrigger - Tests and Updates Entry Triggers by Action       |
+//+------------------------------------------------------------------+
+void UpdateTrigger(void)
+  {
+    if (t[NewLow])
+    {
+      if (IsEqual(t.SMA().Hold,OP_SELL))
+        mr[OP_BUY].Hold           = true;
+      
+      if (IsChanged(mr[OP_SELL].Hold,false))
+        mr[OP_SELL].Pivot         = Bid;
+    }
+
+    if (t[NewHigh])
+    {
+      if (IsEqual(t.SMA().Hold,OP_BUY))
+        mr[OP_SELL].Hold          = true;
+
+      if (IsChanged(mr[OP_BUY].Hold,false))
+        mr[OP_BUY].Pivot          = Bid;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -289,14 +303,16 @@ bool IsChanged(StrategyType &Original, StrategyType Check)
 //+------------------------------------------------------------------+
 bool NewStrategy(int Action)
   {
+    bool mitigate = order[Action].Count>0;
+    
     switch (t.Linear().Zone)
     {
       case -2:  switch (DCAZone(Action))
                 {
                   case -3:
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Release,Mitigate)));
+                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
                   case -1:
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Mitigate,Position)));
+                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
                   default: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Capture,Protect)));
                 }
       case -1:  
@@ -304,7 +320,7 @@ bool NewStrategy(int Action)
                 {
                   case -3: return (IsChanged(mr[Action].Strategy,Release));
                   case -2: 
-                  case -1: return (IsChanged(mr[Action].Strategy,Mitigate));
+                  case -1: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(mitigate,Mitigate,Position)));
                   case  0:
                   case +1: return (IsChanged(mr[Action].Strategy,Position));
                   default: return (IsChanged(mr[Action].Strategy,Protect));
@@ -312,41 +328,21 @@ bool NewStrategy(int Action)
       case +2:  switch (DCAZone(Action))
                 {
                   case -3:
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Mitigate,Release)));
+                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Release)));
                   case -1:
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Position,Mitigate)));
+                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)Position,BoolToInt(mitigate,Mitigate,Position))));
                   default: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Protect,Capture)));
                 }
       default:  switch (DCAZone(Action))
                 {
                   case -3: 
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Release,Mitigate)));
+                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
                   case -1: 
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Mitigate,Position)));
+                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
                   case +1: 
-                  case +2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Position,Mitigate)));
+                  case +2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Position,BoolToInt(mitigate,Mitigate,Position))));
                   default: return (IsChanged(mr[Action].Strategy,Protect));
                 }
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateStrategy - Manage Pending Orders, Bounds, and Risk         |
-//+------------------------------------------------------------------+
-void UpdateStrategy(int Action)
-  {
-    order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYLIMIT,OP_SELLLIMIT));
-    order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYSTOP,OP_SELLSTOP));
-
-    switch (mr[Action].Strategy)
-    {
-      case Protect:     //order.SetRiskLimits(OP_BUY,10,80,2);
-                        break;
-      case Position:    break;
-      case Release:     break;
-      case Mitigate:    Pause("Strategy Change: "+BoolToStr(IsEqual(Action,OP_BUY),"Long","Short")+" to "+EnumToString(mr[Action].Strategy),"New Strategy");
-                        break;
-      case Capture:     break;
     }
   }
 
@@ -413,11 +409,128 @@ void Test9(void)
   }
 
 //+------------------------------------------------------------------+
-//| ExecuteMitigate - True on new Mitigation Order by Action         |
+//| Protect - Returns formatted/valid Protect Request by Action      |
 //+------------------------------------------------------------------+
-OrderRequest ExecuteMitigate(int Action, OrderRequest &Request)
+OrderRequest Protect(int Action, OrderRequest &Request)
   {
-    Request.Memo          = "Mitigation ";
+    Request.Memo          = "Protect ";
+
+    switch (Action)
+    {
+      case OP_BUY:   //-- Looking for Long Adds
+                     if (t[NewLow])
+                     {
+                       if (order.Entry(Action).Count>0)
+                       {
+                         //-- do something; order/dca/position checks...
+                       }
+                       else
+                         switch (t.Fractal().Low.Type)
+                         {
+                           case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                                            {
+                                            //  Request.Type           = OP_BUY;
+                                            //  Request.Memo          += "Divergent [Long]";
+                                            }
+                                            break;
+                           case Convergent: break;
+                           case Expansion:  break;
+                         }
+                      }
+                      break;
+      case OP_SELL:   //-- Looking for Short Adds
+                      break;
+    }
+    
+    return (Request);
+  }
+
+//+------------------------------------------------------------------+
+//| Position - Returns formatted/valid Positioning Request by Action |
+//| 1/Build - Remove Worst/Keep Best                                 |
+//| 2/Factors:                                                       |
+//|   a/Segment Direction Balancing                                  |
+//|   b/Follow Fractal Term                                          |
+//|   c/Soft Target above prior convergences                         |
+//|   d/Soft Stop on fractal root                                    |
+//+------------------------------------------------------------------+
+OrderRequest Position(int Action, OrderRequest &Request)
+  {
+    Request.Memo          = "Position ";
+
+    switch (Action)
+    {
+      case OP_BUY:   //-- Looking for Long Adds
+                     if (t[NewLow])
+                     {
+                       if (order.Entry(Action).Count>0)
+                       {
+                         //-- do something; order/dca/position checks...
+                       }
+                       else
+                         switch (t.Fractal().Low.Type)
+                         {
+                           case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                                            {
+                                            //  Request.Type           = OP_BUY;
+                                            //  Request.Memo          += "Divergent [Long]";
+                                            }
+                                            break;
+                           case Convergent: break;
+                           case Expansion:  break;
+                         }
+                      }
+                      break;
+      case OP_SELL:   //-- Looking for Short Adds
+                      break;
+    }
+    
+    return (Request);
+  }
+
+//+------------------------------------------------------------------+
+//| Release - Returns formatted/valid Release Request by Action      |
+//+------------------------------------------------------------------+
+OrderRequest Release(int Action, OrderRequest &Request)
+  {
+    Request.Memo          = "Release ";
+
+    switch (Action)
+    {
+      case OP_BUY:   //-- Looking for Long Adds
+                     if (t[NewLow])
+                     {
+                       if (order.Entry(Action).Count>0)
+                       {
+                         //-- do something; order/dca/position checks...
+                       }
+                       else
+                         switch (t.Fractal().Low.Type)
+                         {
+                           case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                                            {
+                                            //  Request.Type           = OP_BUY;
+                                            //  Request.Memo          += "Divergent [Long]";
+                                            }
+                                            break;
+                           case Convergent: break;
+                           case Expansion:  break;
+                         }
+                      }
+                      break;
+      case OP_SELL:   //-- Looking for Short Adds
+                      break;
+    }
+    
+    return (Request);
+  }
+
+//+------------------------------------------------------------------+
+//| Mitigate - Returns formatted/valid Mitigation Request by Action  |
+//+------------------------------------------------------------------+
+OrderRequest Mitigate(int Action, OrderRequest &Request)
+  {
+    Request.Memo          = "Mitigate ";
 
     switch (Action)
     {
@@ -435,6 +548,43 @@ OrderRequest ExecuteMitigate(int Action, OrderRequest &Request)
                                             {
                                               Request.Type           = OP_BUY;
                                               Request.Memo          += "Divergent [Long]";
+                                            }
+                                            break;
+                           case Convergent: break;
+                           case Expansion:  break;
+                         }
+                      }
+                      break;
+      case OP_SELL:   //-- Looking for Short Adds
+                      break;
+    }
+    
+    return (Request);
+  }
+
+//+------------------------------------------------------------------+
+//| Capture - Returns formatted/valid Capture Request by Action      |
+//+------------------------------------------------------------------+
+OrderRequest Capture(int Action, OrderRequest &Request)
+  {
+    Request.Memo          = "Capture ";
+
+    switch (Action)
+    {
+      case OP_BUY:   //-- Looking for Long Adds
+                     if (t[NewLow])
+                     {
+                       if (order.Entry(Action).Count>0)
+                       {
+                         //-- do something; order/dca/position checks...
+                       }
+                       else
+                         switch (t.Fractal().Low.Type)
+                         {
+                           case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                                            {
+                                            //  Request.Type           = OP_BUY;
+                                            //  Request.Memo          += "Divergent [Long]";
                                             }
                                             break;
                            case Convergent: break;
@@ -474,15 +624,15 @@ void ManageOrders(int Action)
 //                            order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
 //                          }
 //                          break;
-        case Protect:     request    = order.BlankRequest(requestor);
+        case Protect:     request    = Protect(Action,order.BlankRequest(requestor));
                           break;
-        case Position:    request    = order.BlankRequest(requestor);
+        case Position:    request    = Position(Action,order.BlankRequest(requestor));
                           break;
-        case Release:     request    = order.BlankRequest(requestor);
+        case Release:     request    = Release(Action,order.BlankRequest(requestor));
                           break;
-        case Mitigate:    request    = ExecuteMitigate(Action,order.BlankRequest(requestor));
+        case Mitigate:    request    = Mitigate(Action,order.BlankRequest(requestor));
                           break;
-        case Capture:     request    = order.BlankRequest(requestor);
+        case Capture:     request    = Capture(Action,order.BlankRequest(requestor));
                           break;
       }
 
@@ -501,10 +651,10 @@ void ManageOrders(int Action)
 void Execute(void)
   {
     static int direction    = DirectionChange;
-           int action       = BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment(0).Direction[Trend]),Action(Direction(order[Net].Lots)));
+           int action       = BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment().Direction[Trend]),Action(Direction(order[Net].Lots)));
 
-    ManageOrders(BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment(0).Direction[Trend]),Action(Direction(order[Net].Lots))));
-    ManageOrders(BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment(0).Direction[Trend],InDirection,InContrarian),Action(Direction(order[Net].Lots,InDirection,InContrarian))));
+    ManageOrders(action);
+    ManageOrders(Action(action,InAction,InContrarian));
    // Test9();
     order.ExecuteRequests();
 
@@ -526,6 +676,7 @@ void OnTick()
   {
     UpdateTick();
     UpdateSession();
+    UpdateFractal();
     UpdateOrder();
 
     Execute();
@@ -579,6 +730,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
+    delete f;
     delete t;
     delete order;
     

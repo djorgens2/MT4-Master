@@ -632,13 +632,13 @@ void NewPriceLabel(string PriceLabelName, double Price=0.00, bool Left=false, in
 //+------------------------------------------------------------------+
 //| Flag - creates a right price label object                        |
 //+------------------------------------------------------------------+
-void Flag(string Name, int Color, int Style=OBJ_ARROW_RIGHT_PRICE, bool ShowFlag=Always, int Bar=0)
+void Flag(string Name, int Color, int Bar=0, double Price=0.00, bool ShowFlag=Always, int Style=OBJ_ARROW_RIGHT_PRICE)
   {
     static int fIdx  = 0;
     
     if (ShowFlag)
     {
-      while (!ObjectCreate(Name+"-"+(string)fIdx,Style,0,Time[Bar],Close[Bar]))
+      while (!ObjectCreate(Name+"-"+(string)fIdx,Style,0,Time[Bar],BoolToDouble(IsEqual(Price,0.00),Close[Bar],Price)))
         if (GetLastError()==4200) //-- Object Exists
           fIdx++;
         else
