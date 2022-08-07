@@ -126,7 +126,7 @@ public:
        FractalType      Leg(int Measure);
        FibonacciLevel   EventFibo(FractalType Type)     { return ((FibonacciLevel)(fEventFibo[Type]-1));};
 
-       bool             Is(FractalType Type, int Method);
+       bool             Is(FractalType Type, int State);
        
        string           FractalStr(void);
        string           PriceStr(FractalType Type=FractalTypes);
@@ -223,7 +223,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     else
 
     //-- Handle Recovery on Max Expansion Fractals
-    if (Is(Type,Max))
+    if (fabs(Price(Type,fpRoot)-Price(Type,fpExpansion))>fRange)
     {
       if (IsEqual(Type,Root)||IsEqual(Type,Prior))
         {
@@ -253,7 +253,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     }
     else
     
-    //-- Handle short term bias changes
+    //-- Handle short term bias changes  //--- Need to rethink this
     if (IsEqual(f[fLegNow].Bar,0))
     {
       if (High[fBarNow]>High[fBarNow+1])
@@ -274,6 +274,8 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
       //-- Set New[Origin|Trend|Term] Event
       if (IsEqual(State,Reversal))
         SetEvent(FractalEvent(Type),alertlevel);
+
+      SetEvent(FractalEvent(State),alertlevel);
     }
 
     //-- Test/Reset for Expansion Fibos/Events
@@ -283,11 +285,8 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     if (FiboLevels[fmin(fEventFibo[Type],Fibo823)]<Fibonacci(Type,Expansion,Now))
     {
       fEventFibo[Type]++;
-      f[Type].Event                   = NewFibonacci;        
+      f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event); 
     }
-
-    //-- Set New[State|Fibonacci] Event
-    SetEvent(f[Type].Event,alertlevel);
   }
 
 //+------------------------------------------------------------------+
@@ -714,13 +713,13 @@ FractalType CFractal::Leg(int Measure)
   }
 
 //+------------------------------------------------------------------+
-//| Is - Returns true if Type is Divergent/Convergent                |
+//| Is - True if Type is in supplied State                           |
 //+------------------------------------------------------------------+
-bool CFractal::Is(FractalType Type, int Method)
+bool CFractal::Is(FractalType Type, int State)
   { 
     switch (Type)
     {
-      case Origin:       switch (Method)
+      case Origin:       switch (State)
                          {
                            case Divergent:     return (dOrigin.Direction!=f[Expansion].Direction);
                            case Convergent:    return (dOrigin.Direction==f[Expansion].Direction);
@@ -728,7 +727,7 @@ bool CFractal::Is(FractalType Type, int Method)
                          }
                          break;
       case FractalTypes: return (false);
-      default:           switch (Method)
+      default:           switch (State)
                          {
                            case Divergent:     return (Direction(Type)!=f[Expansion].Direction);
                            case Convergent:    return (Direction(Type)==f[Expansion].Direction);

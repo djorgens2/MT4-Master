@@ -649,6 +649,15 @@ void Flag(string Name, int Color, int Bar=0, double Price=0.00, bool ShowFlag=Al
   }
 
 //+------------------------------------------------------------------+
+//| PrintF - Prints to log based on value of Condition               |
+//+------------------------------------------------------------------+
+void PrintF(string Text, bool Condition)
+{
+  if (Condition)
+    Print(Text);
+}
+
+//+------------------------------------------------------------------+
 //| DrawBox - Draws a box used to frame text                         |
 //+------------------------------------------------------------------+
 void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, int Border, int WinId=0)

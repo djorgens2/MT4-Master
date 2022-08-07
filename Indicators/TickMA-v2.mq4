@@ -14,6 +14,8 @@
 #include <Class\TickMA.mqh>
 #include <std_utility.mqh>
 
+#define debug false
+
 //--- plot plHigh
 #property indicator_label1  "plHigh"
 #property indicator_type1   DRAW_SECTION
@@ -122,14 +124,15 @@ void RefreshScreen(void)
   {
     if (inpSegBounds)
     {
-      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Support(),clrLawnGreen);
-      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Resistance(),clrRed);
-      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Expansion(),clrYellow);
+      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Fractal().Support,clrLawnGreen);
+      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Fractal().Resistance,clrRed);
+      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Fractal().Expansion,clrYellow);
     }
 
     //-- Range
-    UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+" ["+string(t.Count(Ticks)-1)+":"+
-                  string(t.Count(Segments)-1)+"] Z/A ["+(string)t.Linear().Zone+":"+(string)t.Range().Age+"]",Color(Direction(t.Range().Direction)),12);
+    UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+
+                  BoolToStr(debug," ["+string(t.Count(Ticks)-1)+":"+string(t.Count(Segments)-1)+"]")+" Age["+(string)t.Range().Age+"]",
+                  Color(Direction(t.Range().Direction)),12);
 
     //-- Segment
     UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment(0).Direction[Trend],Color(t.Segment(0).Direction[Term]),18);

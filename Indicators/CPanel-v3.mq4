@@ -11,6 +11,8 @@
 #property indicator_buffers 10
 #property indicator_plots   10
 
+#define debug false
+
 #include <Class\TickMA.mqh>
 #include <std_utility.mqh>
 
@@ -134,15 +136,16 @@ void CallPause(string Message, bool Pause)
 void RefreshScreen(void)
   {
     //-- Range
-    UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+" ["+string(t.Count(Ticks)-1)+":"+
-                  string(t.Count(Segments)-1)+"] Z/A ["+(string)t.Linear().Zone+":"+(string)t.Range().Age+"]",Color(Direction(t.Range().Direction)),12);
+    UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+
+                  BoolToStr(debug," ["+string(t.Count(Ticks)-1)+":"+string(t.Count(Segments)-1)+"]")+" Age["+(string)t.Range().Age+"]",
+                  Color(Direction(t.Range().Direction)),12);
 
     //-- Segment
     UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment().Direction[Trend],Color(t.Segment().Direction[Term]),18);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,proper(DirText(t.Segment().Direction[Term]))+" ["+(string)t.Segment().Price.Count+"]: "+
-                  BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Lead]),proper(ActionText(Action(t.Segment().Direction[Lead]))),"Hedge"),
+                  BoolToStr(t.Segment().Hedge,"Hedge",proper(ActionText(Action(t.Segment().Direction[Lead])))),
                   Color(t.Segment().Direction[Term]),12);
-    UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment().Direction[Term],Color(Direction(t.Segment().Bias,InAction)),18);
+    UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),18);
 
     //-- Net Bias
     UpdateDirection("tmaSMABiasNet"+(string)IndWinId,t.SMA().Direction,Color(t.SMA().Direction),18);
@@ -180,10 +183,10 @@ void RefreshScreen(void)
 
     if (inpShowSegBounds==Yes)
     {
-      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Support(),clrLawnGreen);
-      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Resistance(),clrRed);
-      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Expansion(),clrYellow);
-      
+      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Fractal().Support,clrLawnGreen);
+      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Fractal().Resistance,clrRed);
+      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Fractal().Expansion,clrYellow);
+
       if (t[NewHigh]||t[NewLow])
         UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
     }

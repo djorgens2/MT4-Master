@@ -171,7 +171,6 @@
                   Master,
                   Support,
                   Resistance,
-                  Contrarian,
                   WordCount      //--- must be last
               };
 

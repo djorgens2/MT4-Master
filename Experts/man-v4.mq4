@@ -9,6 +9,7 @@
 
 #define Hide       true
 #define NoHide     false
+#define debug      false
 
 #include <Class/Order.mqh>
 #include <Class/TickMA.mqh>
@@ -19,9 +20,9 @@
 input string        showHeader         = "";          // +--- Show Options ---+
 input int           inpShowZone        = 0;           // Show (n) Zone Lines
 
-input string        fractalHeader     = "";           //+----- Fractal inputs -----+
-input int           inpRange          = 120;          // Maximum fractal pip range
-input int           inpRangeMin       = 60;           // Minimum fractal pip range
+input string        fractalHeader      = "";          //+----- Fractal inputs -----+
+input int           inpRange           = 120;         // Maximum fractal pip range
+input int           inpRangeMin        = 60;          // Minimum fractal pip range
 
 //--- Regression parameters
 input string        regrHeader         = "";          // +--- Regression Config ---+
@@ -44,21 +45,40 @@ input double        inpZoneStep        = 2.5;         // Zone Step (pips)
 input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin
 
 //--- Session Inputs
-input int            inpAsiaOpen     = 1;            // Asia Session Opening Hour
-input int            inpAsiaClose    = 10;           // Asia Session Closing Hour
-input int            inpEuropeOpen   = 8;            // Europe Session Opening Hour
-input int            inpEuropeClose  = 18;           // Europe Session Closing Hour
-input int            inpUSOpen       = 14;           // US Session Opening Hour
-input int            inpUSClose      = 23;           // US Session Closing Hour
-input int            inpGMTOffset    = 0;            // Offset from GMT+3
+input int            inpAsiaOpen       = 1;            // Asia Session Opening Hour
+input int            inpAsiaClose      = 10;           // Asia Session Closing Hour
+input int            inpEuropeOpen     = 8;            // Europe Session Opening Hour
+input int            inpEuropeClose    = 18;           // Europe Session Closing Hour
+input int            inpUSOpen         = 14;           // US Session Opening Hour
+input int            inpUSClose        = 23;           // US Session Closing Hour
+input int            inpGMTOffset      = 0;            // Offset from GMT+3
 
-  CFractal      *f                   = new CFractal(inpRange,inpRangeMin,false);
-  CTickMA       *t                   = new CTickMA(inpPeriods,inpDegree,inpAgg);
-  COrder        *order               = new COrder(inpBrokerModel,Hold,Hold);
+  CFractal      *f                     = new CFractal(inpRange,inpRangeMin,false);
+  CTickMA       *t                     = new CTickMA(inpPeriods,inpDegree,inpAgg);
+  COrder        *order                 = new COrder(inpBrokerModel,Hold,Hold);
   CSession      *s[SessionTypes];
 
-  bool           PauseOn             = true;
-  int            Tick                = 0;
+  bool           PauseOn               = false;
+  int            Tick                  = 0;
+
+  enum           HoldType
+                 {
+                   Conforming,
+                   Contrarian,
+                   Activated,
+                   Inactive,
+                   HoldTypes
+                 };
+
+  enum           PlanType
+                 {
+                   Segment,
+                   SMA,
+                   Linear,
+                   Session,
+                   Fractal,
+                   PlanTypes
+                 };
 
   enum           StrategyType
                  {
@@ -69,25 +89,52 @@ input int            inpGMTOffset    = 0;            // Offset from GMT+3
                    Release
                  };
 
+  struct         HoldRec
+                 {
+                   HoldType        Type[2];            //-- Hold type
+                   int             Direction;          //-- Direction
+                   int             Bias;               //-- Bias
+                   EventType       Event;              //-- Hold Event
+                   double          Pivot;              //-- Bias pivot price
+                   double          PivotNetChange;     //-- Net Change on pivot price
+                 };
+
+  struct         PlanRec
+                 {
+                   int             Direction;          //-- Direction
+                   int             Bias;               //-- Bias
+                   int             Zone;               //-- Zone Now
+                   int             High;               //-- Zone High
+                   int             Low;                //-- Zone Low
+                   int             Net;                //-- Net Momemtum
+                   int             Change;             //-- Momentum Change
+                   double          Support;            //-- Plan Support
+                   double          Resistance;         //-- Plan Resistance
+                   double          Expansion;          //-- Plan Expansion
+                 };
+
   struct         ManagerRec
                  {
-                   StrategyType      Strategy;     //-- Action Strategy;
-                   OrderSummary      Zone;         //-- Current Zone Detail (rec)
-                   bool              Hold;         //-- Order Hold by Action
-                   double            Pivot;        //-- Trigger Pivot
+                   int             Action;             //-- Preset Action
+                   StrategyType    Strategy;           //-- Strategy
+                   OrderSummary    Zone;               //-- Current Zone Detail (rec)
+                   PlanType        Plan;               //-- Plan Detail
                  };
 
   ManagerRec     mr[2];
+  PlanRec        plan[PlanTypes];
+  HoldRec        hold;
 
 //+------------------------------------------------------------------+
 //| RefreshPanel - Repaints cPanel-v3                                |
 //+------------------------------------------------------------------+
 void RefreshPanel(void)
   {
-    static StrategyType strategy[2];
+    static StrategyType strategytype[2];
+    const  color        holdcolor[HoldTypes]     = {clrYellow,clrRed,clrLawnGreen,clrDarkGray};
     
     //-- Update Control Panel (Session)
-    for (SessionType type=0;type<SessionTypes;type++)
+    for (SessionType type=Daily;type<SessionTypes;type++)
     {
       if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s[type].Event(NewFractal)||s[type].Event(NewHour))
       {
@@ -98,9 +145,10 @@ void RefreshPanel(void)
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" ["+(string)DCAZone(action)+"]",
-                           BoolToInt(IsChanged(strategy[action],mr[action].Strategy),clrYellow,clrDarkGray));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(mr[action].Hold,clrRed,BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray)),16,"Wingdings");
+//      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" ["+(string)DCAZone(action)+"]",
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" "+EnumToString(hold.Type[action]),
+                           BoolToInt(IsChanged(strategytype[action],mr[action].Strategy),clrYellow,clrDarkGray));
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),holdcolor[hold.Type[action]],16,"Wingdings");
 //      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray),16,"Wingdings");
 //      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(mr[action].Hold,clrYellow,clrDarkGray),16,"Wingdings");
     }
@@ -148,13 +196,143 @@ void CallPause(string Message, bool Pause)
   }
 
 //+------------------------------------------------------------------+
+//| Zone - Returns Zone by supplied Price                            |
+//+------------------------------------------------------------------+
+int Zone(PlanType Plan)
+  {
+    switch (Plan)
+    {
+      case Segment:  if (IsEqual(t.Segment().Direction[Trend],DirectionUp))
+                      return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold.Direction,DirectionUp),1));
+
+                     return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold.Direction,DirectionDown),-1));
+                     break;
+
+      case SMA:      if (IsEqual(t.Segment().Direction[Trend],DirectionUp))
+                       return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold.Direction,DirectionUp),1));
+
+                     return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold.Direction,DirectionDown),-1));
+                     break;
+
+      case Linear:   if (IsEqual(t.Linear().Close.Direction,DirectionUp))
+                       return (BoolToInt(IsHigher(t.Tick().Open,t.Range().Mean),1)+BoolToInt(IsHigher(t.Tick().Open,t.Linear().Close.Lead),1));
+
+                     return (BoolToInt(IsLower(t.Tick().Open,t.Range().Mean),-1)+BoolToInt(IsLower(t.Tick().Open,t.Linear().Close.Lead),-1));
+                     break;
+    }
+
+    return (NoValue);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateHold - Updates Holds on NewHigh/NewLow                     |
+//+------------------------------------------------------------------+
+void UpdateHold(void)
+  {
+    int    bias               = hold.Bias;
+
+    hold.Event                = NoEvent;
+
+    if (t[NewLow])
+    {
+      hold.Type[OP_SELL]      = (HoldType)BoolToInt(IsEqual(hold.Type[OP_SELL],Contrarian),Activated,Inactive);
+      hold.Bias               = OP_SELL;
+
+      if (IsEqual(t.SMA().Hold,OP_SELL))
+      {
+        hold.Type[OP_SELL]    = Conforming;
+        hold.Type[OP_BUY]     = Contrarian;
+        hold.Event            = BoolToEvent(NewDirection(hold.Direction,DirectionDown),NewDirection);
+      }
+    }
+
+    if (t[NewHigh])
+    {
+      hold.Type[OP_BUY]       = (HoldType)BoolToInt(IsEqual(hold.Type[OP_BUY],Contrarian),Activated,Inactive);
+      hold.Bias               = OP_BUY;
+
+      if (IsEqual(t.SMA().Hold,OP_BUY))
+      {
+        hold.Type[OP_BUY]     = Conforming;
+        hold.Type[OP_SELL]    = Contrarian;
+        hold.Event            = BoolToEvent(NewDirection(hold.Direction,DirectionUp),NewDirection);
+      }
+    }
+
+    if (NewBias(bias,hold.Bias))
+    {
+      hold.Event              = NewBias;
+      hold.Pivot              = Close[0];
+      hold.PivotNetChange     = Close[0]-hold.Pivot;
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdatePlan - Updates supplied Plan based on incoming Zone        |
+//+------------------------------------------------------------------+
+void UpdatePlan(PlanType Type)
+  {
+    int zone                    = 0;
+    int change                  = 0;
+    int direction               = 0;
+
+    switch (Type)
+    {
+      case Segment: plan[Type].Support     = t.Fractal().Support;
+                    plan[Type].Resistance  = t.Fractal().Resistance;
+                    plan[Type].Expansion   = t.Fractal().Expansion;
+
+                    zone        = Zone(Segment);
+                    direction   = t.Segment().Direction[Trend];
+                    change      = zone-plan[Type].Zone;
+                    break;
+
+//      case SMA:     plan[Type].Support     = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.SMA().High.Point[fpBase],t.Range().Mean,Digits);
+//                    plan[Type].Resistance  = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
+//                    plan[Type].Expansion   = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
+//
+//                    zone        = Zone(Segment);
+//                    direction   = t.Segment().Direction[Trend];
+//                    change      = zone-plan[Type].Zone;
+//                    break;
+
+      case Linear:  plan[Type].Support     = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Low,t.Range().Mean,Digits);
+                    plan[Type].Resistance  = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
+                    plan[Type].Expansion   = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
+
+                    zone        = Zone(Linear);
+                    direction   = t.Linear().Close.Direction;
+                    change      = zone-plan[Type].Zone;
+                    break;
+    }
+
+    if (IsChanged(plan[Type].Zone,zone))
+    {
+      plan[Type].Bias           = Direction(change);
+      plan[Type].Change         = change;
+      plan[Type].High           = fmax(zone,plan[Type].High);
+      plan[Type].Low            = fmin(zone,plan[Type].Low);
+      plan[Type].Net            = plan[Type].High-plan[Type].Low;
+    }
+    
+    if (NewDirection(plan[Type].Direction,direction))
+    {
+      plan[Type].High           = zone;
+      plan[Type].Low            = zone;
+      plan[Type].Net            = 0;
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateTick - Updates & Retrieves Tick data and fractals          |
 //+------------------------------------------------------------------+
 void UpdateTick(void)
   {
     t.Update();
 
-    UpdateTrigger();
+    UpdatePlan(Segment);
+    UpdatePlan(Linear);
+    UpdateHold();
     
     if (t[NewExpansion])
     {
@@ -218,7 +396,7 @@ void UpdateSession(void)
       s[type].Update();
       
     if (s[Asia].Event(NewTerm))
-      CallPause("New Asia Term",Always);
+      CallPause("New Asia Term",PauseOn);
   }
 
 //+------------------------------------------------------------------+
@@ -227,6 +405,9 @@ void UpdateSession(void)
 void UpdateFractal(void)
   {
     f.Update();
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+
   }
 
 //+------------------------------------------------------------------+
@@ -275,73 +456,52 @@ bool IsChanged(StrategyType &Original, StrategyType Check)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTrigger - Tests and Updates Entry Triggers by Action       |
+//| NewStrategy - True on Micro Strategy Change by Action            |
 //+------------------------------------------------------------------+
-void UpdateTrigger(void)
+bool NewStrategy(ManagerRec &Manager)
   {
-    if (t[NewLow])
-    {
-      if (IsEqual(t.SMA().Hold,OP_SELL))
-        mr[OP_BUY].Hold           = true;
-      
-      if (IsChanged(mr[OP_SELL].Hold,false))
-        mr[OP_SELL].Pivot         = Bid;
-    }
+//    StrategyType strategy;
 
-    if (t[NewHigh])
-    {
-      if (IsEqual(t.SMA().Hold,OP_BUY))
-        mr[OP_SELL].Hold          = true;
-
-      if (IsChanged(mr[OP_BUY].Hold,false))
-        mr[OP_BUY].Pivot          = Bid;
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| NewStrategy - Returns true on Strategy Change by Action          |
-//+------------------------------------------------------------------+
-bool NewStrategy(int Action)
-  {
-    bool mitigate = order[Action].Count>0;
+    bool         capture          = IsEqual(order[Manager.Action].Count,0);
+    bool         mitigate         = !capture;
     
-    switch (t.Linear().Zone)
+    switch (plan[Linear].Zone)
     {
-      case -2:  switch (DCAZone(Action))
+      case -2:  switch (DCAZone(Manager.Action))
                 {
                   case -3:
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
+                  case -2: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
                   case -1:
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
-                  default: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Capture,Protect)));
+                  case  0: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
+                  default: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),(StrategyType)BoolToInt(capture,Capture,Mitigate),Protect)));
                 }
       case -1:  
-      case +1:  switch (DCAZone(Action))
+      case +1:  switch (DCAZone(Manager.Action))
                 {
-                  case -3: return (IsChanged(mr[Action].Strategy,Release));
+                  case -3: return (IsChanged(Manager.Strategy,Release));
                   case -2: 
-                  case -1: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(mitigate,Mitigate,Position)));
+                  case -1: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(mitigate,Mitigate,Position)));
                   case  0:
-                  case +1: return (IsChanged(mr[Action].Strategy,Position));
-                  default: return (IsChanged(mr[Action].Strategy,Protect));
+                  case +1: return (IsChanged(Manager.Strategy,Position));
+                  default: return (IsChanged(Manager.Strategy,Protect));
                 }
-      case +2:  switch (DCAZone(Action))
+      case +2:  switch (DCAZone(Manager.Action))
                 {
                   case -3:
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Release)));
+                  case -2: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Release)));
                   case -1:
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),(StrategyType)Position,BoolToInt(mitigate,Mitigate,Position))));
-                  default: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(Action,OP_BUY),Protect,Capture)));
+                  case  0: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),(StrategyType)Position,BoolToInt(mitigate,Mitigate,Position))));
+                  default: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(Manager.Action,OP_BUY),Protect,(StrategyType)BoolToInt(capture,Capture,Mitigate))));
                 }
-      default:  switch (DCAZone(Action))
+      default:  switch (DCAZone(Manager.Action))
                 {
                   case -3: 
-                  case -2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
+                  case -2: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Manager.Action,InAction)),Release,(StrategyType)BoolToInt(mitigate,Mitigate,Position))));
                   case -1: 
-                  case  0: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
+                  case  0: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Manager.Action,InAction)),(StrategyType)BoolToInt(mitigate,Mitigate,Position),Position)));
                   case +1: 
-                  case +2: return (IsChanged(mr[Action].Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Action,InAction)),Position,BoolToInt(mitigate,Mitigate,Position))));
-                  default: return (IsChanged(mr[Action].Strategy,Protect));
+                  case +2: return (IsChanged(Manager.Strategy,(StrategyType)BoolToInt(IsEqual(t.Linear().Close.Direction,Direction(Manager.Action,InAction)),Position,BoolToInt(mitigate,Mitigate,Position))));
+                  default: return (IsChanged(Manager.Strategy,Protect));
                 }
     }
   }
@@ -604,13 +764,11 @@ OrderRequest Capture(int Action, OrderRequest &Request)
 //+------------------------------------------------------------------+
 void ManageOrders(int Action)
   {
-    OrderRequest request;
-    
-    string       requestor     = "[Auto] "+BoolToStr(IsEqual(Action,OP_BUY),"Long","Short");
-  
+    OrderRequest request       = order.BlankRequest("[Auto] "+BoolToStr(IsEqual(Action,OP_BUY),"Long","Short"));
+
     if (t[NewHigh]||t[NewLow])
     {
-      if (NewStrategy(Action))
+      if (NewStrategy(mr[Action]))
       {
         order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYLIMIT,OP_SELLLIMIT),"Strategy Change");
         order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYSTOP,OP_SELLSTOP),"Strategy Change");
@@ -624,15 +782,15 @@ void ManageOrders(int Action)
 //                            order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
 //                          }
 //                          break;
-        case Protect:     request    = Protect(Action,order.BlankRequest(requestor));
+        case Protect:     request    = Protect(Action,request);
                           break;
-        case Position:    request    = Position(Action,order.BlankRequest(requestor));
+        case Position:    request    = Position(Action,request);
                           break;
-        case Release:     request    = Release(Action,order.BlankRequest(requestor));
+        case Release:     request    = Release(Action,request);
                           break;
-        case Mitigate:    request    = Mitigate(Action,order.BlankRequest(requestor));
+        case Mitigate:    request    = Mitigate(Action,request);
                           break;
-        case Capture:     request    = Capture(Action,order.BlankRequest(requestor));
+        case Capture:     request    = Capture(Action,request);
                           break;
       }
 
@@ -680,7 +838,7 @@ void OnTick()
     UpdateOrder();
 
     Execute();
-    
+
     RefreshScreen();
     RefreshPanel();
   }
@@ -700,6 +858,8 @@ int OnInit()
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
       order.SetDefaultMethod(action,Hold);
+
+      mr[action].Action  = action;
     }
 
     s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
