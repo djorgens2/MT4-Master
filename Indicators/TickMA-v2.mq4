@@ -14,7 +14,7 @@
 #include <Class\TickMA.mqh>
 #include <std_utility.mqh>
 
-#define debug false
+#define debug true
 
 //--- plot plHigh
 #property indicator_label1  "plHigh"
@@ -250,9 +250,7 @@ void UpdateTickMA(void)
   {
     t.Update();
 
-//    if (t[NewTick])
-//      Pause("Tick Change: "+DirText(t.Segment(0).Direction[Lead])+" ["+(string)t.Segment(0).Price.Count+"]", "NewTick() Event");
-
+    if (t.Event(NewTrend,Major)&&!IsEqual(t.Fractal().High.Type,Expansion)) Print(t.FractalDetailStr(t.Fractal().High));
     if (t[NewHigh]||t[NewLow])
       UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
 
@@ -426,6 +424,9 @@ int OnInit()
 
     NewPriceLabel("tmaNewBoundary");
 
+NewLine("lnSupport",0.00,STYLE_DASH,clrGray,IndWinId);
+NewLine("lnResistance",0.00,STYLE_DASH,clrGray,IndWinId);
+NewLine("lnExpansion",0.00,STYLE_DASH,clrGray,IndWinId);
     return(INIT_SUCCEEDED);
   }
 

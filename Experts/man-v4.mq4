@@ -198,27 +198,28 @@ void CallPause(string Message, bool Pause)
 //+------------------------------------------------------------------+
 //| Zone - Returns Zone by supplied Price                            |
 //+------------------------------------------------------------------+
-int Zone(PlanType Plan)
+int Zone(PlanType Type)
   {
-    switch (Plan)
+    switch (Type)
     {
-      case Segment:  if (IsEqual(t.Segment().Direction[Trend],DirectionUp))
+      case Segment:  if (IsEqual(plan[Type].Direction,DirectionUp))
                       return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold.Direction,DirectionUp),1));
 
                      return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold.Direction,DirectionDown),-1));
-                     break;
 
-      case SMA:      if (IsEqual(t.Segment().Direction[Trend],DirectionUp))
-                       return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold.Direction,DirectionUp),1));
+      case SMA:      if (IsEqual(plan[Type].Direction,DirectionUp))
+                       return (BoolToInt(IsHigher(t.Tick().High,plan[Type].Support),1)+
+                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Resistance),1)+
+                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Expansion),1)-1);
 
-                     return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold.Direction,DirectionDown),-1));
-                     break;
+                     return (BoolToInt(IsLower(t.Tick().Low,plan[Type].Support),-1)+
+                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Resistance),-1)+
+                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Expansion),-1)+1);
 
-      case Linear:   if (IsEqual(t.Linear().Close.Direction,DirectionUp))
+      case Linear:   if (IsEqual(plan[Type].Direction,DirectionUp))
                        return (BoolToInt(IsHigher(t.Tick().Open,t.Range().Mean),1)+BoolToInt(IsHigher(t.Tick().Open,t.Linear().Close.Lead),1));
 
                      return (BoolToInt(IsLower(t.Tick().Open,t.Range().Mean),-1)+BoolToInt(IsLower(t.Tick().Open,t.Linear().Close.Lead),-1));
-                     break;
     }
 
     return (NoValue);
@@ -282,29 +283,36 @@ void UpdatePlan(PlanType Type)
                     plan[Type].Resistance  = t.Fractal().Resistance;
                     plan[Type].Expansion   = t.Fractal().Expansion;
 
-                    zone        = Zone(Segment);
-                    direction   = t.Segment().Direction[Trend];
-                    change      = zone-plan[Type].Zone;
+                    direction              = t.Segment().Direction[Trend];
                     break;
 
-//      case SMA:     plan[Type].Support     = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.SMA().High.Point[fpBase],t.Range().Mean,Digits);
-//                    plan[Type].Resistance  = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
-//                    plan[Type].Expansion   = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
-//
-//                    zone        = Zone(Segment);
-//                    direction   = t.Segment().Direction[Trend];
-//                    change      = zone-plan[Type].Zone;
-//                    break;
+      case SMA:     plan[Type].Expansion   = BoolToDouble(IsEqual(t.Fractal().Direction,DirectionUp),t.Fractal().High.Point[Expansion],t.Fractal().Low.Point[Expansion],Digits);
+                    plan[Type].Resistance  = t.Fractal().High.Point[t.Fractal().High.Type];
+                    plan[Type].Support     = t.Fractal().Low.Point[t.Fractal().Low.Type];
+
+                    if (t.Fractal().High.Type>Convergent)
+                      for (FractalType type=t.Fractal().High.Type;type>Expansion;type--)
+                        plan[Type].Resistance  = fmax(plan[Type].Resistance,t.Fractal().High.Point[type]);
+                    else plan[Type].Resistance = fmax(t.Fractal().High.Point[Base],t.Fractal().High.Point[Root]);
+                    
+                    if (t.Fractal().Low.Type>Convergent)
+                      for (FractalType type=t.Fractal().Low.Type;type>Expansion;type--)
+                        plan[Type].Support    = fmin(plan[Type].Support,t.Fractal().Low.Point[type]);
+                    else plan[Type].Support   = fmin(t.Fractal().Low.Point[Base],t.Fractal().Low.Point[Root]);
+
+                    direction   = t.Fractal().Direction;
+                    break;
 
       case Linear:  plan[Type].Support     = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Low,t.Range().Mean,Digits);
                     plan[Type].Resistance  = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
                     plan[Type].Expansion   = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
 
-                    zone        = Zone(Linear);
                     direction   = t.Linear().Close.Direction;
-                    change      = zone-plan[Type].Zone;
                     break;
     }
+
+    zone                   = Zone(Type);
+    change                 = zone-plan[Type].Zone;
 
     if (IsChanged(plan[Type].Zone,zone))
     {
@@ -331,6 +339,11 @@ void UpdateTick(void)
     t.Update();
 
     UpdatePlan(Segment);
+    UpdatePlan(SMA);
+UpdateLine("lnSupport",plan[SMA].Support,STYLE_DASH,clrGreen);
+UpdateLine("lnResistance",plan[SMA].Resistance,STYLE_DASH,clrMaroon);
+UpdateLine("lnExpansion",plan[SMA].Expansion,STYLE_DASH,clrYellow);
+    
     UpdatePlan(Linear);
     UpdateHold();
     

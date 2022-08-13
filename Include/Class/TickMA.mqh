@@ -830,32 +830,27 @@ void CTickMA::UpdateFractal(void)
   {
     fr.Event               = NoEvent;
 
-    if (IsEqual(fr.High.Direction[Term],fr.Low.Direction[Term]))
+    if (IsEqual(fr.High.Direction[Trend],fr.Low.Direction[Trend]))
     {
-      fr.Type              = Convergent;
-
-      if (IsEqual(fr.High.Type,Expansion)&&IsEqual(fr.Low.Type,Expansion))
+      if (NewDirection(fr.Direction,fr.High.Direction[Trend]))
       {
-        fr.Type            = Expansion;
-
-        if (!IsEqual(fr.High.Direction[Term],fr.Low.Direction[Term]))
-          Print ("Parabolic SMA Fractal!?!");
-        else
-        //-- Fractal Direction is Hi/Lo in Expansion
-        if (NewDirection(fr.Direction,fr.High.Direction[Term]))
-        {
-          if (NewState(fr.State,Reversal))
-            fr.Event        = NewReversal;
-        }
-        else
-        {
-          if (NewState(fr.State,Breakout))
-            fr.Event        = NewBreakout;
-        }
-        
-        SetEvent(fr.Event,Major);
+        if (NewState(fr.State,Reversal))
+          fr.Event        = NewReversal;
       }
+      else
+      {
+        if (NewState(fr.State,Breakout))
+          fr.Event        = NewBreakout;
+      }
+        
+      SetEvent(fr.Event,Major);
     }
+
+    if (IsEqual(fr.High.Direction[Term],fr.Low.Direction[Term]))
+      if (IsEqual(fr.High.Type,Expansion)&&IsEqual(fr.Low.Type,Expansion))
+        fr.Type            = Expansion;
+      else
+        fr.Type            = Convergent;
     else
     {
       fr.Type               = Divergent;
