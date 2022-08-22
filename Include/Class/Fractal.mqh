@@ -75,7 +75,7 @@ private:
        double          fExpansion;            //--- Holds Prior Expansion for Minor Breakout Resolution
 
        double          fEventPrice[EventTypes];
-       FibonacciLevel  fEventFibo[FractalTypes];
+       FiboLevel       fEventFibo[FractalTypes];
 
        bool            fReversal;             //--- Reversal Flag
        bool            fBreakout;             //--- Breakout Flag
@@ -107,7 +107,7 @@ public:
        double           Range(FractalType Type, ReservedWords Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
 
        double           Fibonacci(FractalType Type, int Method, ReservedWords Measure, int Format=InDecimal);                 //--- For each retrace type
-       double           Forecast(FractalType Type, int Method, FibonacciLevel Fibo);
+       double           Forecast(FractalType Type, int Method, FiboLevel Fibo);
 
        FractalState     State(FractalType Type) {return((FractalState)BoolToInt(Type==Origin,dOrigin.State,f[Type].State)); } //--- State by Fractal Type
        FractalType      Next(FractalType Type, FractalType Measure=Divergent)
@@ -124,7 +124,7 @@ public:
                                                         }                                                 //--- enum typecast for the Prior element
        FractalType      Dominant(FractalType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }
        FractalType      Leg(int Measure);
-       FibonacciLevel   EventFibo(FractalType Type)     { return ((FibonacciLevel)(fEventFibo[Type]-1));};
+       FiboLevel        EventFibo(FractalType Type)     { return ((FiboLevel)(fEventFibo[Type]-1));};
 
        bool             Is(FractalType Type, int State);
        
@@ -282,10 +282,10 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     if (fBreakout||fReversal||Event(NewBreakout)||Event(NewReversal)||Event(NewDivergence))
       fEventFibo[Type]                  = fmax(FiboLevel(Fibonacci(Type,Expansion,Max))+1,Fibo161);
 
-    if (FiboLevels[fmin(fEventFibo[Type],Fibo823)]<Fibonacci(Type,Expansion,Now))
+    if (FiboPercent(fmin(fEventFibo[Type],Fibo823))<Fibonacci(Type,Expansion,Now))
     {
       fEventFibo[Type]++;
-      f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event); 
+      f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event);
     }
   }
 
@@ -921,7 +921,7 @@ double CFractal::Fibonacci(FractalType Type, int Method, ReservedWords Measure, 
 //+------------------------------------------------------------------+
 //| Forecast - Returns Forecast Price for supplied Fibo              |
 //+------------------------------------------------------------------+
-double CFractal::Forecast(FractalType Type, int Method, FibonacciLevel Fibo)
+double CFractal::Forecast(FractalType Type, int Method, FiboLevel Fibo)
   {
     switch (Method)
     {

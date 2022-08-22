@@ -53,15 +53,7 @@
                      FractalTypes     // None
                    };
 
-  //--- Fibo Defines
-  enum             FiboFormat
-                   {
-                     Unsigned,
-                     Signed,
-                     Extended
-                   };
-
-  enum             FibonacciLevel
+  enum             FiboLevel
                    {
                      FiboRoot,
                      Fibo23,
@@ -72,7 +64,8 @@
                      Fibo161,
                      Fibo261,
                      Fibo423,
-                     Fibo823
+                     Fibo823,
+                     FiboLevels
                    };             
 
   //-- Canonical Fractal Rec
@@ -87,7 +80,6 @@
        //};
 
 static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
-static const double    FiboLevels[10] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
 
 //+------------------------------------------------------------------+
@@ -121,36 +113,9 @@ EventType FractalEvent(FractalType Type)
   }
 
 //+------------------------------------------------------------------+
-//| FiboExt - Converts signed fibos to extended                      |
-//+------------------------------------------------------------------+
-int FiboExt(int Level)
-  {
-    if (Level<0)
-    {
-      Level  = fabs(Level);
-      
-      if (Level<10)
-        Level += 10;
-    }
-
-    return (Level);
-  }
-
-//+------------------------------------------------------------------+
-//| FiboSign - Converts extended fibos to signed                     |
-//+------------------------------------------------------------------+
-int FiboSign(int Level)
-  {
-    if (Level>10)
-      return ((Level-10)*DirectionInverse);
-
-    return (Level);
-  }
-
-//+------------------------------------------------------------------+
 //| FiboPrice - linear fibonacci price for the supplied level        |
 //+------------------------------------------------------------------+
-double FiboPrice(FibonacciLevel Level, double Base, double Root, int Method=Expansion)
+double FiboPrice(FiboLevel Level, double Base, double Root, int Method=Expansion)
   {
     if (Level == 0 || fabs(Level) == 10)
     {
@@ -175,31 +140,6 @@ double FiboPrice(double Fibo, double Base, double Root, int Method=Expansion)
       return (NormalizeDouble(Base-((Base-Root)*Fibo),Digits));
 
     return (NormalizeDouble(Root+((Base-Root)*Fibo),Digits));
-  }
-
-//+------------------------------------------------------------------+
-//| FiboLevel - returns the level id for the supplied fibo value     |
-//+------------------------------------------------------------------+
-int FiboLevel(double Fibonacci, FiboFormat Format=Extended)
-  {
-    int    fibo;
-
-    for (fibo=FiboRoot;fibo<Fibo823;fibo++)
-      if (fabs(Fibonacci)<FiboPercent(fibo))
-        break;
-
-    if (Fibonacci<0.00)
-      switch (Format)
-      {
-        case Unsigned:  fibo = 0;
-                        break;
-        case Signed:    fibo = -(fibo-1);
-                        break;
-        case Extended:  fibo = fabs(fibo)+10;
-      }
-    else fibo--;
-    
-    return(fibo);
   }
 
 //+------------------------------------------------------------------+
@@ -237,32 +177,14 @@ double FiboRetrace(double Root, double Expansion, double Retrace, int Format=InD
 //+------------------------------------------------------------------+
 //| FiboPercent - returns the Fibo percent for the supplied level    |
 //+------------------------------------------------------------------+
-double FiboPercent(int Level, int Format=InPoints, bool Signed=true)
+double FiboPercent(int Level, int Format=InPoints)
   {
-    int fpSign = 1;
-    
-    if (Signed)
-    {
-      if (Level<0)
-      {
-        Level  = fabs(Level);
-        fpSign = -1;
-      }
-      
-      if (Level>10)
-      {
-        Level -= 10;
-        fpSign = -1;
-      }
-    }
-       
-    if (Level>Fibo823)
-      Level       = Fibo823;
-      
-    if (Format == InPoints)
-      return (NormalizeDouble(FiboLevels[Level],3)*fpSign);
-      
-    return (NormalizeDouble(FiboLevels[Level]*100,1)*fpSign);
+    const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
+
+    if (IsBetween(Level,FiboRoot,Fibo823))
+      return (BoolToDouble(IsEqual(Format,InPoints),percent[Level],percent[Level]*100,3));
+
+    return (NoValue);
   }
 
 //+------------------------------------------------------------------+
@@ -286,7 +208,7 @@ bool NewState(FractalState &State, FractalState ChangeState)
 //+------------------------------------------------------------------+
 //| IsLower - returns true if compare value lower than check         |
 //+------------------------------------------------------------------+
-bool IsLower(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
+bool IsLower(FiboLevel Compare, FiboLevel &Check, bool Update=true)
   {
     if (Compare < Check)
     {
@@ -302,7 +224,7 @@ bool IsLower(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
 //+------------------------------------------------------------------+
 //| IsHigher - returns true if compare value higher than check       |
 //+------------------------------------------------------------------+
-bool IsHigher(FibonacciLevel Compare, FibonacciLevel &Check, bool Update=true)
+bool IsHigher(FiboLevel Compare, FiboLevel &Check, bool Update=true)
   {
     if (Compare > Check)
     {

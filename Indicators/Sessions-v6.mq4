@@ -62,12 +62,6 @@ input FractalType    inpFractalLines    = FractalTypes;    // Fractal line to sh
 input YesNoType      inpShowComment     = No;              // Show session data in comment?
 input DataPosition   inpShowData        = dpNone;          // Indicator data position
 
-const color          AsiaColor          = C'0,32,0';       // Asia session box color
-const color          EuropeColor        = C'48,0,0';       // Europe session box color
-const color          USColor            = C'0,0,56';       // US session box color
-const color          DailyColor         = C'64,64,0';      // Daily session box color;
-const color          ForecastColor      = clrIndigo;       // Daily session box color;
-
 CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset);
 
 bool                 sessionOpen        = false;
@@ -179,25 +173,33 @@ void RefreshScreen(int Bar=0)
     if (inpFractalLines!=FractalTypes)
     {
       UpdateLine("lnS_ActiveMid:"+sessionIndex,session.Pivot(ActiveSession),STYLE_SOLID,clrSteelBlue);
-      UpdateLine("lnS_Support:"+sessionIndex,session.Fractal(inpFractalLines).Support,STYLE_SOLID,clrRed);
-      UpdateLine("lnS_Resistance:"+sessionIndex,session.Fractal(inpFractalLines).Resistance,STYLE_SOLID,clrLawnGreen);
-      UpdateLine("lnS_Low:"+sessionIndex,session.Fractal(inpFractalLines).Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnS_High:"+sessionIndex,session.Fractal(inpFractalLines).High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnS_Base:"+sessionIndex,session.Price(inpFractalLines,fpBase),STYLE_SOLID,
+                             BoolToInt(IsEqual(session[inpFractalLines].Direction,DirectionUp),clrLawnGreen,clrRed));
+      UpdateLine("lnS_Root:"+sessionIndex,session.Price(inpFractalLines,fpRoot),STYLE_SOLID,
+                             BoolToInt(IsEqual(session[inpFractalLines].Direction,DirectionUp),clrRed,clrLawnGreen));
+      UpdateLine("lnS_Expansion:"+sessionIndex,session.Price(inpFractalLines,fpExpansion),STYLE_DOT,clrGoldenrod);
+      UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(inpFractalLines,fpRetrace),STYLE_DOT,clrSteelBlue);      
+      UpdateLine("lnS_Low:"+sessionIndex,session[inpFractalLines].Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High:"+sessionIndex,session[inpFractalLines].High,STYLE_DOT,clrForestGreen);
+      UpdateLine("lnS_Support:"+sessionIndex,session[ActiveSession].Support,STYLE_SOLID,clrMaroon);
+      UpdateLine("lnS_Resistance:"+sessionIndex,session[ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
+//      UpdateLine("lnS_CorrectionHi:"+sessionIndex,session[sftCorrection].High,STYLE_DASH,clrWhite);
+//      UpdateLine("lnS_CorrectionLo:"+sessionIndex,session[sftCorrection].Low,STYLE_DASH,clrWhite);
       
-      UpdateLine("lnS_CorrectionHi:"+sessionIndex,session.Fractal(ftCorrection).High,STYLE_DASH,clrWhite);
-      UpdateLine("lnS_CorrectionLo:"+sessionIndex,session.Fractal(ftCorrection).Low,STYLE_DASH,clrWhite);
+      for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+        UpdateLine("lnS_Fibo-"+EnumToString(fl)+":"+sessionIndex,session.Forecast(inpFractalLines,Expansion,fl),STYLE_DASH,clrYellow);
     }
     
     if (inpShowData>dpNone)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session[ActiveSession].Bias))+" "+
         BoolToStr(session[ActiveSession].Bias==Action(session[ActiveSession].Direction,InDirection),"Hold","Hedge"),BoolToInt(session.IsOpen(),clrWhite,clrDarkGray),16);
-      UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,DirColor(session[ActiveSession].Direction),20);
+      UpdateDirection("lbActiveDir"+sessionIndex,session[ActiveSession].Direction,Color(session[ActiveSession].Direction),20);
       
       if (session[ActiveSession].State==Trap)
         UpdateLabel("lbActiveState"+sessionIndex,BoolToStr(session[ActiveSession].Direction==DirectionUp,"Bull Trap","Bear Trap"),clrYellow ,8);
       else
-        UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),DirColor(session[ActiveSession].Direction),8);
+        UpdateLabel("lbActiveState"+sessionIndex,EnumToString(session[ActiveSession].State),Color(session[ActiveSession].Direction),8);
             
       if (session.IsOpen())
         if (TimeHour(session.ServerTime(Bar))>inpHourClose-3)
@@ -210,11 +212,11 @@ void RefreshScreen(int Bar=0)
       else
         UpdateLabel("lbSessionTime"+sessionIndex,"Session Is Closed",clrDarkGray);
 
-      UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,DirColor(session[ActiveSession].BreakoutDir));
+      UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,Color(session[ActiveSession].BreakoutDir));
     }
     
     if (inpShowComment==Yes)
-      session.RefreshScreen();
+      Comment(session.CommentStr());
   }
  
 //+------------------------------------------------------------------+
@@ -269,13 +271,19 @@ int OnInit()
     }
     
     NewLine("lnS_ActiveMid:"+sessionIndex);
+    NewLine("lnS_High:"+sessionIndex);
+    NewLine("lnS_Low:"+sessionIndex);    
+    NewLine("lnS_Base:"+sessionIndex);
+    NewLine("lnS_Root:"+sessionIndex);    
+    NewLine("lnS_Expansion:"+sessionIndex);
     NewLine("lnS_Support:"+sessionIndex);
     NewLine("lnS_Resistance:"+sessionIndex);
+    NewLine("lnS_Retrace:"+sessionIndex);
     NewLine("lnS_CorrectionHi:"+sessionIndex);
     NewLine("lnS_CorrectionLo:"+sessionIndex);
-    NewLine("lnS_High:"+sessionIndex);
-    NewLine("lnS_Low:"+sessionIndex);
     
+    for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+      NewLine("lnS_Fibo-"+EnumToString(fl)+":"+sessionIndex);
     
     if (inpShowData>dpNone)
     {
@@ -306,17 +314,24 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     DeleteRanges();
-    
+
     delete session;    
 
     ObjectDelete("lnS_ActiveMid:"+sessionIndex);
-    ObjectDelete("lnS_Support:"+sessionIndex);
-    ObjectDelete("lnS_Resistance:"+sessionIndex);
     ObjectDelete("lnS_High:"+sessionIndex);
     ObjectDelete("lnS_Low:"+sessionIndex);
-    ObjectDelete("boxForecast");
-    
-    
+    ObjectDelete("lnS_Base:"+sessionIndex);
+    ObjectDelete("lnS_Root:"+sessionIndex);
+    ObjectDelete("lnS_Expansion:"+sessionIndex);
+    ObjectDelete("lnS_Support:"+sessionIndex);
+    ObjectDelete("lnS_Resistance:"+sessionIndex);
+    ObjectDelete("lnS_Retrace:"+sessionIndex);
+    ObjectDelete("lnS_CorrectionHi:"+sessionIndex);
+    ObjectDelete("lnS_CorrectionLo:"+sessionIndex);    
+
+    for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+      ObjectDelete("lnS_Fibo-"+EnumToString(fl)+":"+sessionIndex);
+
     ObjectDelete("lbActiveBrkDir"+sessionIndex);
     ObjectDelete("lbSessionType"+sessionIndex);
     ObjectDelete("lbActiveDir"+sessionIndex);

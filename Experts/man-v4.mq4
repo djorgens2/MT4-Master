@@ -63,10 +63,10 @@ input int            inpGMTOffset      = 0;            // Offset from GMT+3
 
   enum           HoldType
                  {
-                   Conforming,
-                   Contrarian,
-                   Activated,
                    Inactive,
+                   Activated,
+                   Contrarian,
+                   Conforming,
                    HoldTypes
                  };
 
@@ -103,6 +103,7 @@ input int            inpGMTOffset      = 0;            // Offset from GMT+3
                  {
                    int             Direction;          //-- Direction
                    int             Bias;               //-- Bias
+                   int             Hedge;              //-- Hedge Action
                    int             Zone;               //-- Zone Now
                    int             High;               //-- Zone High
                    int             Low;                //-- Zone Low
@@ -123,7 +124,8 @@ input int            inpGMTOffset      = 0;            // Offset from GMT+3
 
   ManagerRec     mr[2];
   PlanRec        plan[PlanTypes];
-  HoldRec        hold;
+  HoldRec        hold[PlanTypes];
+
 
 //+------------------------------------------------------------------+
 //| RefreshPanel - Repaints cPanel-v3                                |
@@ -131,7 +133,7 @@ input int            inpGMTOffset      = 0;            // Offset from GMT+3
 void RefreshPanel(void)
   {
     static StrategyType strategytype[2];
-    const  color        holdcolor[HoldTypes]     = {clrYellow,clrRed,clrLawnGreen,clrDarkGray};
+    const  color        holdcolor[HoldTypes]     = {clrDarkGray,clrLawnGreen,clrRed,clrYellow};
     
     //-- Update Control Panel (Session)
     for (SessionType type=Daily;type<SessionTypes;type++)
@@ -146,9 +148,9 @@ void RefreshPanel(void)
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
 //      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" ["+(string)DCAZone(action)+"]",
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" "+EnumToString(hold.Type[action]),
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" "+EnumToString(hold[Segment].Type[action]),
                            BoolToInt(IsChanged(strategytype[action],mr[action].Strategy),clrYellow,clrDarkGray));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),holdcolor[hold.Type[action]],16,"Wingdings");
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),holdcolor[hold[Segment].Type[action]],16,"Wingdings");
 //      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray),16,"Wingdings");
 //      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(mr[action].Hold,clrYellow,clrDarkGray),16,"Wingdings");
     }
@@ -159,8 +161,12 @@ void RefreshPanel(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_SOLID,clrYellow);
-    
+    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrForestGreen);
+    UpdateLine("czDCA:"+(string)OP_SELL,order.DCA(OP_SELL),STYLE_DOT,clrMaroon);
+    UpdateLine("lnSupport",plan[SMA].Support,STYLE_DASH,clrGreen);
+    UpdateLine("lnResistance",plan[SMA].Resistance,STYLE_DASH,clrMaroon);
+    UpdateLine("lnExpansion",plan[SMA].Expansion,STYLE_DASH,clrYellow);
+
     for (int zone=0;zone<inpShowZone;zone++)
     {
       UpdateLine("crDAM:ZoneHi:"+(string)zone,order.DCA(OP_BUY)+fdiv(point(inpZoneStep),2)+(point(inpZoneStep)*zone),STYLE_DOT,clrForestGreen);
@@ -181,7 +187,8 @@ void RefreshScreen(void)
           Append(text,EnumToString(t.EventAlertLevel(event)));
         }
       Comment(text);
-    }
+    } else Comment("");
+    Comment(PlanStr(SMA));
   }
 
 //+------------------------------------------------------------------+
@@ -203,18 +210,18 @@ int Zone(PlanType Type)
     switch (Type)
     {
       case Segment:  if (IsEqual(plan[Type].Direction,DirectionUp))
-                      return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold.Direction,DirectionUp),1));
+                      return (BoolToInt(IsHigher(t.Fractal().Expansion,t.Fractal().Resistance),1)+BoolToInt(IsEqual(hold[Type].Direction,DirectionUp),1));
 
-                     return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold.Direction,DirectionDown),-1));
+                     return (BoolToInt(IsLower(t.Fractal().Expansion,t.Fractal().Support),-1)+BoolToInt(IsEqual(hold[Type].Direction,DirectionDown),-1));
 
       case SMA:      if (IsEqual(plan[Type].Direction,DirectionUp))
-                       return (BoolToInt(IsHigher(t.Tick().High,plan[Type].Support),1)+
-                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Resistance),1)+
-                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Expansion),1)-1);
+                       return (BoolToInt(IsHigher(t.Tick().High,plan[Type].Support,NoUpdate,Digits),1)+
+                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Resistance,NoUpdate,Digits),1)+
+                               BoolToInt(IsHigher(t.Tick().High,plan[Type].Expansion,NoUpdate,Digits),1)-1);
 
-                     return (BoolToInt(IsLower(t.Tick().Low,plan[Type].Support),-1)+
-                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Resistance),-1)+
-                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Expansion),-1)+1);
+                     return (BoolToInt(IsLower(t.Tick().Low,plan[Type].Support,NoUpdate,Digits),-1)+
+                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Resistance,NoUpdate,Digits),-1)+
+                             BoolToInt(IsLower(t.Tick().Low,plan[Type].Expansion,NoUpdate,Digits),-1)+1);
 
       case Linear:   if (IsEqual(plan[Type].Direction,DirectionUp))
                        return (BoolToInt(IsHigher(t.Tick().Open,t.Range().Mean),1)+BoolToInt(IsHigher(t.Tick().Open,t.Linear().Close.Lead),1));
@@ -226,45 +233,107 @@ int Zone(PlanType Type)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateHold - Updates Holds on NewHigh/NewLow                     |
+//| UpdateHold - Updates Hold on supplied Plan                       |
 //+------------------------------------------------------------------+
-void UpdateHold(void)
+void UpdateHold(PlanType Plan)
   {
-    int    bias               = hold.Bias;
+    int  bias           = hold[Plan].Bias;
 
-    hold.Event                = NoEvent;
+    hold[Plan].Event    = NoEvent;
 
-    if (t[NewLow])
+    switch (Plan)
     {
-      hold.Type[OP_SELL]      = (HoldType)BoolToInt(IsEqual(hold.Type[OP_SELL],Contrarian),Activated,Inactive);
-      hold.Bias               = OP_SELL;
+      case Segment:   if (t.Tick().Low<t.SMA().Low[0])
+                        if (t[NewLow])
+                        {
+                          hold[Plan].Bias             = OP_SELL;
+                          hold[Plan].Type[OP_BUY]     = Contrarian;
+                          hold[Plan].Type[OP_SELL]    = Conforming;
+                          hold[Plan].Event            = BoolToEvent(NewDirection(hold[Plan].Direction,DirectionDown),NewDirection);
+                        }
 
-      if (IsEqual(t.SMA().Hold,OP_SELL))
-      {
-        hold.Type[OP_SELL]    = Conforming;
-        hold.Type[OP_BUY]     = Contrarian;
-        hold.Event            = BoolToEvent(NewDirection(hold.Direction,DirectionDown),NewDirection);
-      }
+                      if (t.Tick().High>t.SMA().High[0])
+                        if (t[NewHigh])
+                        {
+                          hold[Plan].Bias             = OP_BUY;
+                          hold[Plan].Type[OP_BUY]     = Conforming;
+                          hold[Plan].Type[OP_SELL]    = Contrarian;
+                          hold[Plan].Event            = BoolToEvent(NewDirection(hold[Plan].Direction,DirectionUp),NewDirection);
+                        }
+
+                      for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+                        switch (hold[Plan].Type[action])
+                        {
+                          case Conforming:    hold[Plan].Type[action] = (HoldType)BoolToInt(t[NewSegment],Activated,Conforming);
+                                              break;
+                          case Contrarian:    hold[Plan].Type[action] = (HoldType)BoolToInt(IsEqual(BoolToInt(t[NewHigh],OP_BUY,BoolToInt(t[NewLow],OP_SELL,OP_NO_ACTION)),action),Activated,Contrarian);
+                                              break;
+                          case Activated:     hold[Plan].Type[action] = Inactive;
+                        }
+                      break;
+
+      case SMA:       hold[Plan].Event                = BoolToEvent(NewDirection(hold[Plan].Direction,t.Fractal().Direction),NewDirection);
+      
+                      if (IsEqual(t.Fractal().High.Type,Divergent)&&IsEqual(t.Fractal().Low.Type,Divergent))
+                      {
+                        hold[Plan].Bias               = Action(t.Fractal().Direction,InDirection,InContrarian);
+
+                        hold[Plan].Type[hold[Plan].Bias]                                  = (HoldType)BoolToInt(hold[Plan].Type[hold[Plan].Bias]>Activated,Activated,Inactive);
+                        hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)]    = (HoldType)BoolToInt(IsEqual(hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)],Conforming),Activated,Contrarian);
+                      }
+                      else
+                      {
+                        hold[Plan].Bias               = Action(t.Fractal().Direction);
+
+                        if (IsEqual(t.Fractal().Type,Expansion))
+                        {
+                          hold[Plan].Type[hold[Plan].Bias]                                = Conforming;
+                          hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)]  = Contrarian;
+                        }
+                        else
+                        {
+                          hold[Plan].Type[OP_BUY]     = (HoldType)BoolToInt(hold[Plan].Type[OP_BUY]>Activated,Activated,Inactive);
+                          hold[Plan].Type[OP_SELL]    = (HoldType)BoolToInt(hold[Plan].Type[OP_SELL]>Activated,Activated,Inactive);
+                        }
+                      }
+                      break;
+
+      case Linear:    hold[Plan].Event                = BoolToEvent(NewDirection(hold[Plan].Direction,t.Linear().Direction),NewDirection);
+
+                      if (IsEqual(t.Linear().Close.Now,0.00,Digits))
+                      {
+                        //-- No Bias
+                      }
+                      else
+                      if (IsEqual(t.Linear().Close.Max,t.Linear().Close.Now,Digits))
+                      {
+                        hold[Plan].Bias               = Action(t.Linear().Close.Now);
+                        
+                        if (t.Event(NewExpansion,Critical))
+                        {
+                          hold[Plan].Type[hold[Plan].Bias]                                = Conforming;
+                          hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)]  = Contrarian;
+                        }
+                      }
+                      else
+                      if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Now,Digits))
+                      {
+                        hold[Plan].Bias               = Action(t.Linear().Close.Now,InDirection,InContrarian);
+
+                        hold[Plan].Type[hold[Plan].Bias]                                  = (HoldType)BoolToInt(hold[Plan].Type[hold[Plan].Bias]>Activated,Activated,Inactive);
+                        hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)]    = (HoldType)BoolToInt(IsEqual(hold[Plan].Type[Action(hold[Plan].Bias,InAction,InContrarian)],Conforming),Activated,Contrarian);
+                      }
+                      else
+                        for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+                          hold[Plan].Type[action]                                         = (HoldType)BoolToInt(hold[Plan].Type[action]>Activated,Activated,Inactive);
+                      break;
     }
 
-    if (t[NewHigh])
+    if (NewBias(bias,hold[Plan].Bias))
     {
-      hold.Type[OP_BUY]       = (HoldType)BoolToInt(IsEqual(hold.Type[OP_BUY],Contrarian),Activated,Inactive);
-      hold.Bias               = OP_BUY;
-
-      if (IsEqual(t.SMA().Hold,OP_BUY))
-      {
-        hold.Type[OP_BUY]     = Conforming;
-        hold.Type[OP_SELL]    = Contrarian;
-        hold.Event            = BoolToEvent(NewDirection(hold.Direction,DirectionUp),NewDirection);
-      }
-    }
-
-    if (NewBias(bias,hold.Bias))
-    {
-      hold.Event              = NewBias;
-      hold.Pivot              = Close[0];
-      hold.PivotNetChange     = Close[0]-hold.Pivot;
+      hold[Plan].Event              = NewBias;
+      hold[Plan].Pivot              = Close[0];
+      hold[Plan].PivotNetChange     = Close[0]-hold[Plan].Pivot;
     }
   }
 
@@ -273,22 +342,31 @@ void UpdateHold(void)
 //+------------------------------------------------------------------+
 void UpdatePlan(PlanType Type)
   {
-    int zone                    = 0;
-    int change                  = 0;
-    int direction               = 0;
+    int zone              = 0;
+    int change            = 0;
+    int direction         = 0;
 
     switch (Type)
     {
-      case Segment: plan[Type].Support     = t.Fractal().Support;
-                    plan[Type].Resistance  = t.Fractal().Resistance;
-                    plan[Type].Expansion   = t.Fractal().Expansion;
-
-                    direction              = t.Segment().Direction[Trend];
+      case Segment: plan[Type].Support         = t.Fractal().Support;
+                    plan[Type].Resistance      = t.Fractal().Resistance;
+                    plan[Type].Expansion       = t.Fractal().Expansion;
+                    plan[Type].Hedge           = BoolToInt(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Lead]),OP_NO_ACTION,t.Segment().Bias);
+                    direction                  = t.Segment().Direction[Trend];
                     break;
 
-      case SMA:     plan[Type].Expansion   = BoolToDouble(IsEqual(t.Fractal().Direction,DirectionUp),t.Fractal().High.Point[Expansion],t.Fractal().Low.Point[Expansion],Digits);
-                    plan[Type].Resistance  = t.Fractal().High.Point[t.Fractal().High.Type];
-                    plan[Type].Support     = t.Fractal().Low.Point[t.Fractal().Low.Type];
+      case SMA:     plan[Type].Expansion       = BoolToDouble(IsEqual(t.Fractal().Direction,DirectionUp),t.Fractal().High.Point[Expansion],t.Fractal().Low.Point[Expansion],Digits);
+                    plan[Type].Resistance      = t.Fractal().High.Point[t.Fractal().High.Type];
+                    plan[Type].Support         = t.Fractal().Low.Point[t.Fractal().Low.Type];
+                    plan[Type].Hedge           = OP_NO_ACTION;
+
+                    if (IsEqual(t.Fractal().Direction,DirectionUp))
+                      if (t.Segment().Price.Low<t.Fractal().Low.Point[Root])
+                        plan[Type].Hedge       = OP_SELL;
+
+                    if (IsEqual(t.Fractal().Direction,DirectionDown))
+                      if (t.Segment().Price.High>t.Fractal().High.Point[Root])
+                        plan[Type].Hedge       = OP_BUY;
 
                     if (t.Fractal().High.Type>Convergent)
                       for (FractalType type=t.Fractal().High.Type;type>Expansion;type--)
@@ -297,26 +375,40 @@ void UpdatePlan(PlanType Type)
                     
                     if (t.Fractal().Low.Type>Convergent)
                       for (FractalType type=t.Fractal().Low.Type;type>Expansion;type--)
-                        plan[Type].Support    = fmin(plan[Type].Support,t.Fractal().Low.Point[type]);
-                    else plan[Type].Support   = fmin(t.Fractal().Low.Point[Base],t.Fractal().Low.Point[Root]);
+                        plan[Type].Support     = fmin(plan[Type].Support,t.Fractal().Low.Point[type]);
+                    else plan[Type].Support    = fmin(t.Fractal().Low.Point[Base],t.Fractal().Low.Point[Root]);
 
-                    direction   = t.Fractal().Direction;
+                    direction                  = t.Fractal().Direction;
                     break;
 
-      case Linear:  plan[Type].Support     = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Low,t.Range().Mean,Digits);
-                    plan[Type].Resistance  = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
-                    plan[Type].Expansion   = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
+      case Linear:  plan[Type].Support         = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Low,t.Range().Mean,Digits);
+                    plan[Type].Resistance      = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
+                    plan[Type].Expansion       = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
+                    plan[Type].Hedge           = BoolToInt(IsEqual(t.Linear().Close.Max,t.Linear().Close.Now,Digits),OP_NO_ACTION,
+                                                 BoolToInt(IsEqual(t.Linear().Close.Min,t.Linear().Close.Now,Digits),Action(t.Linear().Close.Now,InDirection,InContrarian),OP_NO_ACTION));
 
-                    direction   = t.Linear().Close.Direction;
+                    direction                  = t.Linear().Close.Direction;
+                    break;
+
+      case Session: if (s[Daily].Expansion(Trend,Max)>FiboPercent(Fibo161))
+                    {
+                      plan[Type].Support         = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Low,t.Range().Mean,Digits);
+                      plan[Type].Resistance      = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().Mean,t.Range().High,Digits);
+                      plan[Type].Expansion       = BoolToDouble(IsEqual(t.Range().Direction,DirectionUp),t.Range().High,t.Range().Low,Digits);
+                      plan[Type].Hedge           = BoolToInt(IsEqual(t.Linear().Close.Max,t.Linear().Close.Now,Digits),OP_NO_ACTION,
+                                                 BoolToInt(IsEqual(t.Linear().Close.Min,t.Linear().Close.Now,Digits),Action(t.Linear().Close.Now,InDirection,InContrarian),OP_NO_ACTION));
+
+                      direction                  = t.Linear().Close.Direction;
+                    }
                     break;
     }
 
-    zone                   = Zone(Type);
-    change                 = zone-plan[Type].Zone;
+    zone                        = Zone(Type);
+    change                      = zone-plan[Type].Zone;
 
     if (IsChanged(plan[Type].Zone,zone))
     {
-      plan[Type].Bias           = Direction(change);
+      plan[Type].Bias           = Action(Direction(change));
       plan[Type].Change         = change;
       plan[Type].High           = fmax(zone,plan[Type].High);
       plan[Type].Low            = fmin(zone,plan[Type].Low);
@@ -338,15 +430,9 @@ void UpdateTick(void)
   {
     t.Update();
 
-    UpdatePlan(Segment);
-    UpdatePlan(SMA);
-UpdateLine("lnSupport",plan[SMA].Support,STYLE_DASH,clrGreen);
-UpdateLine("lnResistance",plan[SMA].Resistance,STYLE_DASH,clrMaroon);
-UpdateLine("lnExpansion",plan[SMA].Expansion,STYLE_DASH,clrYellow);
-    
-    UpdatePlan(Linear);
-    UpdateHold();
-    
+//    if (t.Event(NewLow,Notify)) Pause("New Low Event","New Low()");
+//    if (t.Event(NewHigh,Notify)) Pause("New High Event","New High()");
+
     if (t[NewExpansion])
     {
 //      if (IsEqual(t.Fractal().High.Type,Divergent))
@@ -845,10 +931,16 @@ void Execute(void)
 //+------------------------------------------------------------------+
 void OnTick()
   {
+    UpdateOrder();
     UpdateTick();
     UpdateSession();
     UpdateFractal();
-    UpdateOrder();
+
+    for (PlanType Plan=Segment;Plan<PlanTypes;Plan++)
+    {
+      UpdatePlan(Plan);
+      UpdateHold(Plan);
+    }
 
     Execute();
 
@@ -910,3 +1002,35 @@ void OnDeinit(const int reason)
     for (SessionType type=Daily;type<SessionTypes;type++)
       delete s[type];
   }
+
+//+------------------------------------------------------------------+
+//| PlanStr - Returns formatted plan data                            |
+//+------------------------------------------------------------------+
+string PlanStr(PlanType Type)
+  {
+    string text         = EnumToString(Type);
+    
+    Append(text,DirText(plan[Type].Direction));
+    Append(text,ActionText(plan[Type].Bias));
+    Append(text,BoolToStr(IsEqual(plan[Type].Hedge,OP_NO_ACTION),"No Hedge","Hedge["+ActionText(plan[Type].Hedge)+"]"));
+    Append(text,"zone["+IntegerToString(plan[Type].Zone,3)+"]");
+    Append(text,"hi["+IntegerToString(plan[Type].High,3)+"]");
+    Append(text,"lo["+IntegerToString(plan[Type].Low,3)+"]");
+    Append(text,"net["+IntegerToString(plan[Type].Net,3)+"]");
+    Append(text,"chg["+IntegerToString(plan[Type].Change,3)+"]");
+    Append(text,"sp{"+DoubleToStr(plan[Type].Support,Digits)+"]");
+    Append(text,"rs{"+DoubleToStr(plan[Type].Resistance,Digits)+"]");
+    Append(text,"exp{"+DoubleToStr(plan[Type].Expansion,Digits)+"]");
+
+    //-- Holds
+    Append(text,EnumToString(hold[Type].Type[OP_BUY]));
+    Append(text,EnumToString(hold[Type].Type[OP_SELL]));
+    Append(text,DirText(hold[Type].Direction));
+    Append(text,ActionText(hold[Type].Bias));
+    Append(text,EnumToString(hold[Type].Event));
+    Append(text,DoubleToStr(hold[Type].Pivot,Digits));
+    Append(text,DoubleToStr(hold[Type].PivotNetChange,Digits));
+    
+    return (text);
+  }
+

@@ -137,14 +137,13 @@ void RefreshScreen(void)
   {
     //-- Range
     UpdateLabel("tmaRangeState"+(string)IndWinId,EnumToString(t.Range().State)+
-                  BoolToStr(debug," ["+string(t.Count(Ticks)-1)+":"+string(t.Count(Segments)-1)+"]")+" Age["+(string)t.Range().Age+"]",
+                  BoolToStr(debug," ["+string(t.Count(Ticks)-1)+":"+string(t.Count(Segments)-1)+"]")+" Age ["+(string)t.Range().Age+"]",
                   Color(Direction(t.Range().Direction)),12);
 
     //-- Segment
     UpdateDirection("tmaSegmentDir"+(string)IndWinId,t.Segment().Direction[Trend],Color(t.Segment().Direction[Term]),18);
     UpdateLabel("tmaSegmentState"+(string)IndWinId,proper(DirText(t.Segment().Direction[Term]))+" ["+(string)t.Segment().Price.Count+"]: "+
-                  BoolToStr(t.Segment().Hedge,"Hedge",proper(ActionText(Action(t.Segment().Direction[Lead])))),
-                  Color(t.Segment().Direction[Term]),12);
+                  proper(ActionText(Action(t.Segment().Direction[Lead]))),Color(t.Segment().Direction[Term]),12);
     UpdateDirection("tmaSegmentBias"+(string)IndWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),18);
 
     //-- Net Bias
