@@ -72,22 +72,6 @@ SessionData          data[SessionTypes];
 string               dataDate[SessionTypes];
 
 //+------------------------------------------------------------------+
-//| SessionColor - Returns the color for session ranges              |
-//+------------------------------------------------------------------+
-color SessionColor(SessionType Type)
-  {
-    switch (Type)
-    {
-      case Asia:    return(AsiaColor);
-      case Europe:  return(EuropeColor);
-      case US:      return(USColor);
-      case Daily:   return(DailyColor);
-    }
-    
-    return (clrBlack);
-  }
-
-//+------------------------------------------------------------------+
 //| CreateRange - Paints the session boxes                           |
 //+------------------------------------------------------------------+
 void CreateRange(SessionType Type, int Bar=0)
@@ -104,9 +88,9 @@ void CreateRange(SessionType Type, int Bar=0)
    
      ObjectCreate(crRangeId,OBJ_RECTANGLE,0,data[Type].OpenTime,data[Type].PriceHigh,data[Type].OpenTime,data[Type].PriceLow);
    
-     ObjectSet(crRangeId, OBJPROP_STYLE, STYLE_SOLID);
-     ObjectSet(crRangeId, OBJPROP_COLOR, SessionColor(Type));
-     ObjectSet(crRangeId, OBJPROP_BACK, true);
+     ObjectSet(crRangeId, OBJPROP_STYLE,STYLE_SOLID);
+     ObjectSet(crRangeId, OBJPROP_COLOR,Color(Type));
+     ObjectSet(crRangeId, OBJPROP_BACK,true);
    }
  }
 
@@ -165,8 +149,15 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
+    string text = "";
+    
     for (SessionType type=Asia;type<SessionTypes;type++)
+    {
       UpdateRange(type,Bar);
+      
+      if (session[type].ActiveEvent())
+        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n\n");
+    }
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
@@ -179,7 +170,7 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,Color(session[type][ActiveSession].BreakoutDir));
       
       if (inpShowMidLines!=PeriodTypes)
-        UpdateLine("lnMid"+EnumToString(type),session[type].Pivot(inpShowMidLines),STYLE_SOLID,SessionColor(type));
+        UpdateLine("lnMid"+EnumToString(type),session[type].Pivot(inpShowMidLines),STYLE_SOLID,Color(type,Bright));
       
       if (session[type].IsOpen())
         if (TimeHour(session[type].ServerTime(Bar))>session[type].SessionHour(SessionClose)-3)
@@ -200,9 +191,24 @@ void RefreshScreen(int Bar=0)
       else
         UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrDarkGray);
     }
-    
+
     if (inpShowSession!=SessionTypes)
-      Comment(session[inpShowSession].CommentStr());
+      Comment(session[inpShowSession].CommentStr()+"\n\n"+text);
+  }
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+void TestEvent(EventType Event)
+  {
+    string text         = "";
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (session[type][Event])
+        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n");
+        
+    if (StringLen(text)>0)
+      Pause("ActiveEvent("+EnumToString(Event)+")\n\n"+text,"Event Check()");
   }
  
 //+------------------------------------------------------------------+
@@ -222,8 +228,9 @@ int OnCalculate(const int rates_total,
     session[Asia].Update();
     session[Europe].Update();
     session[US].Update();
-    
     session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
+
+    TestEvent(NewDirection);
 
     RefreshScreen();
 

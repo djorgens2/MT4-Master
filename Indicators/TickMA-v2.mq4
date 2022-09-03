@@ -124,9 +124,9 @@ void RefreshScreen(void)
   {
     if (inpSegBounds)
     {
-      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Fractal().Support,clrLawnGreen);
-      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Fractal().Resistance,clrRed);
-      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Fractal().Expansion,clrYellow);
+      UpdatePriceLabel("tmaPL(sp):"+(string)IndWinId,t.Fractal().Support,clrRed);
+      UpdatePriceLabel("tmaPL(rs):"+(string)IndWinId,t.Fractal().Resistance,clrLawnGreen);
+      UpdatePriceLabel("tmaPL(e):"+(string)IndWinId,t.Fractal().Expansion,clrGoldenrod);
     }
 
     //-- Range
@@ -188,11 +188,7 @@ void RefreshScreen(void)
         ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
       }
 
-      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE1,t.Range().Mean);
-      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_PRICE2,t.Range().Mean);
-
-      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME1,Time[inpPeriods-1]);
-      ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_TIME2,Time[0]);
+      UpdateRay("tmaRangeMid:"+(string)IndWinId,t.Range().Mean,inpPeriods-1);
 
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
@@ -385,11 +381,11 @@ int OnInit()
       ObjectSet("tmaOC:"+(string)IndWinId+"-"+(string)obj,OBJPROP_WIDTH,3);
     }
 
-    ObjectCreate("tmaRangeMid:"+(string)IndWinId,OBJ_TREND,IndWinId,0,0);
-    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_RAY,true);
-    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_WIDTH,1);
-    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_STYLE,STYLE_DOT);
-    ObjectSet("tmaRangeMid:"+(string)IndWinId,OBJPROP_COLOR,clrDarkGray);
+    //--- Indicator Rays
+    NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,IndWinId);
+    NewRay("tmaSupport:"+(string)IndWinId,STYLE_DASH,clrRed,IndWinId);
+    NewRay("tmaResistance:"+(string)IndWinId,STYLE_DASH,clrLawnGreen,IndWinId);
+    NewRay("tmaExpansion:"+(string)IndWinId,STYLE_DASH,clrGoldenrod,IndWinId);
 
     if (inpSegBounds)
     {
@@ -424,9 +420,6 @@ int OnInit()
 
     NewPriceLabel("tmaNewBoundary");
 
-NewLine("lnSupport",0.00,STYLE_DASH,clrGray,IndWinId);
-NewLine("lnResistance",0.00,STYLE_DASH,clrGray,IndWinId);
-NewLine("lnExpansion",0.00,STYLE_DASH,clrGray,IndWinId);
     return(INIT_SUCCEEDED);
   }
 

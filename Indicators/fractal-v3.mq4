@@ -95,9 +95,8 @@ void RefreshScreen(void)
     if (inpShowExpEvents)
       if (f.Event(NewFibonacci))
         for (FractalType type=Origin;type<Root;type++)
-          if (type!=Prior)
-            if (f[type].Event==NewFibonacci)
-              Flag("[fr3]"+EnumToString(type)+" "+EnumToString(f.EventFibo(type)),rsFlagColor[type],0,f.Forecast(type,Expansion,f.EventFibo(type)),inpShowFlags);
+          if (f[type].Event==NewFibonacci)
+            Flag("[fr3]"+EnumToString(type)+" "+EnumToString(f.EventFibo(type)),rsFlagColor[type],0,f.Forecast(type,Expansion,f.EventFibo(type)),inpShowFlags);
 
     if (inpShowComment)
       f.RefreshScreen(Always);

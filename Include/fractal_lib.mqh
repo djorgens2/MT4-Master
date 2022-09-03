@@ -113,28 +113,21 @@ EventType FractalEvent(FractalType Type)
   }
 
 //+------------------------------------------------------------------+
-//| FiboPrice - linear fibonacci price for the supplied level        |
+//| Level - Returns the FiboLevel based on extended fibonacci        |
 //+------------------------------------------------------------------+
-double FiboPrice(FiboLevel Level, double Base, double Root, int Method=Expansion)
+FiboLevel Level(double Percent)
   {
-    if (Level == 0 || fabs(Level) == 10)
-    {
-      if (Method == Retrace)     
-        return (NormalizeDouble(Base,Digits));
-        
-      return (NormalizeDouble(Root,Digits));
-    }  
+    for (FiboLevel level=Fibo823;level>FiboRoot;level--)
+      if (fabs(Percent)>Percent(level))
+        return (level);
 
-    if (Method == Retrace)     
-      return (NormalizeDouble(Base-((Base-Root)*FiboPercent(Level)),Digits));
-
-    return (NormalizeDouble(Root+((Base-Root)*FiboPercent(Level)),Digits));
+    return (FiboRoot);
   }
 
 //+------------------------------------------------------------------+
-//| FiboPrice - Derived price for a variable fibonacci level         |
+//| Price - Derived price for a variable fibonacci level             |
 //+------------------------------------------------------------------+
-double FiboPrice(double Fibo, double Base, double Root, int Method=Expansion)
+double Price(double Fibo, double Base, double Root, int Method=Expansion)
   {
     if (Method == Retrace)     
       return (NormalizeDouble(Base-((Base-Root)*Fibo),Digits));
@@ -143,9 +136,9 @@ double FiboPrice(double Fibo, double Base, double Root, int Method=Expansion)
   }
 
 //+------------------------------------------------------------------+
-//| FiboExpansion - returns the Fibo expansion for supplied points   |
+//| Expansion - returns the Fibo expansion for supplied points       |
 //+------------------------------------------------------------------+
-double FiboExpansion(double Base, double Root, double Expansion, int Format=InDecimal)
+double Expansion(double Base, double Root, double Expansion, int Format=InDecimal)
   {
     double feExpansion    = fdiv(fabs(Expansion-Root),fabs(Base-Root),3);
 
@@ -159,9 +152,9 @@ double FiboExpansion(double Base, double Root, double Expansion, int Format=InDe
   }
 
 //+------------------------------------------------------------------+
-//| FiboRetrace - returns the linear Fibo retrace for supplied points|
+//| Retrace - returns the linear Fibo retrace for supplied points    |
 //+------------------------------------------------------------------+
-double FiboRetrace(double Root, double Expansion, double Retrace, int Format=InDecimal)
+double Retrace(double Root, double Expansion, double Retrace, int Format=InDecimal)
   {
     double frRetrace      = fdiv(fabs(Expansion-Retrace),fabs(Expansion-Root),3);
 
@@ -175,9 +168,9 @@ double FiboRetrace(double Root, double Expansion, double Retrace, int Format=InD
   }
 
 //+------------------------------------------------------------------+
-//| FiboPercent - returns the Fibo percent for the supplied level    |
+//| Percent - returns the Fibo percent for the supplied level        |
 //+------------------------------------------------------------------+
-double FiboPercent(int Level, int Format=InPoints)
+double Percent(int Level, int Format=InPoints)
   {
     const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 

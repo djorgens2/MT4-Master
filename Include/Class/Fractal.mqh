@@ -233,8 +233,8 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
 
       if (IsBetween(Type,Origin,Base))
         if (Price(Type,fpRetrace)>0.00)
-          if (Fibonacci(Type,Recovery,Min)<FiboPercent(Fibo23))
-            if (Fibonacci(Type,Retrace,Min)<FiboPercent(Fibo23))
+          if (Fibonacci(Type,Recovery,Min)<Percent(Fibo23))
+            if (Fibonacci(Type,Retrace,Min)<Percent(Fibo23))
             {
               state                     = Recovery;
               EventPrice                = Forecast(Type,Retrace,Fibo23);
@@ -245,7 +245,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
               EventPrice                = Forecast(Type,Recovery,Fibo23);
             }
           else
-            if (Fibonacci(Type,Retrace,Max)>FiboPercent(Fibo23))
+            if (Fibonacci(Type,Retrace,Max)>Percent(Fibo23))
             {
               state                     = Retrace;
               EventPrice                = Forecast(Type,Retrace,Fibo23);
@@ -280,12 +280,14 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
 
     //-- Test/Reset for Expansion Fibos/Events
     if (fBreakout||fReversal||Event(NewBreakout)||Event(NewReversal)||Event(NewDivergence))
-      fEventFibo[Type]                  = fmax(FiboLevel(Fibonacci(Type,Expansion,Max))+1,Fibo161);
+      fEventFibo[Type]                  = fmax(Level(Fibonacci(Type,Expansion,Max))+1,Fibo161);
 
-    if (FiboPercent(fmin(fEventFibo[Type],Fibo823))<Fibonacci(Type,Expansion,Now))
+    if (Percent(fmin(fEventFibo[Type],Fibo823))<Fibonacci(Type,Expansion,Now))
     {
       fEventFibo[Type]++;
       f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event);
+
+      SetEvent(f[Type].Event,alertlevel);
     }
   }
 
@@ -925,9 +927,9 @@ double CFractal::Forecast(FractalType Type, int Method, FiboLevel Fibo)
   {
     switch (Method)
     {
-      case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*FiboPercent(Fibo)),Digits));
-      case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboPercent(Fibo)),Digits));
-      case Recovery:    return(NormalizeDouble(Price(Type,fpRoot)-((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboPercent(Fibo)),Digits));
+      case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*Percent(Fibo)),Digits));
+      case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
+      case Recovery:    return(NormalizeDouble(Price(Type,fpRoot)-((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
     }
 
     return (NormalizeDouble(0.00,Digits));
@@ -1077,7 +1079,7 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
 void CFractal::RefreshFlags(void)
   {
     bool  event[EventTypes];
-    const color segment[FractalTypes]   = {clrYellow,C'255,0,0',C'195,0,0',clrDarkGray,C'135,0,0',clrDarkGray,clrYellow,clrGoldenrod,clrSteelBlue,clrForestGreen,clrNavy,clrNONE};
+    const color fractal[FractalTypes]   = {clrYellow,C'255,0,0',C'195,0,0',clrDarkGray,C'135,0,0',clrDarkGray,clrYellow,clrGoldenrod,clrSteelBlue,clrForestGreen,clrNavy,clrNONE};
 
     ArrayInitialize(event,false);
       
@@ -1086,16 +1088,20 @@ void CFractal::RefreshFlags(void)
       {
         if (Event(FractalEvent(type)))
           if (Event(NewReversal)&&IsChanged(event[NewReversal],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",segment[type],fBarNow,fEventPrice[NewReversal],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Reversal]",fractal[type],fBarNow,fEventPrice[NewReversal],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
         if (IsEqual(State(type),Breakout))
           if (Event(NewBreakout)&&IsChanged(event[NewBreakout],true))
-            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",segment[type],fBarNow,fEventPrice[NewBreakout],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
+            Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]New "+EnumToString(type)+"[Breakout]",fractal[type],fBarNow,fEventPrice[NewBreakout],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
         if (IsEqual(State(type),Correction))
           if (Event(NewCorrection)&&IsChanged(event[NewCorrection],true))
-             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",segment[type],fBarNow,fEventPrice[NewCorrection],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
+             Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Correction]",fractal[type],fBarNow,fEventPrice[NewCorrection],fShowFlags,OBJ_ARROW_RIGHT_PRICE);
 
+//        if (Event(NewFibonacci))
+//          if (f[type].Event==NewFibonacci)
+//            Flag("[fr3]"+EnumToString(type)+" "+EnumToString(EventFibo(type)),fractal[type],fBarNow,Forecast(type,Expansion,EventFibo(type)),true);
+//
         //if (IsEqual(State(type),Recovery))
         //  if (Event(NewRecovery)&&IsChanged(event[NewRecovery],true))
         //     Flag("[fr3]["+IntegerToString(fBarNow,5,'-')+"]"+EnumToString(type)+"[Recovery]",segment[type],fShowFlags,fBarNow,fEventPrice[NewRecovery]);

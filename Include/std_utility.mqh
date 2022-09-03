@@ -56,6 +56,19 @@
 #define SCREEN_LL              2
 #define SCREEN_LR              3
 
+enum StyleType
+     {
+       Wide,
+       Narrow,
+       StyleTypes
+     };
+
+enum DisplayColor
+     {
+       Bright,
+       Dark
+     };
+
 const color          AsiaColor       = C'0,32,0';    // Asia session box color
 const color          EuropeColor     = C'48,0,0';    // Europe session box color
 const color          USColor         = C'0,0,56';    // US session box color
@@ -494,21 +507,37 @@ void UpdateArrow(string ArrowName, int ArrowCode, int Color, int Bar=0, double P
 //+------------------------------------------------------------------+
 //| UpdateDirection - creates an arrow label to show indicator value |
 //+------------------------------------------------------------------+
-void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10)
+void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10, StyleType Style=Wide)
   { 
     if (Color == 0)
       Color = (int)ObjectGet(LabelName,OBJPROP_COLOR);
               
-    if (Direction==OP_HALT)
-      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
-    else
-    if (Direction > 0)
-      ObjectSetText(LabelName,CharToStr(241),Size,"Wingdings",Color);
-    else
-    if (Direction < 0)
-      ObjectSetText(LabelName,CharToStr(242),Size,"Wingdings",Color);
-    else
-      ObjectSetText(LabelName,CharToStr(73), Size,"Wingdings",Color);
+    switch (Style)
+    {
+      case Wide:    if (Direction==OP_HALT)
+                      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
+                    else
+                    if (Direction > 0)
+                      ObjectSetText(LabelName,CharToStr(241),Size,"Wingdings",Color);
+                    else
+                    if (Direction < 0)
+                      ObjectSetText(LabelName,CharToStr(242),Size,"Wingdings",Color);
+                    else
+                      ObjectSetText(LabelName,CharToStr(73), Size,"Wingdings",Color);
+                    break;
+
+      case Narrow:  if (Direction==OP_HALT)
+                      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
+                    else
+                    if (Direction > 0)
+                      ObjectSetText(LabelName,CharToStr(225),Size,"Wingdings",Color);
+                    else
+                    if (Direction < 0)
+                      ObjectSetText(LabelName,CharToStr(226),Size,"Wingdings",Color);
+                    else
+                      ObjectSetText(LabelName,CharToStr(73), Size,"Wingdings",Color);
+                    break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -585,25 +614,25 @@ void NewLine(string LineName, double Price=0.00, int Style=STYLE_SOLID, int Colo
 //+------------------------------------------------------------------+
 //| UpdateRay                                                        |
 //+------------------------------------------------------------------+
-void UpdateRay(string RayName, double PriceStart, int BarStart, double PriceEnd, int BarEnd, int Style=STYLE_SOLID, int Color=White)
+void UpdateRay(string RayName, double PriceStart, int BarStart, double PriceEnd=0.00, int BarEnd=0)
   {
-    ObjectSet(RayName,OBJPROP_STYLE,Style);
-    ObjectSet(RayName,OBJPROP_COLOR,Color);
     ObjectSet(RayName,OBJPROP_PRICE1,PriceStart);
-    ObjectSet(RayName,OBJPROP_PRICE2,PriceEnd);
+    ObjectSet(RayName,OBJPROP_PRICE2,BoolToDouble(IsEqual(PriceEnd,0.00),PriceStart,PriceEnd,Digits));
     
-    ObjectSet(RayName,OBJPROP_TIME1,BoolToDT(BarStart<0,Time[0]+(fabs(BarStart)*(Period()*60)),Time[fabs(BarStart)]));
-    ObjectSet(RayName,OBJPROP_TIME2,BoolToDT(BarEnd<0,Time[0]+(fabs(BarEnd)*(Period()*60)),Time[fabs(BarEnd)]));
+    ObjectSet(RayName,OBJPROP_TIME1,Time[BarStart]);
+    ObjectSet(RayName,OBJPROP_TIME2,Time[BarEnd]);
   }
   
 //+------------------------------------------------------------------+
 //| NewRay - creates a ray object                                    |
 //+------------------------------------------------------------------+
-void NewRay(string RayName, bool ExtendRay=true, int Thickness=1, int Window=0)
+void NewRay(string RayName, int Style=STYLE_SOLID, int Color=clrWhite, int Window=0)
   {
     ObjectCreate(RayName,OBJ_TREND,Window,0,0);
-    ObjectSet(RayName,OBJPROP_RAY,ExtendRay);
-    ObjectSet(RayName,OBJPROP_WIDTH,Thickness);
+    ObjectSet(RayName,OBJPROP_RAY,true);
+    ObjectSet(RayName,OBJPROP_WIDTH,1);
+    ObjectSet(RayName,OBJPROP_STYLE,Style);
+    ObjectSet(RayName,OBJPROP_COLOR,Color);
   }
 
 //+------------------------------------------------------------------+

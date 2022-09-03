@@ -89,7 +89,7 @@ public:
       AlertLevel     HighAlert(void)                   {return (eMaxAlert);}
       AlertLevel     EventAlertLevel(EventType Event)  {return (eAlerts[Event]);}
 
-      string         ActiveEventText(bool WithHeader=true);
+      string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       
       //---  General use events
@@ -152,9 +152,9 @@ void CEvent::ClearEvents(void)
   }
   
 //+------------------------------------------------------------------+
-//| ActiveEventText - String of active events formatted for display  |
+//| ActiveEventStr - String of active events formatted for display   |
 //+------------------------------------------------------------------+
-string CEvent::ActiveEventText(bool WithHeader=true)
+string CEvent::ActiveEventStr(bool WithHeader=true)
   {
     string aeActiveEvents   = "\n------------------------------";
     
@@ -223,7 +223,7 @@ bool IsEqual(EventType Event1, EventType Event2)
   {
     return (Event1==Event2);
   }
-  
+
 const string EventText[EventTypes] =
              {
                "No Event",
