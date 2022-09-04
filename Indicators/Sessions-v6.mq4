@@ -171,8 +171,8 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_pResistance:"+sessionIndex,session[PriorSession].Resistance,STYLE_DASH,clrForestGreen);
       //UpdateLine("lnS_Support:"+sessionIndex,session[sftCorrection].Support,STYLE_SOLID,clrMaroon);
       //UpdateLine("lnS_Resistance:"+sessionIndex,session[sftCorrection].Resistance,STYLE_SOLID,clrForestGreen);
-      //UpdateLine("lnS_CorrectionHi:"+sessionIndex,session[sftCorrection].High,STYLE_DASH,clrWhite);
-      //UpdateLine("lnS_CorrectionLo:"+sessionIndex,session[sftCorrection].Low,STYLE_DASH,clrWhite);
+      UpdateLine("lnS_CorrectionHi:"+sessionIndex,session[Correction].High,STYLE_DASH,clrWhite);
+      UpdateLine("lnS_CorrectionLo:"+sessionIndex,session[Correction].Low,STYLE_DASH,clrWhite);
       
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
       //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(inpFractalLines,Expansion,fl),STYLE_DASH,clrYellow);
@@ -204,7 +204,7 @@ void RefreshScreen(int Bar=0)
     }
     
     if (inpShowComment==Yes)
-      Comment(session.CommentStr());
+      Comment(session.FractalStr());
   }
 
 //+------------------------------------------------------------------+

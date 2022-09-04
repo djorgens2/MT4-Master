@@ -193,7 +193,7 @@ void RefreshScreen(int Bar=0)
     }
 
     if (inpShowSession!=SessionTypes)
-      Comment(session[inpShowSession].CommentStr()+"\n\n"+text);
+      Comment(session[inpShowSession].FractalStr()+"\n\n"+text);
   }
 
 //+------------------------------------------------------------------+

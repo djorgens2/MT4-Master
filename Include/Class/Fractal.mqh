@@ -265,7 +265,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
     else
       state                             = (FractalState)BoolToInt(IsEqual(Direction(fLegNow),DirectionUp),Rally,Pullback);
 
-    if (IsChanged(State,(FractalState)BoolToInt(IsEqual(state,NoState),State,state)))
+    if (NewState(State,(FractalState)BoolToInt(IsEqual(state,NoState),State,state)))
     {
       //-- Set the event price of the new state
       fEventPrice[FractalEvent(State)]  = BoolToDouble(IsEqual(EventPrice,0.00),Close[fBarNow],EventPrice);
@@ -1060,7 +1060,7 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
     }
     
     if (WithEvents)
-      rsReport       += "\n\nFractal "+ActiveEventText()+"\n";
+      rsReport       += "\n\nFractal "+ActiveEventStr()+"\n";
     
     if (LogOutput)
     {

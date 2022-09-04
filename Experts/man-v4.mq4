@@ -216,7 +216,7 @@ void RefreshScreen(void)
 //    Comment(PlanStr(type));
     for (SessionType session=Daily;session<SessionTypes;session++)
       if (s[session].ActiveEvent())
-        Append(text,EnumToString(session)+" "+s[session].ActiveEventText(),"\n\n");
+        Append(text,EnumToString(session)+" "+s[session].ActiveEventStr(),"\n\n");
         
     Comment(text);
   }
