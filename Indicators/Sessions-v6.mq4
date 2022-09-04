@@ -157,16 +157,18 @@ void RefreshScreen(int Bar=0)
     if (inpFractalLines!=FractalTypes)
     {
       UpdateLine("lnS_ActiveMid:"+sessionIndex,session.Pivot(ActiveSession),STYLE_SOLID,clrGoldenrod);
+      UpdateLine("lnS_Low:"+sessionIndex,session[inpFractalLines].Low,STYLE_DOT,clrFireBrick);
+      UpdateLine("lnS_High:"+sessionIndex,session[inpFractalLines].High,STYLE_DOT,clrForestGreen);
       UpdateLine("lnS_Base:"+sessionIndex,session.Price(inpFractalLines,fpBase),STYLE_SOLID,
                              BoolToInt(IsEqual(session[inpFractalLines].Direction,DirectionUp),clrLawnGreen,clrRed));
       UpdateLine("lnS_Root:"+sessionIndex,session.Price(inpFractalLines,fpRoot),STYLE_SOLID,
                              BoolToInt(IsEqual(session[inpFractalLines].Direction,DirectionUp),clrRed,clrLawnGreen));
       UpdateLine("lnS_Expansion:"+sessionIndex,session.Price(inpFractalLines,fpExpansion),STYLE_DOT,clrGoldenrod);
       UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(inpFractalLines,fpRetrace),STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnS_Low:"+sessionIndex,session[inpFractalLines].Low,STYLE_DOT,clrFireBrick);
-      UpdateLine("lnS_High:"+sessionIndex,session[inpFractalLines].High,STYLE_DOT,clrForestGreen);
       UpdateLine("lnS_Support:"+sessionIndex,session[ActiveSession].Support,STYLE_SOLID,clrMaroon);
       UpdateLine("lnS_Resistance:"+sessionIndex,session[ActiveSession].Resistance,STYLE_SOLID,clrForestGreen);
+      UpdateLine("lnS_pSupport:"+sessionIndex,session[PriorSession].Support,STYLE_DASH,clrMaroon);
+      UpdateLine("lnS_pResistance:"+sessionIndex,session[PriorSession].Resistance,STYLE_DASH,clrForestGreen);
       //UpdateLine("lnS_Support:"+sessionIndex,session[sftCorrection].Support,STYLE_SOLID,clrMaroon);
       //UpdateLine("lnS_Resistance:"+sessionIndex,session[sftCorrection].Resistance,STYLE_SOLID,clrForestGreen);
       //UpdateLine("lnS_CorrectionHi:"+sessionIndex,session[sftCorrection].High,STYLE_DASH,clrWhite);
@@ -215,7 +217,7 @@ void TestEvent(EventType Event)
     if (session[Event]&&session[NewBreakout])
 //    if (session.ActiveEvent())
       Append(text,EnumToString(inpType)+" "+session.ActiveEventStr(),"\n");
-        
+
     if (StringLen(text)>0)
       Pause("ActiveEvent("+EnumToString(Event)+")\n\n"+text,"Event Check()");
   }
@@ -279,9 +281,11 @@ int OnInit()
     NewLine("lnS_Base:"+sessionIndex);
     NewLine("lnS_Root:"+sessionIndex);    
     NewLine("lnS_Expansion:"+sessionIndex);
+    NewLine("lnS_Retrace:"+sessionIndex);
     NewLine("lnS_Support:"+sessionIndex);
     NewLine("lnS_Resistance:"+sessionIndex);
-    NewLine("lnS_Retrace:"+sessionIndex);
+    NewLine("lnS_pSupport:"+sessionIndex);
+    NewLine("lnS_pResistance:"+sessionIndex);
     NewLine("lnS_CorrectionHi:"+sessionIndex);
     NewLine("lnS_CorrectionLo:"+sessionIndex);
     
@@ -326,9 +330,9 @@ void OnDeinit(const int reason)
     ObjectDelete("lnS_Base:"+sessionIndex);
     ObjectDelete("lnS_Root:"+sessionIndex);
     ObjectDelete("lnS_Expansion:"+sessionIndex);
+    ObjectDelete("lnS_Retrace:"+sessionIndex);
     ObjectDelete("lnS_Support:"+sessionIndex);
     ObjectDelete("lnS_Resistance:"+sessionIndex);
-    ObjectDelete("lnS_Retrace:"+sessionIndex);
     ObjectDelete("lnS_CorrectionHi:"+sessionIndex);
     ObjectDelete("lnS_CorrectionLo:"+sessionIndex);    
 

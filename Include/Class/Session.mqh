@@ -20,13 +20,6 @@ class CSession : public CEvent
   {
 
 public:
-             //-- Fractal Types
-             enum SessionFractalType
-             {
-               sftCorrection        = 4,
-               SessionFractalTypes  = 5
-             };
-
              //-- Period Types
              enum PeriodType
              {
@@ -84,9 +77,9 @@ public:
              string           FractalStr(void);
              string           SessionStr(PeriodType Type);
 
-             SessionRec       operator[](const SessionFractalType Type) {return(sfractal[Type]);}
-             SessionRec       operator[](const FractalType Type)        {return(sfractal[Type]);}
-             SessionRec       operator[](const PeriodType Type)         {return(srec[Type]);}
+             SessionRec       operator[](const FractalState)     {return(sCorrection);}
+             SessionRec       operator[](const FractalType Type) {return(sfractal[Type]);}
+             SessionRec       operator[](const PeriodType Type)  {return(srec[Type]);}
                                  
 private:
 
@@ -103,7 +96,8 @@ private:
              int              sBarDay;
              int              sBarHour;
              
-             SessionRec       sfractal[SessionFractalTypes];
+             SessionRec       sfractal[FractalTypes];
+             SessionRec       sCorrection;
              
              int              sBarFE;          //--- Fractal Expansion Bar
              int              sDirFE;          //--- Fractal Direction (Painted)
@@ -315,64 +309,60 @@ void CSession::UpdateBias(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTerm(void)
   {
-    double        expansion          = 0.00;
     FractalState  state              = NoState;
 
     //--- Check for term changes
     if (NewDirection(sfractal[Term].Direction,srec[ActiveSession].BreakoutDir))
-    {
       SetEvent(NewTerm,Minor);
 
-      if (sfractal[Term].Direction==DirectionUp)
-      {
-        sfractal[Term].Resistance    = srec[PriorSession].High;
-        sfractal[Term].Support       = sfractal[Term].Low;
-        sfractal[Term].High          = sfractal[Term].Low;   //-- Force NewExpansion Event
-        sfractal[Term].Low           = Close[sBar];
-      }
-
-      if (sfractal[Term].Direction==DirectionDown)
-      {
-        sfractal[Term].Support       = srec[PriorSession].Low;
-        sfractal[Term].Resistance    = sfractal[Term].High;
-        sfractal[Term].Low           = sfractal[Term].High;  //-- Force NewExpansion Event
-        sfractal[Term].High          = Close[sBar];
-      }
-    }
-
     //--- Check for term boundary changes
-    if (sfractal[Term].Direction==DirectionUp)
-      if (IsHigher(High[sBar],sfractal[Term].High))
-      {
-        SetEvent(NewExpansion,Minor);
-        UpdateFractalBuffer(DirectionUp,High[sBar]);
+    switch (sfractal[Term].Direction)
+    {
+      case DirectionUp:     if (Event(NewTerm))
+                            {
+                              sfractal[Term].Resistance  = srec[PriorSession].High;
+                              sfractal[Term].Support     = sfractal[Term].Low;
+                              sfractal[Term].Low         = Close[sBar];
+                            }
 
-        sfractal[Term].Low           = Close[sBar];        
-        expansion                    = sfractal[Term].High;
-      }
-      else sfractal[Term].Low        = BoolToDouble(sBar==0,fmin(Close[sBar],sfractal[Term].Low),fmin(Low[sBar],sfractal[Term].Low),Digits);
+                            if (IsHigher(High[sBar],sfractal[Term].High))
+                            {
+                              sfractal[Term].Low         = Close[sBar];        
 
-    if (sfractal[Term].Direction==DirectionDown)
-      if (IsLower(Low[sBar],sfractal[Term].Low))
-      {
-        SetEvent(NewExpansion,Minor);
-        UpdateFractalBuffer(DirectionDown,Low[sBar]);
+                              UpdateFractalBuffer(DirectionUp,High[sBar]);
+                              SetEvent(NewExpansion,Minor);
+                            }
+                            else sfractal[Term].Low      = fmin(BoolToDouble(sBar==0,Close[sBar],Low[sBar]),sfractal[Term].Low);
+                            break;
 
-        sfractal[Term].High          = Close[sBar];
-        expansion                    = sfractal[Term].Low;
-      }
-      else sfractal[Term].High       = BoolToDouble(sBar==0,fmax(Close[sBar],sfractal[Term].High),fmax(High[sBar],sfractal[Term].High),Digits);
+      case DirectionDown:   if (Event(NewTerm))
+                            {
+                              sfractal[Term].Support     = srec[PriorSession].Low;
+                              sfractal[Term].Resistance  = sfractal[Term].High;
+                              sfractal[Term].High        = Close[sBar];
+                            }
+
+                            if (IsLower(Low[sBar],sfractal[Term].Low))
+                            {
+                              sfractal[Term].High        = Close[sBar];
+
+                              UpdateFractalBuffer(DirectionDown,Low[sBar]);
+                              SetEvent(NewExpansion,Minor);
+                            }
+                            else sfractal[Term].High     = fmax(BoolToDouble(sBar==0,Close[sBar],High[sBar]),sfractal[Term].High);
+                            break;
+    }
 
     //--- Check for term state changes
     if (Event(NewExpansion,Minor))
     {
-      if (IsBetween(expansion,sfractal[Prior].Support,sfractal[Prior].Resistance))
+      if (IsBetween(Price(Term,fpExpansion),sfractal[Prior].Support,sfractal[Prior].Resistance))
         if (sfractal[Term].Direction==sfractal[Term].BreakoutDir)
           state                      = Recovery;
         else
           state                      = Retrace;
       else
-      if (IsBetween(expansion,sfractal[Term].Support,sfractal[Term].Resistance))
+      if (IsBetween(Price(Term,fpExpansion),sfractal[Term].Support,sfractal[Term].Resistance))
         if (sfractal[Term].Direction==DirectionUp)
           state                      = Rally;
         else
@@ -381,10 +371,10 @@ void CSession::UpdateTerm(void)
       {
         if (sfractal[Term].Direction==DirectionUp)
         {
-          if (IsLower(expansion,sfractal[Prior].Support,NoUpdate))
+          if (IsLower(Price(Term,fpExpansion),sfractal[Prior].Support,NoUpdate))
             state                    = Rally;
               
-          if (IsHigher(expansion,sfractal[Prior].Resistance,NoUpdate))
+          if (IsHigher(Price(Term,fpExpansion),sfractal[Prior].Resistance,NoUpdate))
             if (NewDirection(sfractal[Term].BreakoutDir,sfractal[Term].Direction))
               state                  = Reversal;
             else
@@ -392,10 +382,10 @@ void CSession::UpdateTerm(void)
         }
         else
         {
-          if (IsHigher(expansion,sfractal[Prior].Resistance,NoUpdate))
+          if (IsHigher(Price(Term,fpExpansion),sfractal[Prior].Resistance,NoUpdate))
             state                    = Pullback;
 
-          if (IsLower(expansion,sfractal[Prior].Support,NoUpdate))
+          if (IsLower(Price(Term,fpExpansion),sfractal[Prior].Support,NoUpdate))
             if (NewDirection(sfractal[Term].BreakoutDir,sfractal[Term].Direction))
               state                  = Reversal;
             else
@@ -424,18 +414,18 @@ void CSession::UpdateTrend(void)
       if (sfractal[Term].Direction==DirectionUp)
       {
         if (sfractal[Trend].Direction==DirectionUp)
-          sfractal[sftCorrection].Low   = sfractal[Trend].Support;
+          sCorrection.Low   = sfractal[Trend].Support;
         else
-          sfractal[sftCorrection].Low   = sfractal[Trend].Low;
+          sCorrection.Low   = sfractal[Trend].Low;
 
         sfractal[Trend].Support      = sfractal[Term].Support;
       }
       else
       {
         if (sfractal[Trend].Direction==DirectionDown)
-          sfractal[sftCorrection].High  = sfractal[Trend].Resistance;
+          sCorrection.High  = sfractal[Trend].Resistance;
         else
-          sfractal[sftCorrection].High  = sfractal[Trend].High;
+          sCorrection.High  = sfractal[Trend].High;
 
         sfractal[Trend].Resistance   = sfractal[Term].Resistance;
       }
@@ -462,7 +452,7 @@ void CSession::UpdateTrend(void)
         utState                        = Breakout;
 
         //--- Check for linear reversal
-        if (IsHigher(High[sBar],sfractal[sftCorrection].High,NoUpdate))
+        if (IsHigher(High[sBar],sCorrection.High,NoUpdate))
           if (NewDirection(sfractal[Trend].BreakoutDir,DirectionUp))
             SetEvent(NewTrend,Major);
       }
@@ -483,7 +473,7 @@ void CSession::UpdateTrend(void)
         utState                        = Breakout;
         
         //--- Check for linear reversal
-        if (IsLower(Low[sBar],sfractal[sftCorrection].Low,NoUpdate))
+        if (IsLower(Low[sBar],sCorrection.Low,NoUpdate))
           if (NewDirection(sfractal[Trend].BreakoutDir,DirectionDown))
             SetEvent(NewTrend,Major);
       }
@@ -608,38 +598,38 @@ void CSession::UpdateOrigin(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateCorrection(void)
   {
-    FractalState state                       = sfractal[sftCorrection].State;
-    sfractal[sftCorrection].Direction        = sfractal[Term].Direction;
+    FractalState state                       = sCorrection.State;
+    sCorrection.Direction                    = sfractal[Term].Direction;
     
-    if (IsBetween(Close[sBar],sfractal[sftCorrection].High,sfractal[sftCorrection].Low))
+    if (IsBetween(Close[sBar],sCorrection.High,sCorrection.Low))
     {
 //      sfractal[sftCorrection].State          = (FractalState)BoolToInt(IsEqual(sfractal[sftCorrection].Direction,DirectionUp),Rally,Pullback);
-      sfractal[sftCorrection].State          = Retrace;
+      sCorrection.State          = Retrace;
 
-      if (sfractal[sftCorrection].Direction==DirectionUp)
-        if (IsBetween(Close[sBar],sfractal[sftCorrection].Support,sfractal[sftCorrection].Low))
-          sfractal[sftCorrection].State      = Rally;
+      if (sCorrection.Direction==DirectionUp)
+        if (IsBetween(Close[sBar],sCorrection.Support,sCorrection.Low))
+          sCorrection.State      = Rally;
 
-      if (sfractal[sftCorrection].Direction==DirectionDown)
-        if (IsBetween(Close[sBar],sfractal[sftCorrection].Resistance,sfractal[sftCorrection].High))
-          sfractal[sftCorrection].State      = Pullback;
+      if (sCorrection.Direction==DirectionDown)
+        if (IsBetween(Close[sBar],sCorrection.Resistance,sCorrection.High))
+          sCorrection.State      = Pullback;
     }
     else
     {
-      sfractal[sftCorrection].State          = Breakout;
+      sCorrection.State          = Breakout;
 
-      if (NewDirection(sfractal[sftCorrection].BreakoutDir,Direction(Close[sBar]-sfractal[sftCorrection].Low)))
+      if (NewDirection(sCorrection.BreakoutDir,Direction(Close[sBar]-sCorrection.Low)))
       {
-        if (sfractal[sftCorrection].BreakoutDir==DirectionUp)
-          sfractal[sftCorrection].Resistance = sfractal[sftCorrection].High;
+        if (sCorrection.BreakoutDir==DirectionUp)
+          sCorrection.Resistance = sCorrection.High;
         else
-          sfractal[sftCorrection].Support    = sfractal[sftCorrection].Low;        
+          sCorrection.Support    = sCorrection.Low;        
 
-        sfractal[sftCorrection].State        = Reversal;
+        sCorrection.State        = Reversal;
       }
     }
     
-    if (NewState(state,sfractal[sftCorrection].State))
+    if (NewState(state,sCorrection.State))
       SetEvent(FractalEvent(state),Critical);
   }
 
@@ -738,8 +728,10 @@ void CSession::LoadHistory(void)
     }
 
     //--- Initialize Fibo record
-    for (int type=0;type<SessionFractalTypes;type++)
+    for (int type=0;type<FractalTypes;type++)
       sfractal[type]                 = srec[ActiveSession];
+      
+    sCorrection                      = srec[ActiveSession];
 
     ////--- *** May need to modify this if the sbar Open==Close
     //if (IsEqual(Open[sBar],Close[sBar]))
@@ -984,7 +976,7 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo)
 string CSession::CommentStr(void)
   {  
     string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*\n"+
-        "Correction: "+EnumToString(sfractal[sftCorrection].State)+" Direction: "+DirText(sfractal[sftCorrection].Direction)+"/"+DirText(sfractal[sftCorrection].BreakoutDir)+"\n"+
+        "Correction: "+EnumToString(sCorrection.State)+" Direction: "+DirText(sCorrection.Direction)+"/"+DirText(sCorrection.BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[Term].State)+" Direction: "+DirText(sfractal[Term].Direction)+"/"+DirText(sfractal[Term].BreakoutDir)+"\n"+
                        " (r) "+DoubleToStr(Retrace(Term,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Term,Max,InPercent),1)+"%"+"\n"+
                        " (e) "+DoubleToStr(Expansion(Term,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Max,InPercent),1)+"%\n"+
@@ -1005,7 +997,7 @@ string CSession::CommentStr(void)
 string CSession::FractalStr(void)
   {
     return ("*---------- "+EnumToString(this.Type())+ " Session Fractal ----------*\n"+
-        "Correction: "+EnumToString(sfractal[sftCorrection].State)+" Direction: "+DirText(sfractal[sftCorrection].Direction)+"/"+DirText(sfractal[sftCorrection].BreakoutDir)+"\n"+
+        "Correction: "+EnumToString(sCorrection.State)+" Direction: "+DirText(sCorrection.Direction)+"/"+DirText(sCorrection.BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[Term].State)+" Direction: "+DirText(sfractal[Term].Direction)+"/"+DirText(sfractal[Term].BreakoutDir)+
                        " (r) "+DoubleToStr(Retrace(Term,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Term,Max,InPercent),1)+"%"+
                        " (e) "+DoubleToStr(Expansion(Term,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Max,InPercent),1)+"%\n"+
@@ -1047,20 +1039,6 @@ bool IsChanged(SessionType &Compare, SessionType Value)
       return (false);
       
     Compare = Value;
-    return (true);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - returns true if the updated value has changed        |
-//+------------------------------------------------------------------+
-bool IsChanged(SessionFractalType &Check, SessionFractalType Compare, bool Update=true)
-  {
-    if (Check == Compare)
-      return (false);
-  
-    if (Update)
-      Check   = Compare;
-  
     return (true);
   }
 
