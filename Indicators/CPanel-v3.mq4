@@ -246,7 +246,6 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static ReservedWords bound   = Default;
     static int           bias    = OP_NO_ACTION;
     static int  lastSegCount     = 0;
 

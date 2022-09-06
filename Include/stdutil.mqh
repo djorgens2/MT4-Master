@@ -73,34 +73,15 @@
                   No
                 };
 
-       //---- Close Options
-       enum CloseOptions
-            {
-              CloseNone,          // Hold All
-              CloseAll,           // Close All
-              CloseMin,           // Close Worst
-              CloseMax,           // Close Best
-              CloseHalf,          // Close Half (All)
-              CloseProfit,        // Close Profit
-              CloseLoss,          // Close Losses
-              CloseConditional,   // Close Conditionally
-              CloseFIFO,          // FIFO Close
-              NoCloseOption = -1  // No Close Option
-            };
-
        //--- Quantitative measure types
-       enum     MeasureType
+       enum     SummaryType
                 { 
                   Loss,     //--
                   Net,      //-- Hard Sequence
                   Profit,   //-- ** DO NOT MODIFY
                   Total,    //--            
-                  Lowest,
-                  Highest,
-                  Smallest,
-                  Largest,
                   Count,
-                  MeasureTypes
+                  SummaryTypes
                 };
                 
        //--- Numbered position measure types
@@ -120,58 +101,14 @@
                   PositionTypes
                 };
 
-       enum     ReservedWords
+       enum     MeasureType
                 {
-                  Default,
-                  Size,
-                  Dominant,
-                  Direction,
-                  Bar,
-                  Age,
-                  Level,
-                  Top,
-                  Bottom,
-                  Mid,
-                  Head,
-                  Tail,
+                  NoMeasure,
                   Now,
-                  Tick,   //--- Mandatory sequence
-                  Min,    //--- Tick, Min, Max,
-                  Max,    //
+                  Min,    
+                  Max,    
                   All,
-                  Next,
-                  Last,
-                  Previous,
-                  Above,
-                  Below,
-                  Higher,
-                  Lower,
-                  AtRisk,
-                  Deviation,
-                  Mean,
-                  Positive,
-                  Negative,
-                  Aggregate,
-                  StdDev,
-                  OverBought,
-                  OverSold,
-                  PolyTrend,
-                  Polyline,
-                  Trendline,
-                  Range,
-                  RangeHigh,
-                  RangeLow,
-                  Boundary,
-                  Price,
-                  History,
-                  Forecast,
-                  Pivot,
-                  Peg,
-                  Active,
-                  Master,
-                  Support,
-                  Resistance,
-                  WordCount      //--- must be last
+                  MeasureTypes      //--- must be last
               };
 
 //+------------------------------------------------------------------+
@@ -290,20 +227,6 @@ bool IsChanged(bool &Check, bool Compare, bool Update=true)
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
 bool IsChanged(uchar &Check, uchar Compare, bool Update=true)
-  {
-    if (Check == Compare)
-      return (false);
-   
-    if (Update) 
-      Check   = Compare;
-  
-    return (true);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - returns true if the updated value has changed        |
-//+------------------------------------------------------------------+
-bool IsChanged(ReservedWords &Check, ReservedWords Compare, bool Update=true)
   {
     if (Check == Compare)
       return (false);
@@ -483,17 +406,6 @@ datetime BoolToDT(bool IsTrue, datetime TrueValue, datetime FalseValue)
 //| BoolToInt - returns user defined int for the supplied value      |
 //+------------------------------------------------------------------+
 int BoolToInt(bool IsTrue, int TrueValue, int FalseValue=0)
-  {
-    if (IsTrue)
-      return (TrueValue);
-
-    return (FalseValue);
-  }
-
-//+------------------------------------------------------------------+
-//| BoolToWord - Returns a qualified Reserved Word based on a query  |
-//+------------------------------------------------------------------+
-ReservedWords BoolToWord(bool IsTrue, ReservedWords TrueValue, ReservedWords FalseValue=0)
   {
     if (IsTrue)
       return (TrueValue);

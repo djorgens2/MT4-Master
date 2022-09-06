@@ -8,6 +8,10 @@
 #include <stdutil.mqh>
 #include <Class/Event.mqh>
 
+#define FiboCorrection   0.764
+#define FiboRetrace      0.500
+#define FiboRecovery     0.236
+
   //--- Public fractal enums
   enum             FractalState       // Fractal States
                    {
@@ -199,6 +203,9 @@ bool NewState(FractalState &State, FractalState ChangeState)
       if (ChangeState==Reversal||ChangeState==Breakout||ChangeState==Recovery)
         return(IsChanged(State,ChangeState));
       else return(false);
+
+    if (ChangeState==Recovery)
+      return (false);
 
     return(IsChanged(State,ChangeState));
   }

@@ -103,10 +103,10 @@ public:
        void             RefreshFlags(void);
 
        int              Direction(FractalType Type=Expansion, bool Contrarian=false, int Format=InDirection);       
-       double           Price(FractalType Type, FractalPoint PointType);                                  //--- Returns the Price by Fractal Point       
-       double           Range(FractalType Type, ReservedWords Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
+       double           Price(FractalType Type, FractalPoint PointType);                                //--- Returns the Price by Fractal Point       
+       double           Range(FractalType Type, MeasureType Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
 
-       double           Fibonacci(FractalType Type, int Method, ReservedWords Measure, int Format=InDecimal);                 //--- For each retrace type
+       double           Fibonacci(FractalType Type, int Method, MeasureType Measure, int Format=InDecimal);                 //--- For each retrace type
        double           Forecast(FractalType Type, int Method, FiboLevel Fibo);
 
        FractalState     State(FractalType Type) {return((FractalState)BoolToInt(Type==Origin,dOrigin.State,f[Type].State)); } //--- State by Fractal Type
@@ -864,7 +864,7 @@ int CFractal::Direction(FractalType Type=Expansion, bool Contrarian=false, int F
 //+------------------------------------------------------------------+
 //| Range - Returns the leg (Base-Root) Range for supplied Measure   |
 //+------------------------------------------------------------------+
-double CFractal::Range(FractalType Type, ReservedWords Measure=Max, int Format=InDecimal)
+double CFractal::Range(FractalType Type, MeasureType Measure=Max, int Format=InDecimal)
   {
     double range            = 0.00;
 
@@ -888,7 +888,7 @@ double CFractal::Range(FractalType Type, ReservedWords Measure=Max, int Format=I
 //+------------------------------------------------------------------+
 //| Fibonacci - Calcuates fibo % for supplied type Type and Method   |
 //+------------------------------------------------------------------+
-double CFractal::Fibonacci(FractalType Type, int Method, ReservedWords Measure, int Format=InDecimal)
+double CFractal::Fibonacci(FractalType Type, int Method, MeasureType Measure, int Format=InDecimal)
   { 
     switch (Method)
     {

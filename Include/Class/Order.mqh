@@ -275,7 +275,7 @@ public:
           void         Disable(int Action)          {Master[Action].TradeEnabled=false;};
 
           //-- Order properties
-          double       Price(MeasureType Type, int Action, double Requested, double Basis=0.00);
+          double       Price(SummaryType Type, int Action, double Requested, double Basis=0.00);
           double       LotSize(int Action, double Lots=0.00);
           double       Margin(int Format=InPercent)                          {return(Account.Margin*BoolToInt(IsEqual(Format,InPercent),100,1));};
           double       Margin(double Lots, int Format=InPercent)             {return(Calc(Margin,Lots,Format));};
@@ -291,16 +291,16 @@ public:
           void         Cancel(OrderRequest &Request, QueueStatus Status, string Reason="");
 
           bool         Status(QueueStatus State, int Type=OP_NO_ACTION);
-          bool         Pending(int Type=OP_NO_ACTION)                        {return(Status(Pending,Type));};
-          bool         Canceled(int Type=OP_NO_ACTION)                       {return(Status(Canceled,Type));};
-          bool         Declined(int Type=OP_NO_ACTION)                       {return(Status(Declined,Type));};
-          bool         Rejected(int Type=OP_NO_ACTION)                       {return(Status(Rejected,Type));};
-          bool         Expired(int Type=OP_NO_ACTION)                        {return(Status(Expired,Type));};
-          bool         Fulfilled(int Type=OP_NO_ACTION)                      {return(Status(Fulfilled,Type));};
-          bool         Qualified(int Type=OP_NO_ACTION)                      {return(Status(Qualified,Type));};
-          bool         Processing(int Type=OP_NO_ACTION)                     {return(Status(Processing,Type));};
-          bool         Processed(int Type=OP_NO_ACTION)                      {return(Status(Processed,Type));};
-          bool         Closed(int Type=OP_NO_ACTION)                         {return(Status(Closed,Type));};
+          bool         Pending(int Type=OP_NO_ACTION)            {return(Status(Pending,Type));};
+          bool         Canceled(int Type=OP_NO_ACTION)           {return(Status(Canceled,Type));};
+          bool         Declined(int Type=OP_NO_ACTION)           {return(Status(Declined,Type));};
+          bool         Rejected(int Type=OP_NO_ACTION)           {return(Status(Rejected,Type));};
+          bool         Expired(int Type=OP_NO_ACTION)            {return(Status(Expired,Type));};
+          bool         Fulfilled(int Type=OP_NO_ACTION)          {return(Status(Fulfilled,Type));};
+          bool         Qualified(int Type=OP_NO_ACTION)          {return(Status(Qualified,Type));};
+          bool         Processing(int Type=OP_NO_ACTION)         {return(Status(Processing,Type));};
+          bool         Processed(int Type=OP_NO_ACTION)          {return(Status(Processed,Type));};
+          bool         Closed(int Type=OP_NO_ACTION)             {return(Status(Closed,Type));};
           bool         Submitted(OrderRequest &Request);
           
 
@@ -308,12 +308,12 @@ public:
           OrderRequest BlankRequest(string Requestor);
           OrderRequest Request(int Key, int Ticket=NoValue);
           OrderDetail  Ticket(int Ticket);
-          OrderDetail  Ticket(int Action, ReservedWords Measure)             {if (IsEqual(Measure,Min)) 
-                                                                                return(Ticket(Master[Action].TicketMin)); 
-                                                                                return(Ticket(Master[Action].TicketMax));};
+          OrderDetail  Ticket(int Action, MeasureType Measure)   {if (IsEqual(Measure,Min)) 
+                                                                   return(Ticket(Master[Action].TicketMin)); 
+                                                                   return(Ticket(Master[Action].TicketMax));};
 
-          OrderSummary PL(int Action, MeasureType Measure) {return(Master[Action].Summary[Measure]);};
-          OrderSummary Entry(int Action)                   {return(Master[Action].Entry);};
+          OrderSummary PL(int Action, SummaryType Type)          {return(Master[Action].Summary[Type]);};
+          OrderSummary Entry(int Action)                         {return(Master[Action].Entry);};
 
           void         GetZone(int Action, int Zone, OrderSummary &Node);
           int          Zones(int Action) {return (ArraySize(Master[Action].Zone));};
@@ -343,7 +343,7 @@ public:
           string       SnapshotStr(void);
           string       MasterStr(int Action);
 
-          OrderSummary  operator[](const MeasureType Measure) const {return(Summary[Measure]);};
+          OrderSummary  operator[](const SummaryType Type)    const {return(Summary[Type]);};
           OrderSummary  operator[](const int Action)          const {return(Master[Action].Summary[Net]);};
           QueueSummary  operator[](const QueueStatus Status)  const {return(Snapshot[Status]);};
   };
@@ -739,10 +739,10 @@ void COrder::UpdateSummary(void)
       Master[action].TicketMin           = NoValue;
       Master[action].TicketMax           = NoValue;
 
-      for (MeasureType measure=0;measure<Total;measure++)
+      for (SummaryType type=0;type<Total;type++)
       {
-        InitSummary(Summary[measure]);
-        InitSummary(Master[action].Summary[measure]);
+        InitSummary(Summary[type]);
+        InitSummary(Master[action].Summary[type]);
       }
 
       InitSummary(Master[action].Entry,Zone(action,BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid,Digits)));
@@ -833,10 +833,10 @@ void COrder::UpdateSummary(void)
     //-- Calc Action Aggregates
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      for (MeasureType measure=0;measure<Total;measure++)
+      for (SummaryType type=0;type<Total;type++)
       {
-        Master[action].Summary[measure].Equity     = Equity(Master[action].Summary[measure].Value,InPercent);
-        Master[action].Summary[measure].Margin     = Margin(action,Master[action].Summary[measure].Lots,InPercent);
+        Master[action].Summary[type].Equity     = Equity(Master[action].Summary[type].Value,InPercent);
+        Master[action].Summary[type].Margin     = Margin(action,Master[action].Summary[type].Lots,InPercent);
       }
 
       for (int node=0;node<ArraySize(Master[action].Zone);node++)
@@ -850,10 +850,10 @@ void COrder::UpdateSummary(void)
     }
 
     //-- Calc P/L Aggregates
-    for (MeasureType measure=0;measure<Total;measure++)
+    for (SummaryType type=0;type<Total;type++)
     {
-      Summary[measure].Equity                      = Equity(Summary[measure].Value,InPercent);
-      Summary[measure].Margin                      = BoolToDouble(IsEqual(measure,Net),Margin(InPercent));
+      Summary[type].Equity                      = Equity(Summary[type].Value,InPercent);
+      Summary[type].Margin                      = BoolToDouble(IsEqual(type,Net),Margin(InPercent));
     }
   }
 
@@ -1400,7 +1400,7 @@ void COrder::ProcessProfits(int Action)
     if (IsEqual(Action,EquityHold))
       return;
       
-    //-- Calculate Profit Taking Measures
+    //-- Calculate Profit Taking types
     for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
     {
       if (IsEqual(Master[Action].Order[ticket].Status,Working))
@@ -1619,24 +1619,24 @@ bool COrder::Enabled(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| Price - returns Stop(loss)|Profit prices by Action from Basis    |
 //+------------------------------------------------------------------+
-double COrder::Price(MeasureType Measure, int RequestType, double Requested, double Basis=0.00)
+double COrder::Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00)
   {
     //-- Set Initial Values
     int    action       = Operation(RequestType);
     int    direction    = BoolToInt(IsEqual(action,OP_BUY),DirectionUp,DirectionDown)
-                            *BoolToInt(IsEqual(Measure,Profit),DirectionUp,DirectionDown);
+                            *BoolToInt(IsEqual(Type,Profit),DirectionUp,DirectionDown);
 
     Basis               = BoolToDouble(IsEqual(Basis,0.00),BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask),Basis,Digits);
 
     double requested    = fmax(0.00,Requested);
-    double stored       = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),BoolToDouble(IsEqual(Measure,Profit),
+    double stored       = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),BoolToDouble(IsEqual(Type,Profit),
                             Master[action].TakeProfit,Master[action].StopLoss),0.00,Digits);
-    double calculated   = BoolToDouble(IsEqual(Measure,Profit),
+    double calculated   = BoolToDouble(IsEqual(Type,Profit),
                             BoolToDouble(IsEqual(Master[action].DefaultTarget,0.00),0.00,Basis+(direction*point(Master[action].DefaultTarget))),
                             BoolToDouble(IsEqual(Master[action].DefaultStop,0.00),0.00,Basis+(direction*point(Master[action].DefaultStop))),Digits);
                             
     //-- Validate and return
-    if (IsEqual(Measure,Profit)||IsEqual(Measure,Loss))
+    if (IsEqual(Type,Profit)||IsEqual(Type,Loss))
     {
       requested         = BoolToDouble(IsEqual(direction,DirectionUp),
                             BoolToDouble(IsLower(Basis+Account.Spread,requested,NoUpdate),requested,0.00),
@@ -2190,8 +2190,8 @@ string COrder::SummaryStr(void)
     
     Append(text,"===== Master Summary Detail =====","\n");
 
-    for (MeasureType measure=0;measure<Total;measure++)
-      Append(text,SummaryLineStr(EnumToString(measure),Summary[measure],Always),"\n");
+    for (SummaryType type=0;type<Total;type++)
+      Append(text,SummaryLineStr(EnumToString(type),Summary[type],Always),"\n");
 
     return (text);
   }
