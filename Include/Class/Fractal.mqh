@@ -110,16 +110,16 @@ public:
        double           Forecast(FractalType Type, int Method, FiboLevel Fibo);
 
        FractalState     State(FractalType Type) {return((FractalState)BoolToInt(Type==Origin,dOrigin.State,f[Type].State)); } //--- State by Fractal Type
-       FractalType      Next(FractalType Type, FractalType Measure=Divergent)
+       FractalType      Next(FractalType Type, FractalType Fractal=Divergent)
                                                         {
-                                                          if (Measure==Divergent)  return((FractalType)fmax(Origin,Type+1));
-                                                          if (Measure==Convergent) return((FractalType)fmax(Origin,Type+2));
+                                                          if (Fractal==Divergent)  return((FractalType)fmax(Origin,Type+1));
+                                                          if (Fractal==Convergent) return((FractalType)fmax(Origin,Type+2));
                                                           return (Type);
                                                         }                                                 //--- enum typecast for the Next element
-       FractalType      Previous(FractalType Type, FractalType Measure=Divergent)
+       FractalType      Previous(FractalType Type, FractalType Fractal=Divergent)
                                                         {
-                                                          if (Measure==Divergent)  return((FractalType)fmax(Origin,Type-1));
-                                                          if (Measure==Convergent) return((FractalType)fmax(Origin,Type-2));
+                                                          if (Fractal==Divergent)  return((FractalType)fmax(Origin,Type-1));
+                                                          if (Fractal==Convergent) return((FractalType)fmax(Origin,Type-2));
                                                           return (Type);
                                                         }                                                 //--- enum typecast for the Prior element
        FractalType      Dominant(FractalType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }

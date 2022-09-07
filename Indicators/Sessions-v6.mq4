@@ -43,13 +43,13 @@ double indOffMidBuffer[];
 double indFractalBuffer[];
 
 enum DataPosition
-  {
-    dpNone    = None,     //None
-    dpFirst   = First,    //First
-    dpSecond  = Second,   //Second
-    dpThird   = Third,    //Third
-    dpFourth  = Fourth    //Fourth
-  };
+     {
+       dpNone,     //None
+       dpFirst,    //First
+       dpSecond,   //Second
+       dpThird,    //Third
+       dpFourth    //Fourth
+     };
 
 enum ShowOptions
      {
@@ -59,8 +59,7 @@ enum ShowOptions
        ShowOffSession,       // Off Session
        ShowOrigin,           // Origin
        ShowTrend,            // Trend
-       ShowTerm,             // Term
-       ShowCorrection        // Correction
+       ShowTerm              // Term
      };
 
 enum ShowType
@@ -72,7 +71,6 @@ enum ShowType
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
-FractalState  ShowState   = FractalStates;
 
 //--- Indicator Inputs
 input SessionType    inpType            = SessionTypes;    // Indicator session
@@ -196,18 +194,11 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(ShowFractal,fpRetrace),STYLE_DOT,clrSteelBlue);      
       UpdateLine("lnS_Recovery:"+sessionIndex,session.Price(ShowFractal,fpRecovery),STYLE_DOT,clrGoldenrod);
     }
-    //else
-    //if (inpShowOption==ShowCorrection)
-    //{
-    //  UpdateLine("lnS_Base:"+sessionIndex,session.Price(Correction,fpBase),STYLE_SOLID,
-    //                         BoolToInt(IsEqual(session[Correction].Direction,DirectionUp),clrLawnGreen,clrRed));
-    //  UpdateLine("lnS_Root:"+sessionIndex,session.Price(Correction,fpRoot),STYLE_SOLID,
-    //                         BoolToInt(IsEqual(session[Correction].Direction,DirectionUp),clrRed,clrLawnGreen));
-    //  UpdateLine("lnS_Expansion:"+sessionIndex,session.Price(Correction,fpExpansion),STYLE_SOLID,clrYellow);
-    //  UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(Correction,fpRetrace),STYLE_DOT,clrSteelBlue);      
-    //  UpdateLine("lnS_Recovery:"+sessionIndex,session.Price(Correction,fpRecovery),STYLE_DOT,clrGoldenrod);
-    //}
-      
+    else
+    {
+      UpdateLine("lnS_CorrectionHigh:"+sessionIndex,session[Correction].High,STYLE_DOT,clrDarkGray);
+      UpdateLine("lnS_CorrectionLow:"+sessionIndex,session[Correction].Low,STYLE_DOT,clrDarkGray);
+    }
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
       //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(inpFractalLines,Expansion,fl),STYLE_DASH,clrYellow);
     
@@ -326,7 +317,6 @@ int OnInit()
         if (inpShowOption==ShowOrigin)        ShowFractal = Origin;
         if (inpShowOption==ShowTrend)         ShowFractal = Trend;
         if (inpShowOption==ShowTerm)          ShowFractal = Term;
-        if (inpShowOption==ShowCorrection)    ShowState   = Correction;
 
         NewLine("lnS_Base:"+sessionIndex);
         NewLine("lnS_Root:"+sessionIndex);    
@@ -334,8 +324,8 @@ int OnInit()
         NewLine("lnS_Retrace:"+sessionIndex);
         NewLine("lnS_Recovery:"+sessionIndex);
       }
-
     }
+
 //    for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
 //      NewLine("lnS_"+EnumToString(fl)+":"+sessionIndex);
     
@@ -350,6 +340,9 @@ int OnInit()
       NewLabel("lbSessionTime"+sessionIndex,"",100,215+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveState"+sessionIndex,"",25,215+sessionOffset,clrDarkGray,SCREEN_UR,0);
     }
+
+    NewLine("lnS_CorrectionHigh:"+sessionIndex);
+    NewLine("lnS_CorrectionLow:"+sessionIndex);    
 
     DeleteRanges();
 
@@ -374,15 +367,17 @@ void OnDeinit(const int reason)
     ObjectDelete("lnS_ActiveMid:"+sessionIndex);
     ObjectDelete("lnS_High:"+sessionIndex);
     ObjectDelete("lnS_Low:"+sessionIndex);
+    ObjectDelete("lnS_Support:"+sessionIndex);
+    ObjectDelete("lnS_Resistance:"+sessionIndex);
+
     ObjectDelete("lnS_Base:"+sessionIndex);
     ObjectDelete("lnS_Root:"+sessionIndex);
     ObjectDelete("lnS_Expansion:"+sessionIndex);
     ObjectDelete("lnS_Retrace:"+sessionIndex);
     ObjectDelete("lnS_Recovery:"+sessionIndex);
-    ObjectDelete("lnS_Support:"+sessionIndex);
-    ObjectDelete("lnS_Resistance:"+sessionIndex);
-    ObjectDelete("lnS_CorrectionHi:"+sessionIndex);
-    ObjectDelete("lnS_CorrectionLo:"+sessionIndex);    
+
+    ObjectDelete("lnS_CorrectionHigh:"+sessionIndex);
+    ObjectDelete("lnS_CorrectionLow:"+sessionIndex);    
 
     for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
       ObjectDelete("lnS_"+EnumToString(fl)+":"+sessionIndex);

@@ -61,15 +61,15 @@ public:
              void             Update(double &OffSessionBuffer[], double &PriorMidBuffer[], double &FractalBuffer[]);
 
              datetime         ServerTime(int Bar=0);
-             int              SessionHour(int Measure=Now);
+             int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
              double           Price(FractalType Type, FractalPoint FP);
              double           Pivot(const PeriodType Type);                          //--- Mid/Mean by Period Type
              int              Age(void)                          {return(sBarFE);}   //--- Number of periods since the last fractal event
              
-             double           Retrace(FractalType Type, int Measure, int Format=InDecimal);    //--- returns fibonacci retrace
-             double           Expansion(FractalType Type, int Measure, int Format=InDecimal);  //--- returns fibonacci expansion
+             double           Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns fibonacci retrace
+             double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns fibonacci expansion
              double           Forecast(FractalType Type, int Method, FiboLevel Fibo);          //--- returns extended fibo price
 
              string           FractalStr(void);
@@ -110,6 +110,9 @@ private:
              CArrayDouble    *sSessionRange;
              
              //--- Private Methods
+             FractalState     CalcState(FractalState State, int Direction, double Fibonacci, bool Reversal, bool Breakout);
+             int              CalcBias(double Price);    //--- Active Bias 
+
              void             OpenSession(void);
              void             CloseSession(void);
 
@@ -117,14 +120,55 @@ private:
              void             UpdateTerm(void);
              void             UpdateTrend(void);
              void             UpdateOrigin(void);
-             void             UpdateCorrection(void);
 
              void             UpdateBuffers(void);
              void             UpdateFractalBuffer(int Direction, double Value);
 
-             int              CalcBias(double Price);    //--- Active Bias 
              void             LoadHistory(void);         //--- History Load/Init
   };
+
+//+------------------------------------------------------------------+
+//| CalcState - Computes FractalState based on supplied params       |
+//+------------------------------------------------------------------+
+FractalState CSession::CalcState(FractalState State, int Direction, double Fibonacci, bool ReversalEvent, bool BreakoutEvent)
+  {
+    if (ReversalEvent)
+      return (Reversal);
+    else
+    if (BreakoutEvent)
+      return (Breakout);
+    else
+    if (IsEqual(State,Correction))
+    {
+      if (Fibonacci<=FiboRecovery)
+        return (Recovery);
+    }
+    else
+    if (Fibonacci>=FiboCorrection)
+      return (Correction);
+    else
+    if (Fibonacci>=FiboRetrace)
+      return (Retrace);
+    else
+    if (Fibonacci>=FiboRecovery)
+      return (FractalState)(BoolToInt(IsEqual(Direction,DirectionUp),Pullback,Rally));
+      
+    return (State);
+  }
+
+//+------------------------------------------------------------------+
+//| CalcBias - Returns Active Bias(Action) relative to supplied price|
+//+------------------------------------------------------------------+
+int CSession::CalcBias(double Price)
+  {
+    if (Pivot(ActiveSession)>Price)
+      return (OP_BUY);
+
+    if (Pivot(ActiveSession)<Price)
+      return (OP_SELL);
+  
+    return (Action(srec[ActiveSession].Direction,InDirection));
+  }
 
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
@@ -442,8 +486,6 @@ void CSession::UpdateTrend(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateOrigin(void)
   {
-    FractalState  state               = NoState;
-    
     if (Event(NewTrend))
       if (sfractal[Trend].Direction==DirectionUp)
       {
@@ -456,43 +498,30 @@ void CSession::UpdateOrigin(void)
         sfractal[Origin].High         = sfractal[Trend].Resistance;
       }
 
-    if (IsHigher(Price(Origin,fpRecovery),sfractal[Origin].High))
+    if (IsHigher(sfractal[Trend].High,sfractal[Origin].High))
     {
+      SetEvent(NewExpansion,Critical);
+
       if (NewDirection(sfractal[Origin].Direction,DirectionUp))
         SetEvent(NewOrigin,Major);
 
-      if (IsHigher(Price(Origin,fpRecovery),sfractal[Origin].Resistance,NoUpdate))
+      if (IsHigher(sfractal[Trend].High,sfractal[Origin].Resistance,NoUpdate))
         if (NewDirection(sfractal[Origin].BreakoutDir,DirectionUp))
           SetEvent(NewOrigin,Critical);
     }
 
-    if (IsLower(Price(Origin,fpRecovery),sfractal[Origin].Low))
+    if (IsLower(sfractal[Trend].Low,sfractal[Origin].Low))
     {
+      SetEvent(NewExpansion,Critical);
+
       if (NewDirection(sfractal[Origin].Direction,DirectionDown))
         SetEvent(NewOrigin,Major);
 
-      if (IsLower(Price(Origin,fpRecovery),sfractal[Origin].Support,NoUpdate))
+      if (IsLower(sfractal[Trend].Low,sfractal[Origin].Support,NoUpdate))
         if (NewDirection(sfractal[Origin].BreakoutDir,DirectionDown))
           SetEvent(NewOrigin,Critical);
     }
-
-    if (Event(NewOrigin,Critical))
-      state          = Reversal;
-    else
-    if (Event(NewOrigin,Major))
-      state          = Breakout;
-    else
-    if (Retrace(Origin,Now)>=FiboCorrection)
-      state          = Correction;
-    else
-    if (Retrace(Origin,Now)>=FiboRetrace)
-      state          = Retrace;
-    else
-    if (Retrace(Origin,Now)>=FiboRecovery)
-      state          = (FractalState)BoolToInt(IsEqual(sfractal[Term].Direction,DirectionUp),Rally,Pullback);
-    else
-      state          = Recovery;
-
+    
     if (sfractal[Origin].Direction==DirectionUp)
       if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),sfractal[Origin].Support,Retrace))))
         SetEvent(NewBias,Critical);
@@ -501,50 +530,12 @@ void CSession::UpdateOrigin(void)
       if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,sfractal[Origin].Support,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),Retrace))))
         SetEvent(NewBias,Critical);       
     
-    if (NewState(sfractal[Origin].State,state))
+    if (NewState(sfractal[Origin].State,CalcState(sfractal[Origin].State,sfractal[Origin].Direction,Retrace(Origin,Now),
+          Event(NewOrigin,Critical),Event(NewOrigin,Major)||Event(NewExpansion,Critical))))
     {
-      SetEvent(FractalEvent(state),Critical);
+      SetEvent(FractalEvent(sfractal[Origin].State),Critical);
       SetEvent(NewState,Critical);
     }
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateCorrection - Detects market corrections; sets the state    |
-//+------------------------------------------------------------------+
-void CSession::UpdateCorrection(void)
-  {
-    FractalState state           = sCorrection.State;
-    sCorrection.Direction        = sfractal[Term].Direction;
-    
-    if (IsBetween(Close[sBar],sCorrection.High,sCorrection.Low))
-    {
-      sCorrection.State          = Retrace;
-
-      if (sCorrection.Direction==DirectionUp)
-        if (IsBetween(Close[sBar],sCorrection.Support,sCorrection.Low))
-          sCorrection.State      = Rally;
-
-      if (sCorrection.Direction==DirectionDown)
-        if (IsBetween(Close[sBar],sCorrection.Resistance,sCorrection.High))
-          sCorrection.State      = Pullback;
-    }
-    else
-    {
-      sCorrection.State          = Breakout;
-
-      if (NewDirection(sCorrection.BreakoutDir,Direction(Close[sBar]-sCorrection.Low)))
-      {
-        sCorrection.State        = Reversal;
-
-        if (sCorrection.BreakoutDir==DirectionUp)
-          sCorrection.Resistance = sCorrection.High;
-        else
-          sCorrection.Support    = sCorrection.Low;        
-      }
-    }
-    
-    if (NewState(state,sCorrection.State))
-      SetEvent(FractalEvent(state),Critical);
   }
 
 //+------------------------------------------------------------------+
@@ -608,20 +599,6 @@ void CSession::UpdateFractalBuffer(int Direction, double Value)
   }
 
 //+------------------------------------------------------------------+
-//| CalcBias - Returns Active Bias(Action) relative to supplied price|
-//+------------------------------------------------------------------+
-int CSession::CalcBias(double Price)
-  {
-    if (Pivot(ActiveSession)>Price)
-      return (OP_BUY);
-
-    if (Pivot(ActiveSession)<Price)
-      return (OP_SELL);
-  
-    return (Action(srec[ActiveSession].Direction,InDirection));
-  }
-
-//+------------------------------------------------------------------+
 //| LoadHistory - Loads history from the first session open          |
 //+------------------------------------------------------------------+
 void CSession::LoadHistory(void)
@@ -656,7 +633,7 @@ void CSession::LoadHistory(void)
     }
 
     //--- Initialize Fibo records
-    for (int type=0;type<FractalTypes;type++)
+    for (int type=Origin;type<FractalTypes;type++)
       sfractal[type]                 = srec[ActiveSession];
       
     sCorrection                      = srec[ActiveSession];
@@ -758,7 +735,6 @@ void CSession::Update(void)
     UpdateTerm();
     UpdateTrend();
     UpdateOrigin();
-    UpdateCorrection();
   }
   
 //+------------------------------------------------------------------+
@@ -786,13 +762,13 @@ datetime CSession::ServerTime(int Bar=0)
 //+------------------------------------------------------------------+
 //| SessionHour - Returns the hour of open session trading           |
 //+------------------------------------------------------------------+
-int CSession::SessionHour(int Measure=Now)
+int CSession::SessionHour(EventType Event)
   {    
-    switch (Measure)
+    switch (Event)
     {
       case SessionOpen:   return(sHourOpen);
       case SessionClose:  return(sHourClose);
-      case Now:           if (sSessionIsOpen)
+      default:            if (sSessionIsOpen)
                             return (TimeHour(ServerTime(sBar))-sHourOpen+1);
     }
     
@@ -829,9 +805,7 @@ double CSession::Price(FractalType Type, FractalPoint FP)
       case fpBase:      return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].Resistance,sfractal[Type].Support,Digits));
       case fpRoot:      return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].Support,sfractal[Type].Resistance,Digits));
       case fpExpansion: return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].High,sfractal[Type].Low,Digits));
-      case fpRetrace:   if (IsEqual(sfractal[Type].Direction,sfractal[Term].Direction))
-                          return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Term].Low,sfractal[Term].High,Digits));
-                        return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Term].High,sfractal[Term].Low,Digits));
+      case fpRetrace:   return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Term].Low,sfractal[Term].High,Digits));
       case fpRecovery:  return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),srec[ActiveSession].High,srec[ActiveSession].Low,Digits));
     }
     
@@ -841,7 +815,7 @@ double CSession::Price(FractalType Type, FractalPoint FP)
 //+------------------------------------------------------------------+
 //| Retrace - Calcuates fibo retrace % for supplied Type             |
 //+------------------------------------------------------------------+
-double CSession::Retrace(FractalType Type, int Measure, int Format=InDecimal)
+double CSession::Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
       switch (Measure)
       {
@@ -855,13 +829,14 @@ double CSession::Retrace(FractalType Type, int Measure, int Format=InDecimal)
 //+------------------------------------------------------------------+
 //| Expansion - Calcuates fibo expansion % for supplied Type         |
 //+------------------------------------------------------------------+
-double CSession::Expansion(FractalType Type, int Measure, int Format=InDecimal)
+double CSession::Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
     switch (Measure)
     {
       case Now: return(Expansion(Price(Type,fpBase),Price(Type,fpRoot),Close[sBar],Format));
       case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
-      case Max: return(Expansion(Price(Type,fpBase),Price(Type,fpRoot),Price(Type,fpExpansion),Format));
+      case Max: return(Expansion(Price(Type,fpBase),Price(Type,fpRoot),BoolToDouble(IsEqual(Price(Type,fpBase),Price(Type,fpExpansion)),
+                                 Price(Type,fpRecovery),Price(Type,fpExpansion),Digits),Format));
     }
 
     return (0.00);
@@ -888,7 +863,6 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo)
 string CSession::FractalStr(void)
   {  
     string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*\n"+
-        "Correction: "+EnumToString(sCorrection.State)+" Direction: "+DirText(sCorrection.Direction)+"/"+DirText(sCorrection.BreakoutDir)+"\n"+
         "Term State: "+EnumToString(sfractal[Term].State)+" ["+ActionText(sfractal[Term].Bias)+"] Direction: "+DirText(sfractal[Term].Direction)+"/"+DirText(sfractal[Term].BreakoutDir)+"\n"+
                        " (r) "+DoubleToStr(Retrace(Term,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Term,Max,InPercent),1)+"%"+"\n"+
                        " (e) "+DoubleToStr(Expansion(Term,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Min,InPercent),1)+"%\n"+

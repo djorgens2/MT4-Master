@@ -204,6 +204,11 @@ bool NewState(FractalState &State, FractalState ChangeState)
         return(IsChanged(State,ChangeState));
       else return(false);
 
+    if (State==Retrace)
+      if (ChangeState==Reversal||ChangeState==Breakout||ChangeState==Correction)
+        return(IsChanged(State,ChangeState));
+      else return(false);
+
     if (ChangeState==Recovery)
       return (false);
 

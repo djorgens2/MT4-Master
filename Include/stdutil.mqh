@@ -84,23 +84,6 @@
                   SummaryTypes
                 };
                 
-       //--- Numbered position measure types
-       enum     PositionType
-                { 
-                  None,
-                  First,
-                  Second,                
-                  Third,
-                  Fourth,
-                  Fifth,
-                  Sixth,
-                  Seventh,
-                  Eighth,
-                  Ninth,
-                  Tenth,
-                  PositionTypes
-                };
-
        enum     MeasureType
                 {
                   NoMeasure,
