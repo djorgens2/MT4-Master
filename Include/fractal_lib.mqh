@@ -87,6 +87,24 @@ static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
 
 //+------------------------------------------------------------------+
+//| FractalEvent - Returns the Fractal Event on change in Type       |
+//+------------------------------------------------------------------+
+AlertLevel FractalAlert(FractalType Type)
+  {
+    switch (Type)
+    {
+      case Origin:       return(Critical);
+      case Trend:        return(Major);
+      case Term:         return(Minor);
+      case Prior:        return(Nominal);
+      case Base:         return(Warning);
+      case Root:         return(Nominal);
+      case Expansion:    return(Warning);
+      default:           return(Notify);
+    };
+  }
+
+//+------------------------------------------------------------------+
 //| FractalEvent - Returns the Fractal Event on change in State      |
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
@@ -251,6 +269,18 @@ bool IsHigher(FiboLevel Compare, FiboLevel &Check, bool Update=true)
 //| IsChanged - Compares FractalStates to detect changes             |
 //+------------------------------------------------------------------+
 bool IsChanged(FractalState &Compare, FractalState Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Compares FiboLevels to detect changes                |
+//+------------------------------------------------------------------+
+bool IsChanged(FiboLevel &Compare, FiboLevel Value)
   {
     if (Compare==Value)
       return (false);

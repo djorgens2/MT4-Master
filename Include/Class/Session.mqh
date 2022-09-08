@@ -120,6 +120,7 @@ private:
              void             UpdateTerm(void);
              void             UpdateTrend(void);
              void             UpdateOrigin(void);
+             void             UpdateFibonacci(void);
 
              void             UpdateBuffers(void);
              void             UpdateFractalBuffer(int Direction, double Value);
@@ -535,25 +536,21 @@ void CSession::UpdateOrigin(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateFibo - Sets/Fires Fibo Expansion alerts                    |
+//| UpdateFibonacci - Sets/Fires Fibo Expansion alerts               |
 //+------------------------------------------------------------------+
-//void CSession::UpdateFibo(void)
-//  {    
+void CSession::UpdateFibonacci(void)
+  {
     //-- Test/Reset for Expansion Fibos/Events
-//    for (FractalType type=Origin;type<=Term;type++)
-//    {
-//      if (fBreakout||fReversal||Event(NewBreakout)||Event(NewReversal)||Event(NewDivergence))
-//        fEventFibo[Type]                  = fmax(Level(Fibonacci(Type,Expansion,Max))+1,Fibo161);
-//
-//      if (Percent(fmin(fEventFibo[Type],Fibo823))<Fibonacci(Type,Expansion,Now))
-//      {
-//        fEventFibo[Type]++;
-//        f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event);
-//
-//        SetEvent(f[Type].Event,alertlevel);
-//      }
-//    }
-//  }
+    for (FractalType type=Origin;type<=Term;type++)
+    {
+      if (Event(NewTerm))
+        fEventFibo[type]                  = fmax(Level(Expansion(type,Max))+1,Fibo161);
+
+      if (Percent(fmin(fEventFibo[type],Fibo823))<Expansion(type,Now))
+        if (IsChanged(fEventFibo[type],fmin(fEventFibo[type]+1,Fibo823)))
+          SetEvent(NewFibonacci,FractalAlert(type));
+    }
+  }
 
 //+------------------------------------------------------------------+
 //| UpdateBuffers - updates indicator buffer values                  |
@@ -731,6 +728,7 @@ void CSession::Update(void)
     UpdateTerm();
     UpdateTrend();
     UpdateOrigin();
+    UpdateFibonacci();
   }
   
 //+------------------------------------------------------------------+

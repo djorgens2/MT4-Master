@@ -193,14 +193,15 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Expansion:"+sessionIndex,session.Price(ShowFractal,fpExpansion),STYLE_SOLID,clrYellow);
       UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(ShowFractal,fpRetrace),STYLE_DOT,clrSteelBlue);      
       UpdateLine("lnS_Recovery:"+sessionIndex,session.Price(ShowFractal,fpRecovery),STYLE_DOT,clrGoldenrod);
+
+      //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+      //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
     }
     else
     {
       UpdateLine("lnS_CorrectionHigh:"+sessionIndex,session[Correction].High,STYLE_DOT,clrDarkGray);
       UpdateLine("lnS_CorrectionLow:"+sessionIndex,session[Correction].Low,STYLE_DOT,clrDarkGray);
     }
-      //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-      //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(inpFractalLines,Expansion,fl),STYLE_DASH,clrYellow);
     
     if (inpShowData>dpNone)
     {
@@ -268,7 +269,8 @@ int OnCalculate(const int rates_total,
 
 //    TestEvent(NewTrend,Critical);
 //    TestEvent(NewTrend,Major);
-    TestEvent(NewBreakout,Critical);
+//    TestEvent(NewFibonacci);
+//    TestEvent(NewFibonacci);
 
     return(rates_total);
   }
@@ -328,8 +330,8 @@ int OnInit()
       }
     }
 
-//    for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-//      NewLine("lnS_"+EnumToString(fl)+":"+sessionIndex);
+    for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+      NewLine("lnS_"+EnumToString(fl)+":"+sessionIndex);
     
     if (inpShowData>dpNone)
     {

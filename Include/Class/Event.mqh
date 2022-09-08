@@ -95,7 +95,7 @@ public:
       //---  General use events
       bool           Event(EventType Event)            {return (eEvents[Event]);}
       bool           Event(EventType Event, AlertLevel Level)
-                                                       {return (eAlerts[Event]==Level);}
+                                                       {return (eAlerts[Event]==Level&&Level>NoAlert);}
       bool           ActiveEvent(void)                 {return (!eEvents[NoEvent]);}
       EventType      LastEvent(void)                   {return (eLastEvent);};
 

@@ -177,10 +177,6 @@ void CFractal::CalcOrigin(void)
 //+------------------------------------------------------------------+
 void CFractal::CalcState(FractalType Type, FractalState &State, double EventPrice=0.00)
   {
-    AlertLevel   alertlevel             = (AlertLevel)BoolToInt(IsEqual(Type,Origin),Critical,
-                                                      BoolToInt(IsEqual(Type,Trend),Major,
-                                                      BoolToInt(IsEqual(Type,Term),Minor,
-                                                      BoolToInt(IsEqual(Type,Base),Warning,Notify))));
     FractalState state                  = NoState;
     f[Type].Event                       = NoEvent;
 
@@ -273,9 +269,9 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
 
       //-- Set New[Origin|Trend|Term] Event
       if (IsEqual(State,Reversal))
-        SetEvent(FractalEvent(Type),alertlevel);
+        SetEvent(FractalEvent(Type),FractalAlert(Type));
 
-      SetEvent(FractalEvent(State),alertlevel);
+      SetEvent(FractalEvent(State),FractalAlert(Type));
     }
 
     //-- Test/Reset for Expansion Fibos/Events
@@ -287,7 +283,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
       fEventFibo[Type]++;
       f[Type].Event                   = BoolToEvent(IsChanged(f[Type].Event,NewFibonacci),NewFibonacci,f[Type].Event);
 
-      SetEvent(f[Type].Event,alertlevel);
+      SetEvent(f[Type].Event,FractalAlert(Type));
     }
   }
 
