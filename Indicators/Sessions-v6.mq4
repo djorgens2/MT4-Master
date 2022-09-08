@@ -266,7 +266,9 @@ int OnCalculate(const int rates_total,
 
     RefreshScreen();
 
-//    TestEvent(NewState,Critical);
+//    TestEvent(NewTrend,Critical);
+//    TestEvent(NewTrend,Major);
+    TestEvent(NewBreakout,Critical);
 
     return(rates_total);
   }

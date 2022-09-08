@@ -410,77 +410,72 @@ void CSession::UpdateTerm(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTrend(void)
   {
-    FractalState  state              = NoState;
-
     //--- Check for trend changes      
     if (Event(NewTerm))        //--- After a term reversal
       if (sfractal[Term].Direction==DirectionUp)
       {
-        state                        = Rally;
         sCorrection.Low              = BoolToDouble(sfractal[Trend].Direction==DirectionUp,sfractal[Trend].Support,sfractal[Trend].Low,Digits);
         sfractal[Trend].Support      = sfractal[Term].Support;
       }
       else
       {
-        state                        = Pullback;
         sCorrection.High             = BoolToDouble(sfractal[Trend].Direction==DirectionDown,sfractal[Trend].Resistance,sfractal[Trend].High,Digits);
         sfractal[Trend].Resistance   = sfractal[Term].Resistance;
       }
 
     //--- Check for upper trend boundary changes
     if (sfractal[Trend].Direction==DirectionUp)
-      sfractal[Trend].High           = fmax(High[sBar],sfractal[Trend].High);
+    {
+      //--- Check for new Expansion (Breakout)
+      if (IsHigher(High[sBar],sfractal[Trend].High))
+        SetEvent(NewExpansion,Major);
 
-    if (IsHigher(High[sBar],sfractal[Trend].Resistance,NoUpdate))
-      if (NewDirection(sfractal[Trend].Direction,DirectionUp))
-      {
-        state                        = Reversal;
-        sfractal[Trend].High         = High[sBar];
+      //--- Check for inside reversal
+      if (IsLower(Low[sBar],sfractal[Trend].Support,NoUpdate))
+        if (NewDirection(sfractal[Trend].Direction,DirectionDown))
+        {
+          sfractal[Trend].Low          = Low[sBar];
+          SetEvent(NewTrend,Major);
+        }
 
-        SetEvent(NewTrend,Major);
-      }
-      else
-      {
-        state                        = Breakout;
+      //--- Check for linear reversal
+      if (IsLower(Low[sBar],sCorrection.Low,NoUpdate))
+        if (NewDirection(sfractal[Trend].BreakoutDir,DirectionDown))
+          SetEvent(NewTrend,Critical);
+    }
 
-        //--- Check for linear reversal
-        if (IsHigher(High[sBar],sCorrection.High,NoUpdate))
-          if (NewDirection(sfractal[Trend].BreakoutDir,DirectionUp))
-            SetEvent(NewTrend,Critical);
-      }
 
     //--- Check for lower trend boundary changes
     if (sfractal[Trend].Direction==DirectionDown)
-      sfractal[Trend].Low            = fmin(Low[sBar],sfractal[Trend].Low);
+    {
+      //--- Check for new Expansion (Breakout)
+      if (IsLower(Low[sBar],sfractal[Trend].Low))
+        SetEvent(NewExpansion,Major);
 
-    if (IsLower(Low[sBar],sfractal[Trend].Support,NoUpdate))
-      if (NewDirection(sfractal[Trend].Direction,DirectionDown))
-      {
-        state                        = Reversal;
-        sfractal[Trend].Low          = Low[sBar];
+      //--- Check for inside reversal
+      if (IsHigher(High[sBar],sfractal[Trend].Resistance,NoUpdate))
+        if (NewDirection(sfractal[Trend].Direction,DirectionUp))
+        {
+          sfractal[Trend].High         = High[sBar];
+          SetEvent(NewTrend,Major);
+        }
 
-        SetEvent(NewTrend,Major);
-      }
-      else
-      {
-        state                        = Breakout;
-        
-        //--- Check for linear reversal
-        if (IsLower(Low[sBar],sCorrection.Low,NoUpdate))
-          if (NewDirection(sfractal[Trend].BreakoutDir,DirectionDown))
-            SetEvent(NewTrend,Critical);
-      }
+      //--- Check for linear reversal
+      if (IsHigher(High[sBar],sCorrection.High,NoUpdate))
+        if (NewDirection(sfractal[Trend].BreakoutDir,DirectionUp))
+          SetEvent(NewTrend,Critical);
+    }
 
     SetEvent(BoolToEvent(Event(NewTrend),NewDirection),Major);
     SetEvent(BoolToEvent(NewBias(sfractal[Trend].Bias,Action(sfractal[Term].Direction)),NewBias),Major);
 
-    if (NewState(sfractal[Trend].State,state))
+    if (NewState(sfractal[Trend].State,CalcState(sfractal[Trend].State,sfractal[Trend].Direction,Retrace(Trend,Now),Event(NewTrend),Event(NewExpansion,Major))))
     {
       SetEvent(NewState,Major);
-      SetEvent(FractalEvent(state),Major);
+      SetEvent(FractalEvent(sfractal[Trend].State),Major);
     }
   }
-
+  
 //+------------------------------------------------------------------+
 //| UpdateOrigin - Updates origin fractal bounds and state           |
 //+------------------------------------------------------------------+
@@ -500,7 +495,8 @@ void CSession::UpdateOrigin(void)
 
     if (IsHigher(sfractal[Trend].High,sfractal[Origin].High))
     {
-      SetEvent(NewExpansion,Critical);
+      if (sfractal[Origin].Direction==sfractal[Term].Direction)
+        SetEvent(NewExpansion,Critical);
 
       if (NewDirection(sfractal[Origin].Direction,DirectionUp))
         SetEvent(NewOrigin,Major);
@@ -512,7 +508,8 @@ void CSession::UpdateOrigin(void)
 
     if (IsLower(sfractal[Trend].Low,sfractal[Origin].Low))
     {
-      SetEvent(NewExpansion,Critical);
+      if (sfractal[Origin].Direction==sfractal[Term].Direction)
+        SetEvent(NewExpansion,Critical);
 
       if (NewDirection(sfractal[Origin].Direction,DirectionDown))
         SetEvent(NewOrigin,Major);
@@ -530,8 +527,7 @@ void CSession::UpdateOrigin(void)
       if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,sfractal[Origin].Support,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),Retrace))))
         SetEvent(NewBias,Critical);       
     
-    if (NewState(sfractal[Origin].State,CalcState(sfractal[Origin].State,sfractal[Origin].Direction,Retrace(Origin,Now),
-          Event(NewOrigin,Critical),Event(NewOrigin,Major)||Event(NewExpansion,Critical))))
+    if (NewState(sfractal[Origin].State,CalcState(sfractal[Origin].State,sfractal[Origin].Direction,Retrace(Origin,Now),Event(NewOrigin),Event(NewExpansion,Critical))))
     {
       SetEvent(FractalEvent(sfractal[Origin].State),Critical);
       SetEvent(NewState,Critical);
@@ -820,6 +816,7 @@ double CSession::Retrace(FractalType Type, MeasureType Measure, int Format=InDec
       switch (Measure)
       {
         case Now: return(Retrace(Price(Type,fpRoot),Price(Type,fpExpansion),Close[sBar],Format));
+        case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
         case Max: return(Retrace(Price(Type,fpRoot),Price(Type,fpExpansion),Price(Type,fpRetrace),Format));
       }
 
