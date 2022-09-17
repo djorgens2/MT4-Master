@@ -107,7 +107,7 @@ public:
        double           Range(FractalType Type, MeasureType Measure=Max, int Format=InDecimal);         //--- Returns the range between supplied points
 
        double           Fibonacci(FractalType Type, int Method, MeasureType Measure, int Format=InDecimal);                 //--- For each retrace type
-       double           Forecast(FractalType Type, int Method, FiboLevel Fibo);
+       double           Forecast(FractalType Type, int Method, FiboLevel Level=FiboRoot);
 
        FractalState     State(FractalType Type) {return((FractalState)BoolToInt(Type==Origin,dOrigin.State,f[Type].State)); } //--- State by Fractal Type
        FractalType      Next(FractalType Type, FractalType Fractal=Divergent)
@@ -123,6 +123,7 @@ public:
                                                           return (Type);
                                                         }                                                 //--- enum typecast for the Prior element
        FractalType      Dominant(FractalType TimeRange) { if (TimeRange == Trend) return (fDominantTrend); return (fDominantTerm); }
+       FractalType      Idle(int Periods=6);
        FractalType      Leg(int Measure);
        FiboLevel        EventFibo(FractalType Type)     { return ((FiboLevel)(fEventFibo[Type]-1));};
 
@@ -233,12 +234,12 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
             if (Fibonacci(Type,Retrace,Min)<Percent(Fibo23))
             {
               state                     = Recovery;
-              EventPrice                = Forecast(Type,Retrace,Fibo23);
+              EventPrice                = Forecast(Type,Recovery);
             }
             else
             {
               state                     = Correction;
-              EventPrice                = Forecast(Type,Recovery,Fibo23);
+              EventPrice                = Forecast(Type,Correction);
             }
           else
             if (Fibonacci(Type,Retrace,Max)>Percent(Fibo23))
@@ -696,6 +697,18 @@ void CFractal::UpdateBuffer(double &Fractal[])
   }
 
 //+------------------------------------------------------------------+
+//| Idle - Returns first idle Fractal Type based on supplied periods |
+//+------------------------------------------------------------------+
+FractalType CFractal::Idle(int Periods=6)
+  {
+    for (FractalType type=Lead;type>Origin;type--)
+      if (f[type].Bar>=Periods)
+        return (type);
+
+    return (Origin);
+  }
+
+//+------------------------------------------------------------------+
 //| Leg - Returns the leg based on the supplied measure              |
 //+------------------------------------------------------------------+
 FractalType CFractal::Leg(int Measure)
@@ -851,7 +864,7 @@ int CFractal::Direction(FractalType Type=Expansion, bool Contrarian=false, int F
       {
         case DirectionUp:    return (OP_BUY);
         case DirectionDown:  return (OP_SELL);
-        case DirectionNone:  return (OP_NO_ACTION);
+        case DirectionNone:  return (NoAction);
       }
 
     return (dDirection);
@@ -919,13 +932,14 @@ double CFractal::Fibonacci(FractalType Type, int Method, MeasureType Measure, in
 //+------------------------------------------------------------------+
 //| Forecast - Returns Forecast Price for supplied Fibo              |
 //+------------------------------------------------------------------+
-double CFractal::Forecast(FractalType Type, int Method, FiboLevel Fibo)
+double CFractal::Forecast(FractalType Type, int Method, FiboLevel Level=FiboRoot)
   {
     switch (Method)
     {
-      case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*Percent(Fibo)),Digits));
-      case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
-      case Recovery:    return(NormalizeDouble(Price(Type,fpRoot)-((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
+      case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*Percent(Level)),Digits));
+      case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Level)),Digits));
+      case Correction:  return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboCorrection),Digits));
+      case Recovery:    return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboRecovery),Digits));
     }
 
     return (NormalizeDouble(0.00,Digits));

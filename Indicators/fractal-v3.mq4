@@ -129,8 +129,6 @@ void RefreshScreen(void)
     UpdateLine("ftl:fpExpansion",f.Price(Type,fpExpansion),STYLE_SOLID,clrMaroon);
     UpdateLine("ftl:fpRetrace",f.Price(Type,fpRetrace),STYLE_SOLID,clrGoldenrod);
     UpdateLine("ftl:fpRecovery",f.Price(Type,fpRecovery),STYLE_SOLID,clrSteelBlue);
-    UpdateLine("ftl:Correction",f.Forecast(Type,Correction,Fibo23),STYLE_DOT,clrFireBrick);
-    UpdateLine("ftl:Recovery",f.Forecast(Type,Retrace,Fibo23),STYLE_DOT,clrForestGreen);
   }
   
 //+------------------------------------------------------------------+
@@ -211,13 +209,8 @@ int OnInit()
     }
 
     if (inpShowTypeLines!=FractalTypes)
-    {
       for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
         NewLine("ftl:"+EnumToString(type));
-
-//      NewLine("ftl:Correction");
-//      NewLine("ftl:Recovery");
-    }
 
     return(INIT_SUCCEEDED);    
   }
@@ -231,9 +224,6 @@ void OnDeinit(const int reason)
     
     for (FractalPoint type=fpOrigin;type<FractalPoints;type++)
       ObjectDelete("ftl:"+EnumToString(type));
-
-    ObjectDelete("ftl:Correction");
-    ObjectDelete("ftl:Recovery");
 
     ObjectDelete("ptExpansion");
     ObjectDelete("ptRoot");

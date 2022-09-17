@@ -51,7 +51,7 @@ input int            inpEuropeClose  = 18;           // Europe Session Closing H
 input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
-input PeriodType     inpShowMidLines = PeriodTypes;  // Display Mid-Price Lines
+input SessionType    inpShowLines    = SessionTypes; // Display Mid-Price Lines
 input SessionType    inpShowSession  = SessionTypes; // Display Session Comment
 input YesNoType      inpShowData     = No;           // Display Session Data Labels
 
@@ -98,40 +98,40 @@ void CreateRange(SessionType Type, int Bar=0)
 //| UpdateRange - Repaints the session box                           |
 //+------------------------------------------------------------------+
 void UpdateRange(SessionType Type, int Bar=0)
- {
-   string urRangeId       = EnumToString(Type)+IntegerToString(data[Type].Range);
+  {
+    string urRangeId       = EnumToString(Type)+IntegerToString(data[Type].Range);
 
-   if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionClose))
-   {
-     if (data[Type].IsOpen)
-       ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
+    if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionClose))
+    {
+      if (data[Type].IsOpen)
+        ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
 
-     data[Type].IsOpen    = false;
-   }
+      data[Type].IsOpen    = false;
+    }
 
-   if (IsChanged(dataDate[Type],TimeToStr(session[Type].ServerTime(Bar),TIME_DATE)))
-   {
-     data[Type].IsOpen        = false;
+    if (IsChanged(dataDate[Type],TimeToStr(session[Type].ServerTime(Bar),TIME_DATE)))
+    {
+      data[Type].IsOpen        = false;
 
-     if (TimeDayOfWeek(session[Type].ServerTime(Bar))<6)
-       if (TimeHour(session[Type].ServerTime(Bar))>=session[Type].SessionHour(SessionOpen) && TimeHour(session[Type].ServerTime(Bar))<session[Type].SessionHour(SessionClose))
-         CreateRange(Type, Bar);
-   }
-   else
-   if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionOpen))
-     CreateRange(Type,Bar);
-   else
-   if (data[Type].IsOpen)
-   {
-     if (IsHigher(High[Bar],data[Type].PriceHigh))
-       ObjectSet(urRangeId,OBJPROP_PRICE1,data[Type].PriceHigh);
-     
-     if (IsLower(Low[Bar],data[Type].PriceLow))
-       ObjectSet(urRangeId,OBJPROP_PRICE2,data[Type].PriceLow);
+      if (TimeDayOfWeek(session[Type].ServerTime(Bar))<6)
+        if (TimeHour(session[Type].ServerTime(Bar))>=session[Type].SessionHour(SessionOpen) && TimeHour(session[Type].ServerTime(Bar))<session[Type].SessionHour(SessionClose))
+          CreateRange(Type, Bar);
+    }
+    else
+    if (TimeHour(session[Type].ServerTime(Bar))==session[Type].SessionHour(SessionOpen))
+      CreateRange(Type,Bar);
+    else
+    if (data[Type].IsOpen)
+      ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
 
-     ObjectSet(urRangeId,OBJPROP_TIME1,data[Type].OpenTime);
-     ObjectSet(urRangeId,OBJPROP_TIME2,Time[Bar]);
-   }
+    if (data[Type].IsOpen)
+    {
+      if (IsHigher(High[Bar],data[Type].PriceHigh))
+        ObjectSet(urRangeId,OBJPROP_PRICE1,data[Type].PriceHigh);
+      
+      if (IsLower(Low[Bar],data[Type].PriceLow))
+        ObjectSet(urRangeId,OBJPROP_PRICE2,data[Type].PriceLow);
+    }
  }
 
 //+------------------------------------------------------------------+
@@ -150,14 +150,10 @@ void DeleteRanges()
 void RefreshScreen(int Bar=0)
   {
     string text = "";
+    static SessionType lead  = Daily;
     
     for (SessionType type=Asia;type<SessionTypes;type++)
-    {
       UpdateRange(type,Bar);
-      
-      if (session[type].ActiveEvent())
-        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n\n");
-    }
 
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
@@ -169,9 +165,13 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,Color(session[type][ActiveSession].Direction),20);
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,Color(session[type][ActiveSession].BreakoutDir));
       
-      if (inpShowMidLines!=PeriodTypes)
-        UpdateLine("lnMid"+EnumToString(type),session[type].Pivot(inpShowMidLines),STYLE_SOLID,Color(type,Bright));
-      
+      if (inpShowLines==type)
+      {
+        UpdateLine("lnActive"+EnumToString(type),session[type].Pivot(ActiveSession),STYLE_SOLID,Color(type,Bright));
+        UpdateLine("lnOff"+EnumToString(type),session[type].Pivot(OffSession),STYLE_DOT,Color(type,Bright));
+        UpdateLine("lnPrior"+EnumToString(type),session[type].Pivot(PriorSession),STYLE_DASH,Color(type,Bright));
+      }
+
       if (session[type].IsOpen())
         if (TimeHour(session[type].ServerTime(Bar))>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
@@ -190,6 +190,12 @@ void RefreshScreen(int Bar=0)
         UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrYellow);
       else
         UpdateLabel("lbActiveState"+EnumToString(type),EnumToString(session[type][ActiveSession].State),clrDarkGray);
+
+      lead                   = (SessionType)BoolToInt(session[type][SessionOpen]||session[type][SessionClose],type,lead);
+      UpdateLine("[sv7]-Lead",session[lead].Pivot(ActiveSession),STYLE_DOT,Color(lead,Bright));
+
+      if (session[type].ActiveEvent())
+        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n\n");
     }
 
     if (inpShowSession!=SessionTypes)
@@ -230,7 +236,7 @@ int OnCalculate(const int rates_total,
     session[US].Update();
     session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
 
-    TestEvent(NewDirection);
+//    TestEvent(NewExpansion);
 
     RefreshScreen();
 
@@ -279,10 +285,14 @@ int OnInit()
         NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
         NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
 
-        NewLine("lnMid"+EnumToString(type));
+        NewLine("lnActive"+EnumToString(type));
+        NewLine("lnOff"+EnumToString(type));
+        NewLine("lnPrior"+EnumToString(type));
       }
     }
-          
+
+    NewLine("[sv7]-Lead");
+
     for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);
       
@@ -299,16 +309,6 @@ void OnDeinit(const int reason)
   {
     DeleteRanges();
     
-    ObjectDelete("lnActiveMid");
-    ObjectDelete("lnPriorMid");
-    ObjectDelete("lnOffMid");
-
-    ObjectDelete("lnSupport");
-    ObjectDelete("lnResistance");
-
-    ObjectDelete("lbhSession");
-    ObjectDelete("lbhState");
-    
     for (SessionType type=Daily;type<SessionTypes;type++)
     {
       delete session[type];
@@ -318,5 +318,9 @@ void OnDeinit(const int reason)
       ObjectDelete("lbActiveDir"+EnumToString(type));
       ObjectDelete("lbActiveBrkDir"+EnumToString(type));
       ObjectDelete("lbActiveState"+EnumToString(type));
+
+      ObjectDelete("lnActive"+EnumToString(type));
+      ObjectDelete("lnOff"+EnumToString(type));
+      ObjectDelete("lnPrior"+EnumToString(type));
     }
   }

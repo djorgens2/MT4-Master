@@ -439,7 +439,7 @@ void Append(string &Source, string Text, string Separator=" ")
   }
 
 //+------------------------------------------------------------------+
-//| Operation - translates Pending Order Types to Market Actions      |
+//| Operation - translates Pending Order Types to Market Actions     |
 //+------------------------------------------------------------------+
 int Operation(int Action, bool Contrarian=false)
   {

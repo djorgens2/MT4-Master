@@ -786,7 +786,7 @@ void CTickMA::UpdatePoly(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
-    int bias                   = OP_NO_ACTION;
+    int bias                   = NoBias;
 
     CalcLinear(poly.Open,line.Open.Price);
     CalcLinear(poly.Close,line.Close.Price);

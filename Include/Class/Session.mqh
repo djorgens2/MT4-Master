@@ -70,7 +70,7 @@ public:
              
              double           Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns fibonacci retrace
              double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns fibonacci expansion
-             double           Forecast(FractalType Type, int Method, FiboLevel Fibo);          //--- returns extended fibo price
+             double           Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
 
              string           FractalStr(void);
              string           SessionStr(PeriodType Type);
@@ -222,7 +222,7 @@ void CSession::CloseSession(void)
 //| UpdateSession - Sets active state, bounds and alerts on the tick |
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
-  {    
+  {
     FractalState  state              = NoState;
     FractalState  statehigh          = NoState;
     FractalState  statelow           = NoState;
@@ -241,12 +241,9 @@ void CSession::UpdateSession(void)
         if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp))
           state                      = Reversal;
         else
-        if (IsLower(srec[ActiveSession].High,sfractal[Term].High,NoUpdate))
-          state                      = Trap;
-        else
           state                      = Breakout;
-          
-       statehigh                     = state;  //--- Retain for multiple boundary correction
+                 
+      statehigh                      = state;  //--- Retain for multiple boundary correction
     }
             
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
@@ -263,12 +260,9 @@ void CSession::UpdateSession(void)
         if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown))
           state                      = Reversal;
         else
-        if (IsHigher(srec[ActiveSession].Low,sfractal[Term].Low,NoUpdate))
-          state                      = Trap;
-        else
           state                      = Breakout;
 
-       statelow                      = state;  //--- Retain for multiple boundary correction
+      statelow                      = state;  //--- Retain for multiple boundary correction
     }
 
     //-- Apply historical corrections on multiple new boundary events
@@ -319,6 +313,9 @@ void CSession::UpdateSession(void)
         }
       }
     }
+
+    if (IsEqual(state,Reversal))                     //-- catch double/triple+ outside reversals
+        SetEvent(NewReversal,Nominal);
 
     if (NewAction(srec[ActiveSession].Bias,CalcBias(BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
       SetEvent(NewBias,Nominal);
@@ -400,7 +397,7 @@ void CSession::UpdateTerm(void)
 
     if (NewState(sfractal[Term].State,state))
     {
-      SetEvent(BoolToEvent(NewBias(sfractal[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
+      SetEvent(BoolToEvent(NewAction(sfractal[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
                                     Action(sfractal[Term].Direction),Action(sfractal[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
       SetEvent(NewState,Minor);
     }
@@ -468,7 +465,7 @@ void CSession::UpdateTrend(void)
     }
 
     SetEvent(BoolToEvent(Event(NewTrend),NewDirection),Major);
-    SetEvent(BoolToEvent(NewBias(sfractal[Trend].Bias,Action(sfractal[Term].Direction)),NewBias),Major);
+    SetEvent(BoolToEvent(NewAction(sfractal[Trend].Bias,Action(sfractal[Term].Direction)),NewBias),Major);
 
     if (NewState(sfractal[Trend].State,CalcState(sfractal[Trend].State,sfractal[Trend].Direction,Retrace(Trend,Now),Event(NewTrend),Event(NewExpansion,Major))))
     {
@@ -840,13 +837,14 @@ double CSession::Expansion(FractalType Type, MeasureType Measure, int Format=InD
 //+------------------------------------------------------------------+
 //| Forecast - Returns Forecast Price for supplied Fibo              |
 //+------------------------------------------------------------------+
-double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo)
+double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
   {
     switch (Method)
     {
       case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*Percent(Fibo)),Digits));
       case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
       case Recovery:    return(NormalizeDouble(Price(Type,fpRoot)-((Price(Type,fpRoot)-Price(Type,fpRecovery))*Percent(Fibo)),Digits));
+      case Correction:  return(NormalizeDouble(((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboCorrection)+Price(Type,fpExpansion),Digits));
     }
 
     return (0.00);

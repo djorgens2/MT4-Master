@@ -12,32 +12,12 @@
 #import
 
 //--- logical defines
-#define CONTRARIAN          true
 #define Always              true
 
-//--- directional values
-#define DIR_LCORR              4  //--- Long Correction
-#define DIR_LREV               3  //--- Long reversal
-#define DIR_RALLY              2  //--- Prices are moving higher against the trend
-#define DIR_UP                 1  //--- Prices are moving higher
-#define DIR_NONE               0  //--- Undetermined direction
-#define DIR_DOWN              -1  //--- Prices are moving lower
-#define DIR_PULLBACK          -2  //--- Prices are moving lower against the trend
-#define DIR_SREV              -3  //--- Short reversal
-#define DIR_SCORR             -4  //--- Short Correction
-
-
 //--- additional op/action codes
-#define OP_NO_ACTION          -1  //--- No defined action
-#define OP_OPEN               -2  //--- Open actions (new orders)
-#define OP_CLOSE              -3  //--- Close actions (take profit/close orders)
-#define OP_STOP               -4  //--- Close actions (stop loss/close orders)
-#define OP_HALT               -5  //--- Suspend trading till manually restarted
-#define OP_PEND               -6  //--- Pend trading until automation send resume
-#define OP_RESUME             -7  //--- Resume trading
-#define OP_RISK               -8  //--- Technical indicating trades are at risk
-#define OP_HEDGE              -9  //--- Contrarian action opportunity
-
+#define NoAction              -1  //--- Updated Nomenclature
+#define NoBias                -1  //--- New Nomen for Bias (Directional Action)
+#define NoDirection            0  //--- New Nomen for DirectionNone
 
 //---- Format Constants
 #define IN_DIRECTION           8
@@ -190,35 +170,6 @@ string RPad(string Value, string Pad, int Length)
   }
 
 //+------------------------------------------------------------------+
-//| ActionCode - returns order action id (buy/sell)                  |
-//+------------------------------------------------------------------+
-int ActionCode(string Action)
-  {
-    if (Action == "BUY")       return (OP_BUY);
-    if (Action == "SELL")      return (OP_SELL);
-    if (Action == "LONG")      return (OP_BUY);
-    if (Action == "SHORT")     return (OP_SELL);
-
-    if (Action == "BUYLIMIT")  return (OP_BUYLIMIT);
-    if (Action == "BUYMIT")    return (OP_BUYSTOP);
-    if (Action == "BUYSTOP")   return (OP_BUYSTOP);
-    if (Action == "SELLLIMIT") return (OP_SELLLIMIT);
-    if (Action == "SELLMIT")   return (OP_SELLSTOP);
-    if (Action == "SELLSTOP")  return (OP_SELLSTOP);
-    
-    if (Action == "OPEN")      return (OP_OPEN);
-    if (Action == "CLOSE")     return (OP_CLOSE);
-    if (Action == "STOP")      return (OP_STOP);
-    if (Action == "HALT")      return (OP_HALT);
-    if (Action == "PEND")      return (OP_PEND);
-    if (Action == "RESUME")    return (OP_RESUME);
-    if (Action == "RISK")      return (OP_RISK);
-    if (Action == "HEDGE")     return (OP_HEDGE);
-    
-    return (OP_NO_ACTION);
-  }
-
-//+------------------------------------------------------------------+
 //| ActionText - returns the text of an ActionCode                   |
 //+------------------------------------------------------------------+
 string ActionText(int Action, int Format=IN_ACTION)
@@ -226,12 +177,12 @@ string ActionText(int Action, int Format=IN_ACTION)
     if (Format==IN_DIRECTION)
     {
       if (Action==OP_BUY||Action==OP_BUYLIMIT||Action==OP_BUYSTOP)
-        return (DirText(DIR_UP));
+        return (DirText(DirectionUp));
 
       if (Action==OP_SELL||Action==OP_SELLLIMIT||Action==OP_SELLSTOP)
-        return (DirText(DIR_DOWN));
+        return (DirText(DirectionDown));
       
-      return (DirText(DIR_NONE));
+      return (DirText(NoDirection));
     }
 
     switch (Action)
@@ -242,26 +193,9 @@ string ActionText(int Action, int Format=IN_ACTION)
       case OP_SELL          : return("SELL");
       case OP_SELLLIMIT     : return("SELL LIMIT");
       case OP_SELLSTOP      : return("SELL STOP");
-      case OP_NO_ACTION     : return("NO ACTION");
-      case OP_OPEN          : return("OPEN");          //--- Open action describes either buy or sell
-      case OP_CLOSE         : return("CLOSE");         //--- Close action to handle graceful close-outs
-      case OP_STOP          : return("STOP");          //--- Stop action to handle price level close-outs
-      case OP_HALT          : return("HALT");          //--- Close action to kill opens and suspend trading
-      case OP_PEND          : return("PENDING");       //--- No action until a resume is submitted
-      case OP_RESUME        : return("RESUME");        //--- Resume Action to begin trading after a halt, close, or pend
-      case OP_RISK          : return("RISK");          //--- Contrarian action identified
-      case OP_HEDGE         : return("HEDGE");         //--- Contrarian action opportunity
-    
-      default              : return("BAD ACTION CODE");
+      case NoAction         : return("NO ACTION");    
+      default               : return("BAD ACTION CODE");
     }
-  }
-
-//+------------------------------------------------------------------+
-//| NewBias - Updates Bias on change; includes OP_NO_ACTION          |
-//+------------------------------------------------------------------+
-bool NewBias(int &Change, int Compare, bool Update=true)
-  {
-    return (IsChanged(Change,Compare,Update));
   }
 
 //+------------------------------------------------------------------+
@@ -269,7 +203,7 @@ bool NewBias(int &Change, int Compare, bool Update=true)
 //+------------------------------------------------------------------+
 bool NewAction(int &Change, int Compare, bool Update=true)
   {
-    if (Compare==OP_NO_ACTION)
+    if (Compare==NoAction)
       return (false);
       
     return (IsChanged(Change,Compare,Update));
@@ -389,19 +323,13 @@ string lower(string Value)
 string DirText(int Value, bool Contrarian=false)
 {
   if (Contrarian)
-    Value *= OP_NO_ACTION;
+    Value *= NoValue;
     
   switch (Value)
   {
-    case DIR_LCORR     : return("CORRECTION LONG");
-    case DIR_LREV      : return("REVERSAL LONG");
-    case DIR_RALLY     : return("RALLY");
-    case DIR_UP        : return("LONG");
-    case DIR_NONE      : return("FLAT");
-    case DIR_DOWN      : return("SHORT");
-    case DIR_PULLBACK  : return("PULLBACK");
-    case DIR_SREV      : return("REVERSAL SHORT");
-    case DIR_SCORR     : return("CORRECTION SHORT");
+    case DirectionUp:    return("Long");
+    case NoDirection:    return("Flat");
+    case DirectionDown:  return("Short");
   }
 
   return("BAD DIRECTION CODE");
@@ -514,10 +442,7 @@ void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10, 
               
     switch (Style)
     {
-      case Wide:    if (Direction==OP_HALT)
-                      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
-                    else
-                    if (Direction > 0)
+      case Wide:    if (Direction > 0)
                       ObjectSetText(LabelName,CharToStr(241),Size,"Wingdings",Color);
                     else
                     if (Direction < 0)
@@ -526,10 +451,7 @@ void UpdateDirection(string LabelName, int Direction, int Color=0, int Size=10, 
                       ObjectSetText(LabelName,CharToStr(73), Size,"Wingdings",Color);
                     break;
 
-      case Narrow:  if (Direction==OP_HALT)
-                      ObjectSetText(LabelName,CharToStr(78),Size,"Wingdings",Color);
-                    else
-                    if (Direction > 0)
+      case Narrow:  if (Direction > 0)
                       ObjectSetText(LabelName,CharToStr(225),Size,"Wingdings",Color);
                     else
                     if (Direction < 0)
@@ -569,11 +491,11 @@ void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int 
     if (Bar<0 || Bar>Bars)
       return;
       
-    if (Direction == DIR_UP)
+    if (Direction==DirectionUp)
       ObjectSet(PriceTagName,OBJPROP_PRICE1,High[Bar]+point(Up));
     else
     
-    if (Direction == DIR_DOWN)
+    if (Direction==DirectionDown)
       ObjectSet(PriceTagName,OBJPROP_PRICE1,Low[Bar]-point(Down));
 
     else

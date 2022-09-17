@@ -290,17 +290,17 @@ public:
           void         Cancel(int Action, string Reason="");
           void         Cancel(OrderRequest &Request, QueueStatus Status, string Reason="");
 
-          bool         Status(QueueStatus State, int Type=OP_NO_ACTION);
-          bool         Pending(int Type=OP_NO_ACTION)            {return(Status(Pending,Type));};
-          bool         Canceled(int Type=OP_NO_ACTION)           {return(Status(Canceled,Type));};
-          bool         Declined(int Type=OP_NO_ACTION)           {return(Status(Declined,Type));};
-          bool         Rejected(int Type=OP_NO_ACTION)           {return(Status(Rejected,Type));};
-          bool         Expired(int Type=OP_NO_ACTION)            {return(Status(Expired,Type));};
-          bool         Fulfilled(int Type=OP_NO_ACTION)          {return(Status(Fulfilled,Type));};
-          bool         Qualified(int Type=OP_NO_ACTION)          {return(Status(Qualified,Type));};
-          bool         Processing(int Type=OP_NO_ACTION)         {return(Status(Processing,Type));};
-          bool         Processed(int Type=OP_NO_ACTION)          {return(Status(Processed,Type));};
-          bool         Closed(int Type=OP_NO_ACTION)             {return(Status(Closed,Type));};
+          bool         Status(QueueStatus State, int Type=NoAction);
+          bool         Pending(int Type=NoAction)            {return(Status(Pending,Type));};
+          bool         Canceled(int Type=NoAction)           {return(Status(Canceled,Type));};
+          bool         Declined(int Type=NoAction)           {return(Status(Declined,Type));};
+          bool         Rejected(int Type=NoAction)           {return(Status(Rejected,Type));};
+          bool         Expired(int Type=NoAction)            {return(Status(Expired,Type));};
+          bool         Fulfilled(int Type=NoAction)          {return(Status(Fulfilled,Type));};
+          bool         Qualified(int Type=NoAction)          {return(Status(Qualified,Type));};
+          bool         Processing(int Type=NoAction)         {return(Status(Processing,Type));};
+          bool         Processed(int Type=NoAction)          {return(Status(Processed,Type));};
+          bool         Closed(int Type=NoAction)             {return(Status(Closed,Type));};
           bool         Submitted(OrderRequest &Request);
           
 
@@ -334,12 +334,12 @@ public:
           void         PrintLog(void);
 
           string       OrderDetailStr(OrderDetail &Order);
-          string       OrderStr(int Action=OP_NO_ACTION);
+          string       OrderStr(int Action=NoAction);
           string       RequestStr(OrderRequest &Request);
-          string       QueueStr(int Action=OP_NO_ACTION, bool Force=false);
+          string       QueueStr(int Action=NoAction, bool Force=false);
           string       SummaryLineStr(string Description, OrderSummary &Line, bool Force=false);
           string       SummaryStr(void);
-          string       ZoneSummaryStr(int Action=OP_NO_ACTION);
+          string       ZoneSummaryStr(int Action=NoAction);
           string       SnapshotStr(void);
           string       MasterStr(int Action);
 
@@ -614,7 +614,7 @@ void COrder::UpdatePanel(void)
         UpdateLabel("lbvRQ-"+(string)request+"-Cancel",DoubleToStr(Queue[request].Pend.Cancel,Digits),clrDarkGray);
         UpdateLabel("lbvRQ-"+(string)request+"-Resubmit",proper(ActionText(Queue[request].Pend.Type)),clrDarkGray);
         
-        if (IsEqual(Queue[request].Pend.Type,OP_NO_ACTION))
+        if (IsEqual(Queue[request].Pend.Type,NoAction))
           UpdateLabel("lbvRQ-"+(string)request+"-Step"," 0.00",clrDarkGray);
         else
           UpdateLabel("lbvRQ-"+(string)request+"-Step",LPad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
@@ -665,7 +665,7 @@ void COrder::UpdateSnapshot(void)
         }
       else
         for (int request=0;request<ArraySize(Queue);request++)
-          if (IsEqual(Queue[request].Type,OP_NO_ACTION))
+          if (IsEqual(Queue[request].Type,NoAction))
             Snapshot[Invalid].Type[type].Count++;
           else
           {
@@ -1700,10 +1700,10 @@ double COrder::LotSize(int Action, double Lots=0.00)
 //+------------------------------------------------------------------+
 void COrder::Cancel(int Type, string Reason="")
   {
-    if (IsBetween(Type,OP_BUYLIMIT,OP_SELLSTOP)||IsEqual(Type,OP_NO_ACTION))
+    if (IsBetween(Type,OP_BUYLIMIT,OP_SELLSTOP)||IsEqual(Type,NoAction))
       for (int request=0;request<ArraySize(Queue);request++)
         if (IsEqual(Queue[request].Status,Pending))
-          if (IsEqual(Queue[request].Type,Type)||IsEqual(Type,OP_NO_ACTION))
+          if (IsEqual(Queue[request].Type,Type)||IsEqual(Type,NoAction))
           {
             Queue[request].Status   = Canceled;
             Queue[request].Memo     = BoolToStr(IsEqual(StringLen(Reason),0),Queue[request].Memo,Reason);
@@ -1722,9 +1722,9 @@ void COrder::Cancel(OrderRequest &Request, QueueStatus Status, string Reason="")
 //+------------------------------------------------------------------+
 //| Status - True on Order/Request Status by Type on current tick    |
 //+------------------------------------------------------------------+
-bool COrder::Status(QueueStatus State, int Type=OP_NO_ACTION)
+bool COrder::Status(QueueStatus State, int Type=NoAction)
   {
-    if (IsEqual(Type,OP_NO_ACTION))
+    if (IsEqual(Type,NoAction))
       for (int type=OP_BUY;type<=OP_SELLSTOP;type++)
         return (Snapshot[State].Type[type].Count>0);
 
@@ -1752,8 +1752,8 @@ OrderRequest COrder::BlankRequest(string Requestor)
     Request.Status           = Initial;
     Request.Key              = NoValue;
     Request.Ticket           = NoValue;
-    Request.Type             = OP_NO_ACTION;
-    Request.Action           = OP_NO_ACTION;
+    Request.Type             = NoAction;
+    Request.Action           = NoAction;
     Request.Requestor        = Requestor;
     Request.Price            = 0.00;
     Request.Lots             = 0.00;
@@ -1761,7 +1761,7 @@ OrderRequest COrder::BlankRequest(string Requestor)
     Request.StopLoss         = 0.00;
     Request.Memo             = "";
     Request.Expiry           = TimeCurrent()+(Period()*60);
-    Request.Pend.Type        = OP_NO_ACTION;
+    Request.Pend.Type        = NoAction;
     Request.Pend.Limit       = 0.00;
     Request.Pend.Cancel      = 0.00;
     Request.Pend.Step        = 0.00;
@@ -2036,12 +2036,12 @@ string COrder::OrderDetailStr(OrderDetail &Order)
 //+------------------------------------------------------------------+
 //| OrderStr - Returns formatted text for all open orders            |
 //+------------------------------------------------------------------+
-string COrder::OrderStr(int Action=OP_NO_ACTION)
+string COrder::OrderStr(int Action=NoAction)
   {
     string text       = "\n";
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
-      if (IsEqual(Action,OP_NO_ACTION)||IsEqual(action,Action))
+      if (IsEqual(Action,NoAction)||IsEqual(action,Action))
       {
         Append(text,"==== Open "+ActionText(action)+" Orders ["+IntegerToString(Master[action].Summary[Net].Count,3,'-')+"]","\n\n");
         Append(text,"     Profit ["+IntegerToString(Master[action].Summary[Profit].Count,3,'-')+"]","\n");
@@ -2093,7 +2093,7 @@ string COrder::RequestStr(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| QueueStr - Returns formatted Order Queue text                    |
 //+------------------------------------------------------------------+
-string COrder::QueueStr(int Action=OP_NO_ACTION, bool Force=false)
+string COrder::QueueStr(int Action=NoAction, bool Force=false)
   {
     string text       = "\n";
     string actions[6]  = {"","","","","",""};
@@ -2110,7 +2110,7 @@ string COrder::QueueStr(int Action=OP_NO_ACTION, bool Force=false)
     {
       actions[action]      = ActionText(action)+" Queue ["+(string)counts[action]+"]\n"+actions[action]+"\n";
 
-      if (IsEqual(Action,OP_NO_ACTION))
+      if (IsEqual(Action,NoAction))
         if (counts[action]>0||Force)
           Append(text,actions[action],"\n");
 
@@ -2199,13 +2199,13 @@ string COrder::SummaryStr(void)
 //+------------------------------------------------------------------+
 //| ZoneSummaryStr - Returns the formstted Zone Summary by Action    |
 //+------------------------------------------------------------------+
-string COrder::ZoneSummaryStr(int Action=OP_NO_ACTION)
+string COrder::ZoneSummaryStr(int Action=NoAction)
   {
     string text     = "\n";
     
     for (int action=OP_BUY;action<=OP_SELL;action++)
       if (Master[action].Summary[Net].Count>0)
-        if (IsEqual(action,Action)||IsEqual(Action,OP_NO_ACTION))
+        if (IsEqual(action,Action)||IsEqual(Action,NoAction))
         {
           Append(text,"===== "+proper(ActionText(action))+" Master Zone Detail =====","\n");
 
