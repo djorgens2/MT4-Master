@@ -383,9 +383,6 @@ int OnInit()
 
     //--- Indicator Rays
     NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,IndWinId);
-    NewRay("tmaSupport:"+(string)IndWinId,STYLE_DASH,clrRed,IndWinId);
-    NewRay("tmaResistance:"+(string)IndWinId,STYLE_DASH,clrLawnGreen,IndWinId);
-    NewRay("tmaExpansion:"+(string)IndWinId,STYLE_DASH,clrGoldenrod,IndWinId);
 
     if (inpSegBounds)
     {

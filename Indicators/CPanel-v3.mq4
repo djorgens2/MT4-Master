@@ -90,6 +90,7 @@
 input int          inpPeriods        =  80;         // Retention
 input int          inpDegree         =   6;         // Poiy Regression Degree
 input double       inpAgg            = 2.5;         // Tick Aggregation
+input YesNoType    inpShowTickBounds =  No;         // Show Tick Boundary
 input YesNoType    inpShowSegBounds  = Yes;         // Show Segment Boundary
 input YesNoType    inpShowFractal    = Yes;         // Show Fractal Rulers
 
@@ -246,7 +247,7 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int           bias    = OP_NO_ACTION;
+    static int           bias    = NoAction;
     static int  lastSegCount     = 0;
 
     t.Update();
@@ -474,7 +475,11 @@ int OnInit()
 
       NewLabel("lbvOC-"+ActionText(action)+"-Enabled","Enabled",50,(146*(action+1))+30,clrDarkGray,SCREEN_UL,IndWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-Strategy","Strategy",234,(146*(action+1))+30,clrDarkGray,SCREEN_UL,IndWinId);
-      NewLabel("lbvOC-"+ActionText(action)+"-Trigger","",336,(146*(action+1))+26,clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-HoldSegment","SG",336,(146*(action+1))+26,clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-HoldSMA","MA",336,(146*(action+1))+42,clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-HoldLinear","LN",336,(146*(action+1))+58,clrDarkGray,SCREEN_UL,IndWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-HoldSession","SE",336,(146*(action+1))+74,clrDarkGray,SCREEN_UL,IndWinId); 
+      NewLabel("lbvOC-"+ActionText(action)+"-HoldFractal","FR",336,(146*(action+1))+90,clrDarkGray,SCREEN_UL,IndWinId); 
       NewLabel("lbvOC-"+ActionText(action)+"-EqTarget","999.9%",20,(146*(action+1))+56,clrDarkGray,SCREEN_UL,IndWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-EqMin","99.9%",70,(146*(action+1))+56,clrDarkGray,SCREEN_UL,IndWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-Target","9.99999",116,(146*(action+1))+56,clrDarkGray,SCREEN_UL,IndWinId);
@@ -641,6 +646,12 @@ int OnInit()
       NewPriceLabel("tmaPL(rs):"+(string)IndWinId,0.00,false,IndWinId);
       NewPriceLabel("tmaPL(e):"+(string)IndWinId,0.00,false,IndWinId);
       NewPriceLabel("tmaNewBoundary",0.00,false);
+    }
+
+    if (inpShowTickBounds==Yes)
+    {
+      NewPriceLabel("tmaPL(th):"+(string)IndWinId,0.00,false,IndWinId);
+      NewPriceLabel("tmaPL(tl):"+(string)IndWinId,0.00,false,IndWinId);
     }
 
     //--- Create Display Visuals

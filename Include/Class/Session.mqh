@@ -613,7 +613,7 @@ void CSession::LoadHistory(void)
     //--- Initialize session records
     for (int type=0;type<PeriodTypes;type++)
     {
-      srec[type].Direction           = direction;
+      srec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
       srec[type].BreakoutDir         = DirectionNone;
       srec[type].State               = Breakout;
       srec[type].High                = High[sBar];
@@ -627,14 +627,6 @@ void CSession::LoadHistory(void)
       sfractal[type]                 = srec[ActiveSession];
       
     sCorrection                      = srec[ActiveSession];
-
-    ////--- *** May need to modify this if the sbar Open==Close
-    //if (IsEqual(Open[sBar],Close[sBar]))
-    //{
-    //  Print ("Freak anomaly: aborting due to sbar(Open==Close)");
-    //  ExpertRemove();
-    //  return;
-    //}
 
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();

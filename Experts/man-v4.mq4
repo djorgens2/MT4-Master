@@ -158,12 +158,11 @@ void RefreshPanel(void)
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-//      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" ["+(string)DCAZone(action)+"]",
       UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",EnumToString(mr[action].Strategy)+" "+EnumToString(hold[Segment].Type[action]),
                            BoolToInt(IsChanged(strategytype[action],mr[action].Strategy),clrYellow,clrDarkGray));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),holdcolor[hold[Segment].Type[action]],16,"Wingdings");
-//      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(IsEqual(action,t.SMA().Hold),clrYellow,clrDarkGray),16,"Wingdings");
-//      UpdateLabel("lbvOC-"+ActionText(action)+"-Trigger",CharToStr(176),BoolToInt(mr[action].Hold,clrYellow,clrDarkGray),16,"Wingdings");
+                           
+      for (PlanType type=Segment;type<PlanTypes;type++)
+        UpdateLabel("lbvOC-"+ActionText(action)+"-Hold"+EnumToString(type),CharToStr(176),holdcolor[hold[type].Type[action]],16,"Wingdings");
     }
   }
 
@@ -172,26 +171,20 @@ void RefreshPanel(void)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    #define type Segment
+    string text = "";
 
     //UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrForestGreen);
     //UpdateLine("czDCA:"+(string)OP_SELL,order.DCA(OP_SELL),STYLE_DOT,clrMaroon);
 
-    UpdateLine("[sv7]:DailyMid",s[Daily].Pivot(OffSession),STYLE_DOT,clrDarkGray);
-    //UpdateRay("tmaSupport:1",plan[type].Support,inpPeriods-1);
-    //UpdateRay("tmaResistance:1",plan[type].Resistance,inpPeriods-1);
-    //UpdateRay("tmaExpansion:1",plan[type].Expansion,inpPeriods-1);
-
+    UpdateLine("[m4]DailyMid",s[Daily].Pivot(OffSession),STYLE_DOT,clrDarkGray);
+    UpdateLine("[m4]Lead",s[sm.Lead].Pivot(ActiveSession),STYLE_DOT,Color(sm.Lead,Bright));
+      
     for (int zone=0;zone<inpShowZone;zone++)
     {
       UpdateLine("crDAM:ZoneHi:"+(string)zone,order.DCA(OP_BUY)+fdiv(point(inpZoneStep),2)+(point(inpZoneStep)*zone),STYLE_DOT,clrForestGreen);
       UpdateLine("crDAM:ZoneLo:"+(string)zone,order.DCA(OP_BUY)-fdiv(point(inpZoneStep),2)-(point(inpZoneStep)*zone),STYLE_DOT,clrFireBrick);
     }
-//    UpdateLine("czDCA:"+(string)OP_SELL,order.DCA(OP_SELL),STYLE_SOLID,clrRed);
-//    UpdateLine("crDAM:ActiveMid",s[Daily].Pivot(ActiveSession),STYLE_DOT,Color(s[Daily][Term].Direction));
-//    UpdateLine("crDAM:PriorMid",s[Daily].Pivot(PriorSession),STYLE_DOT,Color(s[Daily][Term].Direction));
 
-      string text = "";
 //    if (t.ActiveEvent())
 //    {
 //      for (EventType event=1;event<EventTypes;event++)
@@ -203,6 +196,7 @@ void RefreshScreen(void)
 //      Comment(text);
 //    } else Comment("");
 //    text=(PlanStr(type));
+
     for (PlanType type=Segment;type<PlanTypes;type++)
       Append(text,PlanStr(type),"\n");
 
@@ -363,7 +357,7 @@ void UpdateHold(PlanType Plan)
                           hold[Plan].Type[action]     = (HoldType)BoolToInt(hold[Plan].Type[action]>Activated,Activated,Inactive);
                       break;
 
-      case Session:   hold[Plan].Event                = BoolToEvent(NewDirection(hold[Plan].Direction,s[Daily][NewDirection]),NewDirection);
+      case Session:   hold[Plan].Event                = BoolToEvent(NewDirection(hold[Plan].Direction,s[Daily][Trend].Direction),NewDirection);
                       bias                            = s[Daily][Term].Bias;
 
                       if (sm.Expansion)
@@ -385,7 +379,7 @@ void UpdateHold(PlanType Plan)
                       break;
     }
 
-    hold[Plan].Event      = BoolToEvent(NewAction(hold[Plan].Bias,bias),NewBias);
+    hold[Plan].Event      = BoolToEvent(NewAction(hold[Plan].Bias,bias),NewBias,hold[Plan].Event);
   }
 
 //+------------------------------------------------------------------+
@@ -530,9 +524,6 @@ void UpdateTick(void)
 //+------------------------------------------------------------------+
 void UpdateSession(void)
   {
-    bool   hedge       = false;
-    string text        = "";
-
     sm.Expansion       = false;
 
     for (SessionType type=Daily;type<SessionTypes;type++)
@@ -541,19 +532,9 @@ void UpdateSession(void)
 
       sm.Pivot                  = sm.Lead;
       sm.Lead                   = (SessionType)BoolToInt(s[type][SessionOpen]||s[type][SessionClose],type,sm.Lead);
-
-      UpdateLine("[m4]-Lead",s[sm.Lead].Pivot(ActiveSession),STYLE_DOT,Color(sm.Lead,Bright));
-//      sm.Hedge                  = BoolToInt(IsEqual(s[Daily][Term].Bias,s[type][Term].Bias),sm.Hedge,s[type][Term].Bias);
-      //hedge = BoolToInt(IsEqual(s[type][ActiveSession].Bias,Action(s[type][ActiveSession].Direction)),s[type][ActiveSession].Bias,
-      //                            Action(s[type][ActiveSession].Bias,InAction,InContrarian))
       sm.Expansion              = sm.Expansion||s[type][NewExpansion];
-      
-      if (s[type].ActiveEvent())
-        Append(text,EnumToString(type)+" "+s[type].ActiveEventStr(),"\n\n");
-    }
-    
-    //if (IsChanged(hedgetest,hedge))
-    //  CallPause(PlanStr(Session)+text,Always);
+      sm.Hedge                  = BoolToInt(IsEqual(s[Daily][Term].Bias,s[type][Term].Bias),sm.Hedge,s[type][Term].Bias);
+    }    
   }
 
 //+------------------------------------------------------------------+
@@ -996,10 +977,14 @@ void Execute(void)
   {
     static int direction    = DirectionChange;
            int action       = BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment().Direction[Trend]),Action(Direction(order[Net].Lots)));
+    static int event        = 0;
 
     for (PlanType type=0;type<PlanTypes;type++)
       if (IsChanged(type))
         Print(PlanStr(type));
+
+//    if (IsChanged(Segment))
+//      CallPause((string)++event+":"+PlanStr(Segment),Always);
 
     ManageOrders(action);
     ManageOrders(Action(action,InAction,InContrarian));
@@ -1067,14 +1052,8 @@ int OnInit()
     NewLine("czDCA:"+(string)OP_BUY);
     NewLine("czDCA:"+(string)OP_SELL);
 
-    NewLine("crDAM:ActiveMid");
-    NewLine("crDAM:PriorMid");
-
-    NewLine("[sv7]Support");
-    NewLine("[sv7]Resistance");
-
-    NewLine("[m4]-Lead");
-    NewLine("[sv7]:DailyMid");
+    NewLine("[m4]Lead");
+    NewLine("[m4]DailyMid");
 
     for (int zone=0;zone<inpShowZone;zone++)
     {
@@ -1115,6 +1094,7 @@ string PlanStr(PlanType Type)
     Append(text,"net["+(string)(plan[Type].Zone.Net)+"]");
     Append(text,"chg["+(string)(plan[Type].Zone.Change)+"]");
     Append(text,"cl["+DoubleToStr(Close[0],Digits)+"]");
+    Append(text,"sma["+DoubleToStr(BoolToDouble(IsEqual(hold[Type].Bias,OP_BUY),t.SMA().High[0],t.SMA().Low[0]),Digits)+"]");
     Append(text,"sp["+DoubleToStr(plan[Type].Support,Digits)+"]");
     Append(text,"rs["+DoubleToStr(plan[Type].Resistance,Digits)+"]");
     Append(text,"exp["+DoubleToStr(plan[Type].Expansion,Digits)+"]");
