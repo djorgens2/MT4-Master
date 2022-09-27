@@ -1,1 +1,13 @@
-
+risk 80 5
+eq 7.5 3
+eqr
+buy
+//
+//limit sell 19.492
+//dca short 5 profit keep 1
+//close profit
+//hold cancel
+//limit buy 19.324 0.00 1.60
+//buy .8
+//limit cancel
+//tp long 19.435

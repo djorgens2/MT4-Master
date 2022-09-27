@@ -312,8 +312,9 @@ public:
                                                                    return(Ticket(Master[Action].TicketMin)); 
                                                                    return(Ticket(Master[Action].TicketMax));};
 
-          OrderSummary PL(int Action, SummaryType Type)          {return(Master[Action].Summary[Type]);};
-          OrderSummary Entry(int Action)                         {return(Master[Action].Entry);};
+          OrderSummary PL(int Action, SummaryType Type)      {return(Master[Action].Summary[Type]);};
+          OrderSummary Entry(int Action)                     {return(Master[Action].Entry);};
+          double       Free(int Action)                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
 
           void         GetZone(int Action, int Zone, OrderSummary &Node);
           int          Zones(int Action) {return (ArraySize(Master[Action].Zone));};
@@ -505,6 +506,10 @@ void COrder::UpdatePanel(void)
       UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneNow",center((string)Zone(action),8),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-EntryZone",center("Entry "+DoubleToStr(Free(action),Account.LotPrecision),10),
+                                                   BoolToInt(IsEqual(Entry(action).Lots,0.00),clrLawnGreen,
+                                                   BoolToInt(IsEqual(Entry(action).Lots,LotSize(action)),clrGoldenrod,
+                                                   BoolToInt(Entry(action).Lots<fdiv(Entry(action).Lots,2),clrYellow,clrRed))));
     }
     
     //-- Order Zone metrics by Action

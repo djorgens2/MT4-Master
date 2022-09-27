@@ -72,11 +72,18 @@ protected:
 
 private:
 
+      struct         EventLog
+                     {
+                       EventType     Event;
+                       AlertLevel    Alert;
+                     };
+
       bool           eEvents[EventTypes];
       
       EventType      eLastEvent;
       AlertLevel     eAlerts[EventTypes];
       AlertLevel     eMaxAlert;
+      EventLog       eEventLog[];
 
 public:
                      CEvent(){ClearEvents();};
@@ -87,11 +94,8 @@ public:
       void           ClearEvents(void);
 
       AlertLevel     HighAlert(void)                   {return (eMaxAlert);}
-      AlertLevel     EventAlertLevel(EventType Event)  {return (eAlerts[Event]);}
+      AlertLevel     EventLevel(EventType Event)       {return (eAlerts[Event]);}
 
-      string         ActiveEventStr(bool WithHeader=true);
-      string         EventStr(void);
-      
       //---  General use events
       bool           Event(EventType Event)            {return (eEvents[Event]);}
       bool           Event(EventType Event, AlertLevel Level)
@@ -99,6 +103,9 @@ public:
       bool           ActiveEvent(void)                 {return (!eEvents[NoEvent]);}
       EventType      LastEvent(void)                   {return (eLastEvent);};
 
+      string         ActiveEventStr(bool WithHeader=true);
+      string         EventStr(void);
+      
       bool           operator[](const EventType Event) {return(eEvents[Event]);}
   };
 
@@ -137,7 +144,7 @@ void CEvent::ClearEvent(EventType Event)
         eMaxAlert           = fmax(eAlerts[event],eMaxAlert);
       }
   }
-  
+
 //+------------------------------------------------------------------+
 //| ClearEvents - Initializes all events to false                    |
 //+------------------------------------------------------------------+

@@ -44,105 +44,123 @@ private:
 
     struct TickRec
            {
-             int          Count;
-             double       Open;
-             double       High;
-             double       Low;
-             double       Close;
+             int            Count;
+             double         Open;
+             double         High;
+             double         Low;
+             double         Close;
            };
 
     struct SegmentRec
            {
-             int          Direction[FractalTypes];
-             int          Bias;
-             EventType    Event;
-             TickRec      Price;
+             int            Direction[FractalTypes];
+             int            Bias;
+             EventType      Event;
+             TickRec        Price;
            };
 
     struct RangeRec
            {
-             int          Direction;
-             FractalState State;
-             EventType    Event;
-             int          Age;
-             double       High;
-             double       Low;
-             double       Now;
-             double       Mean;
-             double       Retrace;
+             int            Direction;
+             FractalState   State;
+             EventType      Event;
+             int            Age;
+             double         High;
+             double         Low;
+             double         Now;
+             double         Mean;
+             double         Retrace;
            };
 
     struct SMARec
            {
-             int          Direction;   //-- Expansion Direction
-             int          Bias;        //-- Open/Close cross
-             EventType    Event;       //-- Aggregate event
-             SMAState     State;       //-- Aggregate state
-             double       Open[];
-             double       High[];
-             double       Low[];
-             double       Close[];
+             int            Direction;   //-- Expansion Direction
+             int            Bias;        //-- Open/Close cross
+             EventType      Event;       //-- Aggregate event
+             SMAState       State;       //-- Aggregate state
+             double         Open[];
+             double         High[];
+             double         Low[];
+             double         Close[];
+           };
+
+    struct MomentumDetail
+           {
+             int            Direction;
+             int            Bias;
+             EventType      Event;
+             double         Now;
+             double         Change;
+           };
+           
+    struct MomentumRec
+           {
+             MomentumDetail Open;
+             MomentumDetail High;
+             MomentumDetail Low;
+             MomentumDetail Close;
            };
 
     struct FractalDetail
            {
-             FractalType  Type;
-             int          Direction[FractalTypes];
-             int          Bar[FractalTypes];
-             double       Point[FractalTypes];
+             FractalType    Type;
+             int            Direction[FractalTypes];
+             int            Bar[FractalTypes];
+             double         Point[FractalTypes];
            };
 
     struct FractalRec
            {
-             int           Direction;
-             FractalType   Type;
-             FractalState  State;
-             EventType     Event;
-             FractalDetail High;
-             FractalDetail Low;
-             double        Support;
-             double        Resistance;
-             double        Expansion;
+             int            Direction;
+             FractalType    Type;
+             FractalState   State;
+             EventType      Event;
+             FractalDetail  High;
+             FractalDetail  Low;
+             double         Support;
+             double         Resistance;
+             double         Expansion;
            };
 
     struct PolyRec
            {
-             int          Direction;
-             int          Bias;
-             EventType    Event;
-             double       Open[];
-             double       High;
-             double       Low;
-             double       Close[];
+             int            Direction;
+             int            Bias;
+             double         Open[];
+             double         High;
+             double         Low;
+             double         Close[];
            };
 
     struct FOCRec
            {
-             int          Direction;
-             int          Bias;
-             EventType    Event;
-             double       Price[];
-             double       Lead;
-             double       Origin;
-             double       Min;
-             double       Max;
-             double       Now;
+             int            Direction;
+             int            Bias;
+             FractalState   State;
+             EventType      Event;
+             double         Price[];
+             double         Lead;
+             double         Origin;
+             double         Min;
+             double         Max;
+             double         Now;
            };
 
     struct LinearRec
            {
-             int          Direction;
-             int          Bias;
-             EventType    Event;
-             FOCRec       Open;
-             FOCRec       Close;
+             int            Direction;
+             int            Bias;
+             EventType      Event;
+             FOCRec         Open;
+             FOCRec         Close;
            };
 
-    void             CalcFOC(FOCRec &FOC);
+    void             CalcFOC(PriceType Type, FOCRec &FOC);
     void             CalcSMA(void);
-    void             CalcPoly(double &Poly[], PriceType Type);
+    void             CalcPoly(PriceType Type, double &Poly[]);
     void             CalcLinear(double &Source[], double &Target[]);
     void             CalcFractal(FractalDetail &Fractal, double &Price[]);
+    void             CalcMomentum(MomentumDetail &Detail, double &SMA[]);
 
     void             NewTick();
     void             NewSegment(void);
@@ -163,13 +181,14 @@ private:
     int              tmaBar;
     
     //-- Aggregation Structures
-    TickRec          tr[];          //-- Tick Record
-    SegmentRec       sr[];          //-- Segment Record
-    RangeRec         range;         //-- Range Record
-    SMARec           sma;           //-- SMA Master Record
-    PolyRec          poly;          //-- Poly Regr Record
-    LinearRec        line;          //-- Linear Regr Record
-    FractalRec       fr;            //-- Fractal Record
+    TickRec          tr[];           //-- Tick Record
+    SegmentRec       sr[];           //-- Segment Record
+    RangeRec         range;          //-- Range Record
+    SMARec           sma;            //-- SMA Master Record
+    PolyRec          poly;           //-- Poly Regr Record
+    LinearRec        line;           //-- Linear Regr Record
+    FractalRec       fr;             //-- Fractal Record
+    MomentumRec      mr;             //-- Momentum Record
 
 public:
                      CTickMA(int Periods, int Degree, double Aggregate);
@@ -185,6 +204,7 @@ public:
     PolyRec          Poly(void)            { return(poly); };
     LinearRec        Linear(void)          { return(line); };
     FractalRec       Fractal(void)         { return(fr); };
+    MomentumRec      Momentum(void)        { return(mr); };
 
     int              Count(CountType Type) { return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr))); };
     int              Direction(double &Price[], int Speed=Fast) { return(Direction(Price[0]-Price[Speed-1])); };
@@ -208,13 +228,15 @@ public:
 //+------------------------------------------------------------------+
 //| CalcFOC - Computes Linear(FOC) Fractal states, events            |
 //+------------------------------------------------------------------+
-void CTickMA::CalcFOC(FOCRec &FOC)
+void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
   {
     int    bias             = FOC.Bias;
 
     double maxFOC           = fabs(FOC.Max);
     double minFOC           = fabs(FOC.Min);
     double nowFOC           = fabs(FOC.Now);
+    
+    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Notify);
     
     FOC.Event               = NoEvent;
 
@@ -227,34 +249,34 @@ void CTickMA::CalcFOC(FOCRec &FOC)
 
       if (NewDirection(FOC.Direction,Direction(FOC.Lead-FOC.Price[1])))
       {
-        FOC.Min             = FOC.Now;
-        FOC.Max             = FOC.Now;
-        FOC.Event           = NewDirection;
-
-        bias                = Action(FOC.Direction);
+        maxFOC              = NoValue;
+        FOC.Event           = BoolToEvent(NewState(FOC.State,Reversal),NewReversal);
       }
-      else
+
       if (IsHigher(fabs(FOC.Now),maxFOC,NoUpdate,3)||Event(NewExpansion,Critical))
       {
+        bias                = Action(FOC.Direction);
+
         FOC.Min             = FOC.Now;
         FOC.Max             = FOC.Now;
-        FOC.Event           = NewExpansion;
-
-        bias                = Action(FOC.Direction);
+        FOC.Event           = BoolToEvent(NewState(FOC.State,Breakout),NewBreakout,FOC.Event);
       }
       else
       if (IsLower(fabs(FOC.Now),minFOC,NoUpdate,3))
       {
-        FOC.Min             = FOC.Now;
-        FOC.Event           = NewRetrace;
-
         bias                = Action(FOC.Direction,InDirection,InContrarian);
+
+        FOC.Min             = FOC.Now;
+        
+        if (IsEqual(poly.Bias,bias))
+          FOC.Event         = BoolToEvent(NewState(FOC.State,(FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)),
+                                                             FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
       }
       else
         bias                = Action(fabs(FOC.Now)-nowFOC);
 
-      SetEvent(BoolToEvent(IsChanged(FOC.Bias,bias),NewBias),Major);
-      SetEvent(FOC.Event,Major);
+      SetEvent(BoolToEvent(IsChanged(FOC.Bias,bias),NewBias),alertlevel);
+      SetEvent(FOC.Event,alertlevel);
     }
   }
 
@@ -294,7 +316,7 @@ void CTickMA::CalcSMA(void)
 //+------------------------------------------------------------------+
 //| CalcPoly - computes polynomial regression to x degree            |
 //+------------------------------------------------------------------+
-void CTickMA::CalcPoly(double &Poly[], PriceType Type)
+void CTickMA::CalcPoly(PriceType Type, double &Poly[])
   {
     double ai[10,10],b[10],x[10],sx[20];
     double sum;
@@ -466,6 +488,9 @@ void CTickMA::NewTick()
     tr[0].High                = BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar]);
     tr[0].Low                 = BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]);
     tr[0].Close               = Close[tmaBar];
+    
+    if (ArraySize(tr)>1)
+      SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow));
 
     SetEvent(NewTick,Notify);
   }
@@ -565,6 +590,30 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
   }
 
 //+------------------------------------------------------------------+
+//| CalcMomentum - Computes the Momentum for the supplied SMA array  |
+//+------------------------------------------------------------------+
+void CTickMA::CalcMomentum(MomentumDetail &Detail, double &SMA[])
+  {
+    double momentum       = (SMA[0]-SMA[1])-(SMA[1]-SMA[2]);
+    double change         = momentum-Detail.Now;
+    
+    Detail.Event          = NoEvent;
+
+    if (IsEqual(change,0.00))
+      return;
+
+    Detail.Event        = BoolToEvent(IsEqual(Direction(change),DirectionUp),NewRally,NewPullback);
+    Detail.Now          = momentum;
+    Detail.Change       = change;
+      
+    if (NewAction(Detail.Bias,Action(change)))
+      Detail.Event      = NewBias;
+
+    if (NewDirection(Detail.Direction,Direction(momentum)))
+      Detail.Event      = NewDirection;
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateTick - Calc tick bounds and update tick history            |
 //+------------------------------------------------------------------+
 void CTickMA::UpdateTick(void)
@@ -577,6 +626,8 @@ void CTickMA::UpdateTick(void)
 
     if (IsLower(BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]),tr[0].Low))
       SetEvent(NewLow,Notify);
+
+    SetEvent(BoolToEvent(Event(NewHigh)||Event(NewLow),NewBoundary),Notify);
 
     tr[0].Close           = Close[tmaBar];
     tr[0].Count++;
@@ -608,7 +659,7 @@ void CTickMA::UpdateSegment(void)
 
       SetEvent(NewHigh,Nominal);
     }
-    
+
     if (IsLower(tr[0].Low,sr[0].Price.Low))
     {
       if (Count(Segments)>1)
@@ -623,13 +674,13 @@ void CTickMA::UpdateSegment(void)
 
       if (IsEqual(tmaDirection[Term],DirectionDown))
         fr.Expansion       = fmin(fr.Expansion,sr[0].Price.Low);
-      
+
       SetEvent(NewLow,Nominal);
     }
 
     if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))
       SetEvent(NewTerm,Nominal);
-  
+
     if (!IsBetween(fr.Expansion,fr.Support,fr.Resistance,Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
         SetEvent(NewTrend,Nominal);
@@ -777,8 +828,11 @@ void CTickMA::UpdateSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdatePoly(void)
   {
-    CalcPoly(poly.Open,ptOpen);
-    CalcPoly(poly.Close,ptClose);
+    CalcPoly(ptOpen,poly.Open);
+    CalcPoly(ptClose,poly.Close);
+    
+    poly.Direction             = Direction(poly.Close[0]-poly.Close[1]);
+    poly.Bias                  = Action(Direction(poly.Close[0]-poly.Open[0]));
   }
 
 //+------------------------------------------------------------------+
@@ -791,8 +845,8 @@ void CTickMA::UpdateLinear(void)
     CalcLinear(poly.Open,line.Open.Price);
     CalcLinear(poly.Close,line.Close.Price);
 
-    CalcFOC(line.Open);
-    CalcFOC(line.Close);
+    CalcFOC(ptOpen,line.Open);
+    CalcFOC(ptClose,line.Close);
 
     line.Direction             = line.Open.Direction;
     line.Event                 = NoEvent;
@@ -914,7 +968,14 @@ void CTickMA::Update(void)
     UpdateRange();
 
     if (Count(Segments)>Slow)
+    {
       UpdateSMA();
+
+      CalcMomentum(mr.Open,sma.Open);
+      CalcMomentum(mr.High,sma.High);
+      CalcMomentum(mr.Low,sma.Low);
+      CalcMomentum(mr.Close,sma.Close);
+    }
 
     if (Count(Segments)>tmaPeriods)
     {
@@ -1059,7 +1120,6 @@ string CTickMA::PolyStr(void)
 
     Append(text,DirText(poly.Direction),"|");
     Append(text,ActionText(poly.Bias),"|");
-    Append(text,EnumToString(poly.Event),"|");
     Append(text,DoubleToStr(poly.High,Digits),"|");
     Append(text,DoubleToStr(poly.Low,Digits),"|");
 
@@ -1084,6 +1144,7 @@ string CTickMA::FOCStr(FOCRec &FOC)
 
     Append(text,DirText(FOC.Direction),"|");
     Append(text,ActionText(FOC.Bias),"|");
+    Append(text,EnumToString(FOC.State),"|");
     Append(text,EnumToString(FOC.Event),"|");
     Append(text,DoubleToStr(FOC.Min,Digits),"|");
     Append(text,DoubleToStr(FOC.Max,Digits),"|");
@@ -1126,17 +1187,13 @@ string CTickMA::EventStr(EventType Type)
   {
     string text      = "|"+EnumToString(Type);
 
-    Append(text,EnumToString(EventAlertLevel(Type)),"|");
+    Append(text,EnumToString(EventLevel(Type)),"|");
     
     if (Event(Type))
     {
       Append(text,EnumToString(sr[0].Event),"|");
-
       Append(text,EnumToString(sma.Event),"|");
-
       Append(text,EnumToString(range.Event),"|");
-      Append(text,EnumToString(poly.Event),"|");
-
       Append(text,EnumToString(line.Event),"|");
       Append(text,EnumToString(line.Open.Event),"|");
       Append(text,EnumToString(line.Close.Event),"|");

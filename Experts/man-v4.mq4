@@ -461,62 +461,15 @@ void UpdatePlan(PlanType Type)
 //+------------------------------------------------------------------+
 void UpdateTick(void)
   {
+    static int direction   = NoDirection;
+
     t.Update();
 
-//    if (t.Event(NewLow,Notify)) Pause("New Low Event","New Low()");
-//    if (t.Event(NewHigh,Notify)) Pause("New High Event","New High()");
-
-    if (t[NewExpansion])
-    {
-//      if (IsEqual(t.Fractal().High.Type,Divergent))
-
-//      if (IsEqual(t.Fractal().Low.Type,Divergent))
-      
-      //Pause("New Divergence\n"+"High:"+EnumToString(t.Fractal().High.Type)+"\nLow:"+EnumToString(t.Fractal().Low.Type),"Divergence Check");
-    }
-    if (t[NewDivergence])
-    {
-//      if (IsEqual(t.Fractal().High.Type,Divergent))
-
-//      if (IsEqual(t.Fractal().Low.Type,Divergent))
-      
-      //Pause("New Divergence\n"+"High:"+EnumToString(t.Fractal().High.Type)+"\nLow:"+EnumToString(t.Fractal().Low.Type),"Divergence Check");
-    }
-    if (t[NewConvergence])
-    {
-//      if (IsEqual(t.Fractal().High.Type,Divergent))
-
-//      if (IsEqual(t.Fractal().Low.Type,Divergent))
-      
-      //Pause("New Divergence\n"+"High:"+EnumToString(t.Fractal().High.Type)+"\nLow:"+EnumToString(t.Fractal().Low.Type),"Divergence Check");
-    }
-
-    //if (t[NewState])
-    //  Pause("State Check","NewState()");
-    //if (t.Event(NewReversal,Major))
-    //  Pause("Fractal Event: NewReversal","Major:NewReversal()");
-    //if (t.Event(NewBreakout,Major))
-    //  Pause("Fractal Event: NewBreakout","Major:NewBreakout()");
-//    if (t.Event(NewTerm,Nominal))
-//      Pause("New Term: Level "+EnumToString(t.EventAlertLevel(NewTerm)),"NewTerm Event Check()");
-
-//    if (t.Event(NewTerm,Major))
-//    {
-//      if (IsChanged(direction[OP_BUY],t.Fractal().High.Direction[Term]))
-//        Pause("Major New Long Term","TickMA Fractal SMA() Event");
-//
-//      if (IsChanged(direction[OP_SELL],t.Fractal().Low.Direction[Term]))
-//        Pause("Major New Short Term","TickMA Fractal SMA() Event");
-//    }
-    //else
-    //if (t.Event(NewTrend,Major))
-    //  Pause("Major New Term","TickMA Fractal SMA() Event");
-    //else
-    //if (t.Event(FractalEvent(frHigh.Type),Major))
-    //  Pause("Major New "+EnumToString(frHigh.Type),"TickMA Fractal SMA() Event");
+    if (t[NewTick])
+      if (NewDirection(direction,Direction(t.Tick().Open-t.Linear().Close.Lead)))
+        Flag("lnDirChg",Color(direction));
     
-    //Print("SMA-High|",t.FractalStr(frHigh));
-    //Print("SMA-Low|",t.FractalStr(frLow));
+    
   }
 
 //+------------------------------------------------------------------+
