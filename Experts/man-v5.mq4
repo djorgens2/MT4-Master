@@ -17,7 +17,6 @@
                    NoStrategy,
                    Protect,
                    Position,
-                   Scalper,
                    Mitigate,
                    Capture,
                    Release
@@ -83,6 +82,15 @@ input int           inpGMTOffset       = 0;            // Offset from GMT+3
 
   CTickMA          *t                  = new CTickMA(inpPeriods,inpDegree,inpAgg);
   COrder           *order              = new COrder(inpBrokerModel,Hold,Hold);
+  CSession         *s[SessionTypes];
+
+  struct SessionMaster
+  {
+    SessionType   Lead;               //-- Lead session
+    SessionType   Pivot;              //-- Pivot session
+    int           Hedge;              //-- Net Equal Term Direction
+    bool          Expansion;          //-- All Session Breakout/Reversal Flag
+  };
 
   struct ManagerRec
   {
@@ -98,6 +106,7 @@ input int           inpGMTOffset       = 0;            // Offset from GMT+3
   };
 
   ManagerRec      mr[2];
+  SessionMaster   sm;
 
   int             trManager             = NoAction;
   int             trBias                = NoBias;
@@ -114,6 +123,14 @@ void RefreshPanel(void)
   {
     ManagerType manager;
 
+    //-- Update Control Panel (Session)
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s[type].Event(NewFractal)||s[type].Event(NewHour))
+      {
+        UpdateBox("bxhAI-Session"+EnumToString(type),Color(s[type][Term].Direction,IN_DARK_DIR));
+        UpdateBox("bxbAI-OpenInd"+EnumToString(type),BoolToInt(s[type].IsOpen(),clrYellow,clrBoxOff));
+      }
+
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
       manager         = (ManagerType)Action(action,InAction,InContrarian);
@@ -121,7 +138,7 @@ void RefreshPanel(void)
       UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",BoolToStr(mr[manager].Strategy==NoStrategy,"Pending",EnumToString(mr[manager].Strategy)),
                                                           BoolToInt(mr[manager].Strategy==NoStrategy,clrDarkGray,Color(mr[manager].Strategy)));
       UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),BoolToInt(mr[action].Confirmed,clrYellow,
-                                                                     BoolToInt(mr[Action(action,InAction,InContrarian)].Confirmed,clrRed,clrDarkGray)),16,"Wingdings");
+                                                          BoolToInt(mr[Action(action,InAction,InContrarian)].Confirmed,clrRed,clrDarkGray)),16,"Wingdings");
     }
   }
 
@@ -134,12 +151,14 @@ void RefreshScreen(void)
     
     text = "Source Value ["+EnumToString(inpSource)+"]:"+DoubleToStr(iClose("XRPUSD",0,0))+"\n"+ManagerStr()+"\n\n"+t.ActiveEventStr();
 
-    //UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrForestGreen);
-    //UpdateLine("czDCA:"+(string)OP_SELL,order.DCA(OP_SELL),STYLE_DOT,clrMaroon);
+    UpdateLine("[m4]Mid",s[Daily].Pivot(OffSession),STYLE_DOT,clrDarkGray);
+    UpdateLine("[m4]Lead",s[sm.Lead].Pivot(ActiveSession),STYLE_DOT,Color(sm.Lead,Bright));
+    //UpdateLine("[m4]DCABuy",order.DCA(OP_BUY),STYLE_DOT,clrForestGreen);
+    //UpdateLine("[m4]DCASell",order.DCA(OP_SELL),STYLE_DOT,clrMaroon);
 
-    //for (SessionType session=Daily;session<SessionTypes;session++)
-    //  if (s[session].ActiveEvent())
-    //    Append(text,EnumToString(session)+" "+s[session].ActiveEventStr(),"\n\n");
+    for (SessionType session=Daily;session<SessionTypes;session++)
+      if (s[session].ActiveEvent())
+        Append(text,EnumToString(session)+" "+s[session].ActiveEventStr(),"\n\n");
         
     Comment(text);
   }
@@ -189,6 +208,27 @@ int Zone(int Action, double Pivot)
         return zones[Action,node];
 
     return zones[Action][5];    
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateSession - Updates Session Fractal Data                     |
+//+------------------------------------------------------------------+
+void UpdateSession(void)
+  {
+    sm.Expansion       = false;
+    sm.Hedge           = NoAction;
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      s[type].Update();
+
+      sm.Pivot                  = sm.Lead;
+      sm.Lead                   = (SessionType)BoolToInt(s[type][SessionOpen]||s[type][SessionClose],type,sm.Lead);
+      sm.Expansion              = sm.Expansion||s[type][NewExpansion];
+      
+      if (type>Daily)
+        sm.Hedge                = BoolToInt(IsEqual(s[Daily][Term].Direction,s[type][Term].Direction),sm.Hedge,s[sm.Lead][Term].Bias);
+    }    
   }
 
 //+------------------------------------------------------------------+
@@ -277,6 +317,7 @@ bool NewStrategy(ManagerType Manager)
   {
     StrategyType strategy   = NoStrategy;
     int          action     = Action(Manager,InAction,InContrarian);
+    int          calc       = Zone(Manager,order.DCA(action))-Zone(action,s[sm.Lead].Pivot(ActiveSession));
 
     switch (Zone(Manager,order.DCA(action)))
     {
@@ -391,6 +432,7 @@ void OnTick()
   {
     UpdateOrder();
     UpdateTick();
+    UpdateSession();
 
     Execute();
 
@@ -427,7 +469,7 @@ string ManagerStr(void)
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    order.Enable();
+    order.Disable();
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
@@ -452,11 +494,20 @@ int OnInit()
       NewPriceLabel("trManager-"+ActionText(action));
     }
 
-    NewLine("czDCA:"+(string)OP_BUY);
-    NewLine("czDCA:"+(string)OP_SELL);
+    //-- Initialize Session
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+
+    NewLine("[m4]Lead");
+    NewLine("[m4]Mid");
+    NewLine("[m4]DCABuy");
+    NewLine("[m4]DCASell");
 
     NewPriceLabel("tmaNewLow");
     NewPriceLabel("tmaNewHigh");
+
     return(INIT_SUCCEEDED);
   }
 
@@ -466,5 +517,8 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete t;
-    delete order;  
+    delete order;
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
   }

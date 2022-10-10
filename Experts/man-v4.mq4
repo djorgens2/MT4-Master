@@ -209,10 +209,6 @@ void RefreshScreen(void)
 
     UpdateLine("[m4]DailyMid",s[Daily].Pivot(OffSession),STYLE_DOT,clrDarkGray);
     UpdateLine("[m4]Lead",s[sm.Lead].Pivot(ActiveSession),STYLE_DOT,Color(sm.Lead,Bright));
-
-    UpdateRay("tmaPlanExp:1",plan[plantype].Expansion,inpPeriods-1);
-    UpdateRay("tmaPlanSup:1",plan[plantype].Support,inpPeriods-1);
-    UpdateRay("tmaPlanRes:1",plan[plantype].Resistance,inpPeriods-1);
       
     for (int zone=0;zone<inpShowZone;zone++)
     {
