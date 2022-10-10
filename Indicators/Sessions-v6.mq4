@@ -244,7 +244,7 @@ void RefreshScreen(int Bar=0)
     //  if (session[NewReversal])
     //    Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),Color(session[ActiveSession].BreakoutDir));
     //  else Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),clrWhite);
-    static int bias=OP_NO_ACTION;
+    static int bias=NoBias;
 //    if (IsChanged(bias,session[ActiveSession].Bias))
 //      if (session.Event(NewBias,Nominal))
 //        Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),Color(Direction(session[ActiveSession].Bias,InAction)));

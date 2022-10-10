@@ -90,7 +90,7 @@ void RefreshScreen(void)
         if (tick[event])
         {
           Append(text,EventText[event],"\n");
-          Append(text,EnumToString(tick.EventAlertLevel(event)));
+          Append(text,EnumToString(tick.EventLevel(event)));
         }
       Comment("Tick: "+(string)Tick+"\n"+text);
     }
@@ -566,7 +566,7 @@ void Test9(void)
       order.SetEquityHold(OP_SELL);
       
     if (Tick==11415)
-      order.SetEquityHold(OP_NO_ACTION);
+      order.SetEquityHold(NoAction);
 
     if (Tick==18000)
     {
@@ -575,7 +575,7 @@ void Test9(void)
     }
     
     if (Bid<17.60)
-      order.SetEquityHold(OP_NO_ACTION);
+      order.SetEquityHold(NoAction);
 
     //--- Queue Order Test
       if (!fill) 
@@ -611,7 +611,7 @@ void Test9(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 9
+    #define Test 1
     ++Tick;
     
     switch (Test)
@@ -743,7 +743,7 @@ int OnInit()
       order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
       order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetZoneLimits(action,2.0,2.0);
+      order.SetZoneLimits(action,2.0,10.0);
     }
 
     NewLine("czDCA:0");

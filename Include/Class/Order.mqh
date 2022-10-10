@@ -117,9 +117,9 @@ private:
 
   struct              QueueSnapshot
                       {
-                        int             Count;             //-- Status by Order Type
-                        double          Lots;              //-- Lots by Order Type
-                        double          Profit;            //-- Value by Order Type
+                        int             Count;                //-- Status by Order Type
+                        double          Lots;                 //-- Lots by Order Type
+                        double          Profit;               //-- Value by Order Type
                       };
 
   struct              QueueSummary
@@ -129,10 +129,10 @@ private:
 
   struct              OrderResubmit
                       {
-                        int             Type;              //-- Order Type following fill
-                        double          Cancel;            //-- Cancel order on Stop
-                        double          Limit;             //-- Cancel order on Limit
-                        double          Step;              //-- Resubmit Stop/Limit from fill
+                        int             Type;                 //-- Order Type following fill
+                        double          Cancel;               //-- Cancel order on Stop
+                        double          Limit;                //-- Cancel order on Limit
+                        double          Step;                 //-- Resubmit Stop/Limit from fill
                       };
 
   struct              OrderRequest
@@ -186,7 +186,6 @@ private:
                         //-- Profit Management
                         double         EquityTarget;          //-- Principal equity target
                         double         EquityMin;             //-- Minimum profit target
-                        double         DCATarget;             //-- Minimum Equity target for DCA
                         //-- Risk Management
                         double         MaxRisk;               //-- Max Principle Risk
                         double         LotScale;              //-- LotSize scaling factor in Margin
@@ -277,12 +276,15 @@ public:
           //-- Order properties
           double       Price(SummaryType Type, int Action, double Requested, double Basis=0.00);
           double       LotSize(int Action, double Lots=0.00);
+
+          //-- Margin Calcs
           double       Margin(int Format=InPercent)                          {return(Account.Margin*BoolToInt(IsEqual(Format,InPercent),100,1));};
           double       Margin(double Lots, int Format=InPercent)             {return(Calc(Margin,Lots,Format));};
           double       Margin(int Action, double Lots, int Format=InPercent) {return(Calc((MarginType)BoolToInt(IsEqual(Operation(Action),OP_BUY),MarginLong,MarginShort),Lots,Format));};
           double       Margin(int Type, QueueStatus Status, int Format=InPercent)
                                                                              {return(Calc((MarginType)BoolToInt(IsEqual(Operation(Type),OP_BUY),MarginLong,MarginShort),
                                                                                      Snapshot[Status].Type[Operation(Type)].Lots,Format));};
+          double       Free(int Action)                                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
           double       Equity(double Value, int Format=InPercent);
           double       DCA(int Action)                                       {return(NormalizeDouble(Master[Action].DCA,Digits));};
 
@@ -312,9 +314,8 @@ public:
                                                                    return(Ticket(Master[Action].TicketMin)); 
                                                                    return(Ticket(Master[Action].TicketMax));};
 
-          OrderSummary PL(int Action, SummaryType Type)      {return(Master[Action].Summary[Type]);};
+          OrderSummary Recap(int Action, SummaryType Type)   {return(Master[Action].Summary[Type]);};
           OrderSummary Entry(int Action)                     {return(Master[Action].Entry);};
-          double       Free(int Action)                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
 
           void         GetZone(int Action, int Zone, OrderSummary &Node);
           int          Zones(int Action) {return (ArraySize(Master[Action].Zone));};
@@ -413,7 +414,6 @@ void COrder::InitMaster(int Action, OrderMethod Method)
     Master[Action].TradeEnabled    = !IsEqual(Master[Action].Method,Halt);
     Master[Action].EquityTarget    = 0.00;
     Master[Action].EquityMin       = 0.00;
-    Master[Action].DCATarget       = 0.00;
     Master[Action].MaxRisk         = 0.00;
     Master[Action].LotScale        = 0.00;
     Master[Action].MaxMargin       = 0.00;
@@ -497,7 +497,7 @@ void COrder::UpdatePanel(void)
       UpdateLabel("lbvOC-"+ActionText(action)+"-Stop",center(DoubleToStr(Price(Loss,action,0.00),Digits),9),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-DfltStop","Default "+DoubleToStr(Master[action].StopLoss,Digits)+" ("+DoubleToStr(Master[action].DefaultStop,1)+"p)",clrDarkGray,8);
       UpdateLabel("lbvOC-"+ActionText(action)+"-EQBase",DoubleToStr(Account.NetProfit[action],0)+" ("+DoubleToStr(fdiv(Account.NetProfit[action],Account.Balance)*100,1)+"%)",clrDarkGray,10);
-      UpdateLabel("lbvOC-"+ActionText(action)+"-DCA",DoubleToStr(Master[action].DCA,Digits)+BoolToStr(IsEqual(Master[action].DCATarget,0.00),"","("+DoubleToStr(Master[action].DCATarget,1)+"%)"),clrDarkGray,10);
+      UpdateLabel("lbvOC-"+ActionText(action)+"-DCA",DoubleToStr(Master[action].DCA,Digits),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-LotSize",center(DoubleToStr(LotSize(action),Account.LotPrecision),7),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-MinLotSize",center(DoubleToStr(Account.LotSizeMin,Account.LotPrecision),6),clrDarkGray,10);
       UpdateLabel("lbvOC-"+ActionText(action)+"-MaxLotSize",center(DoubleToStr(Account.LotSizeMax,Account.LotPrecision),7),clrDarkGray,10);
@@ -623,7 +623,8 @@ void COrder::UpdatePanel(void)
           UpdateLabel("lbvRQ-"+(string)request+"-Step"," 0.00",clrDarkGray);
         else
           UpdateLabel("lbvRQ-"+(string)request+"-Step",LPad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
-                     Master[Operation(Queue[request].Pend.Type)].Step,Queue[request].Pend.Step,1),1)," ",4),
+                     BoolToDouble(IsBetween(Queue[request].Pend.Type,OP_BUY,OP_SELLSTOP),Master[Operation(Queue[request].Pend.Type)].Step,0.00),
+                     Queue[request].Pend.Step,1),1)," ",4),
                      BoolToInt(IsEqual(Queue[request].Pend.Step,0.00),clrYellow,clrDarkGray));
                      
         UpdateLabel("lbvRQ-"+(string)request+"-Memo",Queue[request].Memo,clrDarkGray);
@@ -1158,7 +1159,7 @@ bool COrder::OrderApproved(OrderRequest &Request)
       {
         case Pending:   Request.Status     = Declined;
 
-                        if (IsLower(Margin(Request.Action,Snapshot[Pending].Type[Request.Action].Lots+
+                        if (IsLower(Margin(Snapshot[Pending].Type[Request.Action].Lots+
                                       LotSize(Request.Action,Request.Lots),InPercent)-MarginTolerance,
                                       Master[Request.Action].MaxMargin,NoUpdate))
                           return (IsChanged(Request.Status,Approved));
@@ -1170,7 +1171,7 @@ bool COrder::OrderApproved(OrderRequest &Request)
 
         case Immediate: Request.Status     = Declined;
         
-                        if (IsLower(Margin(Request.Action,Master[Request.Action].Summary[Net].Lots+
+                        if (IsLower(Margin(Master[Request.Action].Summary[Net].Lots+
                                       LotSize(Request.Action,Request.Lots),InPercent)-MarginTolerance,
                                       Master[Request.Action].MaxMargin,NoUpdate))
                         {

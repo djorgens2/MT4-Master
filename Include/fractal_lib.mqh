@@ -126,8 +126,8 @@ EventType FractalEvent(FractalType Type)
       case Expansion:    return(NewExpansion);
       case Divergent:    return(NewDivergence);
       case Convergent:   return(NewConvergence);
-      case Inversion:    return(NewRetrace);
-      case Conversion:   return(NewRecovery);
+      case Inversion:    return(NewInversion);
+      case Conversion:   return(NewConversion);
       case Lead:         return(NewLead);
     };
     
@@ -149,12 +149,12 @@ FiboLevel Level(double Percent)
 //+------------------------------------------------------------------+
 //| Price - Derived price for a variable fibonacci level             |
 //+------------------------------------------------------------------+
-double Price(double Fibo, double Base, double Root, int Method=Expansion)
+double Price(FiboLevel Level, double Root, double Extension, int Method=Expansion)
   {
     if (Method == Retrace)     
-      return (NormalizeDouble(Base-((Base-Root)*Fibo),Digits));
+      return (NormalizeDouble(Extension-((Extension-Root)*Percent(Level)),Digits));
 
-    return (NormalizeDouble(Root+((Base-Root)*Fibo),Digits));
+    return (NormalizeDouble(Root+((Extension-Root)*Percent(Level)),Digits));
   }
 
 //+------------------------------------------------------------------+
@@ -192,7 +192,7 @@ double Retrace(double Root, double Expansion, double Retrace, int Format=InDecim
 //+------------------------------------------------------------------+
 //| Percent - returns the Fibo percent for the supplied level        |
 //+------------------------------------------------------------------+
-double Percent(int Level, int Format=InPoints)
+double Percent(FiboLevel Level, int Format=InPoints)
   {
     const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 

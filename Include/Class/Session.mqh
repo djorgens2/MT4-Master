@@ -518,11 +518,11 @@ void CSession::UpdateOrigin(void)
     }
     
     if (sfractal[Origin].Direction==DirectionUp)
-      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),sfractal[Origin].Support,Retrace))))
+      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,sfractal[Origin].Support,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),Retrace))))
         SetEvent(NewBias,Critical);
 
     if (sfractal[Origin].Direction==DirectionDown)
-      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,sfractal[Origin].Support,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),Retrace))))
+      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),sfractal[Origin].Support,Retrace))))
         SetEvent(NewBias,Critical);       
     
     if (NewState(sfractal[Origin].State,CalcState(sfractal[Origin].State,sfractal[Origin].Direction,Retrace(Origin,Now),Event(NewOrigin),Event(NewExpansion,Critical))))
@@ -847,18 +847,17 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
 //+------------------------------------------------------------------+
 string CSession::FractalStr(void)
   {  
-    string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*\n"+
-        "Term State: "+EnumToString(sfractal[Term].State)+" ["+ActionText(sfractal[Term].Bias)+"] Direction: "+DirText(sfractal[Term].Direction)+"/"+DirText(sfractal[Term].BreakoutDir)+"\n"+
-                       " (r) "+DoubleToStr(Retrace(Term,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Term,Max,InPercent),1)+"%"+"\n"+
-                       " (e) "+DoubleToStr(Expansion(Term,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(Term,Min,InPercent),1)+"%\n"+
-        "Trend State: "+EnumToString(sfractal[Trend].State)+" Direction: "+DirText(sfractal[Trend].Direction)+"/"+DirText(sfractal[Trend].BreakoutDir)+"\n"+
-                       " (r) "+DoubleToStr(Retrace(Trend,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Trend,Max,InPercent),1)+"%"+"\n"+
-                       " (e) "+DoubleToStr(Expansion(Trend,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Trend,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(Trend,Min,InPercent),1)+"%\n"+
-        "Origin State:  "+EnumToString(sfractal[Origin].State)+" Direction: "+DirText(sfractal[Origin].Direction)+"/"+DirText(sfractal[Origin].BreakoutDir)+"\n"+
-                       " (r) "+DoubleToStr(Retrace(Origin,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(Origin,Max,InPercent),1)+"%"+"\n"+
-                       " (e) "+DoubleToStr(Expansion(Origin,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(Origin,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(Origin,Min,InPercent),1)+"%\n"+
-        "\n"+EnumToString(sType)+" Active "+ActiveEventStr();
-        
+    string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*\n";
+    
+    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+      Append(text,EnumToString(type)+" State: "+
+                  EnumToString(sfractal[type].State)+" ["+ActionText(sfractal[type].Bias)+"] Direction: "+
+                  DirText(sfractal[type].Direction)+"/"+DirText(sfractal[type].BreakoutDir)+"\n"+
+                  "      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%"+"\n"+
+                  "      (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n\n");
+
+    Append(text,EnumToString(sType)+" Active "+ActiveEventStr());
+    
     return (text);
   }
 

@@ -30,6 +30,7 @@ protected:
        enum     EventType
                 {
                   NoEvent,
+                  AdverseEvent,
                   NewDirection,
                   NewSegment,
                   NewParabolic,
@@ -47,6 +48,8 @@ protected:
                   NewBase,
                   NewDivergence,
                   NewConvergence,
+                  NewInversion,
+                  NewConversion,
                   NewExpansion,
                   NewContraction,
                   NewRetrace,
@@ -234,6 +237,7 @@ bool IsEqual(EventType Event1, EventType Event2)
 const string EventText[EventTypes] =
              {
                "No Event",
+               "Adverse Event",
                "New Direction",
                "New Segment",
                "New Parabolic",
@@ -251,6 +255,8 @@ const string EventText[EventTypes] =
                "New Base",
                "New Divergence",
                "New Convergence",
+               "New Inversion",
+               "New Conversion",
                "New Expansion",
                "New Contraction",
                "New Retrace",
