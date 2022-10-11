@@ -30,8 +30,8 @@
 
   enum           ManagerType
                  {
-                   Sales,
                    Purchasing,
+                   Sales,
                    Unassigned    = -1
                  };
 
@@ -94,15 +94,18 @@ input int           inpGMTOffset       = 0;            // Offset from GMT+3
 
   struct ManagerRec
   {
-    FractalType   Type;
-    StrategyType  Strategy;
-    int           Bias;
-    bool          Confirmed;
-    double        Pivot;
-    double        AOO;                                 //-- Area of Operation
-    double        EquityRiskMax;
-    double        EquityTargetMin;
-    double        EquityTarget;
+    ManagerType   Manager;            //-- Manager Action (Contrary to OP_[BUY|SELL]
+    StrategyType  Strategy;           //-- Manager Strategy
+    FractalType   Type;               //-- Last Fractal triggered
+    int           Bias;               //-- Bias for Action
+    bool          Confirmed;          //-- Bias Confirmation
+    double        Pivot;              //-- Bias Pivot
+    double        AOO;                //-- Area of Operation
+    double        EquityRiskMax;      //-- Maximum Risk by Manager
+    double        EquityTargetMin;    //-- Minimum Equity Target by Manager
+    double        EquityTarget;       //-- Equity Target by Manager
+    double        StopLoss;           //-- Stop Loss by Manager
+    double        TakeProfit;         //-- Take Profit by Manager
   };
 
   ManagerRec      mr[2];
@@ -252,10 +255,10 @@ void UpdateOrder(void)
 //+------------------------------------------------------------------+
 void ManageOrders(ManagerType Manager)
   {
-    OrderRequest request    = order.BlankRequest(EnumToString(Manager));
-    int action              = Operation(mr[Manager].Bias);
+    OrderRequest request      = order.BlankRequest(EnumToString(Manager));
+    int action                = Operation(mr[Manager].Bias);
 
-    if (order.Enabled(Manager))
+    if (order.Enabled(action))
     {
       if (NewStrategy(Manager))
       {};
@@ -269,8 +272,8 @@ void ManageOrders(ManagerType Manager)
         if (order.LotSize(action)<=order.Free(action))
           if (mr[Manager].Confirmed)
           {
-            request.Type        = action;
-            request.Memo        = "Order "+ActionText(request.Type)+" Test";
+            request.Type      = action;
+            request.Memo      = "Order "+ActionText(request.Type)+" Test";
    
             if (order.Submitted(request))
               Print(order.RequestStr(request));
@@ -279,25 +282,25 @@ void ManageOrders(ManagerType Manager)
     }
 
     //-- Process Contrarian Queue
-    if (order.Enabled(Action(Manager,InAction,InContrarian)))
-      order.ExecuteOrders(Action(Manager,InAction,InContrarian));
+    if (order.Enabled(action))
+      order.ExecuteOrders(action);
   }
 
 //+------------------------------------------------------------------+
 //| NewBias - Confirms bias changes                                  |
 //+------------------------------------------------------------------+
-bool NewBias(int Manager, int &Bias, int Change)
+bool NewBias(int Action, int &Bias, int Change)
   {
-    if (IsEqual(mr[Manager].AOO,NoValue))
+    if (IsEqual(mr[Action].AOO,NoValue))
       return false;
 
-    if (IsEqual(Manager,OP_BUY))
-      if (IsHigher(Close[0],mr[Manager].AOO,NoUpdate,Digits))
-        Change           = Manager;
+    if (IsEqual(Action,OP_BUY))
+      if (IsHigher(Close[0],mr[Action].AOO,NoUpdate,Digits))
+        Change           = Action;
 
-    if (IsEqual(Manager,OP_SELL))
-      if (IsLower(Close[0],mr[Manager].AOO,NoUpdate,Digits))
-        Change           = Manager;
+    if (IsEqual(Action,OP_SELL))
+      if (IsLower(Close[0],mr[Action].AOO,NoUpdate,Digits))
+        Change           = Action;
 
     return NewAction(Bias,Change);
   }
@@ -354,16 +357,16 @@ bool NewStrategy(ManagerType Manager)
 //+------------------------------------------------------------------+
 bool NewTrigger(void)
   {
-    static int    action       = NoBias;
+    static int    bias         = NoBias;
            bool   triggered    = false;
 
-    for (int manager=OP_BUY;IsBetween(manager,OP_BUY,OP_SELL);manager++)
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-      if (NewBias(manager,mr[manager].Bias,BoolToInt(Close[0]>mr[manager].AOO,OP_BUY,OP_SELL)))
-        mr[manager].Confirmed  = false;
+      if (NewBias(action,mr[action].Bias,BoolToInt(Close[0]>mr[action].AOO,OP_BUY,OP_SELL)))
+        mr[action].Confirmed  = false;
 
-      if (IsChanged(mr[manager].Confirmed,mr[manager].Confirmed||(IsEqual(mr[manager].Bias,OP_BUY)&&Close[0]>t.SMA().High[0])||(IsEqual(mr[manager].Bias,OP_SELL)&&Close[0]<t.SMA().Low[0])))
-        trConfirmed            = manager;
+      if (IsChanged(mr[action].Confirmed,mr[action].Confirmed||(IsEqual(mr[action].Bias,OP_BUY)&&Close[0]>t.SMA().High[0])||(IsEqual(mr[action].Bias,OP_SELL)&&Close[0]<t.SMA().Low[0])))
+        trConfirmed            = action;
     }
 
     if (mr[OP_BUY].Confirmed&&mr[OP_SELL].Confirmed)
@@ -371,14 +374,14 @@ bool NewTrigger(void)
         if (IsChanged(trTrend,trConfirmed))
           Flag("trConfirmed",Color(Direction(trTrend)));
 
-    if (IsChanged(action,t.Fractal().Bias))
-      if (NewAction(trManager,action))
+    if (IsChanged(bias,t.Fractal().Bias))
+      if (NewAction(trManager,bias))
         triggered              = true;
 
     if (t.Event(NewReversal,Critical))
     {
       if (NewAction(trManager,Action(t.Range().Direction)))
-        if (IsChanged(action,trManager))
+        if (IsChanged(bias,trManager))
           Flag("lnRangeReversal",clrWhite);
 
       triggered                = true;
@@ -387,7 +390,7 @@ bool NewTrigger(void)
     if (t.Event(NewBreakout,Critical))
     {
       if (NewAction(trManager,Action(t.Range().Direction)))
-        if (IsChanged(action,trManager))
+        if (IsChanged(bias,trManager))
           Flag("lnRangeBreakout",clrSteelBlue);
 
       triggered                = true;
@@ -436,6 +439,7 @@ void OnTick()
 
     Execute();
 
+    Print (ManagerStr());
     RefreshScreen();
     RefreshPanel();
   }
@@ -450,15 +454,21 @@ string ManagerStr(void)
     
     Append(text,"Manager Active: "+EnumToString((ManagerType)trManager),"\n");
     Append(text,"Confirmed: "+EnumToString((ManagerType)trConfirmed));
-    Append(text,"Trend: "+BoolToStr(IsEqual(trTrend,OP_BUY),"Long",BoolToStr(IsEqual(trTrend,OP_SELL),"Short","Awaiting Confirmation")),"\n");
-    
-    for (int bias=OP_BUY;IsBetween(bias,OP_BUY,OP_SELL);bias++)
+    Append(text,"Trend: "+BoolToStr(IsEqual(trTrend,OP_BUY),"Long",BoolToStr(IsEqual(trTrend,OP_SELL),"Short","Pending Confirmation")),"\n");
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-      Append(text,"Manager: "+EnumToString((ManagerType)bias),"\n");
-      Append(text,"Bias: "+ActionText(mr[bias].Bias)+BoolToStr(mr[bias].Confirmed,"*"));
-      Append(text,"Type: "+EnumToString(mr[bias].Type));
-      Append(text,"Pivot: "+DoubleToString(mr[bias].Pivot,Digits));
-      Append(text,"AOO: "+DoubleToString(mr[bias].AOO,Digits));
+      Append(text,"Manager: "+EnumToString(mr[action].Manager),"\n");
+      Append(text,"Strategy: "+BoolToStr(IsEqual(mr[action].Strategy,NoStrategy),"Pending",EnumToString(mr[action].Strategy)));
+      Append(text,"Type: "+EnumToString(mr[action].Type));
+      Append(text,"Bias: "+ActionText(mr[action].Bias)+BoolToStr(mr[action].Confirmed,"*"));
+      Append(text,"Pivot: "+DoubleToString(mr[action].Pivot,Digits));
+      Append(text,"AOO: "+DoubleToString(mr[action].AOO,Digits));
+      Append(text,"Risk: "+DoubleToString(mr[action].EquityRiskMax,1)+"%");
+      Append(text,"Target [Min]: "+DoubleToString(mr[action].EquityTargetMin,1)+"%");
+      Append(text," [Max]: "+DoubleToString(mr[action].EquityTarget,1)+"%");
+      Append(text,"Stop Loss: "+DoubleToString(mr[action].StopLoss,Digits));
+      Append(text,"Take Profit: "+DoubleToString(mr[action].TakeProfit,Digits));
     }
 
     return text;
@@ -469,19 +479,23 @@ string ManagerStr(void)
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    order.Disable();
+    order.Enable();
 
-    for (int action=OP_BUY;action<=OP_SELL;action++)
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
       //-- Manager Config
+      mr[action].Manager           = (ManagerType)Action(action,InAction,InContrarian);
+      mr[action].Strategy          = NoStrategy;
       mr[action].Type              = Expansion;
       mr[action].Bias              = NoBias;
       mr[action].Confirmed         = false;
       mr[action].Pivot             = NoValue;
-      mr[action].AOO               = NoValue;       //-- Area of Operation
+      mr[action].AOO               = NoValue;
       mr[action].EquityRiskMax     = inpEquityRiskMax;
       mr[action].EquityTargetMin   = inpEquityTargetMin;
       mr[action].EquityTarget      = inpEquityTarget;
+      mr[action].StopLoss          = NoValue;
+      mr[action].TakeProfit        = NoValue;
 
       //-- Order Config
       order.Enable(action);
