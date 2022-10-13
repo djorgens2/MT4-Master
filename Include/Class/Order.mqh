@@ -102,6 +102,7 @@ private:
                         double          Equity;
                         double          LotMargin;
                         double          MarginHedged;
+                        double          LotSize;
                         double          LotSizeMin;
                         double          LotSizeMax;
                         int             LotPrecision;
@@ -184,6 +185,7 @@ private:
                         bool           TradeEnabled;          //-- Enables/Disables trading by Action
                         OrderMethod    Method;                //-- Order Processing Method by Action
                         //-- Profit Management
+                        bool           EquityHold;            //-- Temporary Equity Hold by Action
                         double         EquityTarget;          //-- Principal equity target
                         double         EquityMin;             //-- Minimum profit target
                         //-- Risk Management
@@ -221,8 +223,6 @@ private:
 
           AccountMetrics  Account;
           
-          int          EquityHold;
-
           //-- Private Methods
           void         AppendLog(int Key, int Ticket,string Note);
           void         PurgeLog(int Retain=0);
@@ -267,14 +267,17 @@ public:
 
           bool         Enabled(int Action);
           bool         Enabled(OrderRequest &Request);
+          bool         Disabled(void)                           {return(Account.TradeEnabled);};
+          bool         Disabled(int Action)                     {return(Master[Action].TradeEnabled);};
 
-          void         Enable(void)                 {Account.TradeEnabled=true;};
-          void         Disable(void)                {Account.TradeEnabled=false;};
-          void         Enable(int Action)           {Master[Action].TradeEnabled=true;};
-          void         Disable(int Action)          {Master[Action].TradeEnabled=false;};
+          void         Enable(string Message="")                {Account.TradeEnabled=true;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
+          void         Disable(string Message="")               {Account.TradeEnabled=false;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
+          void         Enable(int Action, string Message="")    {Master[Action].TradeEnabled=true;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
+          void         Disable(int Action, string Message="")   {Master[Action].TradeEnabled=false;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
 
           //-- Order properties
           double       Price(SummaryType Type, int Action, double Requested, double Basis=0.00);
+          double       Forecast(int Action, double Equity, double Spread=0.00);
           double       LotSize(int Action, double Lots=0.00);
 
           //-- Margin Calcs
@@ -287,6 +290,7 @@ public:
           double       Free(int Action)                                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
           double       Equity(double Value, int Format=InPercent);
           double       DCA(int Action)                                       {return(NormalizeDouble(Master[Action].DCA,Digits));};
+          double       Spread(void)                                          {return(NormalizeDouble(Account.Spread,Digits));};
 
           //-- Order methods
           void         Cancel(int Action, string Reason="");
@@ -330,7 +334,7 @@ public:
           void         SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double LotScale=0.00);
           void         SetDefaults(int Action, double DefaultLotSize, double DefaultStop, double DefaultTarget);
           void         SetZoneLimits(int Action, double Step, double MaxZoneMargin);
-          void         SetEquityHold(int Action) {EquityHold=Operation(Action);};
+          void         SetEquityHold(int Action, bool On=true) {Master[Action].EquityHold=On;};
 
           //-- Formatted Output Text
           void         PrintLog(void);
@@ -412,6 +416,7 @@ void COrder::InitMaster(int Action, OrderMethod Method)
   {
     Master[Action].Method          = Method;
     Master[Action].TradeEnabled    = !IsEqual(Master[Action].Method,Halt);
+    Master[Action].EquityHold      = false;    
     Master[Action].EquityTarget    = 0.00;
     Master[Action].EquityMin       = 0.00;
     Master[Action].MaxRisk         = 0.00;
@@ -548,9 +553,9 @@ void COrder::UpdatePanel(void)
           
           UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Ticket",IntegerToString(detail.Ticket,10,'-'),clrDarkGray,9,"Consolas");
           UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-State",BoolToStr(IsEqual(detail.Status,Working),
-                         BoolToStr(IsEqual(action,EquityHold),CharToStr(149)+"Hold",
+                         BoolToStr(Master[action].EquityHold,CharToStr(149)+"Hold",
                          BoolToStr(IsEqual(detail.Method,Hold),CharToStr(149)+"Hold",EnumToString(detail.Method))),EnumToString(detail.Status)),
-                         BoolToInt(IsEqual(action,EquityHold),clrYellow,clrDarkGray),9,"Consolas");
+                         BoolToInt(Master[action].EquityHold,clrYellow,clrDarkGray),9,"Consolas");
           UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Price",DoubleToStr(detail.Price,Digits),clrDarkGray,9,"Consolas");
           UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Lots",DoubleToStr(detail.Lots,Account.LotPrecision),clrDarkGray,9,"Consolas");
           UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-TP",DoubleToStr(detail.TakeProfit,Digits),clrDarkGray,9,"Consolas");
@@ -874,9 +879,10 @@ void COrder::UpdateAccount(void)
     Account.EquityClosed            = NormalizeDouble((AccountEquity()-(AccountBalance()+AccountCredit()))/(AccountBalance()+AccountCredit()),3);
     Account.EquityVariance          = NormalizeDouble(Account.EquityOpen-Account.EquityClosed,3);
     Account.EquityBalance           = NormalizeDouble(AccountEquity(),2);
-    Account.Spread                  = NormalizeDouble(Ask-Bid,Digits);
     Account.Equity                  = NormalizeDouble(Account.EquityBalance-Account.Balance,2);
+    Account.Spread                  = NormalizeDouble(Ask-Bid,Digits);
     Account.Margin                  = NormalizeDouble(AccountMargin()/AccountEquity(),3);
+    Account.LotSize                 = MarketInfo(Symbol(),MODE_LOTSIZE);
     Account.LotMargin               = NormalizeDouble(BoolToDouble(Symbol()=="USDJPY",(MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)),
                                         (MarketInfo(Symbol(),MODE_LOTSIZE)*MarketInfo(Symbol(),MODE_MINLOT)*Close[0]))/AccountLeverage(),2);
     Account.MarginHedged            = fdiv(MarketInfo(Symbol(),MODE_MARGINHEDGED),MarketInfo(Symbol(),MODE_LOTSIZE),2);
@@ -902,8 +908,6 @@ void COrder::UpdateMaster(void)
     {
       ArrayResize(updated,0,1000);
       
-      Master[action].DCA                           = 0.00;
-
       extended                                     = 0.00;
       lots                                         = 0.00;
       
@@ -931,8 +935,7 @@ void COrder::UpdateMaster(void)
         }
       }
 
-      Master[action].DCA      = BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask)
-                                  -fdiv((lots*BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask))-extended,lots);
+      Master[action].DCA                           = BoolToDouble(IsEqual(lots,0.00),BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask),fdiv(extended,lots),Digits);
       
       ArrayResize(Master[action].Order,ArraySize(updated),1000);
 
@@ -1295,7 +1298,7 @@ bool COrder::OrderClosed(OrderDetail &Order)
   }
 
 //+------------------------------------------------------------------+
-//| AdverseEquityHandler - Kills and halts system                     |
+//| AdverseEquityHandler - Kills and halts system                    |
 //+------------------------------------------------------------------+
 void COrder::AdverseEquityHandler(void)
   {
@@ -1303,15 +1306,17 @@ void COrder::AdverseEquityHandler(void)
 
     if (IsLower(Summary[Net].Equity,maxrisk))
     {
-      for (int action=OP_BUY;action<OP_SELL;action++)
+      Cancel(NoAction);
+
+      for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
       {
         for (int ticket=0;ticket<Master[action].Summary[Net].Count;ticket++)
           Master[action].Order[ticket].Method   = Kill;
-          
+
         ProcessLosses(action);
       }
-      
-      Disable();
+
+      Disable("System halted on adverse equity; Maximum risk threshold exceeded");
     }
   }
 
@@ -1403,7 +1408,7 @@ void COrder::ProcessProfits(int Action)
     double netRecapture  = 0.00;
 
     //-- Early exit on Equity Hold
-    if (IsEqual(Action,EquityHold))
+    if (Master[Action].EquityHold)
       return;
       
     //-- Calculate Profit Taking types
@@ -1478,13 +1483,15 @@ void COrder::ProcessLosses(int Action)
     double maxrisk                = -(Master[Action].MaxRisk);
 
     for (int ticket=0;ticket<Master[Action].Summary[Net].Count;ticket++)
+    {
+      //-- Handle Kills first
+      if (IsEqual(Master[Action].Order[ticket].Method,Kill))
+        Master[Action].Order[ticket].Status  = Processing;
+      else
+
+      //-- Handle working orders
       if (IsEqual(Master[Action].Order[ticket].Status,Working))
       {
-        //-- Handle Kills first
-        if (IsEqual(Master[Action].Order[ticket].Method,Kill))
-          Master[Action].Order[ticket].Status  = Processing;
-        else
-      
         //-- Handle Adverse Tickets (No Stop)
         if (IsEqual(Master[Action].Order[ticket].StopLoss,0.00,Digits))
           Master[Action].Order[ticket].Status  = (QueueStatus)BoolToInt(IsLower(Equity(Master[Action].Order[ticket].Profit),maxrisk),Processing,Master[Action].Order[ticket].Status);
@@ -1504,15 +1511,16 @@ void COrder::ProcessLosses(int Action)
                              Master[Action].Order[ticket].Status     = Processing;
                           break;
           }
-        
-        if (IsEqual(Master[Action].Order[ticket].Status,Processing))
-          if (OrderClosed(Master[Action].Order[ticket]))
-            UpdateSnapshot();
-          else
-            Master[Action].Order[ticket].Status                      = Working;
+      }
+
+      if (IsEqual(Master[Action].Order[ticket].Status,Processing))
+        if (OrderClosed(Master[Action].Order[ticket]))
+          UpdateSnapshot();
         else
           Master[Action].Order[ticket].Status                        = Working;
-      }
+      else
+        Master[Action].Order[ticket].Status                          = Working;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -1658,6 +1666,17 @@ double COrder::Price(SummaryType Type, int RequestType, double Requested, double
     }
     
     return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Forecast - returns the spread adjusted equity and risk prices    |
+//+------------------------------------------------------------------+
+double COrder::Forecast(int Action, double Equity, double Spread=0.00)
+  {   
+    double spread       = BoolToDouble(IsEqual(Action,OP_BUY),Spread,-Spread);
+    double equity       = fdiv(fdiv(Equity*Account.Balance,Account.LotSize),Master[Action].Summary[Net].Lots)*Direction(Action,InAction);
+      
+    return (NormalizeDouble(Master[Action].DCA+equity+spread,Digits));
   }
 
 //+------------------------------------------------------------------+

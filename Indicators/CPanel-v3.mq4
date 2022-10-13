@@ -450,9 +450,9 @@ int OnInit()
 
     //-- App Comms
     NewLabel("lbhAC-Trade","Trading",365,7,clrWhite,SCREEN_UL,IndWinId);
-    NewLabel("lbhAC-Option","Options",456,7,clrWhite,SCREEN_UL,IndWinId);
+    NewLabel("lbhAC-SysMsg","Message",458,7,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbvAC-Trading","Trade",408,7,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbvAC-Options","Options",500,7,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbvAC-SysMsg","This is the system speaking",508,7,clrDarkGray,SCREEN_UL,IndWinId);
 
     //-- Order Config
     DrawBox("bxfOC-Long",5,174,352,144,C'0,42,0',BORDER_FLAT,IndWinId);

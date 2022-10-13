@@ -73,27 +73,43 @@ void GetData(void)
     }
   }
 
+//+------------------------------------------------------------------+
+//| ForecastStr - Returns formatted order forecast pricing data      |
+//+------------------------------------------------------------------+
+string ForecastStr(int Action)
+  {    
+    string text = "";
 
+    Append(text,"DCA: "+DoubleToStr(order.Forecast(Action,0.00),Digits));
+    Append(text,"Eq%: "+DoubleToStr(order.Forecast(Action,inpMinTarget/100),Digits));
+    Append(text,"Risk%: "+DoubleToStr(order.Forecast(Action,-inpMaxRisk/100),Digits));
+    Append(text,"spEq%: "+DoubleToStr(order.Forecast(Action,inpMinTarget/100,order.Spread()),Digits));
+    Append(text,"spRisk%: "+DoubleToStr(order.Forecast(Action,-inpMaxRisk/100,order.Spread()),Digits));
+
+    return text;
+  }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {    
-    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_BUY),STYLE_DOT,clrGoldenrod);
-    
-    if (tick.ActiveEvent())
-    {
-      string text = "";
+    string text = "";
 
+    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_SELL),STYLE_DOT,clrGoldenrod);
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+      Append(text,ActionText(action)+" "+ForecastStr(action),"\n");
+
+    if (tick.ActiveEvent())
       for (EventType event=1;event<EventTypes;event++)
         if (tick[event])
         {
           Append(text,EventText[event],"\n");
           Append(text,EnumToString(tick.EventLevel(event)));
         }
-      Comment("Tick: "+(string)Tick+"\n"+text);
-    }
+
+    Comment("Tick: "+(string)Tick+"\n"+text);
   }
 
 //+------------------------------------------------------------------+
@@ -563,10 +579,13 @@ void Test9(void)
       order.SetEquityHold(OP_BUY);
     
     if (Bid>18.12)
+    {
+      order.SetEquityHold(OP_BUY,false);
       order.SetEquityHold(OP_SELL);
+    }
       
     if (Tick==11415)
-      order.SetEquityHold(NoAction);
+      order.SetEquityHold(OP_SELL,false);
 
     if (Tick==18000)
     {
@@ -575,9 +594,55 @@ void Test9(void)
     }
     
     if (Bid<17.60)
-      order.SetEquityHold(NoAction);
+      order.SetEquityHold(OP_SELL,false);
 
     //--- Queue Order Test
+      if (!fill) 
+      {        
+        eRequest.Pend.Type       = OP_BUYSTOP;
+        eRequest.Pend.Limit      = 17.970;
+        eRequest.Pend.Step       = 2;
+        eRequest.Pend.Cancel     = 18.112;
+
+        eRequest.Type            = OP_BUYLIMIT;
+        eRequest.Price           = 17.994;
+        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+    
+        if (order.Submitted(eRequest))
+          fill=true;
+          
+        eRequest.Pend.Type       = OP_SELLSTOP;
+        eRequest.Pend.Limit      = 18.160;
+        eRequest.Pend.Step       = 2;
+        eRequest.Pend.Cancel     = 17.765;
+
+        eRequest.Type            = OP_SELLLIMIT;
+        eRequest.Price           = 18.116;
+        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
+
+        if (order.Submitted(eRequest))
+          fill=true;
+      }
+  }
+
+//+------------------------------------------------------------------+
+//| Percentage Risk/Equity calcs                                     |
+//+------------------------------------------------------------------+
+void Test10(void)
+  {
+    int req                 = 0;
+    OrderRequest eRequest   = order.BlankRequest("Test[10] Calc%");
+    
+    eRequest.Memo           = "Test 10-Risk%";
+    
+    static bool fill   = false;
+
+    order.SetRiskLimits(OP_BUY,80,80,2);
+    order.SetDefaults(OP_BUY,0,0,0);
+    order.SetDefaults(OP_SELL ,0,0,0);
+
+    //--- Queue Order Test
+    if (Tick==1)
       if (!fill) 
       {        
         eRequest.Pend.Type       = OP_BUYSTOP;
@@ -611,29 +676,31 @@ void Test9(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 1
+    #define Test 10
     ++Tick;
     
     switch (Test)
     {
-      case 1:  Test1();
-               break;
-      case 2:  Test2();
-               break;
-      case 3:  Test3();
-               break;
-      case 4:  Test4();
-               break;
-      case 5:  Test5();
-               break;
-      case 6:  Test6();
-               break;
-      case 7:  Test7();
-               break;
-      case 8:  Test8();
-               break;
-      case 9:  Test9();
-               break;
+      case 1:   Test1();
+                break;
+      case 2:   Test2();
+                break;
+      case 3:   Test3();
+                break;
+      case 4:   Test4();
+                break;
+      case 5:   Test5();
+                break;
+      case 6:   Test6();
+                break;
+      case 7:   Test7();
+                break;
+      case 8:   Test8();
+                break;
+      case 9:   Test9();
+                break;
+      case 10:  Test10();
+                break;               
     }
     
 //    if (order[OP_BUY].Count>0)
