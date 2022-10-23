@@ -212,7 +212,7 @@ void RefreshScreen(void)
     //-- Fractal
     UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
     UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
-    UpdateDirection("tmaFractalBias"+(string)IndWinId,t.Fractal().Bias,Color(t.Fractal().Bias),18);
+    UpdateDirection("tmaFractalBias"+(string)IndWinId,Direction(t.Fractal().Bias,InAction),Color(Direction(t.Fractal().Bias,InAction)),18);
 
     //-- Fractal Bounds
     if (inpFractalBounds)

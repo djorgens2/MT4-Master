@@ -35,6 +35,15 @@
                    Unassigned    = -1
                  };
 
+  enum           HoldType
+                 {
+                   Conforming,
+                   Contrarian,
+                   Activated,
+                   Inactive,
+                   Broken
+                 };
+
 #include <Class/Order.mqh>
 #include <Class/TickMA.mqh>
 #include <Class/Session.mqh>
@@ -93,12 +102,15 @@ input int           inpGMTOffset       = 0;            // Offset from GMT+3
 
   struct ManagerAction
   {
-    ManagerType   Manager;            //-- Manager Action (Contrary to OP_[BUY|SELL]
+    ManagerType   Manager;            //-- Manager Type (Contrary to OP_[BUY=Sales|SELL=Purchase]
+    int           Action;             //-- Manager's Action (Operation Responsibility)
+    int           Bias;               //-- Bias for Action
+    HoldType      Hold;               //-- Directional Hold
     StrategyType  Strategy;           //-- Manager Strategy
     FractalType   Type;               //-- Last Fractal triggered
-    int           Bias;               //-- Bias for Action
     bool          Confirmed;          //-- Bias Confirmation
     double        Pivot;              //-- Bias Pivot
+    AlertLevel    PivotAlert;         //-- Event Alert Level on Pivot Change
     double        AOO;                //-- Area of Operation
     double        EquityRiskMax;      //-- Maximum Risk by Manager
     double        EquityTargetMin;    //-- Minimum Equity Target by Manager
@@ -107,9 +119,9 @@ input int           inpGMTOffset       = 0;            // Offset from GMT+3
     double        TakeProfit;         //-- Take Profit by Manager
   };
 
-  ManagerType     manager[FractalTypes];
-  ManagerAction   ma[2];
-  SessionMaster   sm;
+  ManagerType     mb[FractalTypes];   //-- Manager Bias (mb) by Fractal
+  ManagerAction   ma[2];              //-- Manager Pivot maint by Action
+  SessionMaster   sm;                 //-- Session General
 
   bool            PauseOn               = false;
   int             Tick                  = 0;
@@ -129,10 +141,10 @@ void RefreshPanel(void)
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",BoolToStr(ma[ma[action].Manager].Strategy==NoStrategy,"Pending",EnumToString(ma[ma[action].Manager].Strategy)),
-                                                          BoolToInt(ma[ma[action].Manager].Strategy==NoStrategy,clrDarkGray,Color(ma[ma[action].Manager].Strategy)));
-      UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),BoolToInt(ma[action].Confirmed,clrYellow,
-                                                          BoolToInt(ma[ma[action].Manager].Confirmed,clrRed,clrDarkGray)),16,"Wingdings");
+      UpdateLabel("lbvOC-"+ActionText(ma[action].Action)+"-Strategy",BoolToStr(ma[action].Strategy==NoStrategy,"Pending",EnumToString(ma[action].Strategy)),
+                                                          BoolToInt(ma[action].Strategy==NoStrategy,clrDarkGray,Color(ma[action].Strategy)));
+      UpdateLabel("lbvOC-"+ActionText(ma[action].Action)+"-Hold",CharToStr(176),BoolToInt(IsEqual(ma[action].Hold,Conforming),clrYellow,
+                                                                                BoolToInt(IsEqual(ma[action].Hold,Contrarian),clrRed,clrDarkGray)),16,"Wingdings");
     }
   }
 
@@ -184,27 +196,6 @@ bool IsChanged(StrategyType &Compare, StrategyType Value)
   }
 
 //+------------------------------------------------------------------+
-//| Zone - Returns calculated Zone of supplied Plan                  |
-//+------------------------------------------------------------------+
-int Zone(int Action, double Pivot)
-  {
-    const int zones[2][6]  = {{-3,-2,-1,0,1,2},{2,1,0,-1,-2,-3}};
-    double    zone[5];
-    
-    zone[0]  = t.Range().High;
-    zone[1]  = t.Range().Resistance;
-    zone[2]  = t.Range().Mean;
-    zone[3]  = t.Range().Support;
-    zone[4]  = t.Range().Low;
-    
-    for (int node=0;node<5;node++)
-      if (Pivot>zone[node])
-        return zones[Action,node];
-
-    return zones[Action][5];    
-  }
-
-//+------------------------------------------------------------------+
 //| UpdateSession - Updates Session Fractal Data                     |
 //+------------------------------------------------------------------+
 void UpdateSession(void)
@@ -239,6 +230,225 @@ void UpdateTick(void)
 void UpdateOrder(void)
   {
     order.Update();
+  }
+
+//+------------------------------------------------------------------+
+//| Watch - Onboarding mitigation watch                              |
+//+------------------------------------------------------------------+
+void Watch(int Action)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| Zone - Returns calculated Zone of supplied Plan                  |
+//+------------------------------------------------------------------+
+int Zone(int Action, double Pivot)
+  {
+    const int zones[2][6]  = {{-3,-2,-1,0,1,2},{2,1,0,-1,-2,-3}};
+    double    zone[5];
+    
+    zone[0]  = t.Range().High;
+    zone[1]  = t.Range().Resistance;
+    zone[2]  = t.Range().Mean;
+    zone[3]  = t.Range().Support;
+    zone[4]  = t.Range().Low;
+    
+    for (int node=0;node<5;node++)
+      if (Pivot>zone[node])
+        return zones[Action,node];
+
+    return zones[Action][5];    
+  }
+
+//+------------------------------------------------------------------+
+//| NewManager - Confirms Manager turnover on change in Bias         |
+//+------------------------------------------------------------------+
+bool NewManager(ManagerType &Manager, int Bias)
+  {
+    if (IsEqual(Bias,NoBias))
+      return false;
+
+    if (IsEqual(Manager,Bias))
+      return false;
+
+    Manager               = (ManagerType)Bias;
+
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| NewBias - Confirms bias changes                                  |
+//+------------------------------------------------------------------+
+bool NewBias(int Action, int &Bias, int Change)
+  {
+    if (IsEqual(ma[Action].AOO,NoValue))
+      return false;
+
+    if (IsEqual(Action,OP_BUY))
+      if (IsHigher(Close[0],ma[Action].AOO,NoUpdate,Digits))
+        Change           = Action;
+
+    if (IsEqual(Action,OP_SELL))
+      if (IsLower(Close[0],ma[Action].AOO,NoUpdate,Digits))
+        Change           = Action;
+
+    return NewAction(Bias,Change);
+  }
+
+//+------------------------------------------------------------------+
+//| NewMomentum - Tests changes in Momentum                          |
+//+------------------------------------------------------------------+
+bool NewMomentum(void)
+  {
+    return !(t.Momentum().High.Event==NoEvent&&t.Momentum().Low.Event==NoEvent);
+  }
+
+//+------------------------------------------------------------------+
+//| NewStrategy - Updates strategy based on supplied Action Pivot    |
+//+------------------------------------------------------------------+
+bool NewStrategy(ManagerType Manager)
+  {
+    StrategyType strategy   = NoStrategy;
+    int          action     = ma[Manager].Action;
+    int          zone       = Zone(Manager,order.DCA(action))-Zone(action,s[sm.Lead].Pivot(ActiveSession));
+
+    switch (zone)
+    {
+       case -3: //--Capture/Release
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Release,Capture);
+                break;
+
+       case -2: //--Mitigate/Release
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Release,Mitigate);
+                break;
+                
+       case -1: //--Mitigate/Position
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Mitigate,Position);
+                break;
+
+       case  0: //--Position
+                strategy    = Position;
+                break;
+
+       case +1: //--Position/Protect
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Profit).Equity>ma[action].EquityTarget,Protect,Position);
+                break;
+
+       case +2: //--Protect
+                strategy    = Protect;
+                break;
+    }
+
+    if (IsEqual(mb[Lead],Unassigned))
+      if (strategy<Position)
+        Watch(action);
+
+    return IsChanged(ma[Manager].Strategy,strategy);
+  }
+
+//+------------------------------------------------------------------+
+//| NewTrigger - Tests and sets trigger boundaries                   |
+//+------------------------------------------------------------------+
+bool NewTrigger(void)
+  {
+    static int    bias         = NoBias;
+    AlertLevel    alert        = NoAlert;
+    static int    event        = 0;
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+    {
+      if (NewBias(action,ma[action].Bias,BoolToInt(Close[0]>ma[action].AOO,OP_BUY,OP_SELL)))
+        ma[action].Confirmed   = false;
+
+      if (IsChanged(ma[action].Confirmed,ma[action].Confirmed||
+                                (IsEqual(ma[action].Bias,OP_BUY)&&Close[0]>t.SMA().High[0])||
+                                (IsEqual(ma[action].Bias,OP_SELL)&&Close[0]<t.SMA().Low[0])))
+        mb[Term]               = (ManagerType)action;
+    }
+
+    if (ma[OP_BUY].Confirmed&&ma[OP_SELL].Confirmed)
+      if (IsEqual(ma[OP_BUY].Bias,ma[OP_SELL].Bias))
+        if (NewManager(mb[Trend],mb[Term]))
+          NewArrow("tmaActiveEvent"+(string)event++,(ArrowType)BoolToInt(IsEqual(mb[Term],OP_BUY),ArrowUp,ArrowDown),Color(Direction(ma[mb[Trend]].Bias,InAction),IN_CHART_DIR));
+          //UpdatePriceLabel("tmaActiveEvent",Close[0],Color(Direction(ma[mb[Trend]].Bias,InAction)));
+
+    if (IsChanged(bias,t.Fractal().Bias))
+      if (NewManager(mb[Lead],bias))
+        alert                  = Minor;
+
+    if (t.Event(NewReversal,Critical)||t.Event(NewBreakout,Critical))
+      if (NewManager(mb[Lead],Action(t.Range().Direction)))
+      {
+        bias                   = mb[Lead];
+        alert                  = Major;
+      }
+
+    UpdateHold();
+
+    if (alert>NoAlert)
+    {
+      ma[mb[Lead]].Type        = (FractalType)BoolToInt(t[NewHigh],t.Fractal().High.Type,t.Fractal().Low.Type);
+      ma[mb[Lead]].Bias        = Action(mb[Lead],InAction,InContrarian);
+      ma[mb[Lead]].Pivot       = Close[0];
+      ma[mb[Lead]].PivotAlert  = alert;
+      ma[mb[Lead]].AOO         = BoolToDouble(IsEqual(mb[Lead],OP_BUY),ma[mb[Lead]].Pivot,ma[mb[Lead]].Pivot)+(point(inpAreaOfOperation)*Direction(mb[Lead],InAction));
+      ma[mb[Lead]].Confirmed   = false;
+
+      //if (IsEqual(ma[mb[Lead]].Bias,mb[Trend]))
+      if (alert==Major)
+      Flag(EnumToString(alert),BoolToInt(alert==Minor,Color(Direction(bias,InAction)),BoolToInt(t[NewReversal],clrWhite,clrSteelBlue)));
+//      UpdatePriceLabel("tmaActiveEvent",Close[0],BoolToInt(alert==Minor,Color(Direction(bias,InAction)),BoolToInt(t[NewReversal],clrWhite,clrSteelBlue)));
+//      UpdatePriceLabel("mb[Lead]-"+EnumToString(mb[Lead]),Close[0],Color(Direction(ma[mb[Lead]].Bias,InAction)));
+      return true;
+    }
+    
+    return NewMomentum();
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateHold - Updates hold type based on trigger event            |
+//+------------------------------------------------------------------+
+void UpdateHold(void)
+  {
+    int term          = mb[Term];
+    int trend         = mb[Trend];
+    int antitrend     = Action(mb[Trend],InAction,InContrarian);
+
+    if (ma[Sales].Confirmed&&ma[Purchasing].Confirmed)
+      if (IsEqual(ma[Sales].Bias,ma[Purchasing].Bias))
+      {
+        ma[trend].Hold           = Contrarian;
+        ma[antitrend].Hold       = Conforming;
+      }
+      else
+      if (IsEqual(term,trend))
+      {
+        ma[trend].Hold           = Conforming;
+        ma[antitrend].Hold       = Contrarian;      
+      }
+        for (int manager=Sales;IsBetween(manager,Sales,Purchasing);manager++)
+
+            ma[manager].Hold     = (HoldType)BoolToInt(IsEqual(ma[manager].Bias,trend),Contrarian,Conforming);
+
+    if (t.Tick().High>t.SMA().Lead.High)
+    {
+      ma[OP_BUY].Hold       = 
+      ma[OP_SELL].Hold      = (HoldType)BoolToInt(IsEqual(hold,ma[OP_SELL].Bias),Contrarian,Conforming);
+    }
+    else
+    if (t.Tick().Low>t.SMA().Lead.Low)
+    {
+    }
+    else
+    {
+    }
+    //    else
+    //      ma[action].Hold          = (HoldType)BoolToInt(IsEqual(action,ma[action].Bias),Contrarian,BoolToInt(ma[action].Hold<Activated,Activated,Inactive));
+    //  else
+    //  if (ma[action].Confirmed)
+    //    ma[action].Hold            = (HoldType)BoolToInt(IsEqual(ma[action].Bias,mb[Trend]),Conforming,Contrarian);
+    //  else
+    //    ma[action].Hold            = (HoldType)BoolToInt(ma[action].Hold<Activated,Activated,Inactive);
   }
 
 //+------------------------------------------------------------------+
@@ -287,36 +497,50 @@ OrderRequest Protect(int Action, OrderRequest &Request)
 //|   c/Soft Target above prior convergences                         |
 //|   d/Soft Stop on fractal root                                    |
 //+------------------------------------------------------------------+
-OrderRequest Position(int Action, OrderRequest &Request)
+OrderRequest Position(ManagerType Manager, OrderRequest &Request)
   {
-    Request.Memo          = "Position ";
+//    if (mr[OP_BUY].Hold)
+//    {
+//      order.SetOrderMethod(OP_BUY,(OrderMethod)BoolToInt(mr[OP_BUY].Hold,Hold,Split),ByAction);
+//      order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
+//    }
 
-    switch (Action)
-    {
-      case OP_BUY:   //-- Looking for Long Adds
-                     if (t[NewLow])
-                     {
-                       if (order.Entry(Action).Count>0)
-                       {
-                         //-- do something; order/dca/position checks...
-                       }
-                       else
-                         switch (t.Fractal().Low.Type)
-                         {
-                           case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
-                                            {
-                                            //  Request.Type           = OP_BUY;
-                                            //  Request.Memo          += "Divergent [Long]";
-                                            }
-                                            break;
-                           case Convergent: break;
-                           case Expansion:  break;
-                         }
-                      }
-                      break;
-      case OP_SELL:   //-- Looking for Short Adds
-                      break;
-    }
+    if (ma[Manager].Confirmed)
+      if (order.LotSize(ma[Manager].Bias)<=order.Free(ma[Manager].Bias))
+      switch (ma[Manager].Action)
+      {
+        case OP_BUY:    //-- Looking for Long Adds
+                        if (t[NewLow])
+                        {
+                          Request.Type           = OP_BUY;
+                          Request.Memo           = "Position "+EnumToString(t.Fractal().Low.Type);
+                        }
+
+                         //if (order.Entry(Action).Count>0)
+                         //{
+                         //  //-- do something; order/dca/position checks...
+                         //}
+                         //else
+                           //switch (t.Fractal().Low.Type)
+                           //{
+                           //  case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
+                           //                   {
+                           //                   //  Request.Type           = OP_BUY;
+                           //                   //  Request.Memo          += "Divergent [Long]";
+                           //                   }
+                           //                   break;
+                           //  case Convergent: break;
+                           //  case Expansion:  break;
+                           //}
+                        break;
+        case OP_SELL:   //-- Looking for Short Adds
+                        if (t[NewHigh])
+                        {
+                          Request.Type           = OP_SELL;
+                          Request.Memo           = "Position "+EnumToString(t.Fractal().High.Type);
+                        }
+                        break;
+      }
     
     return (Request);
   }
@@ -379,8 +603,8 @@ OrderRequest Mitigate(int Action, OrderRequest &Request)
                          {
                            case Divergent:  if (IsEqual(t.Fractal().Low.Direction[Term],DirectionUp))
                                             {
-                                              Request.Type           = OP_BUY;
-                                              Request.Memo          += "Divergent [Long]";
+                                              //Request.Type           = OP_BUY;
+                                              //Request.Memo          += "Divergent [Long]";
                                             }
                                             break;
                            case Convergent: break;
@@ -426,6 +650,10 @@ OrderRequest Capture(int Action, OrderRequest &Request)
                       }
                       break;
       case OP_SELL:   //-- Looking for Short Adds
+                      if (t[NewHigh])
+                      {
+                        // Do Something
+                      }
                       break;
     }
     
@@ -433,53 +661,9 @@ OrderRequest Capture(int Action, OrderRequest &Request)
   }
 
 //+------------------------------------------------------------------+
-//| ManageOrders - Manages Order Processing by Action                |
+//| ManageOrders - Orders/Requests/Risk/Profit by Manager by Turn    |
 //+------------------------------------------------------------------+
-void ManageOrders(int Action)
-  {
-//    OrderRequest request       = order.BlankRequest("[Auto] "+BoolToStr(IsEqual(Action,OP_BUY),"Long","Short"));
-//
-//    if (t[NewHigh]||t[NewLow])
-//    {
-//      if (NewStrategy(mr[Action],Linear))
-//      {
-//        order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYLIMIT,OP_SELLLIMIT),"Strategy Change");
-//        order.Cancel(BoolToInt(IsEqual(Action,OP_BUY),OP_BUYSTOP,OP_SELLSTOP),"Strategy Change");
-//      }
-//        
-//      switch (mr[Action].Strategy)
-//      {
-////        case Protect:     if (mr[OP_BUY].Hold)
-////                          {
-////                            order.SetOrderMethod(OP_BUY,(OrderMethod)BoolToInt(mr[OP_BUY].Hold,Hold,Split),ByAction);
-////                            order.SetTakeProfit(OP_BUY,t.Tick(0).High,0,Hide);
-////                          }
-////                          break;
-//        case Protect:     request    = Protect(Action,request);
-//                          break;
-//        case Position:    request    = Position(Action,request);
-//                          break;
-//        case Release:     request    = Release(Action,request);
-//                          break;
-//        case Mitigate:    request    = Mitigate(Action,request);
-//                          break;
-//        case Capture:     request    = Capture(Action,request);
-//                          break;
-//      }
-//
-//      if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
-//        if (!order.Submitted(request))
-//          if (IsEqual(request.Status,Rejected))
-//            CallPause(order.RequestStr(request),PauseOn);
-//    }
-//
-//    order.ExecuteOrders(Action);
-  }
-
-//+------------------------------------------------------------------+
-//| ManageOrders - Handle Order, Request, Risk & Profit by Manager   |
-//+------------------------------------------------------------------+
-void ManageOrders(ManagerType Manager)
+void ManageOrders(ManagerType Manager, HoldType Turn)
   {
     OrderRequest request      = order.BlankRequest(EnumToString(Manager));
     int action                = Operation(ma[Manager].Bias);
@@ -496,165 +680,31 @@ void ManageOrders(ManagerType Manager)
       }
 
       else
-        if (order.LotSize(action)<=order.Free(action))
-          if (ma[Manager].Confirmed)
-          {
-            request.Type      = action;
-            request.Memo      = "Order "+ActionText(request.Type)+" Test";
-   
-            if (order.Submitted(request))
-              Print(order.RequestStr(request));
-            else {/* identifyfailure */}
-          }
+      {
+        switch (ma[Manager].Strategy)
+        {
+          case Protect:     request    = Protect(Manager,request);
+                            break;
+          case Position:    request    = Position(Manager,request);
+                            break;
+          case Release:     request    = Release(Manager,request);
+                            break;
+          case Mitigate:    request    = Mitigate(Manager,request);
+                            break;
+          case Capture:     request    = Capture(Manager,request);
+                            break;
+        }
+
+        if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
+          if (order.Submitted(request))
+            Print(order.RequestStr(request));
+          else {/* identifyfailure */}
+      }
+
+      //-- Process Contrarian Queue
+      if (order.Enabled(action))
+        order.ExecuteOrders(action);
     }
-
-    //-- Process Contrarian Queue
-    if (order.Enabled(action))
-      order.ExecuteOrders(action);
-  }
-
-//+------------------------------------------------------------------+
-//| NewManager - Confirms Manager turnover on change in Bias         |
-//+------------------------------------------------------------------+
-bool NewManager(ManagerType &Manager, int Bias)
-  {
-    if (IsEqual(Bias,NoBias))
-      return false;
-
-    if (IsEqual(Manager,Bias))
-      return false;
-
-    Manager               = (ManagerType)Bias;
-
-    return true;
-  }
-
-//+------------------------------------------------------------------+
-//| NewBias - Confirms bias changes                                  |
-//+------------------------------------------------------------------+
-bool NewBias(int Action, int &Bias, int Change)
-  {
-    if (IsEqual(ma[Action].AOO,NoValue))
-      return false;
-
-    if (IsEqual(Action,OP_BUY))
-      if (IsHigher(Close[0],ma[Action].AOO,NoUpdate,Digits))
-        Change           = Action;
-
-    if (IsEqual(Action,OP_SELL))
-      if (IsLower(Close[0],ma[Action].AOO,NoUpdate,Digits))
-        Change           = Action;
-
-    return NewAction(Bias,Change);
-  }
-
-//+------------------------------------------------------------------+
-//| NewMomentum - Tests changes in Momentum                          |
-//+------------------------------------------------------------------+
-bool NewMomentum(void)
-  {
-    return !(t.Momentum().High.Event==NoEvent&&t.Momentum().Low.Event==NoEvent);
-  }
-
-//+------------------------------------------------------------------+
-//| NewStrategy - Updates strategy based on supplied Action Pivot    |
-//+------------------------------------------------------------------+
-bool NewStrategy(ManagerType Manager)
-  {
-    StrategyType strategy   = NoStrategy;
-    int          action     = Action(Manager,InAction,InContrarian);
-    int          calc       = Zone(Manager,order.DCA(action))-Zone(action,s[sm.Lead].Pivot(ActiveSession));
-
-    switch (Zone(Manager,order.DCA(action)))
-    {
-       case -3: //--Capture/Release
-                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Release,Capture);
-                break;
-                
-       case -2: //--Mitigate/Release
-                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Release,Mitigate);
-                break;
-                
-       case -1: //--Mitigate/Position
-                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-ma[action].EquityRiskMax,Mitigate,Position);
-                break;
-
-       case  0: //--Position
-                strategy    = Position;
-                break;
-
-       case +1: //--Position/Protect
-                strategy    = (StrategyType)BoolToInt(order.Recap(action,Profit).Equity>ma[action].EquityTarget,Protect,Position);
-                break;
-
-       case +2: //--Protect
-                strategy    = Protect;
-                break;
-    }
-    
-    if (manager[
-
-    return IsChanged(ma[Manager].Strategy,strategy);
-  }
-
-//+------------------------------------------------------------------+
-//| NewTrigger - Tests and sets trigger boundaries                   |
-//+------------------------------------------------------------------+
-bool NewTrigger(void)
-  {
-    static int    bias         = NoBias;
-           bool   triggered    = false;
-
-    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
-    {
-      if (NewBias(action,ma[action].Bias,BoolToInt(Close[0]>ma[action].AOO,OP_BUY,OP_SELL)))
-        ma[action].Confirmed  = false;
-
-      if (IsChanged(ma[action].Confirmed,ma[action].Confirmed||(IsEqual(ma[action].Bias,OP_BUY)&&Close[0]>t.SMA().High[0])||(IsEqual(ma[action].Bias,OP_SELL)&&Close[0]<t.SMA().Low[0])))
-        manager[Term]            = (ManagerType)action;
-    }
-
-    if (ma[OP_BUY].Confirmed&&ma[OP_SELL].Confirmed)
-      if (IsEqual(ma[OP_BUY].Bias,ma[OP_SELL].Bias))
-        if (NewManager(manager[Trend],manager[Term]))
-          Flag("manager[Term]",Color(Direction(manager[Trend])));
-
-    if (IsChanged(bias,t.Fractal().Bias))
-      if (NewManager(manager[Lead],bias))
-        triggered              = true;
-
-    if (t.Event(NewReversal,Critical))
-    {
-      if (NewManager(manager[Lead],Action(t.Range().Direction)))
-        if (IsChanged(bias,manager[Lead]))
-          Flag("lnRangeReversal",clrWhite);
-
-      triggered                = true;
-    }
-
-    if (t.Event(NewBreakout,Critical))
-    {
-      if (NewManager(manager[Lead],Action(t.Range().Direction)))
-        if (IsChanged(bias,manager[Lead]))
-          Flag("lnRangeBreakout",clrSteelBlue);
-
-      triggered                = true;
-    }
-
-    if (triggered)
-    {
-//      Flag("New "+ActionText(action),Color(Direction(action,InAction)));
-      ma[manager[Lead]].Type       = (FractalType)BoolToInt(t[NewHigh],t.Fractal().High.Type,t.Fractal().Low.Type);
-      ma[manager[Lead]].Bias       = Action(manager[Lead],InAction,InContrarian);
-      ma[manager[Lead]].Pivot      = Close[0];
-      ma[manager[Lead]].AOO        = BoolToDouble(IsEqual(manager[Lead],OP_BUY),ma[manager[Lead]].Pivot,ma[manager[Lead]].Pivot)+(point(inpAreaOfOperation)*Direction(manager[Lead],InAction));
-      ma[manager[Lead]].Confirmed  = false;
-
-      UpdatePriceLabel("manager[Lead]-"+EnumToString(manager[Lead]),Close[0],Color(Direction(ma[manager[Lead]].Bias,InAction)));
-      return true;
-    }
-    
-    return NewMomentum();
   }
 
 //+------------------------------------------------------------------+
@@ -663,11 +713,10 @@ bool NewTrigger(void)
 void Execute(void)
   {    
     if (NewTrigger())
-      if (IsBetween(manager[Lead],OP_BUY,OP_SELL))
+      if (IsBetween(mb[Term],OP_BUY,OP_SELL))
       {
-//      Pause("New Trigger!","Change");
-        ManageOrders((ManagerType)manager[Lead]);
-        ManageOrders((ManagerType)Action(manager[Lead],InAction,InContrarian));
+        ManageOrders((ManagerType)mb[Term],Conforming);
+        ManageOrders((ManagerType)Action(mb[Term],InAction,InContrarian),Contrarian);
       }
 
     order.ExecuteRequests();    
@@ -684,11 +733,89 @@ void OnTick()
 
     Execute();
 
-    Print (ManagerStr());
     RefreshScreen();
     RefreshPanel();
   }
 
+//+------------------------------------------------------------------+  
+//| OnBoarding - App opening with existing trades                    |
+//+------------------------------------------------------------------+
+void OnBoarding(int Action)
+  {
+    if (order[Action].Lots>0)
+      order.Disable(Action,"Open Positions Detected; Preparing execution plan");
+    else
+      order.Enable(Action,"System started "+TimeToString(TimeCurrent()));
+
+    //-- Order Config
+    order.SetDefaults(Action,inpLotSize,inpDefaultStop,inpDefaultTarget);
+    order.SetEquityTargets(Action,ma[Action].EquityTarget,ma[Action].EquityTargetMin);
+    order.SetRiskLimits(Action,ma[Action].EquityRiskMax,inpMaxMargin,inpLotFactor);
+    order.SetZoneLimits(Action,inpZoneStep,inpMaxZoneMargin);
+    order.SetDefaultMethod(Action,Hold);
+  }
+
+//+------------------------------------------------------------------+  
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+    // -- Opening Protection (existing positions)
+    order.Enable();
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+    {
+      //-- Manager Config
+      ma[action].Manager           = (ManagerType)action;
+      ma[action].Action            = Action(action,InAction,InContrarian);
+      ma[action].Bias              = NoBias;
+      ma[action].Strategy          = NoStrategy;
+      ma[action].Type              = Expansion;
+      ma[action].Confirmed         = false;
+      ma[action].Pivot             = NoValue;
+      ma[action].AOO               = NoValue;
+      ma[action].EquityRiskMax     = inpEquityRiskMax;
+      ma[action].EquityTargetMin   = inpEquityTargetMin;
+      ma[action].EquityTarget      = inpEquityTarget;
+      ma[action].StopLoss          = NoValue;
+      ma[action].TakeProfit        = NoValue;
+
+      NewPriceLabel("mb[Lead]-"+EnumToString(ma[action].Manager));
+      
+      OnBoarding(action);
+    }
+
+    ArrayInitialize(mb,Unassigned);
+
+    //-- Initialize Session
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+
+    NewLine("[m4]Lead");
+    NewLine("[m4]Mid");
+    NewLine("[m4]DCABuy");
+    NewLine("[m4]DCASell");
+
+    NewPriceLabel("tmaNewLow");
+    NewPriceLabel("tmaNewHigh");
+    NewPriceLabel("tmaActiveEvent");
+
+    return(INIT_SUCCEEDED);
+  }
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+    delete t;
+    delete order;
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
+  }
 
 //+------------------------------------------------------------------+
 //| ManagerStr - returns formatted Manager data                      |
@@ -697,9 +824,11 @@ string ManagerStr(void)
   {
     string text   = "";
     
-    Append(text,"Manager Active: "+EnumToString((ManagerType)manager[Lead]),"\n");
-    Append(text,"Confirmed: "+EnumToString((ManagerType)manager[Term]));
-    Append(text,"Trend: "+BoolToStr(IsEqual(manager[Trend],OP_BUY),"Long",BoolToStr(IsEqual(manager[Trend],OP_SELL),"Short","Pending Confirmation")),"\n");
+    Append(text,"Manager Active: "+EnumToString((ManagerType)mb[Lead]),"\n");
+    Append(text,"Confirmed: "+EnumToString((ManagerType)mb[Term]));
+    if (mb[Term]>Unassigned)
+      Append(text," ["+ActionText(ma[mb[Term]].Bias)+BoolToStr(ma[mb[Term]].Confirmed,"*")+"]");
+    Append(text,"Trend: "+BoolToStr(IsEqual(mb[Trend],OP_BUY),"Long",BoolToStr(IsEqual(mb[Trend],OP_SELL),"Short","Pending Confirmation")),"\n");
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
@@ -719,70 +848,3 @@ string ManagerStr(void)
     return text;
   }
 
-//+------------------------------------------------------------------+  
-//| Expert initialization function                                   |
-//+------------------------------------------------------------------+
-int OnInit()
-  {
-    // -- Opening Protection (existing positions)
-    order.Enable();
-    order.Disable(OP_BUY);
-    order.Disable(OP_SELL);
-
-    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
-    {
-      //-- Manager Config
-      ma[action].Manager           = (ManagerType)action;
-      ma[action].Strategy          = NoStrategy;
-      ma[action].Type              = Expansion;
-      ma[action].Bias              = NoBias;
-      ma[action].Confirmed         = false;
-      ma[action].Pivot             = NoValue;
-      ma[action].AOO               = NoValue;
-      ma[action].EquityRiskMax     = inpEquityRiskMax;
-      ma[action].EquityTargetMin   = inpEquityTargetMin;
-      ma[action].EquityTarget      = inpEquityTarget;
-      ma[action].StopLoss          = NoValue;
-      ma[action].TakeProfit        = NoValue;
-
-      //-- Order Config
-      order.Enable(action);
-      order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetEquityTargets(action,ma[action].EquityTarget,ma[action].EquityTargetMin);
-      order.SetRiskLimits(action,ma[action].EquityRiskMax,inpMaxMargin,inpLotFactor);
-      order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
-      order.SetDefaultMethod(action,Hold);
-
-      NewPriceLabel("manager[Lead]-"+EnumToString(ma[action].Manager));
-    }
-
-    ArrayInitialize(manager,Unassigned);
-
-    //-- Initialize Session
-    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
-    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
-    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
-    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
-
-    NewLine("[m4]Lead");
-    NewLine("[m4]Mid");
-    NewLine("[m4]DCABuy");
-    NewLine("[m4]DCASell");
-
-    NewPriceLabel("tmaNewLow");
-    NewPriceLabel("tmaNewHigh");
-
-    return(INIT_SUCCEEDED);
-  }
-
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-  {
-    delete t;
-    delete order;
-
-    for (SessionType type=Daily;type<SessionTypes;type++)
-      delete s[type];
-  }

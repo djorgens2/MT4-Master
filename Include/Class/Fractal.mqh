@@ -299,7 +299,7 @@ void CFractal::UpdateRetrace(FractalType Type, int Bar, double Price=0.00)
     for (FractalType type=Type;type<FractalTypes;type++)
     {    
       //--- Initialize retrace data by type
-      f[type].Direction           = DirectionNone;
+      f[type].Direction           = NoDirection;
       f[type].Bar                 = NoValue;
       f[type].Price               = 0.00;
 
@@ -489,7 +489,7 @@ void CFractal::InitFractal(void)
       dOrigin.Age             = 0;
       dOrigin.Direction       = fDirection;
 
-      f[Root].Direction       = fDirection*DirectionInverse;
+      f[Root].Direction       = Direction(fDirection,InDirection,InContrarian);
       f[Expansion].Direction  = fDirection;
 
       fBuffer.SetValue(fBarLow,NormalizeDouble(Low[fBarLow],Digits));
@@ -603,7 +603,7 @@ void CFractal::CalcFractal(void)
 //+------------------------------------------------------------------+
 CFractal::CFractal(int Range, int MinRange, bool ShowEventFlags)
   {
-    fDirection              = DirectionNone;
+    fDirection              = NoDirection;
     fLegMax                 = Expansion;
     fLegMin                 = Expansion;
 
@@ -638,7 +638,7 @@ CFractal::CFractal(int Range, int MinRange, bool ShowEventFlags)
     f[Expansion].Peg        = false;
 
     dOrigin.Age             = NoValue;
-    dOrigin.Direction       = DirectionNone;
+    dOrigin.Direction       = NoDirection;
 
     //-- Load History
     for (fBarNow=Bars-1; fBarNow>0; fBarNow--)
@@ -854,17 +854,17 @@ int CFractal::Direction(FractalType Type=Expansion, bool Contrarian=false, int F
       dDirection           = fDirection;
     else
     if (fmod(Type,2)>0.00)
-      dDirection           = fDirection*DirectionInverse;
+      dDirection           = Direction(fDirection,InDirection,InContrarian);
 
     if (Contrarian)
-      dDirection          *= DirectionInverse;
+      dDirection          *= Direction(fDirection,InDirection,InContrarian);
 
     if (Format==InAction)
       switch(dDirection)
       {
         case DirectionUp:    return (OP_BUY);
         case DirectionDown:  return (OP_SELL);
-        case DirectionNone:  return (NoAction);
+        case NoDirection:    return (NoAction);
       }
 
     return (dDirection);

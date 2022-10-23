@@ -593,7 +593,7 @@ void CSession::UpdateFractalBuffer(int Direction, double Value)
 //+------------------------------------------------------------------+
 void CSession::LoadHistory(void)
   {    
-    int direction                    = DirectionNone;
+    int direction                    = NoDirection;
           
     //--- Initialize period operationals
     sBar                             = Bars-1;
@@ -602,7 +602,7 @@ void CSession::LoadHistory(void)
     sBarHour                         = NoValue;
     
     sBarFE                           = sBar;
-    sDirFE                           = DirectionNone;
+    sDirFE                           = NoDirection;
 
     if (Close[sBar]<Open[sBar])
       direction                      = DirectionDown;
@@ -614,7 +614,7 @@ void CSession::LoadHistory(void)
     for (int type=0;type<PeriodTypes;type++)
     {
       srec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
-      srec[type].BreakoutDir         = DirectionNone;
+      srec[type].BreakoutDir         = NoDirection;
       srec[type].State               = Breakout;
       srec[type].High                = High[sBar];
       srec[type].Low                 = Low[sBar];

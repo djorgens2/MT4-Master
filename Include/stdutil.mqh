@@ -12,7 +12,6 @@
 //+------------------------------------------------------------------+
 
 //--- additional arrowcodes
-#define SYMBOL_DASH           4
 #define SYMBOL_ROOT           128
 #define SYMBOL_POINT1         129
 #define SYMBOL_POINT2         130
@@ -24,11 +23,8 @@
 
 //--- Standard diectional defines
 #define DirectionDown        -1
-#define DirectionNone         0
 #define DirectionUp           1
-#define DirectionInverse     -1
 #define DirectionChange      -2
-
 
 //--- Null value defines
 #define NoValue              -1
@@ -93,26 +89,6 @@
                   All,
                   MeasureTypes      //--- must be last
               };
-
-//+------------------------------------------------------------------+
-//| BarDir - Returns the bar direction for the supplied bar          |
-//+------------------------------------------------------------------+
-int BarDir(int Bar=0)
-  {
-    // Need to work this for inside bars...
-    static int bdDir   = DirectionNone;
-    
-    if (Bar<Bars-1)
-    {
-      if (NormalizeDouble(Close[Bar],Digits)>NormalizeDouble(High[Bar+1],Digits))
-        bdDir          = DirectionUp;
-        
-      if (NormalizeDouble(Close[Bar],Digits)<NormalizeDouble(Low[Bar+1],Digits))
-        bdDir          = DirectionDown;
-    }
-    
-    return (bdDir);
-  }
 
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
@@ -330,9 +306,9 @@ string lpad(string Value, string Pad, int Length)
   }
 
 //+------------------------------------------------------------------+
-//| Swap - swaps one double value for the other with precision       |
+//| swap - swaps one double value for the other with precision       |
 //+------------------------------------------------------------------+
-void Swap(double &Value1, double &Value2, int Precision=0.00)
+void swap(double &Value1, double &Value2, int Precision=0.00)
   {
     double swap   = Value1;
     
@@ -341,6 +317,17 @@ void Swap(double &Value1, double &Value2, int Precision=0.00)
       
     Value1        = NormalizeDouble(Value2,Precision);
     Value2        = NormalizeDouble(swap,Precision);
+  }
+
+//+------------------------------------------------------------------+
+//| BoolToDT - returns the datetime of a user-defined condition      |
+//+------------------------------------------------------------------+
+datetime BoolToDate(bool IsTrue, datetime TrueValue, datetime FalseValue)
+  {
+    if (IsTrue)
+      return (TrueValue);
+
+    return (FalseValue);
   }
 
 //+------------------------------------------------------------------+
@@ -367,17 +354,6 @@ string BoolToStr(bool IsTrue, int Format=InTrueFalse)
 //| BoolToStr - returns user defined text for the supplied value     |
 //+------------------------------------------------------------------+
 string BoolToStr(bool IsTrue, string TrueValue, string FalseValue="")
-  {
-    if (IsTrue)
-      return (TrueValue);
-
-    return (FalseValue);
-  }
-
-//+------------------------------------------------------------------+
-//| BoolToDT - returns the datetime of a user-defined condition      |
-//+------------------------------------------------------------------+
-datetime BoolToDT(bool IsTrue, datetime TrueValue, datetime FalseValue)
   {
     if (IsTrue)
       return (TrueValue);
@@ -438,80 +414,3 @@ void Append(string &Source, string Text, string Separator=" ")
     Source += Text;
   }
 
-//+------------------------------------------------------------------+
-//| Operation - translates Pending Order Types to Market Actions     |
-//+------------------------------------------------------------------+
-int Operation(int Action, bool Contrarian=false)
-  {
-    if (IsEqual(Action,OP_BUY)||IsEqual(Action,OP_BUYLIMIT)||IsEqual(Action,OP_BUYSTOP))
-      return (BoolToInt(Contrarian,OP_SELL,OP_BUY));
-
-    if (IsEqual(Action,OP_SELL)||IsEqual(Action,OP_SELLLIMIT)||IsEqual(Action,OP_SELLSTOP))
-      return (BoolToInt(Contrarian,OP_BUY,OP_SELL));
-    
-    return (NoValue);  //-- << clean up for another day
-  }
-
-//+------------------------------------------------------------------+
-//| Action - translates price direction into order action            |
-//+------------------------------------------------------------------+
-int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
-  {
-    const int dInverseState   = 3;
-    int       dContrarian     = BoolToInt(Contrarian,-1,1);
-    
-    switch (ValueType)
-    {
-      case InDirection:   Value         *= dContrarian;
-                          break;
-      case InState:       if (fabs(Value)<dInverseState)
-                            Value        = DirectionNone;
-                          else
-                            Value       *= dContrarian;
-                          break;
-      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
-                            Value        = DirectionUp*dContrarian;
-                          else
-                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
-                            Value        = DirectionDown*dContrarian;
-                          else
-                            Value        = DirectionNone;
-    }
-    
-    if (IsLower(DirectionNone,Value))  return (OP_BUY);
-    if (IsHigher(DirectionNone,Value)) return (OP_SELL);
-    
-    return (NoValue);
-  }
-
-//+------------------------------------------------------------------+
-//| Direction - order action translates into price direction         |
-//+------------------------------------------------------------------+
-int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
-  {
-    const int dInverseState   = 3;
-    int       dContrarian     = BoolToInt(Contrarian,-1,1);
-    
-    switch (ValueType)
-    {
-      case InDirection:   Value         *= dContrarian;
-                          break;
-      case InState:       if (fabs(Value)<dInverseState)
-                            Value        = DirectionNone;
-                          else
-                            Value       *= dContrarian;
-                          break;
-      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
-                            Value        = DirectionUp*dContrarian;
-                          else
-                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
-                            Value        = DirectionDown*dContrarian;
-                          else
-                            Value        = DirectionNone;
-    }
-    
-    if (IsLower(DirectionNone,Value,false,8))  return (DirectionUp);
-    if (IsHigher(DirectionNone,Value,false,8)) return (DirectionDown);
-    
-    return (DirectionNone);
-  }

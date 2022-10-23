@@ -183,8 +183,7 @@ void RefreshScreen(void)
     //-- Fractal
     UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
     UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
-    UpdateDirection("tmaFractalBias"+(string)IndWinId,t.Fractal().Bias,Color(t.Fractal().Bias),18);
-
+    UpdateDirection("tmaFractalBias"+(string)IndWinId,Direction(t.Fractal().Bias,InAction),Color(Direction(t.Fractal().Bias,InAction)),18);
 
     if (inpShowSegBounds==Yes)
     {
@@ -417,7 +416,7 @@ int OnInit()
 
     NewLabel("lbhAI-OrderBias","Bias",27,153,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbvAI-OrderBias","",20,116,clrDarkGray,SCREEN_UL,IndWinId);
-    UpdateDirection("lbvAI-OrderBias",DirectionNone,clrDarkGray,30);
+    UpdateDirection("lbvAI-OrderBias",NoDirection,clrDarkGray,30);
 
     NewLabel("lbhAI-Orders","----------------------  Order Aggregates ----------------------",70,102,clrGold,SCREEN_UL,IndWinId);
     NewLabel("lbhAI-"+"#","#",108,116,clrWhite,SCREEN_UL,IndWinId);
@@ -452,7 +451,7 @@ int OnInit()
     NewLabel("lbhAC-Trade","Trading",365,7,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbhAC-SysMsg","Message",458,7,clrWhite,SCREEN_UL,IndWinId);
     NewLabel("lbvAC-Trading","Trade",408,7,clrDarkGray,SCREEN_UL,IndWinId);
-    NewLabel("lbvAC-SysMsg","This is the system speaking",508,7,clrDarkGray,SCREEN_UL,IndWinId);
+    NewLabel("lbvAC-SysMsg","System Start "+TimeToString(TimeCurrent()),508,7,clrDarkGray,SCREEN_UL,IndWinId);
 
     //-- Order Config
     DrawBox("bxfOC-Long",5,174,352,144,C'0,42,0',BORDER_FLAT,IndWinId);

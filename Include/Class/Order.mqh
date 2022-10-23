@@ -1316,7 +1316,7 @@ void COrder::AdverseEquityHandler(void)
         ProcessLosses(action);
       }
 
-      Disable("System halted on adverse equity; Maximum risk threshold exceeded");
+      Disable("System halted [adverse equity]: Maximum risk threshold exceeded");
     }
   }
 
@@ -1672,10 +1672,16 @@ double COrder::Price(SummaryType Type, int RequestType, double Requested, double
 //| Forecast - returns the spread adjusted equity and risk prices    |
 //+------------------------------------------------------------------+
 double COrder::Forecast(int Action, double Equity, double Spread=0.00)
-  {   
+  {
+    //-- WIP: Ideas:
+    //-- Entry/Exit (Currently coded for exit)
+    //-- Lots needed from Price to reach Equity
+    //-- Concern: Spread gaps are an issue
+    //--   a. Long on Entry
+    //--   b. Short on Exit
     double spread       = BoolToDouble(IsEqual(Action,OP_BUY),Spread,-Spread);
     double equity       = fdiv(fdiv(Equity*Account.Balance,Account.LotSize),Master[Action].Summary[Net].Lots)*Direction(Action,InAction);
-      
+
     return (NormalizeDouble(Master[Action].DCA+equity+spread,Digits));
   }
 

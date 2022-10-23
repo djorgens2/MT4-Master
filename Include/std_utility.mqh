@@ -36,6 +36,17 @@
 #define SCREEN_LL              2
 #define SCREEN_LR              3
 
+enum ArrowType
+     {
+       ArrowUp       = SYMBOL_ARROWUP,
+       ArrowDown     = SYMBOL_ARROWDOWN,
+       ArrowDash     = 4,
+       ArrowHold     = 73,
+       ArrowCheck    = SYMBOL_CHECKSIGN,
+       ArrowStop     = SYMBOL_STOPSIGN,
+       ArrowHalt     = 78
+     };
+
 enum StyleType
      {
        Wide,
@@ -170,6 +181,75 @@ string RPad(string Value, string Pad, int Length)
   }
 
 //+------------------------------------------------------------------+
+//| Operation - translates Pending Order Types to Market Actions     |
+//+------------------------------------------------------------------+
+int Operation(int Action, bool Contrarian=false)
+  {
+    if (IsEqual(Action,OP_BUY)||IsEqual(Action,OP_BUYLIMIT)||IsEqual(Action,OP_BUYSTOP))
+      return (BoolToInt(Contrarian,OP_SELL,OP_BUY));
+
+    if (IsEqual(Action,OP_SELL)||IsEqual(Action,OP_SELLLIMIT)||IsEqual(Action,OP_SELLSTOP))
+      return (BoolToInt(Contrarian,OP_BUY,OP_SELL));
+    
+    return (NoValue);  //-- << clean up for another day
+  }
+
+//+------------------------------------------------------------------+
+//| Action - translates price direction into order action            |
+//+------------------------------------------------------------------+
+int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
+  {
+    const int dInverseState   = 3;
+    int       dContrarian     = BoolToInt(Contrarian,-1,1);
+    
+    switch (ValueType)
+    {
+      case InDirection:   Value         *= dContrarian;
+                          break;
+
+      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = NoDirection;
+    }
+    
+    if (IsLower(NoDirection,Value))  return (OP_BUY);
+    if (IsHigher(NoDirection,Value)) return (OP_SELL);
+    
+    return (NoAction);
+  }
+
+//+------------------------------------------------------------------+
+//| Direction - order action translates into price direction         |
+//+------------------------------------------------------------------+
+int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
+  {
+    const int dInverseState   = 3;
+    int       dContrarian     = BoolToInt(Contrarian,-1,1);
+    
+    switch (ValueType)
+    {
+      case InDirection:   Value         *= dContrarian;
+                          break;
+      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = NoDirection;
+    }
+    
+    if (IsLower(NoDirection,Value,false,8))  return (DirectionUp);
+    if (IsHigher(NoDirection,Value,false,8)) return (DirectionDown);
+    
+    return (NoDirection);
+  }
+
+//+------------------------------------------------------------------+
 //| ActionText - returns the text of an ActionCode                   |
 //+------------------------------------------------------------------+
 string ActionText(int Action, int Format=IN_ACTION)
@@ -210,14 +290,14 @@ bool NewAction(int &Change, int Compare, bool Update=true)
   }
 
 //+------------------------------------------------------------------+
-//| NewDirection - Updates Direction on change;filters DirectionNone |
+//| NewDirection - Updates Direction on change;filters NoDirection   |
 //+------------------------------------------------------------------+
 bool NewDirection(int &Change, int Compare, bool Update=true)
   {
-    if (Compare==DirectionNone)
+    if (Compare==NoDirection)
       return (false);
 
-    if (Change==DirectionNone)
+    if (Change==NoDirection)
       if (IsChanged(Change,Compare,Update))
         return (false);
     
@@ -407,28 +487,28 @@ int GetPeriod(string Value)
 //+------------------------------------------------------------------+
 //| New Arrow - paints an arrow on the chart in the price area       |
 //+------------------------------------------------------------------+
-void NewArrow(string ArrowName, int ArrowCode, int Color, int Bar=0, double Price=0.00)
+void NewArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
   {      
     if (Price==0.00)
       Price = Close[Bar];
 
     ObjectDelete (ArrowName);
     ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
-    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, ArrowCode);
+    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
     ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
   }
 
 //+------------------------------------------------------------------+
 //| UpdateArrow - repaints existing arrow with supplied properties   |
 //+------------------------------------------------------------------+
-void UpdateArrow(string ArrowName, int ArrowCode, int Color, int Bar=0, double Price=0.00)
+void UpdateArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
   {
     if (Price==0.00)
       Price = Close[0];
 
     ObjectDelete (ArrowName);
     ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
-    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, ArrowCode);
+    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
     ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
   }
 
@@ -564,7 +644,7 @@ void UpdatePriceLabel(string PriceLabelName, double Price, int Color=White, int 
   {
     ObjectSet(PriceLabelName,OBJPROP_COLOR,Color);
     ObjectSet(PriceLabelName,OBJPROP_PRICE1,Price);
-    ObjectSet(PriceLabelName,OBJPROP_TIME1,BoolToDT(Bar<0,Time[0]+(fabs(Bar)*(Period()*60)),Time[fabs(Bar)]));
+    ObjectSet(PriceLabelName,OBJPROP_TIME1,BoolToDate(Bar<0,Time[0]+(fabs(Bar)*(Period()*60)),Time[fabs(Bar)]));
   }
   
 //+------------------------------------------------------------------+

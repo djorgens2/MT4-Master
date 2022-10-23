@@ -1,199 +1,428 @@
 //+------------------------------------------------------------------+
-//|                                                       man-v6.mq4 |
-//|                                 Copyright 2014, Dennis Jorgenson |
-//|                                             https://www.mql5.com |
+//|                                                       man-v5.mq4 |
+//|                                                 Dennis Jorgenson |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2014, Dennis Jorgenson"
-#property link      "https://www.mql5.com"
-#property version   "1.00"
+#property copyright "Dennis Jorgenson"
+//#property link      "https://www.mql5.com"
+#property version   "5.01"
 #property strict
 
-#include <Class\PipFractal.mqh>
-#include <Class\TrendRegression.mqh>
-#include <manual.mqh>
+#define Hide       true
+#define NoHide     false
+#define debug      false
 
-input string appHeader               = "";    //+------ App Options -------+
-input bool   inpShowFiboLines        = false; // Display Fibonacci Lines
+  //-- App-Specific Nomens
+  enum           StrategyType
+                 {
+                   NoStrategy,
+                   Protect,
+                   Position,
+                   Mitigate,
+                   Capture,
+                   Release
+                 };
 
-input string fractalHeader           = "";    //+------ Fractal Options ------+
-input int    inpRangeMax             = 120;   // Maximum fractal pip range
-input int    inpRangeMin             = 60;    // Minimum fractal pip range
+  enum           AccountSource
+                 {
+                   USD,
+                   XRP
+                 };
 
-input string PipMAHeader             = "";    //+------ PipMA Options ------+
-input int    inpDegree               = 6;     // Degree of poly regression
-input int    inpPeriods              = 200;   // Number of poly regression periods
-input double inpTolerance            = 0.5;   // Directional change sensitivity
+  enum           ManagerType
+                 {
+                   Sales,
+                   Purchasing,
+                   Unassigned    = -1
+                 };
 
-input string TRegressionHeader       = "";    //+------ T-Regression Options ------+
-input int    inpTRDegree             = 6;     // Degree of trend regression
-input int    inpTRPeriods            = 72;    // Number of trend regression periods
-input int    inpTRSmoothFactor       = 3;     // Trend MA Smoothing Factor
-input int    inpTRStdDevPad          = 5;     // Standard Deviation Pad (in pips)
+#include <Class/Order.mqh>
+#include <Class/TickMA.mqh>
+#include <Class/Session.mqh>
+#include <Class/Fractal.mqh>
 
+//--- Show Options
+input string        showHeader         = "";          // +--- Show Options ---+
+input AccountSource inpSource          = XRP;         // Account Source
+input int           inpPeriodsIdle     = 6;           // Idle Time (In Periods)
+input int           inpShowZone        = 0;           // Show (n) Zone Lines
+input int           inpAreaOfOperation = 6;           // Pips from trigger
 
-//--- Class defs
-  CTrendRegression *trend            = new CTrendRegression(inpTRDegree,inpTRPeriods,inpTRSmoothFactor);
-  CFractal         *fractal          = new CFractal(inpRangeMax,inpRangeMin);
-  CPipFractal      *pfractal         = new CPipFractal(inpDegree,inpPeriods,inpTolerance,fractal);
-  
-//--- Operational variables
-  int              display           = NoValue;
+input string        fractalHeader      = "";          //+----- Fractal inputs -----+
+input int           inpRange           = 120;         // Maximum fractal pip range
+input int           inpRangeMin        = 60;          // Minimum fractal pip range
 
-//--- Trend Analysis
-  double           sdcMaxHeadPrice   = 0.00;            //--- Max TL head price
-  double           sdcMaxTailPrice   = 0.00;            //--- Max TL tail price
-  double           stdDevMax         = 0.00;            //--- Max standard deviation   
+//--- Regression parameters
+input string        regrHeader         = "";          // +--- Regression Config ---+
+input int           inpPeriods         = 80;          // Retention
+input int           inpDegree          = 6;           // Poiy Regression Degree
+input double        inpAgg             = 2.5;         // Tick Aggregation
+input PriceType     inpShowFractal     = PriceTypes;  // Show Fractal
 
-//+------------------------------------------------------------------+
-//| ShowFiboArrow - paints the pipMA fibo arrow                      |
-//+------------------------------------------------------------------+
-void ShowFiboArrow(void)
+input string        ordHeader          = "";          // +----- Order Options -----+
+input BrokerModel   inpBrokerModel     = Discount;    // Brokerage Leverage Model
+input double        inpEquityTarget    = 5.0;         // Equity% Target
+input double        inpEquityTargetMin = 0.8;         // Minimum take profit%
+input double        inpEquityRiskMax   = 5.0;         // Maximum Risk%
+input double        inpMaxMargin       = 60.0;        // Maximum Margin
+input double        inpLotFactor       = 2.00;        // Lot Size Risk% of Balance
+input double        inpLotSize         = 0.00;        // Lot size override
+input int           inpDefaultStop     = 50;          // Default Stop Loss (pips)
+input int           inpDefaultTarget   = 50;          // Default Take Profit (pips)
+input double        inpZoneStep        = 2.5;         // Zone Step (pips)
+input double        inpMaxZoneMargin   = 5.0;         // Max Zone Margin
+
+//--- Session Inputs
+input int           inpAsiaOpen        = 1;            // Asia Session Opening Hour
+input int           inpAsiaClose       = 10;           // Asia Session Closing Hour
+input int           inpEuropeOpen      = 8;            // Europe Session Opening Hour
+input int           inpEuropeClose     = 18;           // Europe Session Closing Hour
+input int           inpUSOpen          = 14;           // US Session Opening Hour
+input int           inpUSClose         = 23;           // US Session Closing Hour
+input int           inpGMTOffset       = 0;            // Offset from GMT+3
+
+  CTickMA          *t                  = new CTickMA(inpPeriods,inpDegree,inpAgg);
+  COrder           *order              = new COrder(inpBrokerModel,Hold,Hold);
+  CSession         *s[SessionTypes];
+
+  struct SessionMaster
   {
-    static string    arrowName      = "";
-    static int       arrowDir       = DirectionNone;
-    static double    arrowPrice     = 0.00;
-           uchar     arrowCode      = SYMBOL_DASH;
+    SessionType   Lead;               //-- Lead session
+    SessionType   Pivot;              //-- Pivot session
+    int           Hedge;              //-- Net Equal Term Direction
+    bool          Expansion;          //-- All Session Breakout/Reversal Flag
+  };
 
-    if (IsChanged(arrowDir,pfractal.Direction(Term)))
-    {
-      arrowPrice                    = Close[0];
-      arrowName                     = NewArrow(arrowCode,DirColor(arrowDir,clrYellow),DirText(arrowDir),arrowPrice);
-    }
-     
-    if (pfractal.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo823))
-      arrowCode                     = SYMBOL_POINT4;
-    else
-    if (pfractal.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo423))
-      arrowCode                     = SYMBOL_POINT3;
-    else
-    if (pfractal.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo261))
-      arrowCode                     = SYMBOL_POINT2;
-    else  
-    if (pfractal.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo161))
-      arrowCode                     = SYMBOL_POINT1;
-    else
-    if (pfractal.Fibonacci(Term,arrowDir,Expansion,Max)>FiboPercent(Fibo100))
-      arrowCode                     = SYMBOL_CHECKSIGN;
-    else
-      arrowCode                     = SYMBOL_DASH;
+  struct ManagerRec
+  {
+    FractalType   Type;
+    StrategyType  Strategy;
+    int           Bias;
+    bool          Confirmed;
+    double        Pivot;
+    double        AOO;                                 //-- Area of Operation
+    double        EquityRiskMax;
+    double        EquityTargetMin;
+    double        EquityTarget;
+  };
 
-    switch (arrowDir)
+  ManagerRec      mr[2];
+  SessionMaster   sm;
+
+  int             trManager             = NoAction;
+  int             trBias                = NoBias;
+  int             trConfirmed           = NoAction;
+  int             trTrend               = NoAction;
+
+  bool            PauseOn               = false;
+  int             Tick                  = 0;
+
+//+------------------------------------------------------------------+
+//| RefreshPanel - Repaints cPanel-v3                                |
+//+------------------------------------------------------------------+
+void RefreshPanel(void)
+  {
+    ManagerType manager;
+
+    //-- Update Control Panel (Session)
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s[type].Event(NewFractal)||s[type].Event(NewHour))
+      {
+        UpdateBox("bxhAI-Session"+EnumToString(type),Color(s[type][Term].Direction,IN_DARK_DIR));
+        UpdateBox("bxbAI-OpenInd"+EnumToString(type),BoolToInt(s[type].IsOpen(),clrYellow,clrBoxOff));
+      }
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
-      case DirectionUp:    if (IsChanged(arrowPrice,fmax(arrowPrice,Close[0])))
-                             UpdateArrow(arrowName,arrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
-                           break;
-      case DirectionDown:  if (IsChanged(arrowPrice,fmin(arrowPrice,Close[0])))
-                             UpdateArrow(arrowName,arrowCode,DirColor(arrowDir,clrYellow),arrowPrice);
-                           break;
+      manager         = (ManagerType)Action(action,InAction,InContrarian);
+
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Strategy",BoolToStr(mr[manager].Strategy==NoStrategy,"Pending",EnumToString(mr[manager].Strategy)),
+                                                          BoolToInt(mr[manager].Strategy==NoStrategy,clrDarkGray,Color(mr[manager].Strategy)));
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),BoolToInt(mr[action].Confirmed,clrYellow,
+                                                          BoolToInt(mr[Action(action,InAction,InContrarian)].Confirmed,clrRed,clrDarkGray)),16,"Wingdings");
     }
   }
 
 //+------------------------------------------------------------------+
-//| ShowAppData - Hijacks the comment for application metrics        |
-//+------------------------------------------------------------------+
-void ShowAppData(void)
-  {
-    string        rsComment   = "";
-
-    rsComment     = "No Comment";
-    
-    Comment(rsComment);  
-  }
-
-//+------------------------------------------------------------------+
-//| RefreshScreen                                                    |
+//| RefreshScreen - Repaints Indicator labels                        |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    switch (display)
-    {
-      case 0:  fractal.RefreshScreen();
-               break;
-      case 1:  pfractal.RefreshScreen();
-               break;
-      case 2:  ShowAppData();
-               break;
-      default: Comment("No Data");
-    }
-
-    //--- Standard Deviation channel lines
-    UpdateRay("sdcTop",sdcMaxTailPrice+stdDevMax,inpTRPeriods-1,sdcMaxHeadPrice+stdDevMax,0,STYLE_DOT,clrYellow);
-    UpdateRay("sdcBottom",sdcMaxTailPrice-stdDevMax,inpTRPeriods-1,sdcMaxHeadPrice-stdDevMax,0,STYLE_DOT,clrRed);
-    UpdateRay("sdcTrend",sdcMaxTailPrice,inpTRPeriods-1,sdcMaxHeadPrice,0,STYLE_DOT,clrLightGray);
-
-    ShowFiboArrow();
-  }
+    string text = "";
     
-//+------------------------------------------------------------------+
-//| CalcStdDev - Computes the std dev channel                        |
-//+------------------------------------------------------------------+
-void CalcStdDev(void)
-  {
-    static double csdMaxDev    = 0.00;
-    static int    csdDirection = DirectionNone;
-    
-//    for (int idx=inpTRPeriods-1;idx>0;idx--)
-//      Print(DoubleToStr(High[idx],Digits)+";"+DoubleToString(Low[idx],Digits)+";"+DoubleToStr(trend[idx],Digits));
+    text = "Source Value ["+EnumToString(inpSource)+"]:"+DoubleToStr(iClose("XRPUSD",0,0))+"\n"+ManagerStr()+"\n\n"+t.ActiveEventStr();
 
-    if (IsChanged(csdDirection,trend.Direction(Trendline)))
-    {
-      sdcMaxHeadPrice          = trend.Trendline(Head);
-      sdcMaxTailPrice          = trend.Trendline(Tail);
-    }
-        
-    if (IsBetween(Close[0],trend.Trendline(Tail),trend.Trendline(Head),Digits))
-    {
-      if (csdDirection == DirectionUp)
-        if (IsHigher(trend.Trendline(Head),sdcMaxHeadPrice))
-          sdcMaxTailPrice        = trend.Trendline(Tail);
-        
-      if (csdDirection == DirectionDown)
-        if (IsLower(trend.Trendline(Head),sdcMaxHeadPrice))
-          sdcMaxTailPrice        = trend.Trendline(Tail);
+    UpdateLine("[m4]Mid",s[Daily].Pivot(OffSession),STYLE_DOT,clrDarkGray);
+    UpdateLine("[m4]Lead",s[sm.Lead].Pivot(ActiveSession),STYLE_DOT,Color(sm.Lead,Bright));
+    //UpdateLine("[m4]DCABuy",order.DCA(OP_BUY),STYLE_DOT,clrForestGreen);
+    //UpdateLine("[m4]DCASell",order.DCA(OP_SELL),STYLE_DOT,clrMaroon);
 
-      if (IsHigher(trend.StdDev(Actual)+Pip(inpTRStdDevPad,InPoints),csdMaxDev))
-        stdDevMax                = csdMaxDev;
-    }
+    for (SessionType session=Daily;session<SessionTypes;session++)
+      if (s[session].ActiveEvent())
+        Append(text,EnumToString(session)+" "+s[session].ActiveEventStr(),"\n\n");
+        
+    Comment(text);
   }
 
 //+------------------------------------------------------------------+
-//| GetData                                                          |
+//| CallPause                                                        |
 //+------------------------------------------------------------------+
-void GetData(void)
+void CallPause(string Message, bool Pause)
   {
-    trend.Update();
-    fractal.Update();
-    pfractal.Update();
+    if (Pause)
+      Pause(Message,AccountCompany()+" Event Trapper");
+    else
+      Print(Message);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Returns true on Strategy Change by Manager           |
+//+------------------------------------------------------------------+
+bool IsChanged(StrategyType &Compare, StrategyType Value)
+  {
+    if (Value==NoStrategy)
+      return false;
+
+    if (Compare==Value)
+      return false;
+      
+    Compare = Value;
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Zone - Returns calculated Zone of supplied Plan                  |
+//+------------------------------------------------------------------+
+int Zone(int Action, double Pivot)
+  {
+    const int zones[2][6]  = {{-3,-2,-1,0,1,2},{2,1,0,-1,-2,-3}};
+    double    zone[5];
     
-    CalcStdDev();
+    zone[0]  = t.Range().High;
+    zone[1]  = t.Range().Resistance;
+    zone[2]  = t.Range().Mean;
+    zone[3]  = t.Range().Support;
+    zone[4]  = t.Range().Low;
+    
+    for (int node=0;node<5;node++)
+      if (Pivot>zone[node])
+        return zones[Action,node];
+
+    return zones[Action][5];    
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateSession - Updates Session Fractal Data                     |
+//+------------------------------------------------------------------+
+void UpdateSession(void)
+  {
+    sm.Expansion       = false;
+    sm.Hedge           = NoAction;
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      s[type].Update();
+
+      sm.Pivot                  = sm.Lead;
+      sm.Lead                   = (SessionType)BoolToInt(s[type][SessionOpen]||s[type][SessionClose],type,sm.Lead);
+      sm.Expansion              = sm.Expansion||s[type][NewExpansion];
+      
+      if (type>Daily)
+        sm.Hedge                = BoolToInt(IsEqual(s[Daily][Term].Direction,s[type][Term].Direction),sm.Hedge,s[sm.Lead][Term].Bias);
+    }    
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTick - Updates & Retrieves Tick data and fractals          |
+//+------------------------------------------------------------------+
+void UpdateTick(void)
+  {
+    t.Update();
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateOrder - Updates & Retrieves order data                     |
+//+------------------------------------------------------------------+
+void UpdateOrder(void)
+  {
+    order.Update();
+  }
+
+//+------------------------------------------------------------------+
+//| ManagePosition - Handle Order, Request, Risk & Profit by Manager |
+//+------------------------------------------------------------------+
+void ManageOrders(ManagerType Manager)
+  {
+    OrderRequest request    = order.BlankRequest(EnumToString(Manager));
+    int action              = Operation(mr[Manager].Bias);
+
+    if (order.Enabled(Manager))
+    {
+      if (NewStrategy(Manager))
+      {};
+
+      if (IsEqual(Manager,mr[Manager].Bias)||IsEqual(mr[Manager].Bias,NoBias))
+      {
+        //-- Risk mitigation steps
+      }
+
+      else
+        if (order.LotSize(action)<=order.Free(action))
+          if (mr[Manager].Confirmed)
+          {
+            request.Type        = action;
+            request.Memo        = "Order "+ActionText(request.Type)+" Test";
+   
+            if (order.Submitted(request))
+              Print(order.RequestStr(request));
+            else {/* identifyfailure */}
+          }
+    }
+
+    //-- Process Contrarian Queue
+    if (order.Enabled(Action(Manager,InAction,InContrarian)))
+      order.ExecuteOrders(Action(Manager,InAction,InContrarian));
+  }
+
+//+------------------------------------------------------------------+
+//| NewBias - Confirms bias changes                                  |
+//+------------------------------------------------------------------+
+bool NewBias(int Manager, int &Bias, int Change)
+  {
+    if (IsEqual(mr[Manager].AOO,NoValue))
+      return false;
+
+    if (IsEqual(Manager,OP_BUY))
+      if (IsHigher(Close[0],mr[Manager].AOO,NoUpdate,Digits))
+        Change           = Manager;
+
+    if (IsEqual(Manager,OP_SELL))
+      if (IsLower(Close[0],mr[Manager].AOO,NoUpdate,Digits))
+        Change           = Manager;
+
+    return NewAction(Bias,Change);
+  }
+
+//+------------------------------------------------------------------+
+//| NewMomentum - Tests changes in Momentum                          |
+//+------------------------------------------------------------------+
+bool NewMomentum(void)
+  {
+    return !(t.Momentum().High.Event==NoEvent&&t.Momentum().Low.Event==NoEvent);
+  }
+
+//+------------------------------------------------------------------+
+//| NewStrategy - Updates strategy based on supplied Action Pivot    |
+//+------------------------------------------------------------------+
+bool NewStrategy(ManagerType Manager)
+  {
+    StrategyType strategy   = NoStrategy;
+    int          action     = Action(Manager,InAction,InContrarian);
+    int          calc       = Zone(Manager,order.DCA(action))-Zone(action,s[sm.Lead].Pivot(ActiveSession));
+
+    switch (Zone(Manager,order.DCA(action)))
+    {
+       case -3: //--Capture/Release
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-mr[action].EquityRiskMax,Release,Capture);
+                break;
+                
+       case -2: //--Mitigate/Release
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-mr[action].EquityRiskMax,Release,Mitigate);
+                break;
+                
+       case -1: //--Mitigate/Position
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Loss).Equity<-mr[action].EquityRiskMax,Mitigate,Position);
+                break;
+
+       case  0: //--Position
+                strategy    = Position;
+                break;
+
+       case +1: //--Position/Protect
+                strategy    = (StrategyType)BoolToInt(order.Recap(action,Profit).Equity>mr[action].EquityTarget,Protect,Position);
+                break;
+
+       case +2: //--Protect
+                strategy    = Protect;
+                break;
+    }
+
+    return IsChanged(mr[Manager].Strategy,strategy);
+  }
+
+//+------------------------------------------------------------------+
+//| NewTrigger - Tests and sets trigger boundaries                   |
+//+------------------------------------------------------------------+
+bool NewTrigger(void)
+  {
+    static int    action       = NoBias;
+           bool   triggered    = false;
+
+    for (int manager=OP_BUY;IsBetween(manager,OP_BUY,OP_SELL);manager++)
+    {
+      if (NewBias(manager,mr[manager].Bias,BoolToInt(Close[0]>mr[manager].AOO,OP_BUY,OP_SELL)))
+        mr[manager].Confirmed  = false;
+
+      if (IsChanged(mr[manager].Confirmed,mr[manager].Confirmed||(IsEqual(mr[manager].Bias,OP_BUY)&&Close[0]>t.SMA().High[0])||(IsEqual(mr[manager].Bias,OP_SELL)&&Close[0]<t.SMA().Low[0])))
+        trConfirmed            = manager;
+    }
+
+    if (mr[OP_BUY].Confirmed&&mr[OP_SELL].Confirmed)
+      if (IsEqual(mr[OP_BUY].Bias,mr[OP_SELL].Bias))
+        if (IsChanged(trTrend,trConfirmed))
+          Flag("trConfirmed",Color(Direction(trTrend)));
+
+    if (IsChanged(action,t.Fractal().Bias))
+      if (NewAction(trManager,action))
+        triggered              = true;
+
+    if (t.Event(NewReversal,Critical))
+    {
+      if (NewAction(trManager,Action(t.Range().Direction)))
+        if (IsChanged(action,trManager))
+          Flag("lnRangeReversal",clrWhite);
+
+      triggered                = true;
+    }
+
+    if (t.Event(NewBreakout,Critical))
+    {
+      if (NewAction(trManager,Action(t.Range().Direction)))
+        if (IsChanged(action,trManager))
+          Flag("lnRangeBreakout",clrSteelBlue);
+
+      triggered                = true;
+    }
+
+    if (triggered)
+    {
+      Flag("New "+ActionText(action),Color(Direction(action,InAction)));
+      mr[trManager].Type       = (FractalType)BoolToInt(t[NewHigh],t.Fractal().High.Type,t.Fractal().Low.Type);
+      mr[trManager].Bias       = Action(trManager,InAction,InContrarian);
+      mr[trManager].Pivot      = Close[0];
+      mr[trManager].AOO        = BoolToDouble(IsEqual(trManager,OP_BUY),mr[trManager].Pivot,mr[trManager].Pivot)+(point(inpAreaOfOperation)*Direction(trManager,InAction));
+      mr[trManager].Confirmed  = false;
+
+      UpdatePriceLabel("trManager-"+ActionText(trManager),Close[0],Color(Direction(mr[trManager].Bias,InAction)));
+      return true;
+    }
+    
+    return NewMomentum();
   }
 
 //+------------------------------------------------------------------+
 //| Execute                                                          |
 //+------------------------------------------------------------------+
 void Execute(void)
-  {
-  }
-
-//+------------------------------------------------------------------+
-//| ExecAppCommands                                                  |
-//+------------------------------------------------------------------+
-void ExecAppCommands(string &Command[])
   {    
-    if (Command[0]=="SHOW")
-      if (InStr(Command[1],"NONE"))
-        display  = NoValue;
-      else
-      if (InStr(Command[1],"FIB"))
-        display  = 0;
-      else
-      if (InStr(Command[1],"PIP"))
-        display  = 1;
-      else
-      if (InStr(Command[1],"APP"))
-        display  = 2;
-      else
-        display  = NoValue;
+    if (NewTrigger())
+      if (IsBetween(trManager,OP_BUY,OP_SELL))
+      {
+//      Pause("New Trigger!","Change");
+        ManageOrders((ManagerType)trManager);
+        ManageOrders((ManagerType)Action(trManager,InAction,InContrarian));
+      }
+
+    order.ExecuteRequests();    
   }
 
 //+------------------------------------------------------------------+
@@ -201,37 +430,84 @@ void ExecAppCommands(string &Command[])
 //+------------------------------------------------------------------+
 void OnTick()
   {
-    string     otParams[];
-  
-    InitializeTick();
+    UpdateOrder();
+    UpdateTick();
+    UpdateSession();
 
-    GetManualRequest();
-
-    while (AppCommand(otParams,6))
-      ExecAppCommands(otParams);
-
-    OrderMonitor();
-    GetData(); 
+    Execute();
 
     RefreshScreen();
-    
-    if (AutoTrade())
-      Execute();
-    
-    ReconcileTick();        
+    RefreshPanel();
   }
 
+
 //+------------------------------------------------------------------+
+//| ManagerStr - returns formatted Manager data                      |
+//+------------------------------------------------------------------+
+string ManagerStr(void)
+  {
+    string text   = "";
+    
+    Append(text,"Manager Active: "+EnumToString((ManagerType)trManager),"\n");
+    Append(text,"Confirmed: "+EnumToString((ManagerType)trConfirmed));
+    Append(text,"Trend: "+BoolToStr(IsEqual(trTrend,OP_BUY),"Long",BoolToStr(IsEqual(trTrend,OP_SELL),"Short","Awaiting Confirmation")),"\n");
+    
+    for (int bias=OP_BUY;IsBetween(bias,OP_BUY,OP_SELL);bias++)
+    {
+      Append(text,"Manager: "+EnumToString((ManagerType)bias),"\n");
+      Append(text,"Bias: "+ActionText(mr[bias].Bias)+BoolToStr(mr[bias].Confirmed,"*"));
+      Append(text,"Type: "+EnumToString(mr[bias].Type));
+      Append(text,"Pivot: "+DoubleToString(mr[bias].Pivot,Digits));
+      Append(text,"AOO: "+DoubleToString(mr[bias].AOO,Digits));
+    }
+
+    return text;
+  }
+
+//+------------------------------------------------------------------+  
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    ManualInit();
-    
-    NewRay("sdcTop",false);
-    NewRay("sdcBottom",false);
-    NewRay("sdcTrend",false);
-    
+    order.Disable();
+
+    for (int action=OP_BUY;action<=OP_SELL;action++)
+    {
+      //-- Manager Config
+      mr[action].Type              = Expansion;
+      mr[action].Bias              = NoBias;
+      mr[action].Confirmed         = false;
+      mr[action].Pivot             = NoValue;
+      mr[action].AOO               = NoValue;       //-- Area of Operation
+      mr[action].EquityRiskMax     = inpEquityRiskMax;
+      mr[action].EquityTargetMin   = inpEquityTargetMin;
+      mr[action].EquityTarget      = inpEquityTarget;
+
+      //-- Order Config
+      order.Enable(action);
+      order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
+      order.SetEquityTargets(action,mr[action].EquityTarget,mr[action].EquityTargetMin);
+      order.SetRiskLimits(action,mr[action].EquityRiskMax,inpMaxMargin,inpLotFactor);
+      order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
+      order.SetDefaultMethod(action,Hold);
+
+      NewPriceLabel("trManager-"+ActionText(action));
+    }
+
+    //-- Initialize Session
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+
+    NewLine("[m4]Lead");
+    NewLine("[m4]Mid");
+    NewLine("[m4]DCABuy");
+    NewLine("[m4]DCASell");
+
+    NewPriceLabel("tmaNewLow");
+    NewPriceLabel("tmaNewHigh");
+
     return(INIT_SUCCEEDED);
   }
 
@@ -240,7 +516,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete trend;
-    delete fractal;
-    delete pfractal;
+    delete t;
+    delete order;
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
   }

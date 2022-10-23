@@ -84,6 +84,7 @@ private:
              int            Bias;        //-- Open/Close cross
              EventType      Event;       //-- Aggregate event
              SMAState       State;       //-- Aggregate state
+             TickRec        Lead;        //-- Leading Values (for nomen)
              double         Open[];
              double         High[];
              double         Low[];
@@ -288,7 +289,6 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
                                                              FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
       }
       else bias             = NoBias;
-//        bias                = Action(fabs(FOC.Now)-nowFOC);
 
       SetEvent(BoolToEvent(IsChanged(FOC.Bias,bias),NewBias),alertlevel);
       SetEvent(FOC.Event,alertlevel);
@@ -326,6 +326,13 @@ void CTickMA::CalcSMA(void)
     sma.High[0]           = fdiv(calcsma.High,Fast);
     sma.Low[0]            = fdiv(calcsma.Low,Fast);
     sma.Close[0]          = fdiv(calcsma.Close,Slow);
+
+    //-- Update lead
+    sma.Lead.Count        = Count(Ticks);   //-- May find better use;
+    sma.Lead.Open         = sma.Open[0];
+    sma.Lead.High         = sma.High[0];
+    sma.Lead.Low          = sma.Low[0];
+    sma.Lead.Close        = sma.Close[0];
   }
 
 //+------------------------------------------------------------------+
@@ -558,7 +565,7 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
     double        high              = Price[0];
     double        low               = Price[0];
 
-    ArrayInitialize(fractal.Direction,DirectionNone);
+    ArrayInitialize(fractal.Direction,NoDirection);
     ArrayInitialize(fractal.Bar,NoValue);
     ArrayInitialize(fractal.Point,NoValue);
 
@@ -827,7 +834,7 @@ void CTickMA::UpdateSMA(void)
     else
     
     //-- Handle Flatlines
-    if (IsEqual(dirHigh,DirectionNone)&&IsEqual(dirLow,DirectionNone))
+    if (IsEqual(dirHigh,NoDirection)&&IsEqual(dirLow,NoDirection))
     {
       event          = NewFlatline;
       state          = Flatline;
