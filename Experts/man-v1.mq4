@@ -69,6 +69,7 @@ void OnTick()
 int OnInit()
   {
     ManualInit();
+    ReconcileTick();        
     
     return(INIT_SUCCEEDED);
   }

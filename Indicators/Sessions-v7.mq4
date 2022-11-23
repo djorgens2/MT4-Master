@@ -42,6 +42,16 @@ double indPriorMidBuffer[];
 double indOffMidBuffer[];
 double indFractalBuffer[];
 
+enum ShowOptions
+     {
+       ShowNone,             // None
+       ShowActiveSession,    // Active Session
+       ShowPriorSession,     // Prior Session
+       ShowOffSession,       // Off Session
+       ShowOrigin,           // Origin
+       ShowTrend,            // Trend
+       ShowTerm              // Term
+     };
 
 //--- Operational Inputs
 input int            inpAsiaOpen     = 1;            // Asia Session Opening Hour
@@ -51,7 +61,8 @@ input int            inpEuropeClose  = 18;           // Europe Session Closing H
 input int            inpUSOpen       = 14;           // US Session Opening Hour
 input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
-input SessionType    inpShowLines    = SessionTypes; // Display Mid-Price Lines
+input SessionType    inpShowLines    = SessionTypes; // Show Fractal/Session Lines
+input ShowOptions    inpShowOption   = ShowNone;     // Show Fractal Points
 input SessionType    inpShowSession  = SessionTypes; // Display Session Comment
 input YesNoType      inpShowData     = No;           // Display Session Data Labels
 
@@ -70,6 +81,10 @@ CSession            *session[SessionTypes];
 
 SessionData          data[SessionTypes];
 string               dataDate[SessionTypes];
+
+PeriodType           ShowSession = PeriodTypes; 
+FractalType          ShowFractal = FractalTypes;
+
 
 //+------------------------------------------------------------------+
 //| CreateRange - Paints the session boxes                           |
@@ -165,13 +180,6 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveDir"+EnumToString(type),session[type][ActiveSession].Direction,Color(session[type][ActiveSession].Direction),20);
       UpdateDirection("lbActiveBrkDir"+EnumToString(type),session[type][ActiveSession].BreakoutDir,Color(session[type][ActiveSession].BreakoutDir));
       
-      if (inpShowLines==type)
-      {
-        UpdateLine("lnActive"+EnumToString(type),session[type].Pivot(ActiveSession),STYLE_SOLID,Color(type,Bright));
-        UpdateLine("lnOff"+EnumToString(type),session[type].Pivot(OffSession),STYLE_DOT,Color(type,Bright));
-        UpdateLine("lnPrior"+EnumToString(type),session[type].Pivot(PriorSession),STYLE_DASH,Color(type,Bright));
-      }
-
       if (session[type].IsOpen())
         if (TimeHour(session[type].ServerTime(Bar))>session[type].SessionHour(SessionClose)-3)
           UpdateLabel("lbSessionTime"+EnumToString(type),"Late Session ("+IntegerToString(session[type].SessionHour())+")",clrRed);
@@ -200,6 +208,34 @@ void RefreshScreen(int Bar=0)
 
     if (inpShowSession!=SessionTypes)
       Comment(session[inpShowSession].FractalStr()+"\n\n"+text);
+      
+    if (inpShowLines<SessionTypes)
+    {
+      if (ShowSession<PeriodTypes)
+      {
+        UpdateLine("lnS_ActiveMid:-v7",session[inpShowLines].Pivot(ShowSession),STYLE_SOLID,clrGoldenrod);
+        UpdateLine("lnS_Low:-v7",session[inpShowLines][ShowSession].Low,STYLE_DOT,clrMaroon);
+        UpdateLine("lnS_High:-v7",session[inpShowLines][ShowSession].High,STYLE_DOT,clrForestGreen);
+        UpdateLine("lnS_Support:-v7",session[inpShowLines][ShowSession].Support,STYLE_SOLID,clrMaroon);
+        UpdateLine("lnS_Resistance:-v7",session[inpShowLines][ShowSession].Resistance,STYLE_SOLID,clrForestGreen);
+      }
+      else
+      if (ShowFractal<FractalTypes)
+      {
+        UpdateLine("lnS_Base:-v7",session[inpShowLines].Price(ShowFractal,fpBase),STYLE_SOLID,
+                               BoolToInt(IsEqual(session[inpShowLines][ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+        UpdateLine("lnS_Root:-v7",session[inpShowLines].Price(ShowFractal,fpRoot),STYLE_SOLID,
+                               BoolToInt(IsEqual(session[inpShowLines][ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
+        UpdateLine("lnS_Expansion:-v7",session[inpShowLines].Price(ShowFractal,fpExpansion),STYLE_SOLID,clrYellow);
+        UpdateLine("lnS_Retrace:-v7",session[inpShowLines].Price(ShowFractal,fpRetrace),STYLE_SOLID,clrSteelBlue);      
+        UpdateLine("lnS_Recovery:-v7",session[inpShowLines].Price(ShowFractal,fpRecovery),STYLE_DOT,clrGoldenrod);
+
+        //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+        //  UpdateLine("lnS_"+EnumToString(fl)+":-v7",session[inpShowSession].Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
+      }
+
+
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -284,14 +320,41 @@ int OnInit()
         NewLabel("lbActiveBrkDir"+EnumToString(type),"",20,250+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
         NewLabel("lbSessionTime"+EnumToString(type),"",100,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
         NewLabel("lbActiveState"+EnumToString(type),"",25,275+(type*sessionOffset),clrDarkGray,SCREEN_UR,0);
-
-        NewLine("lnActive"+EnumToString(type));
-        NewLine("lnOff"+EnumToString(type));
-        NewLine("lnPrior"+EnumToString(type));
       }
     }
 
     NewLine("[sv7]-Lead");
+
+    if (inpShowOption>ShowNone)
+    {
+      if (inpShowOption<ShowOrigin)
+      {
+        if (inpShowOption==ShowActiveSession) ShowSession = ActiveSession;
+        if (inpShowOption==ShowOffSession)    ShowSession = OffSession;
+        if (inpShowOption==ShowPriorSession)  ShowSession = PriorSession;
+
+        NewLine("lnS_ActiveMid:-v7");
+        NewLine("lnS_High:-v7");
+        NewLine("lnS_Low:-v7");    
+        NewLine("lnS_Support:-v7");
+        NewLine("lnS_Resistance:-v7");
+      }
+      else
+      {    
+        if (inpShowOption==ShowOrigin)        ShowFractal = Origin;
+        if (inpShowOption==ShowTrend)         ShowFractal = Trend;
+        if (inpShowOption==ShowTerm)          ShowFractal = Term;
+
+        NewLine("lnS_Base:-v7");
+        NewLine("lnS_Root:-v7");    
+        NewLine("lnS_Expansion:-v7");
+        NewLine("lnS_Retrace:-v7");
+        NewLine("lnS_Recovery:-v7");
+      }
+
+      for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+        NewLine("lnS_"+EnumToString(fl)+":-v7");
+    }
 
     for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);

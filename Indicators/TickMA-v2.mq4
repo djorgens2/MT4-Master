@@ -299,17 +299,15 @@ int BoundaryState(void)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int direction = NoDirection;
-    
     t.Update();
 
     //if (t.Event(NewExpansion,Major))
     //  Pause("New Expansion: Major","EventCheck(): New Expansion");
     if (t.Event(NewReversal,Critical))
-        Flag("lnRangeReversal",Color(direction));
+        Flag("lnRangeReversal",BoolToInt(t[AdverseEvent],clrRed,clrLightGray));
 
     if (t.Event(NewBreakout,Critical))
-        Flag("lnRangeBreakout",clrSteelBlue);
+        Flag("lnRangeBreakout",BoolToInt(t[AdverseEvent],clrRed,clrSteelBlue));
 //    
 //    if (t.Event(NewFractal,Major))
 //      Pause("New Fractal: Major\n"+t.ActiveEventStr(),"EventCheck(): New Fractal");
@@ -441,8 +439,8 @@ int OnInit()
     SetIndexLabel (0,""); 
     SetIndexLabel (1,""); 
     SetIndexLabel (2,""); 
-    SetIndexLabel (3,""); 
-    SetIndexLabel (4,""); 
+//    SetIndexLabel (3,""); 
+//    SetIndexLabel (4,""); 
     SetIndexLabel (5,""); 
     SetIndexLabel (6,""); 
     SetIndexLabel (7,""); 

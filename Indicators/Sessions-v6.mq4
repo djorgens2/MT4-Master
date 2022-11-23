@@ -62,13 +62,6 @@ enum ShowOptions
        ShowTerm              // Term
      };
 
-enum ShowType
-     {
-       stSession,
-       stFractal,
-       stState
-     };
-
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
 
@@ -236,6 +229,12 @@ void RefreshScreen(int Bar=0)
       UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,Color(session[ActiveSession].BreakoutDir));
     }
 
+    if (session[NewCorrection])
+      Pause("New Correction Found ["+EnumToString(session.EventLevel(NewCorrection))+"]","NewCorrection Event()");
+    //if (session[NewRetrace])
+    //  Pause("New Retrace Found ["+EnumToString(session.EventLevel(NewRetrace))+"]","NewRetrace Event()");
+    //if (session[NewRecovery])
+    //  Pause("New Recovery Found ["+EnumToString(session.EventLevel(NewRecovery))+"]","NewRecovery Event()");
     //static FractalState state=NoState;
     //if (IsChanged(state,session[ActiveSession].State))
     //  Flag("[s6(a)]-"+EnumToString(state),Color(session[ActiveSession].BreakoutDir));

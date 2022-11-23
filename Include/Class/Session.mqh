@@ -378,6 +378,17 @@ void CSession::UpdateTerm(void)
       else sfractal[Term].High     = fmax(BoolToDouble(sBar==0,Close[sBar],High[sBar]),sfractal[Term].High);
     }
 
+    if (IsEqual(sfractal[Term].Low,sfractal[Term].High))
+    {
+      //-- Check Correction
+    }
+    else
+    if (IsEqual(Price(Term,fpRetrace),Close[sBar]))
+      SetEvent(NewRetrace,Nominal);
+    else
+    if (IsEqual(Price(Term,fpRecovery),Close[sBar]))
+      SetEvent(NewRecovery,Nominal);
+    
     //--- Check for term state changes
     if (Event(NewTerm))
       state                        = Reversal;

@@ -73,6 +73,40 @@ void SetTradeMode(TradeMode Mode, bool Default=false)
   }
 
 //+------------------------------------------------------------------+
+//| ActionCode - returns order action id (buy/sell)                  |
+//+------------------------------------------------------------------+
+int ActionCode(string Action)
+  {
+    if (Action == "BUY")       return (OP_BUY);
+    if (Action == "SELL")      return (OP_SELL);
+    if (Action == "LONG")      return (OP_BUY);
+    if (Action == "SHORT")     return (OP_SELL);
+
+    if (Action == "BUYLIMIT")  return (OP_BUYLIMIT);
+    if (Action == "BUYMIT")    return (OP_BUYSTOP);
+    if (Action == "BUYSTOP")   return (OP_BUYSTOP);
+    if (Action == "SELLLIMIT") return (OP_SELLLIMIT);
+    if (Action == "SELLMIT")   return (OP_SELLSTOP);
+    if (Action == "SELLSTOP")  return (OP_SELLSTOP);
+    
+    return (NoAction);
+  }
+
+//+------------------------------------------------------------------+
+//| SetQueueParams - Extracts queue params and sets defaults         |
+//+------------------------------------------------------------------+
+void SetQueueParams(string &Queue[])
+  {
+    string ordDefault[6] = {"","","0.00","0.00",(string)NoValue,"0.00"};
+    
+    for (int idx=0; idx<ArraySize(Queue) && idx<6;idx++)
+      ordDefault[idx] = Queue[idx];
+      
+    ArrayResize(Queue,6);
+    ArrayCopy(Queue,ordDefault);
+  }
+
+//+------------------------------------------------------------------+
 //| SetOrderParams - Extracts order params and sets defaults         |
 //+------------------------------------------------------------------+
 void SetOrderParams(string &Order[])
@@ -160,7 +194,9 @@ void GetManualRequest(string Command="")
     bool   holdeqprofit   = eqprofit;
     bool   holdeqhalf     = eqhalf;
     int    holdeqhold     = eqhold;
-    int    closeAction    = OP_NO_ACTION;
+    int    closeAction    = NoAction;
+
+    QueueRec qrec;
 
     //--- clear trademode change
     tradeModeChange       = false;
@@ -229,6 +265,28 @@ void GetManualRequest(string Command="")
                       break;
             }
           else
+
+          //--- Queue orders
+          if (params[0]=="Q")
+          {
+            SetQueueParams(params);
+
+            if (params[1] == "CANCEL")
+              CloseQueueOrder(ActionCode(params[2]));
+            
+            if (IsBetween(ActionCode(params[1]),OP_BUYLIMIT,OP_SELLSTOP))
+            {
+              qrec.Type          = ActionCode(params[1]);
+              qrec.Count         = 0;
+              qrec.Price         = StrToDouble(params[2]);
+              qrec.Step          = StrToDouble(params[3]);
+              qrec.Stop          = StrToDouble(params[4]);
+              qrec.Lots          = StrToDouble(params[5]);
+            }
+            
+            OpenQueueOrder(qrec);
+          }
+          else          
           
           //--- Pending orders
           if (InStr(params[0],"MIT"))
@@ -339,12 +397,7 @@ void GetManualRequest(string Command="")
                         else
                         {
                           SetOrderParams(params);
-
-                          if (ActionCode(params[1])==OP_BUY)
-                            OpenProfitPlan(OP_BUY,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
-                          else
-                          if (ActionCode(params[1])==OP_SELL)
-                            OpenProfitPlan(OP_SELL,StringToDouble(params[2])+(Ask-Bid),StringToDouble(params[3]),StringToDouble(params[4]));
+                          OpenProfitPlan(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
                         }                    
                         break;
                       }
@@ -355,7 +408,7 @@ void GetManualRequest(string Command="")
                         CloseProfitPlan(OP_SELL);
                       }
                       else
-                      if (ActionCode(params[1])!=OP_NO_ACTION)
+                      if (ActionCode(params[1])!=NoAction)
                         CloseProfitPlan(ActionCode(params[1]));
                       break;
 
@@ -383,7 +436,7 @@ void GetManualRequest(string Command="")
             {
               case 1: {
                         eqprofit = true;
-                        eqhold   = OP_NO_ACTION;
+                        eqhold   = NoAction;
 
                         if(CloseOrders(CloseConditional))
                         {
@@ -402,10 +455,10 @@ void GetManualRequest(string Command="")
                         SetTargetPrice(OP_SELL);
                       }              
                       else
-                      if (ActionCode(params[1])!=OP_NO_ACTION)
+                      if (ActionCode(params[1])!=NoAction)
                       {
                         eqprofit = true;
-                        eqhold   = OP_NO_ACTION;
+                        eqhold   = NoAction;
 
                         if (CloseOrders(CloseConditional, ActionCode(params[1])))
                           CloseProfitPlan(ActionCode(params[1]));
@@ -422,7 +475,7 @@ void GetManualRequest(string Command="")
                         if (ActionCode(params[1])==OP_SELL)
                           params[2]=DoubleToStr(StrToDouble(params[2])-(Ask-Bid),Digits);
 
-                        if (ActionCode(params[1])!=OP_NO_ACTION)
+                        if (ActionCode(params[1])!=NoAction)
                           SetTargetPrice(ActionCode(params[1]),StrToDouble(params[2]));
                       }
                       break;
@@ -432,7 +485,7 @@ void GetManualRequest(string Command="")
                         if (ActionCode(params[1])==OP_SELL)
                           params[2]=DoubleToStr(StrToDouble(params[2])-(Ask-Bid),Digits);
 
-                        if (ActionCode(params[1])!=OP_NO_ACTION)
+                        if (ActionCode(params[1])!=NoAction)
                           SetTargetPrice(ActionCode(params[1]),StrToDouble(params[2]),true);
                       }
                       break;                      
@@ -482,7 +535,7 @@ void GetManualRequest(string Command="")
                         if (ActionCode(params[1])==OP_SELL)
                           params[2]=DoubleToStr(StrToDouble(params[2])+(Ask-Bid),Digits);
 
-                        if (ActionCode(params[1])!=OP_NO_ACTION)
+                        if (ActionCode(params[1])!=NoAction)
                           SetStopPrice(ActionCode(params[1]),StrToDouble(params[2]));
                       }
                       break;
@@ -491,7 +544,7 @@ void GetManualRequest(string Command="")
                         if (ActionCode(params[1])==OP_SELL)
                           params[2]=DoubleToStr(StrToDouble(params[2])+(Ask-Bid),Digits);
 
-                        if (ActionCode(params[1])!=OP_NO_ACTION)
+                        if (ActionCode(params[1])!=NoAction)
                           SetStopPrice(ActionCode(params[1]),StrToDouble(params[2]),true);
                       }
                       break;
@@ -503,17 +556,17 @@ void GetManualRequest(string Command="")
           if (params[0]=="HOLD")
             switch (ArraySize(params))
             {
-              case 1: SetEquityHold(OP_NO_ACTION);
+              case 1: SetEquityHold(NoAction);
                       break;
               case 2: if (params[1]=="CANCEL")
-                        SetEquityHold(OP_NO_ACTION);
+                        SetEquityHold(NoAction);
                       else
                         SetEquityHold(ActionCode(params[1]));
                       break;
               case 3: if (params[2] == "TRAIL")
                         SetEquityHold(ActionCode(params[1]),inpDefaultStop,true);
                       if (params[2] == "CANCEL")
-                        SetEquityHold(OP_NO_ACTION);
+                        SetEquityHold(NoAction);
                       break;
               case 4: if (params[2] == "TRAIL")
                         SetEquityHold(ActionCode(params[1]),StringToDouble(params[3]),true);

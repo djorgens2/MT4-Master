@@ -248,7 +248,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
     double minFOC           = fabs(FOC.Min);
     double nowFOC           = fabs(FOC.Now);
     
-    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Notify);
+    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Nominal);
     
     FOC.Event               = NoEvent;
 
@@ -288,9 +288,12 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
           FOC.Event         = BoolToEvent(NewState(FOC.State,(FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)),
                                                              FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
       }
-      else bias             = NoBias;
+      else 
+        bias                = NoBias;
 
-      SetEvent(BoolToEvent(IsChanged(FOC.Bias,bias),NewBias),alertlevel);
+      if (IsChanged(FOC.Bias,bias))
+        FOC.Event           = NewBias;
+
       SetEvent(FOC.Event,alertlevel);
     }
   }
@@ -713,7 +716,7 @@ void CTickMA::UpdateSegment(void)
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
 
-    SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
+    SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Notify);
 
     sr[0].Event            = BoolToEvent(Event(NewDirection,Nominal),  NewDirection,
                                BoolToEvent(Event(NewPullback,Nominal), NewPullback,

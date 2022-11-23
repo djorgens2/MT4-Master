@@ -499,6 +499,19 @@ void NewArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Pri
   }
 
 //+------------------------------------------------------------------+
+//| New Arrow - paints an arrow by Direction                         |
+//+------------------------------------------------------------------+
+void NewArrow(string ArrowName, int Direction, int Color, int Bar=0, double Price=0.00)
+  {      
+    NewArrow(ArrowName,
+             (ArrowType)BoolToInt(IsEqual(Direction,DirectionUp),ArrowUp,
+                        BoolToInt(IsEqual(Direction,DirectionDown),ArrowDown,ArrowHold)),
+             Color,
+             Bar,
+             Price);
+  }
+
+//+------------------------------------------------------------------+
 //| UpdateArrow - repaints existing arrow with supplied properties   |
 //+------------------------------------------------------------------+
 void UpdateArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)

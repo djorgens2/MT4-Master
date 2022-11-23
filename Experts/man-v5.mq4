@@ -139,12 +139,12 @@ void RefreshPanel(void)
         UpdateBox("bxbAI-OpenInd"+EnumToString(type),BoolToInt(s[type].IsOpen(),clrYellow,clrBoxOff));
       }
 
-    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+    for (int manager=Sales;IsBetween(manager,Sales,Purchasing);manager++)
     {
-      UpdateLabel("lbvOC-"+ActionText(ma[action].Action)+"-Strategy",BoolToStr(ma[action].Strategy==NoStrategy,"Pending",EnumToString(ma[action].Strategy)),
-                                                          BoolToInt(ma[action].Strategy==NoStrategy,clrDarkGray,Color(ma[action].Strategy)));
-      UpdateLabel("lbvOC-"+ActionText(ma[action].Action)+"-Hold",CharToStr(176),BoolToInt(IsEqual(ma[action].Hold,Conforming),clrYellow,
-                                                                                BoolToInt(IsEqual(ma[action].Hold,Contrarian),clrRed,clrDarkGray)),16,"Wingdings");
+      UpdateLabel("lbvOC-"+ActionText(ma[manager].Action)+"-Strategy",BoolToStr(ma[manager].Strategy==NoStrategy,"Pending",EnumToString(ma[manager].Strategy)),
+                                                          BoolToInt(ma[manager].Strategy==NoStrategy,clrDarkGray,Color(ma[manager].Strategy)));
+      UpdateLabel("lbvOC-"+ActionText(ma[manager].Action)+"-Hold",CharToStr(176),BoolToInt(IsEqual(ma[manager].Hold,Conforming),clrYellow,
+                                                                                BoolToInt(IsEqual(ma[manager].Hold,Contrarian),clrRed,clrDarkGray)),16,"Wingdings");
     }
   }
 
@@ -382,6 +382,7 @@ bool NewTrigger(void)
         bias                   = mb[Lead];
         alert                  = Major;
       }
+      else Flag("Continuation",clrGoldenrod);
 
     UpdateHold();
 
@@ -410,11 +411,17 @@ bool NewTrigger(void)
 //+------------------------------------------------------------------+
 void UpdateHold(void)
   {
-    int term          = mb[Term];
-    int trend         = mb[Trend];
-    int antitrend     = Action(mb[Trend],InAction,InContrarian);
+    int term                     = mb[Term];
+    int trend                    = mb[Trend];
+    int antitrend                = Action(mb[Trend],InAction,InContrarian);
 
     if (ma[Sales].Confirmed&&ma[Purchasing].Confirmed)
+      if (IsEqual(trend,NoBias))
+      {
+        ma[Sales].Hold           = Inactive;
+        ma[Purchasing].Hold      = Inactive;
+      }
+      else
       if (IsEqual(ma[Sales].Bias,ma[Purchasing].Bias))
       {
         ma[trend].Hold           = Contrarian;
@@ -424,24 +431,31 @@ void UpdateHold(void)
       if (IsEqual(term,trend))
       {
         ma[trend].Hold           = Conforming;
-        ma[antitrend].Hold       = Contrarian;      
+        ma[antitrend].Hold       = Contrarian;
       }
-        for (int manager=Sales;IsBetween(manager,Sales,Purchasing);manager++)
-
-            ma[manager].Hold     = (HoldType)BoolToInt(IsEqual(ma[manager].Bias,trend),Contrarian,Conforming);
-
-    if (t.Tick().High>t.SMA().Lead.High)
-    {
-      ma[OP_BUY].Hold       = 
-      ma[OP_SELL].Hold      = (HoldType)BoolToInt(IsEqual(hold,ma[OP_SELL].Bias),Contrarian,Conforming);
-    }
+      else
+      {
+        ma[trend].Hold           = Contrarian;
+        ma[antitrend].Hold       = Contrarian;
+      }
     else
-    if (t.Tick().Low>t.SMA().Lead.Low)
-    {
-    }
-    else
-    {
-    }
+    {}
+//        for (int manager=Sales;IsBetween(manager,Sales,Purchasing);manager++)
+//
+//            ma[manager].Hold     = (HoldType)BoolToInt(IsEqual(ma[manager].Bias,trend),Contrarian,Conforming);
+//
+//    if (t.Tick().High>t.SMA().Lead.High)
+//    {
+//      ma[OP_BUY].Hold       = 
+//      ma[OP_SELL].Hold      = (HoldType)BoolToInt(IsEqual(hold,ma[OP_SELL].Bias),Contrarian,Conforming);
+//    }
+//    else
+//    if (t.Tick().Low>t.SMA().Lead.Low)
+//    {
+//    }
+//    else
+//    {
+//    }
     //    else
     //      ma[action].Hold          = (HoldType)BoolToInt(IsEqual(action,ma[action].Bias),Contrarian,BoolToInt(ma[action].Hold<Activated,Activated,Inactive));
     //  else
@@ -695,10 +709,10 @@ void ManageOrders(ManagerType Manager, HoldType Turn)
                             break;
         }
 
-        if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
-          if (order.Submitted(request))
-            Print(order.RequestStr(request));
-          else {/* identifyfailure */}
+        //if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
+        //  if (order.Submitted(request))
+        //    Print(order.RequestStr(request));
+        //  else {/* identifyfailure */}
       }
 
       //-- Process Contrarian Queue
@@ -769,6 +783,7 @@ int OnInit()
       ma[action].Manager           = (ManagerType)action;
       ma[action].Action            = Action(action,InAction,InContrarian);
       ma[action].Bias              = NoBias;
+      ma[action].Hold              = Inactive;
       ma[action].Strategy          = NoStrategy;
       ma[action].Type              = Expansion;
       ma[action].Confirmed         = false;
