@@ -119,40 +119,9 @@ double         plSMALow[1];
 //--- Class defs
 CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
 
-////+------------------------------------------------------------------+
-////| TestHold - Captures and Tests hold levels                        |
-////+------------------------------------------------------------------+
-//void TestHold(int Action)
-//  {
-//    if (t.Tick().Low<t.SMA().Low[0])
-//      if (t[NewLow])
-//      {
-//        bias                        = OP_SELL;
-//        hold[Plan].Type[OP_BUY]     = Contrarian;
-//        hold[Plan].Type[OP_SELL]    = Conforming;
-//        hold[Plan].Event            = BoolToEvent(NewDirection(hold[Plan].Direction,DirectionDown),NewDirection);
-//      }
-//
-//    if (t.Tick().High>t.SMA().High[0])
-//      if (t[NewHigh])
-//      {
-//        bias                        = OP_BUY;
-//        hold[Plan].Type[OP_BUY]     = Conforming;
-//        hold[Plan].Type[OP_SELL]    = Contrarian;
-//        hold[Plan].Event            = BoolToEvent(NewDirection(hold[Plan].Direction,DirectionUp),NewDirection);
-//      }
-//
-//    if (t.Tick().High<t.SMA().High[0]&&t.Tick().Low>t.SMA().Low[0])
-//      for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
-//        switch (hold[Plan].Type[action])
-//        {
-//          case Conforming:    hold[Plan].Type[action] = (HoldType)BoolToInt(t[NewSegment],Activated,Conforming);
-//                              break;
-//          case Contrarian:    hold[Plan].Type[action] = (HoldType)BoolToInt(IsEqual(BoolToInt(t[NewHigh],OP_BUY,BoolToInt(t[NewLow],OP_SELL,NoAction)),action),Activated,Contrarian);
-//                              break;
-//          case Activated:     hold[Plan].Type[action] = Inactive;
-//        }
-//  }
+//--- Operational Vars
+double         highbuffer        = NoValue;
+double         lowbuffer         = NoValue;
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
@@ -220,6 +189,7 @@ void RefreshScreen(void)
       UpdateRay("tmaPlanSup:"+(string)IndWinId,t.Range().Support,inpPeriods-1);
       UpdateRay("tmaPlanRes:"+(string)IndWinId,t.Range().Resistance,inpPeriods-1);
       UpdateRay("tmaRangeMid:"+(string)IndWinId,t.Range().Mean,inpPeriods-1);
+      UpdateRay("tmaClose:"+(string)IndWinId,Close[0],inpPeriods-1);
     }
 
     //-- Fractal Rulers
@@ -227,11 +197,11 @@ void RefreshScreen(void)
     {
       for (int bar=0;bar<inpPeriods;bar++)
       {
-        ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
-        ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
+        ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
+        ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
 
-        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().High);
-        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().Low);
+        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,highbuffer+point(2));
+        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,lowbuffer);
 
         ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
         ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
@@ -240,10 +210,10 @@ void RefreshScreen(void)
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (type<=t.Fractal().High.Type)
-          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",clrRed);
 
         if (type<=t.Fractal().Low.Type)
-          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",clrRed);
       }
     }
 
@@ -270,67 +240,11 @@ void ResetBuffer(double &Buffer[], double &Source[])
   }
 
 //+------------------------------------------------------------------+
-//| BoundaryState - returns Boundary State on NewHigh|NewLow event   |
-//+------------------------------------------------------------------+
-int BoundaryState(void)
-  {
-    static int direction  = DirectionChange;
-    static int expansion  = 0;
-    int        state      = 4;
-    
-    //if (t.Event(NewExpansion,Critical))
-    //  Pause("New Expansion (Critical)","Event Check");
-
-    expansion   = BoolToInt(t.Event(NewExpansion,Critical),t.Range().Direction,
-                  BoolToInt(t[NewSegment],0,expansion));
-
-    state      += BoolToInt(t.Segment(0).High>t.SMA().High[0],DirectionUp,
-                  BoolToInt(t.Segment(0).Low<t.SMA().Low[0],DirectionDown));
-    
-    state      += t.Segment(0).Direction[Term]+t.Segment(0).Direction[Trend];
-    
-    state      += expansion;
-    
-    return (state);
-  }
-
-//+------------------------------------------------------------------+
 //| UpdateTickMA - refreshes indicator data                          |
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
     t.Update();
-
-    //if (t.Event(NewExpansion,Major))
-    //  Pause("New Expansion: Major","EventCheck(): New Expansion");
-    if (t.Event(NewReversal,Critical))
-        Flag("lnRangeReversal",BoolToInt(t[AdverseEvent],clrRed,clrLightGray));
-
-    if (t.Event(NewBreakout,Critical))
-        Flag("lnRangeBreakout",BoolToInt(t[AdverseEvent],clrRed,clrSteelBlue));
-//    
-//    if (t.Event(NewFractal,Major))
-//      Pause("New Fractal: Major\n"+t.ActiveEventStr(),"EventCheck(): New Fractal");
-//
-//    if (IsEqual(t.Fractal().Type,Expansion))
-//      if (t.Event(NewDivergence,Major))
-//        Pause("New Post-Expansion Divergence: Major","EventCheck(): New Divergence");
-    //if (!IsEqual(t.Linear().Close.Event,NoEvent))
-    //  Print(t.FOCStr(t.Linear().Close)+"|"+DoubleToStr(Close[0],Digits));
-//    if (t.Event(NewTrend,Major)&&!IsEqual(t.Fractal().High.Type,Expansion)) Print(t.FractalDetailStr(t.Fractal().High));
-//    if (t.ActiveEvent())
-      //Pause("Testing TickMA() Active Events\n"+t.ActiveEventStr(),"ActiveEvent()");
-    if (IsEqual(t.Linear().Close.Now,t.Linear().Close.Max,Digits))
-    {
-      //if (NewDirection(direction,t.Linear().Close.Direction))
-      //  Flag("[tm2]FOC Major",Color(direction,IN_CHART_DIR));
-    }
-    else
-    if (IsEqual(t.Linear().Close.Now,t.Linear().Close.Min,Digits))
-    {
-//      if (NewDirection(direction,Direction(t.Linear().Close.Direction,InDirection,InContrarian)))
-//        Flag("[tm2]FOC Minor",Color(direction,IN_CHART_DIR));
-    }
 
     if (t[NewBoundary])
       UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
@@ -366,6 +280,9 @@ void UpdateNode(string NodeName, int Node, double Price1, double Price2)
 //+------------------------------------------------------------------+
 void UpdateSegment(void)
   {
+    highbuffer     = t.Range().High;
+    lowbuffer      = t.Range().Low;
+
     if (t[NewSegment])
     {
       ArrayInitialize(plHighBuffer,0.00);
@@ -376,10 +293,24 @@ void UpdateSegment(void)
     {
       UpdateNode("tmaHL:"+(string)IndWinId+"-",node,t.Segment(node).High,t.Segment(node).Low);
       UpdateNode("tmaOC:"+(string)IndWinId+"-",node,t.Segment(node).Open,t.Segment(node).Close);
-    }
 
-    plHighBuffer[0]        = t.Range().High;
-    plLowBuffer[0]         = t.Range().Low;
+      highbuffer   = fmax(highbuffer,plSMAHighBuffer[node]);
+      highbuffer   = fmax(highbuffer,plSMALowBuffer[node]);
+      highbuffer   = fmax(highbuffer,plPolyOpenBuffer[node]);
+      highbuffer   = fmax(highbuffer,plPolyCloseBuffer[node]);
+      highbuffer   = fmax(highbuffer,plLineOpenBuffer[node]);
+      highbuffer   = fmax(highbuffer,plLineCloseBuffer[node]);
+
+      lowbuffer    = fmin(lowbuffer,plSMAHighBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plSMALowBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plPolyOpenBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plPolyCloseBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plLineOpenBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plLineCloseBuffer[node]);
+      }
+
+    plHighBuffer[0]        = fmax(highbuffer,t.Range().High)+point(2);
+    plLowBuffer[0]         = fmin(lowbuffer,t.Range().Low);
   }
 
 //+------------------------------------------------------------------+
@@ -463,10 +394,10 @@ int OnInit()
     }
 
     //--- Indicator Rays
-    NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,IndWinId);
-    NewRay("tmaPlanExp:"+(string)IndWinId,STYLE_DOT,clrGoldenrod,IndWinId);
-    NewRay("tmaPlanSup:"+(string)IndWinId,STYLE_DOT,clrRed,IndWinId);
-    NewRay("tmaPlanRes:"+(string)IndWinId,STYLE_DOT,clrLawnGreen,IndWinId);
+    NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,false,IndWinId);
+    NewRay("tmaPlanSup:"+(string)IndWinId,STYLE_DOT,clrRed,false,IndWinId);
+    NewRay("tmaPlanRes:"+(string)IndWinId,STYLE_DOT,clrLawnGreen,false,IndWinId);
+    NewRay("tmaClose:"+(string)IndWinId,STYLE_SOLID,clrDarkGray,false,IndWinId);
 
     if (inpSegBounds)
     {

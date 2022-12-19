@@ -88,7 +88,6 @@ private:
                       {
                         bool            TradeEnabled;
                         BrokerModel     MarginModel;
-                        double          MaxRisk;
                         int             MaxSlippage;
                         double          EquityOpen;
                         double          EquityClosed;
@@ -242,7 +241,7 @@ private:
 
           OrderRequest SubmitOrder(OrderRequest &Request, bool Resubmit=false);
 
-          OrderDetail  MergeRequest(OrderRequest &Request, bool Split=false);
+          OrderDetail  MergeRequest(OrderRequest &Request);
           void         MergeOrder(int Action, int Ticket);
           void         MergeSplit(OrderDetail &Order);
 
@@ -270,10 +269,12 @@ public:
           bool         Disabled(void)                           {return(Account.TradeEnabled);};
           bool         Disabled(int Action)                     {return(Master[Action].TradeEnabled);};
 
-          void         Enable(string Message="")                {Account.TradeEnabled=true;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
-          void         Disable(string Message="")               {Account.TradeEnabled=false;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
-          void         Enable(int Action, string Message="")    {Master[Action].TradeEnabled=true;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
-          void         Disable(int Action, string Message="")   {Master[Action].TradeEnabled=false;UpdateLabel("lbvAC-SysMsg",Message,clrDarkGray);};
+          void         Enable(string Message="")                {Account.TradeEnabled=true;ConsoleAlert(Message);};
+          void         Disable(string Message="")               {Account.TradeEnabled=false;ConsoleAlert(Message);};
+          void         Enable(int Action, string Message="")    {Master[Action].TradeEnabled=true;ConsoleAlert(Message);};
+          void         Disable(int Action, string Message="")   {Master[Action].TradeEnabled=false;ConsoleAlert(Message);};
+
+          void         ConsoleAlert(string Message, color Color=clrDarkGray) {UpdateLabel("lbvAC-SysMsg",Message,Color);};
 
           //-- Order properties
           double       Price(SummaryType Type, int Action, double Requested, double Basis=0.00);
@@ -288,6 +289,7 @@ public:
                                                                              {return(Calc((MarginType)BoolToInt(IsEqual(Operation(Type),OP_BUY),MarginLong,MarginShort),
                                                                                      Snapshot[Status].Type[Operation(Type)].Lots,Format));};
           double       Free(int Action)                                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
+          double       Split(int Action)                                     {return(fdiv(LotSize(Action),2,Account.LotPrecision));};
           double       Equity(double Value, int Format=InPercent);
           double       DCA(int Action)                                       {return(NormalizeDouble(Master[Action].DCA,Digits));};
           double       Spread(void)                                          {return(NormalizeDouble(Account.Spread,Digits));};
@@ -1050,7 +1052,7 @@ OrderRequest COrder::SubmitOrder(OrderRequest &Request, bool Resubmit=false)
 //+------------------------------------------------------------------+
 //| MergeRequest - Merge EA-opened order requests into Master        |
 //+------------------------------------------------------------------+
-OrderDetail COrder::MergeRequest(OrderRequest &Request, bool Split=false)
+OrderDetail COrder::MergeRequest(OrderRequest &Request)
   {
     int detail;
 
@@ -1073,7 +1075,8 @@ OrderDetail COrder::MergeRequest(OrderRequest &Request, bool Split=false)
     
     Request.TakeProfit    = Master[Request.Action].Order[detail].TakeProfit;
     Request.StopLoss      = Master[Request.Action].Order[detail].StopLoss;
-    
+
+    ConsoleAlert("Request["+(string)Request.Key+"]:Merged "+Request.Memo); 
     AppendLog(Request.Key,Request.Ticket,"Request["+(string)Request.Key+"]:Merged");
 
     return (Master[Request.Action].Order[detail]);
@@ -1114,7 +1117,8 @@ void COrder::MergeOrder(int Action, int Ticket)
     Master[Action].Order[detail].StopLoss     = OrderStopLoss();
     Master[Action].Order[detail].Memo         = OrderComment();
 
-    AppendLog(NoValue,Ticket,"[Order["+(string)Ticket+"]:Merged");
+    ConsoleAlert(ActionText(Action)+" Order["+(string)Ticket+"]:Merged "+Master[Action].Order[detail].Memo);
+    AppendLog(NoValue,Ticket,ActionText(Action)+" Order["+(string)Ticket+"]:Merged");
   }
 
 //+------------------------------------------------------------------+
@@ -1145,7 +1149,8 @@ void COrder::MergeSplit(OrderDetail &Order)
         Master[Order.Action].Order[detail].StopLoss   = OrderStopLoss();
         Master[Order.Action].Order[detail].Memo       = OrderComment();
 
-        AppendLog(NoValue,OrderTicket(),"[Split["+(string)Order.Ticket+"]:"+(string)OrderTicket());
+        ConsoleAlert("Split["+(string)Order.Ticket+"]:"+(string)OrderTicket()+":Merged "+Master[Order.Action].Order[detail].Memo);
+        AppendLog(NoValue,OrderTicket(),"Split["+(string)Order.Ticket+"]:"+(string)OrderTicket());
       }
   }
 
@@ -1257,10 +1262,11 @@ bool COrder::OrderOpened(OrderRequest &Request)
 bool COrder::OrderClosed(OrderDetail &Order) 
   {
     int    error                = NoValue;
-    double split                = fdiv(LotSize(Order.Action),2,Account.LotPrecision);
-    double lots                 = BoolToDouble(IsBetween(Order.Method,Split,Retain),                                //-- If Split/Retain
-                                    LotSize(Order.Action,fmin(fdiv(Order.Lots,2),fmax(split,fdiv(Order.Lots,2)))),  //--   Calculate Split Lots
-                                    Order.Lots,Account.LotPrecision);                                               //-- else use Order Lots
+    double lots                 = BoolToDouble(IsBetween(Order.Method,Split,Retain),     //-- If Split/Retain
+                                    LotSize(Order.Action,                                //--   Calculate Split Lots
+                                        fmin(fdiv(Order.Lots,2),
+                                        fmax(Split(Order.Action),fdiv(Order.Lots,2)))),  
+                                    Order.Lots,Account.LotPrecision);                    //-- else use Order Lots
     RefreshRates();
 
     if (OrderClose(Order.Ticket,
@@ -1302,7 +1308,7 @@ bool COrder::OrderClosed(OrderDetail &Order)
 //+------------------------------------------------------------------+
 void COrder::AdverseEquityHandler(void)
   {
-    double maxrisk                = -(Account.MaxRisk);
+    double maxrisk                = -fmax(Master[OP_SELL].MaxRisk,Master[OP_BUY].MaxRisk);
 
     if (IsLower(Summary[Net].Equity,maxrisk))
     {
@@ -1565,9 +1571,6 @@ void COrder::Update(void)
     UpdateMaster();
     UpdateSummary();
     UpdateSnapshot();
-    
-    AdverseEquityHandler();
-    
     UpdatePanel();
   }
 
@@ -1576,8 +1579,8 @@ void COrder::Update(void)
 //+------------------------------------------------------------------+
 void COrder::ExecuteRequests(void)
   {  
+    AdverseEquityHandler();
     ProcessRequests();
-
     UpdatePanel();
   }
 
@@ -1982,11 +1985,7 @@ void COrder::SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double 
      {
        Master[Action].MaxRisk           = fmax(0.00,MaxRisk);
        Master[Action].MaxMargin         = fmax(0.00,MaxMargin);
-       Master[Action].LotScale          = fmax(0.00,LotScale);
-     
-       Account.MaxRisk                  = BoolToDouble(IsEqual(Action,OP_BUY),
-                                            fmax(MaxRisk,Master[OP_SELL].MaxRisk),
-                                            fmax(MaxRisk,Master[OP_BUY].MaxRisk));
+       Master[Action].LotScale          = fmax(0.00,LotScale);     
      }
   }
 

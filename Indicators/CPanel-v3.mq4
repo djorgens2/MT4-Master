@@ -100,7 +100,6 @@ int            IndWinId = -1;
 string         ShortName             = "CPanel-v3";
 string         cpSessionTypes[4]     = {"Daily","Asia","Europe","US"};
 
-
 //--- Indicator buffers
 double         plHighBuffer[];
 double         plLowBuffer[];
@@ -120,6 +119,9 @@ double         plSMALow[1];
 
 //--- Class defs
 CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
+
+double         highbuffer        = NoValue;
+double         lowbuffer         = NoValue;
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -208,11 +210,11 @@ void RefreshScreen(void)
     {
       for (int bar=0;bar<inpPeriods;bar++)
       {
-        ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
-        ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,"-",12,"Stencil",clrRed);
+        ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
+        ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
 
-        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().High);
-        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,t.Range().Low);
+        ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,highbuffer+point(2));
+        ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_PRICE1,lowbuffer);
 
         ObjectSet("tmaFrHi:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
         ObjectSet("tmaFrLo:"+(string)IndWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);        
@@ -221,10 +223,10 @@ void RefreshScreen(void)
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (type<=t.Fractal().High.Type)
-          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",clrRed);
 
         if (type<=t.Fractal().Low.Type)
-          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],12,"Stencil",clrRed);
+          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",clrRed);
       }
     }
 
@@ -258,47 +260,8 @@ void UpdateBuffer(double &Source[], double Price)
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    static int           bias    = NoAction;
-    static int  lastSegCount     = 0;
-
     t.Update();
 
-    //if (t[NewTick])
-    //  Pause("New Tick\n"+t.TickHistoryStr(2),"NewTick() Event");
-    
-    if (IsChanged(lastSegCount,t.Segment().Count))
-    {
-      //Flag("SegChg",Color(t.Segment().Direction,IN_CHART_DIR));
-      //CallPause("Segment Change["+(string)t.Segment().Count+"]: "+proper(ActionText(Action(t.Segment().Direction,InDirection))),Always);
-    }
-
-//    if (NewAction(bias,(int)t.Linear().Close.Bias))
-//      Flag("Bias",Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
-    //if (NewAction(bias,(int)t.Linear().Open.Bias))
-    //{
-    //  Flag("Bias",Color(Direction(t.Linear().Open.Bias,InAction),IN_CHART_DIR));
-    //  CallPause("Open Bias Change: "+proper(ActionText(t.Linear().Open.Bias)),Always);
-    //}
-    
-    //if (t[NewTick])
-    //  if (t.Event(NewBias,Critical))
-    //    Flag("Bias",Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
-//    if (t[NewTick])
-//      if (t.Segment().Count>1)
-//        if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Max))
-//        {
-//          if (IsChanged(bound,Max))
-//            Flag("Max",Color(t.Linear().Open.Direction,IN_CHART_DIR));
-//        }
-//        else
-//        if (IsEqual(t.Linear().Close.Min,t.Linear().Close.Now))
-//          if (IsChanged(bound,Min))
-//            Flag("Min",Color(t.Linear().Open.Direction*DirectionInverse,IN_CHART_DIR));
-//
-    //if (t[NewTick])
-    //  CallPause("NewTick\n"+t.TickHistoryStr(2),t[NewTick]);
-
-//    SetLevelValue(1,fdiv(t.Range().High+t.Range().Low,2));
     SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
     SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
 
@@ -330,6 +293,10 @@ void UpdateNode(string NodeName, int Node, double Price1, double Price2)
 //+------------------------------------------------------------------+
 void UpdateSegment(void)
   {
+    highbuffer     = t.Range().High;
+    lowbuffer      = t.Range().Low;
+
+
     if (t[NewSegment])
     {
       ArrayInitialize(plHighBuffer,0.00);
@@ -340,10 +307,24 @@ void UpdateSegment(void)
     {
       UpdateNode("tmaHL:"+(string)IndWinId+"-",node,t.Segment(node).High,t.Segment(node).Low);
       UpdateNode("tmaOC:"+(string)IndWinId+"-",node,t.Segment(node).Open,t.Segment(node).Close);
-    }
 
-    plHighBuffer[0]        = t.Range().High;
-    plLowBuffer[0]         = t.Range().Low;
+      highbuffer   = fmax(highbuffer,plSMAHighBuffer[node]);
+      highbuffer   = fmax(highbuffer,plSMALowBuffer[node]);
+      highbuffer   = fmax(highbuffer,plPolyOpenBuffer[node]);
+      highbuffer   = fmax(highbuffer,plPolyCloseBuffer[node]);
+      highbuffer   = fmax(highbuffer,plLineOpenBuffer[node]);
+      highbuffer   = fmax(highbuffer,plLineCloseBuffer[node]);
+
+      lowbuffer    = fmin(lowbuffer,plSMAHighBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plSMALowBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plPolyOpenBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plPolyCloseBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plLineOpenBuffer[node]);
+      lowbuffer    = fmin(lowbuffer,plLineCloseBuffer[node]);
+      }
+
+    plHighBuffer[0]        = fmax(highbuffer,t.Range().High)+point(2);
+    plLowBuffer[0]         = fmin(lowbuffer,t.Range().Low);
   }
 
 
@@ -365,7 +346,6 @@ int OnCalculate(const int rates_total,
     UpdateSegment();
 
     RefreshScreen();
-
 
     return(rates_total);
   }
@@ -666,10 +646,10 @@ int OnInit()
     }
 
     //--- Create Display Visuals
-    NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,IndWinId);
-    NewRay("tmaPlanSup:"+(string)IndWinId,STYLE_DOT,clrRed,IndWinId);
-    NewRay("tmaPlanRes:"+(string)IndWinId,STYLE_DOT,clrLawnGreen,IndWinId);
-    NewRay("tmaClose:"+(string)IndWinId,STYLE_SOLID,clrDarkGray,IndWinId);
+    NewRay("tmaRangeMid:"+(string)IndWinId,STYLE_DOT,clrDarkGray,false,IndWinId);
+    NewRay("tmaPlanSup:"+(string)IndWinId,STYLE_DOT,clrRed,false,IndWinId);
+    NewRay("tmaPlanRes:"+(string)IndWinId,STYLE_DOT,clrLawnGreen,false,IndWinId);
+    NewRay("tmaClose:"+(string)IndWinId,STYLE_SOLID,clrDarkGray,false,IndWinId);
     
     for (int obj=0;obj<inpPeriods;obj++)
     {

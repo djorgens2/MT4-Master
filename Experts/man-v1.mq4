@@ -52,7 +52,7 @@ void OnTick()
     while (AppCommand(otParams,6))
       ExecAppCommands(otParams);
 
-    OrderMonitor();
+    OrderMonitor(Legacy);
     GetData(); 
 
     RefreshScreen();

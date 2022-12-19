@@ -563,7 +563,7 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
     FractalType   hightype          = Expansion;
     FractalType   lowtype           = Expansion;
 
-    int           direction         = DirectionChange;
+    int           direction         = NewDirection;
     int           bar               = 0;
     double        high              = Price[0];
     double        low               = Price[0];
@@ -885,7 +885,8 @@ void CTickMA::UpdateLinear(void)
     {
       //-- Handle Zero Deviation
       if (IsEqual(line.Close.Min,line.Close.Max,Digits))
-        bias                   = Action(line.Close.Max-line.Open.Now);
+//        bias                   = Action(line.Close.Lead-line.Open.Lead);  //-- Safe Conservative
+        bias                   = Action(line.Close.Now,InDirection,Event(AdverseEvent));
       else
       if (IsEqual(line.Close.Min,line.Close.Now,Digits))
         bias                   = Action(line.Close.Min-line.Open.Now);
@@ -944,7 +945,7 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     tmaTickAgg                 = point(Aggregate);
     tmaBar                     = Bars-1;
 
-    ArrayInitialize(tmaDirection,DirectionChange);
+    ArrayInitialize(tmaDirection,NewDirection);
 
     ArrayResize(poly.Open,tmaPeriods);
     ArrayResize(poly.Close,tmaPeriods);

@@ -1047,7 +1047,7 @@ void ChangeTest(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    static int direction    = DirectionChange;
+    static int direction    = NewDirection;
            int action       = BoolToInt(IsEqual(order[Net].Lots,0.00),Action(t.Segment().Direction[Trend]),Action(Direction(order[Net].Lots)));
     static int event        = 0;
 

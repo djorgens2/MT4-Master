@@ -9,32 +9,43 @@
 
 #include <Order.mqh>
 
-//---- Trade Modes
-enum TradeMode {
-                    Manual,
-                    Auto
-               };
-
-input TradeMode manTradeMode   = Auto;          // Trade Mode
+input TradeMode manTradeMode   = Legacy;        // Trade Mode
 input string    manComFile     = "manual.csv";  // Command File Name
 
-#define MODE_MANUAL            0
-#define MODE_AUTO              1
+  //-- Operational vars
+  TradeMode mode;
 
-  bool   manualAuto          = false;
-  bool   tradeModeChange     = false;
-  bool   appCommand          = false;
+  string    params[];
+  string    commands[];
 
-  string params[];
-  string appCommands[];
 
+//+------------------------------------------------------------------+
+//| IsChanged - Returns true on TradeMode change                     |
+//+------------------------------------------------------------------+
+bool IsChanged(TradeMode &Mode, TradeMode Change)
+  {
+    if (Mode==Change)
+      return (false);
+
+    Mode                  = Change;
+
+    return (true);
+  }
+
+//+------------------------------------------------------------------+
+//| Mode - returns active trading mode                               |
+//+------------------------------------------------------------------+
+TradeMode Mode(void)
+  {
+    return (mode);
+  }
 
 //+------------------------------------------------------------------+
 //| AutoTrade - returns true if auto trading is authorized           |
 //+------------------------------------------------------------------+
 bool AutoTrade(void)
   {
-    if (manualAuto)
+    if (IsEqual(mode,Legacy))
       if (!eqhalt)
         return (true);
         
@@ -46,30 +57,13 @@ bool AutoTrade(void)
 //+------------------------------------------------------------------+
 void SetTradeMode(TradeMode Mode, bool Default=false)
   {    
-    bool lastAuto = manualAuto;
-    
-    if (Mode==Auto)
+    if (IsChanged(mode,Mode))
     {
-      manualAuto=true;
-      UpdateLabel("manMode","AUTO ("+manComFile+")",LawnGreen,8);
-    }
-    else
-    if (Mode==Manual)
-    {
-      manualAuto=false;
-      UpdateLabel("manMode","MANUAL ("+manComFile+")",Red,8);
-    }
-    else
-    {
-      manualAuto=false;
-      UpdateLabel("manMode","BAD MODE",Red,8);
-    }
+      UpdateLabel("manMode",EnumToString(Mode)+" ("+manComFile+")",LawnGreen,8);
 
-    if (Default)
-      SetDefaults();
-        
-    if (lastAuto!=manualAuto)
-      tradeModeChange = true;
+      if (Default)
+        SetDefaults();
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -162,15 +156,15 @@ bool FormatPrice(string &Price, int Action)
 //+------------------------------------------------------------------+
 bool AppCommand(string &args[], int Elements=0)
   {    
-    if (ArraySize(appCommands)>0)
+    if (ArraySize(commands)>0)
     {      
-      StringSplit(appCommands[0],"|",args);
+      StringSplit(commands[0],"|",args);
       ArrayResize(args,Elements);
 
-      for (int idx=1;idx<ArraySize(appCommands);idx++)
-        appCommands[idx-1]=appCommands[idx];
+      for (int idx=1;idx<ArraySize(commands);idx++)
+        commands[idx-1]=commands[idx];
         
-      ArrayResize(appCommands,ArraySize(appCommands)-1);
+      ArrayResize(commands,ArraySize(commands)-1);
       
       return (true);
     }
@@ -198,10 +192,6 @@ void GetManualRequest(string Command="")
 
     QueueRec qrec;
 
-    //--- clear trademode change
-    tradeModeChange       = false;
-    appCommand            = false;
-       
     //--- process command file
     while(fHandle==INVALID_HANDLE)
     {
@@ -219,11 +209,13 @@ void GetManualRequest(string Command="")
         fRecord=FileReadString(fHandle);
 
         if (StringLen(fRecord) == 0)
-          if (StringLen(Command) == 0)
+          if (StringLen(Command) > 0)
             break;
           else
-            fRecord = Command;
-        
+            fRecord  = Command;
+
+        fRecord      = StringTrimLeft(StringTrimRight(fRecord));
+
         lComment     = false;
         if (InStr(fRecord,"//"))
           lComment   = true;
@@ -234,7 +226,7 @@ void GetManualRequest(string Command="")
         if (InStr(fRecord,"*/"))
           bComment   = false;
           
-        if (!bComment&&!lComment)
+        if (StringLen(fRecord)>0&&!bComment&&!lComment)
         {
           if (StringToUpper(fRecord))
             StringSplit(fRecord," ",params);
@@ -246,22 +238,25 @@ void GetManualRequest(string Command="")
 
           //--- Trade mode
           if (params[0] == "AUTO")
+            SetTradeMode(Auto);
+          else
+          if (params[0] == "LEGACY")
             switch (ArraySize(params))
             {
-              case 1: SetTradeMode(MODE_AUTO);
+              case 1: SetTradeMode(Legacy);
                       break;
               case 2: if (params[1]=="DEFAULT")
-                        SetTradeMode(MODE_AUTO,true);
+                        SetTradeMode(Legacy,true);
                       break;
             }
           else
           if (params[0] == "MANUAL")
             switch (ArraySize(params))
             {
-              case 1: SetTradeMode(MODE_MANUAL);
+              case 1: SetTradeMode(Manual);
                       break;
               case 2: if (params[1]=="DEFAULT")
-                        SetTradeMode(MODE_MANUAL,true);
+                        SetTradeMode(Manual,true);
                       break;
             }
           else
@@ -277,7 +272,6 @@ void GetManualRequest(string Command="")
             if (IsBetween(ActionCode(params[1]),OP_BUYLIMIT,OP_SELLSTOP))
             {
               qrec.Type          = ActionCode(params[1]);
-              qrec.Count         = 0;
               qrec.Price         = StrToDouble(params[2]);
               qrec.Step          = StrToDouble(params[3]);
               qrec.Stop          = StrToDouble(params[4]);
@@ -591,7 +585,7 @@ void GetManualRequest(string Command="")
                         OpenDCAPlan(ActionCode(params[1]));
                       break;
               case 3: if (params[1]=="CANCEL")
-                        CloseDCAPlan(ActionCode(params[1]));
+                        CloseDCAPlan(ActionCode(params[2]));
                       else
                         OpenDCAPlan(ActionCode(params[1]),StringToDouble(params[2]));
                       break;
@@ -657,8 +651,8 @@ void GetManualRequest(string Command="")
 
           //--- Pass command back to App
           {
-            ArrayResize(appCommands,ArraySize(appCommands)+1);
-            appCommands[ArraySize(appCommands)-1] = fRecord;
+            ArrayResize(commands,ArraySize(commands)+1);
+            commands[ArraySize(commands)-1] = fRecord;
           }    
         }        
     }    

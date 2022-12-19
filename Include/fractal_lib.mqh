@@ -15,15 +15,15 @@
   //--- Public fractal enums
   enum             FractalState       // Fractal States
                    {
-                     NoState,         //-- No State Assignment
-                     Rally,           //-- Advancing fractal
-                     Pullback,        //-- Declining fractal
-                     Retrace,         //-- Pegged retrace (>Rally||Pullack)
-                     Recovery,        //-- Trend resumption post-correction
-                     Correction,      //-- Fractal max stress point/Market Correction
-                     Trap,            //-- Fractal penetration into containment
-                     Breakout,        //-- Fractal Breakout
-                     Reversal,        //-- Fractal Reversal
+                     NoState,         // No State Assignment
+                     Rally,           // Advancing fractal
+                     Pullback,        // Declining fractal
+                     Retrace,         // Pegged retrace (>Rally||Pullack)
+                     Recovery,        // Trend resumption post-correction
+                     Correction,      // Fractal max stress point/Market Correction
+                     Trap,            // Fractal penetration into containment
+                     Breakout,        // Fractal Breakout
+                     Reversal,        // Fractal Reversal
                      FractalStates
                    };
   
@@ -205,32 +205,29 @@ double Percent(FiboLevel Level, int Format=InPoints)
 //+------------------------------------------------------------------+
 //| NewState - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
-bool NewState(FractalState &State, FractalState ChangeState)
+bool NewState(FractalState &State, FractalState Change, bool Update=true)
   {
-    if (ChangeState==NoState)
+    if (Change==NoState)
       return(false);
 
-    if (State==NoState)
-      State                       = ChangeState;
-
-    if (ChangeState==Breakout)
+    if (Change==Breakout)
       if (State==Reversal)
         return(false);
 
     if (State==Correction)
-      if (ChangeState==Reversal||ChangeState==Breakout||ChangeState==Recovery)
-        return(IsChanged(State,ChangeState));
+      if (Change==Reversal||Change==Breakout||Change==Recovery)
+        return(IsChanged(State,Change,Update));
       else return(false);
 
     if (State==Retrace)
-      if (ChangeState==Reversal||ChangeState==Breakout||ChangeState==Correction)
-        return(IsChanged(State,ChangeState));
+      if (Change==Reversal||Change==Breakout||Change==Correction)
+        return(IsChanged(State,Change,Update));
       else return(false);
 
-    if (ChangeState==Recovery)
+    if (Change==Recovery)
       return (false);
 
-    return(IsChanged(State,ChangeState));
+    return(IsChanged(State,Change,Update));
   }
 
 //+------------------------------------------------------------------+
@@ -268,12 +265,14 @@ bool IsHigher(FiboLevel Compare, FiboLevel &Check, bool Update=true)
 //+------------------------------------------------------------------+
 //| IsChanged - Compares FractalStates to detect changes             |
 //+------------------------------------------------------------------+
-bool IsChanged(FractalState &Compare, FractalState Value)
+bool IsChanged(FractalState &Check, FractalState Change, bool Update=true)
   {
-    if (Compare==Value)
+    if (IsEqual(Check,Change))
       return (false);
       
-    Compare = Value;
+    if (Update)
+      Check      = Change;
+
     return (true);
   }
 
@@ -292,14 +291,14 @@ bool IsChanged(FiboLevel &Compare, FiboLevel Value)
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
-bool IsChanged(FractalType &Check, FractalType Compare, bool Update=true)
+bool IsChanged(FractalType &Check, FractalType Change, bool Update=true)
   {
-    if (Check == Compare)
+    if (IsEqual(Check,Change))
       return (false);
-  
+      
     if (Update)
-      Check   = Compare;
-  
+      Check      = Change;
+
     return (true);
   }
 

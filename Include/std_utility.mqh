@@ -273,7 +273,7 @@ string ActionText(int Action, int Format=IN_ACTION)
       case OP_SELL          : return("SELL");
       case OP_SELLLIMIT     : return("SELL LIMIT");
       case OP_SELLSTOP      : return("SELL STOP");
-      case NoAction         : return("NO ACTION");    
+      case NoAction         : return("NO ACTION");
       default               : return("BAD ACTION CODE");
     }
   }
@@ -294,9 +294,13 @@ bool NewAction(int &Change, int Compare, bool Update=true)
 //+------------------------------------------------------------------+
 bool NewDirection(int &Change, int Compare, bool Update=true)
   {
-    if (Compare==NoDirection)
-      return (false);
-
+    if (IsBetween(Compare,DirectionUp,DirectionDown))
+    {
+      if (Compare==NoDirection)
+        return (false);
+    }
+    else return (false);
+      
     if (Change==NoDirection)
       if (IsChanged(Change,Compare,Update))
         return (false);
@@ -487,7 +491,7 @@ int GetPeriod(string Value)
 //+------------------------------------------------------------------+
 //| New Arrow - paints an arrow on the chart in the price area       |
 //+------------------------------------------------------------------+
-void NewArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
+void Arrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
   {      
     if (Price==0.00)
       Price = Close[Bar];
@@ -501,28 +505,14 @@ void NewArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Pri
 //+------------------------------------------------------------------+
 //| New Arrow - paints an arrow by Direction                         |
 //+------------------------------------------------------------------+
-void NewArrow(string ArrowName, int Direction, int Color, int Bar=0, double Price=0.00)
+void Arrow(string ArrowName, int Direction, int Color, int Bar=0, double Price=0.00)
   {      
-    NewArrow(ArrowName,
-             (ArrowType)BoolToInt(IsEqual(Direction,DirectionUp),ArrowUp,
-                        BoolToInt(IsEqual(Direction,DirectionDown),ArrowDown,ArrowHold)),
-             Color,
-             Bar,
-             Price);
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateArrow - repaints existing arrow with supplied properties   |
-//+------------------------------------------------------------------+
-void UpdateArrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
-  {
-    if (Price==0.00)
-      Price = Close[0];
-
-    ObjectDelete (ArrowName);
-    ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
-    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
-    ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
+    Arrow(ArrowName,
+         (ArrowType)BoolToInt(IsEqual(Direction,DirectionUp),ArrowUp,
+                    BoolToInt(IsEqual(Direction,DirectionDown),ArrowDown,ArrowHold)),
+          Color,
+          Bar,
+          Price);
   }
 
 //+------------------------------------------------------------------+
@@ -641,10 +631,10 @@ void UpdateRay(string RayName, double PriceStart, int BarStart, double PriceEnd=
 //+------------------------------------------------------------------+
 //| NewRay - creates a ray object                                    |
 //+------------------------------------------------------------------+
-void NewRay(string RayName, int Style=STYLE_SOLID, int Color=clrWhite, int Window=0)
+void NewRay(string RayName, int Style=STYLE_SOLID, int Color=clrWhite, bool Extend=true, int Window=0)
   {
     ObjectCreate(RayName,OBJ_TREND,Window,0,0);
-    ObjectSet(RayName,OBJPROP_RAY,true);
+    ObjectSet(RayName,OBJPROP_RAY,Extend);
     ObjectSet(RayName,OBJPROP_WIDTH,1);
     ObjectSet(RayName,OBJPROP_STYLE,Style);
     ObjectSet(RayName,OBJPROP_COLOR,Color);

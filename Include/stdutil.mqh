@@ -24,7 +24,6 @@
 //--- Standard diectional defines
 #define DirectionDown        -1
 #define DirectionUp           1
-#define DirectionChange      -2
 
 //--- Null value defines
 #define NoValue              -1
@@ -77,6 +76,9 @@
                   Profit,   //-- ** DO NOT MODIFY
                   Total,    //--            
                   Count,
+                  Area,
+                  Highest,
+                  Lowest,
                   SummaryTypes
                 };
                 
