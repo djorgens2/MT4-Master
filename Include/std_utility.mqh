@@ -96,8 +96,9 @@ void ArrayInitializeStr(string &Array[], int Count)
 //+------------------------------------------------------------------+
 bool InStr(string Source, string Search)
   {
-    if (StringSubstr(Source,StringFind(Source,Search),StringLen(Search))==Search)
-      return (true);
+    if (Search!="")
+      if (StringSubstr(Source,StringFind(Source,Search),StringLen(Search))==Search)
+        return (true);
      
     return (false);
   }
