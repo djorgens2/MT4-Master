@@ -63,7 +63,7 @@ input int            inpUSClose      = 23;           // US Session Closing Hour
 input int            inpGMTOffset    = 0;            // Offset from GMT+3
 input SessionType    inpShowLines    = SessionTypes; // Show Fractal/Session Lines
 input ShowOptions    inpShowOption   = ShowNone;     // Show Fractal Points
-input SessionType    inpShowSession  = SessionTypes; // Display Session Comment
+input YesNoType      inpShowComment  = No;           // Display Session Comment
 input YesNoType      inpShowData     = No;           // Display Session Data Labels
 
 struct SessionData
@@ -201,13 +201,10 @@ void RefreshScreen(int Bar=0)
 
       lead                   = (SessionType)BoolToInt(session[type][SessionOpen]||session[type][SessionClose],type,lead);
       UpdateLine("[sv7]-Lead",session[lead].Pivot(ActiveSession),STYLE_DOT,Color(lead,Bright));
-
-      if (session[type].ActiveEvent())
-        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n\n");
     }
 
-    if (inpShowSession!=SessionTypes)
-      Comment(session[inpShowSession].FractalStr()+"\n\n"+text);
+    if (IsEqual(inpShowComment,Yes))
+      Comment(session[ShowSession].FractalStr()+"\n\n"+text);
       
     if (inpShowLines<SessionTypes)
     {
@@ -233,26 +230,9 @@ void RefreshScreen(int Bar=0)
         //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
         //  UpdateLine("lnS_"+EnumToString(fl)+":-v7",session[inpShowSession].Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
       }
-
-
     }
   }
 
-//+------------------------------------------------------------------+
-//| Custom indicator iteration function                              |
-//+------------------------------------------------------------------+
-void TestEvent(EventType Event)
-  {
-    string text         = "";
-
-    for (SessionType type=Daily;type<SessionTypes;type++)
-      if (session[type][Event])
-        Append(text,EnumToString(type)+" "+session[type].ActiveEventStr(),"\n");
-        
-    if (StringLen(text)>0)
-      Pause("ActiveEvent("+EnumToString(Event)+")\n\n"+text,"Event Check()");
-  }
- 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
 //+------------------------------------------------------------------+
@@ -271,8 +251,6 @@ int OnCalculate(const int rates_total,
     session[Europe].Update();
     session[US].Update();
     session[Daily].Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
-
-//    TestEvent(NewExpansion);
 
     RefreshScreen();
 
@@ -371,6 +349,15 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     DeleteRanges();
+
+    ObjectDelete("lbhSession");
+    ObjectDelete("lbhState");
+
+    ObjectDelete("lnS_Base:-v7");
+    ObjectDelete("lnS_Root:-v7");    
+    ObjectDelete("lnS_Expansion:-v7");
+    ObjectDelete("lnS_Retrace:-v7");
+    ObjectDelete("lnS_Recovery:-v7");
     
     for (SessionType type=Daily;type<SessionTypes;type++)
     {

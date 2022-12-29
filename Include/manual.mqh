@@ -13,7 +13,7 @@ input TradeMode manTradeMode   = Legacy;        // Trade Mode
 input string    manComFile     = "manual.csv";  // Command File Name
 
   //-- Operational vars
-  TradeMode mode;
+  TradeMode trademode;
 
   string    params[];
   string    commands[];
@@ -37,7 +37,7 @@ bool IsChanged(TradeMode &Mode, TradeMode Change)
 //+------------------------------------------------------------------+
 TradeMode Mode(void)
   {
-    return (mode);
+    return (trademode);
   }
 
 //+------------------------------------------------------------------+
@@ -45,7 +45,7 @@ TradeMode Mode(void)
 //+------------------------------------------------------------------+
 bool AutoTrade(void)
   {
-    if (IsEqual(mode,Legacy))
+    if (IsEqual(trademode,Legacy))
       if (!eqhalt)
         return (true);
         
@@ -57,7 +57,7 @@ bool AutoTrade(void)
 //+------------------------------------------------------------------+
 void SetTradeMode(TradeMode Mode, bool Default=false)
   {    
-    if (IsChanged(mode,Mode))
+    if (IsChanged(trademode,Mode))
     {
       UpdateLabel("manMode",EnumToString(Mode)+" ("+manComFile+")",LawnGreen,8);
 
@@ -69,20 +69,24 @@ void SetTradeMode(TradeMode Mode, bool Default=false)
 //+------------------------------------------------------------------+
 //| ActionCode - returns order action id (buy/sell)                  |
 //+------------------------------------------------------------------+
-int ActionCode(string Action)
+int ActionCode(string Action, string Operation="")
   {
-    if (Action == "BUY")       return (OP_BUY);
-    if (Action == "SELL")      return (OP_SELL);
-    if (Action == "LONG")      return (OP_BUY);
-    if (Action == "SHORT")     return (OP_SELL);
-
-    if (Action == "BUYLIMIT")  return (OP_BUYLIMIT);
-    if (Action == "BUYMIT")    return (OP_BUYSTOP);
-    if (Action == "BUYSTOP")   return (OP_BUYSTOP);
-    if (Action == "SELLLIMIT") return (OP_SELLLIMIT);
-    if (Action == "SELLMIT")   return (OP_SELLSTOP);
-    if (Action == "SELLSTOP")  return (OP_SELLSTOP);
+    int operation     = NoAction;
     
+    if (Action=="BUY"||Action=="LONG")   operation   = OP_BUY;
+    if (Action=="SELL"||Action=="SHORT") operation   = OP_SELL;
+    
+    switch (operation)
+    {
+      case OP_BUY:   if (IsEqual(Operation,"LIMIT",true)) return (OP_BUYLIMIT);
+                     if (InStr("MITSTOP",Operation))      return (OP_BUYSTOP);
+                     return (operation);
+
+      case OP_SELL:  if (IsEqual(Operation,"LIMIT",true)) return (OP_SELLLIMIT);
+                     if (InStr("MITSTOP",Operation))      return (OP_SELLSTOP);
+                     return (operation);                  
+    }
+
     return (NoAction);
   }
 
@@ -91,13 +95,13 @@ int ActionCode(string Action)
 //+------------------------------------------------------------------+
 void SetQueueParams(string &Queue[])
   {
-    string ordDefault[6] = {"","","0.00","0.00",(string)NoValue,"0.00"};
+    string queue[7] = {"","","","0.00","0.00",(string)NoValue,"0.00"};
     
-    for (int idx=0; idx<ArraySize(Queue) && idx<6;idx++)
-      ordDefault[idx] = Queue[idx];
+    for (int idx=0;idx<ArraySize(Queue)&&idx<7;idx++)
+      queue[idx] = Queue[idx];
       
-    ArrayResize(Queue,6);
-    ArrayCopy(Queue,ordDefault);
+    ArrayResize(Queue,7);
+    ArrayCopy(Queue,queue);
   }
 
 //+------------------------------------------------------------------+
@@ -117,7 +121,7 @@ void SetOrderParams(string &Order[])
 //+------------------------------------------------------------------+
 //| FormatPrice - Converts manual requests from Pips to Price        |
 //+------------------------------------------------------------------+
-bool FormatPrice(string &Price, int Action)
+bool FormatPrice(string &Price, int Operation)
   {
     double sopPips  = 0.00;
 
@@ -125,7 +129,7 @@ bool FormatPrice(string &Price, int Action)
     {
       sopPips       = point(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)));
       
-      switch (Action)
+      switch (Operation)
       {
         case OP_SELLLIMIT:
         case OP_SELL:       Price = DoubleToStr(Bid+sopPips,Digits);
@@ -269,13 +273,13 @@ void GetManualRequest(string Command="")
             if (params[1] == "CANCEL")
               CloseQueueOrder(ActionCode(params[2]));
             
-            if (IsBetween(ActionCode(params[1]),OP_BUYLIMIT,OP_SELLSTOP))
+            if (IsBetween(ActionCode(params[2],params[1]),OP_BUYLIMIT,OP_SELLSTOP))
             {
-              qrec.Type          = ActionCode(params[1]);
-              qrec.Price         = StrToDouble(params[2]);
-              qrec.Step          = StrToDouble(params[3]);
-              qrec.Stop          = StrToDouble(params[4]);
-              qrec.Lots          = StrToDouble(params[5]);
+              qrec.Type          = ActionCode(params[2],params[1]);
+              qrec.Price         = StrToDouble(params[3]);
+              qrec.Step          = StrToDouble(params[4]);
+              qrec.Stop          = StrToDouble(params[5]);
+              qrec.Lots          = StrToDouble(params[6]);
             }
             
             OpenQueueOrder(qrec);
@@ -298,15 +302,15 @@ void GetManualRequest(string Command="")
             else
             {
               //--- Compute entry price
-              if (FormatPrice(params[2], ActionCode(params[1]+params[0])))
+              if (FormatPrice(params[2],ActionCode(params[1],params[0])))
               {
                 if (params[0] == "MIT")
-                  if (FormatPrice(params[3], ActionCode(params[1]+"LIMIT")))
-                    OpenMITOrder(ActionCode(params[1]), StrToDouble(params[2]), StrToDouble(params[3]), StrToDouble(params[4]), point(StrToDouble(params[5])), params[6]);
+                  if (FormatPrice(params[3],ActionCode(params[1],"LIMIT")))
+                    OpenMITOrder(ActionCode(params[1]),StrToDouble(params[2]),StrToDouble(params[3]),StrToDouble(params[4]),point(StrToDouble(params[5])),params[6]);
 
                 if (params[0] == "LIMIT")
-                  if (FormatPrice(params[3], ActionCode(params[1]+"MIT")))
-                    OpenLimitOrder(ActionCode(params[1]), StrToDouble(params[2]), StrToDouble(params[3]), StrToDouble(params[4]), point(StrToDouble(params[5])), params[6]);
+                  if (FormatPrice(params[3], ActionCode(params[1],"MIT")))
+                    OpenLimitOrder(ActionCode(params[1]),StrToDouble(params[2]),StrToDouble(params[3]),StrToDouble(params[4]),point(StrToDouble(params[5])),params[6]);
               }
             }
           }
