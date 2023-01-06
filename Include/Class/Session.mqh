@@ -64,7 +64,6 @@ public:
              int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
-             double           Price(FractalType Type, FractalPoint FP);
              double           Pivot(const PeriodType Type);                          //--- Mid/Mean by Period Type
              int              Age(void)                          {return(sBarFE);}   //--- Number of periods since the last fractal event
              
@@ -75,8 +74,7 @@ public:
              string           FractalStr(void);
              string           SessionStr(PeriodType Type);
 
-             SessionRec       operator[](const FractalState)     {return(sCorrection);}
-             SessionRec       operator[](const FractalType Type) {return(sfractal[Type]);}
+             FractalRec       operator[](const FractalType Type) {return(frec[Type]);}
              SessionRec       operator[](const PeriodType Type)  {return(srec[Type]);}
                                  
 private:
@@ -94,8 +92,7 @@ private:
              int              sBarDay;
              int              sBarHour;
              
-             SessionRec       sfractal[FractalTypes];
-             SessionRec       sCorrection;
+             FractalRec       frec[3];
              
              int              sBarFE;          //--- Fractal Expansion Bar
              int              sDirFE;          //--- Fractal Direction (Painted)
@@ -110,7 +107,6 @@ private:
              CArrayDouble    *sSessionRange;
              
              //--- Private Methods
-             FractalState     CalcState(FractalState State, int Direction, double Fibonacci, bool Reversal, bool Breakout);
              int              CalcBias(double Price);    //--- Active Bias 
 
              void             OpenSession(void);
@@ -127,35 +123,6 @@ private:
 
              void             LoadHistory(void);         //--- History Load/Init
   };
-
-//+------------------------------------------------------------------+
-//| CalcState - Computes FractalState based on supplied params       |
-//+------------------------------------------------------------------+
-FractalState CSession::CalcState(FractalState State, int Direction, double Fibonacci, bool ReversalEvent, bool BreakoutEvent)
-  {
-    if (ReversalEvent)
-      return (Reversal);
-    else
-    if (BreakoutEvent)
-      return (Breakout);
-    else
-    if (IsEqual(State,Correction))
-    {
-      if (Fibonacci<=FiboRecovery)
-        return (Recovery);
-    }
-    else
-    if (Fibonacci>=FiboCorrection)
-      return (Correction);
-    else
-    if (Fibonacci>=FiboRetrace)
-      return (Retrace);
-    else
-    if (Fibonacci>=FiboRecovery)
-      return (FractalState)(BoolToInt(IsEqual(Direction,DirectionUp),Pullback,Rally));
-      
-    return (State);
-  }
 
 //+------------------------------------------------------------------+
 //| CalcBias - Returns Active Bias(Action) relative to supplied price|
@@ -331,64 +298,50 @@ void CSession::UpdateTerm(void)
   {
     FractalState  state            = NoState;
 
-    //--- Check for term changes
-    if (NewDirection(sfractal[Term].Direction,srec[ActiveSession].BreakoutDir))
+    //--- Check for Term Reversals
+    if (NewDirection(frec[Term].Direction,srec[ActiveSession].BreakoutDir))
     {
-      sfractal[Term].BreakoutDir   = sfractal[Term].Direction;
-
-      SetEvent(NewDirection,Minor);
+      frec[Term].Point[fpOrigin]   = frec[Term].Point[fpRoot];
+      frec[Term].Point[fpRoot]     = frec[Term].Point[fpExpansion];
+      frec[Term].Point[fpBase]     = BoolToDouble(IsEqual(frec[Term].Direction,DirectionUp),
+                                       srec[PriorSession].High,srec[PriorSession].Low);
       SetEvent(NewTerm,Minor);
     }
 
-    //--- Check for term boundary changes
-    if (sfractal[Term].Direction==DirectionUp)
-    {
-      if (Event(NewTerm))
+    //--- Check for Term Upper Boundary changes
+    if (IsEqual(frec[Term].Direction,DirectionUp))
+      if (IsHigher(High[sBar],frec[Term].Point[fpExpansion]))
       {
-        sfractal[Term].Resistance  = srec[PriorSession].High;
-        sfractal[Term].Support     = sfractal[Term].Low;
-        sfractal[Term].Low         = Close[sBar];
-      }
+        frec[Term].Point[fpRetrace]  = frec[Term].Point[fpExpansion];
+        frec[Term].Point[fpRecovery] = frec[Term].Point[fpExpansion];
 
-      if (IsHigher(High[sBar],sfractal[Term].High))
-      {
-        sfractal[Term].Low         = Close[sBar];        
+        SetEvent(NewExpansion,Minor);
 
         UpdateFractalBuffer(DirectionUp,High[sBar]);
-        SetEvent(NewExpansion,Minor);
       }
-      else sfractal[Term].Low      = fmin(BoolToDouble(sBar==0,Close[sBar],Low[sBar]),sfractal[Term].Low);
-    }
+      else 
+      if (IsLower(BoolToDouble(sBar==0,Close[sBar],Low[sBar]),frec[Term].Point[fpRetrace]))
+        frec[Term].Point[fpRecovery] = frec[Term].Point[fpRetrace];
+      else
+        frec[Term].Point[fpRecovery] = fmax(BoolToDouble(sBar==0,Close[sBar],High[sBar]),frec[Term].Point[fpRecovery]);
     else
-    {
-      if (Event(NewTerm))
-      {
-        sfractal[Term].Support     = srec[PriorSession].Low;
-        sfractal[Term].Resistance  = sfractal[Term].High;
-        sfractal[Term].High        = Close[sBar];
-      }
 
-      if (IsLower(Low[sBar],sfractal[Term].Low))
+    //--- Check for Term Lower Boundary changes
+      if (IsLower(Low[sBar],frec[Term].Point[fpExpansion]))
       {
-        sfractal[Term].High        = Close[sBar];
+        frec[Term].Point[fpRetrace]  = frec[Term].Point[fpExpansion];
+        frec[Term].Point[fpRecovery] = frec[Term].Point[fpExpansion];
+
+        SetEvent(NewExpansion,Minor);
 
         UpdateFractalBuffer(DirectionDown,Low[sBar]);
-        SetEvent(NewExpansion,Minor);
       }
-      else sfractal[Term].High     = fmax(BoolToDouble(sBar==0,Close[sBar],High[sBar]),sfractal[Term].High);
-    }
+      else
+      if (IsHigher(BoolToDouble(sBar==0,Close[sBar],High[sBar]),frec[Term].Point[fpRetrace]))
+        frec[Term].Point[fpRecovery] = frec[Term].Point[fpRetrace];
+      else
+        frec[Term].Point[fpRecovery] = fmin(BoolToDouble(sBar==0,Close[sBar],Low[sBar]),frec[Term].Point[fpRecovery]);
 
-    if (IsEqual(sfractal[Term].Low,sfractal[Term].High))
-    {
-      //-- Check Correction
-    }
-    else
-    if (IsEqual(Price(Term,fpRetrace),Close[sBar]))
-      SetEvent(NewRetrace,Nominal);
-    else
-    if (IsEqual(Price(Term,fpRecovery),Close[sBar]))
-      SetEvent(NewRecovery,Nominal);
-    
     //--- Check for term state changes
     if (Event(NewTerm))
       state                        = Reversal;
@@ -397,19 +350,20 @@ void CSession::UpdateTerm(void)
       state                        = Breakout;
     else
     {
-      if (sfractal[Term].Direction==DirectionUp)
-        if (Price(Term,fpRetrace)<Pivot(PriorSession))
+      if (frec[Term].Direction==DirectionUp)
+        if (frec[Term].Point[fpRetrace]<Pivot(PriorSession))
           state                    = Pullback;
 
-      if (sfractal[Term].Direction==DirectionDown)
-        if (Price(Term,fpRetrace)>Pivot(PriorSession))
+      if (frec[Term].Direction==DirectionDown)
+        if (frec[Term].Point[fpRetrace]>Pivot(PriorSession))
           state                    = Rally;
     }
 
-    if (NewState(sfractal[Term].State,state))
+    if (NewState(frec[Term].State,state))
     {
-      SetEvent(BoolToEvent(NewAction(sfractal[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
-                                    Action(sfractal[Term].Direction),Action(sfractal[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
+      SetEvent(BoolToEvent(NewAction(frec[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
+                              Action(frec[Term].Direction),Action(frec[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
+      SetEvent(FractalEvent(state),Minor);
       SetEvent(NewState,Minor);
     }
   }
@@ -419,69 +373,39 @@ void CSession::UpdateTerm(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTrend(void)
   {
-    //--- Check for trend changes      
+    FractalState state                = NoState;
+
+    //--- Set Common Fractal Points
+    frec[Trend].Point[fpExpansion]    = frec[Term].Point[fpExpansion];
+    frec[Trend].Point[fpRetrace]      = frec[Term].Point[fpRetrace];
+    frec[Trend].Point[fpRecovery]     = frec[Term].Point[fpRecovery];
+
+    //--- Handle Term Reversals 
     if (Event(NewTerm))        //--- After a term reversal
-      if (sfractal[Term].Direction==DirectionUp)
-      {
-        sCorrection.Low              = BoolToDouble(sfractal[Trend].Direction==DirectionUp,sfractal[Trend].Support,sfractal[Trend].Low,Digits);
-        sfractal[Trend].Support      = sfractal[Term].Support;
-      }
-      else
-      {
-        sCorrection.High             = BoolToDouble(sfractal[Trend].Direction==DirectionDown,sfractal[Trend].Resistance,sfractal[Trend].High,Digits);
-        sfractal[Trend].Resistance   = sfractal[Term].Resistance;
-      }
-
-    //--- Check for upper trend boundary changes
-    if (sfractal[Trend].Direction==DirectionUp)
     {
-      //--- Check for new Expansion (Breakout)
-      if (IsHigher(High[sBar],sfractal[Trend].High))
-        SetEvent(NewExpansion,Major);
+      frec[Trend].Direction           = frec[Term].Direction;
+      frec[Trend].Point[fpOrigin]     = frec[Term].Point[fpRoot];
+      frec[Trend].Point[fpBase]       = frec[Term].Point[fpOrigin];
+      frec[Trend].Point[fpRoot]       = frec[Term].Point[fpRoot];
 
-      //--- Check for inside reversal
-      if (IsLower(Low[sBar],sfractal[Trend].Support,NoUpdate))
-        if (NewDirection(sfractal[Trend].Direction,DirectionDown))
-        {
-          sfractal[Trend].Low          = Low[sBar];
-          SetEvent(NewTrend,Major);
-        }
+      state                           = (FractalState)BoolToInt(IsEqual(frec[Term].Direction,DirectionUp),Rally,Pullback);
 
-      //--- Check for linear reversal
-      if (IsLower(Low[sBar],sCorrection.Low,NoUpdate))
-        if (NewDirection(sfractal[Trend].BreakoutDir,DirectionDown))
-          SetEvent(NewTrend,Critical);
+      SetEvent(BoolToEvent(NewAction(frec[Trend].Bias,Action(frec[Term].Direction)),NewBias),Major);
     }
 
-
-    //--- Check for lower trend boundary changes
-    if (sfractal[Trend].Direction==DirectionDown)
+    //--- Handle Trend Breakout/Reversal/NewExpansion)
+    if (!IsBetween(frec[Term].Point[fpExpansion],frec[Trend].Point[fpRoot],frec[Trend].Point[fpBase]))
     {
-      //--- Check for new Expansion (Breakout)
-      if (IsLower(Low[sBar],sfractal[Trend].Low))
-        SetEvent(NewExpansion,Major);
+      state                           = (FractalState)BoolToInt(NewDirection(frec[Origin].Direction,frec[Trend].Direction),Reversal,Breakout);
 
-      //--- Check for inside reversal
-      if (IsHigher(High[sBar],sfractal[Trend].Resistance,NoUpdate))
-        if (NewDirection(sfractal[Trend].Direction,DirectionUp))
-        {
-          sfractal[Trend].High         = High[sBar];
-          SetEvent(NewTrend,Major);
-        }
-
-      //--- Check for linear reversal
-      if (IsHigher(High[sBar],sCorrection.High,NoUpdate))
-        if (NewDirection(sfractal[Trend].BreakoutDir,DirectionUp))
-          SetEvent(NewTrend,Critical);
+      SetEvent(NewExpansion,Major);
     }
 
-    SetEvent(BoolToEvent(Event(NewTrend),NewDirection),Major);
-    SetEvent(BoolToEvent(NewAction(sfractal[Trend].Bias,Action(sfractal[Term].Direction)),NewBias),Major);
-
-    if (NewState(sfractal[Trend].State,CalcState(sfractal[Trend].State,sfractal[Trend].Direction,Retrace(Trend,Now),Event(NewTrend),Event(NewExpansion,Major))))
+    if (NewState(frec[Trend].State,state))
     {
       SetEvent(NewState,Major);
-      SetEvent(FractalEvent(sfractal[Trend].State),Major);
+      SetEvent(FractalEvent(frec[Trend].State),Major);
+      SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major);
     }
   }
   
@@ -490,55 +414,38 @@ void CSession::UpdateTrend(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateOrigin(void)
   {
+    FractalRec origin                 = frec[Origin];
+
     if (Event(NewTrend))
-      if (sfractal[Trend].Direction==DirectionUp)
-      {
-        sfractal[Origin].Support      = fmin(sfractal[Trend].Support,sfractal[Trend].Low);
-        sfractal[Origin].Low          = sfractal[Trend].Support;
-      }
-      else
-      {
-        sfractal[Origin].Resistance   = fmax(sfractal[Trend].Resistance,sfractal[Trend].High);
-        sfractal[Origin].High         = sfractal[Trend].Resistance;
-      }
-
-    if (IsHigher(sfractal[Trend].High,sfractal[Origin].High))
     {
-      if (sfractal[Origin].Direction==sfractal[Term].Direction)
-        SetEvent(NewExpansion,Critical);
+      frec[Origin]                    = frec[Trend];
+      frec[Origin].Point[fpOrigin]    = origin.Point[fpExpansion];
+      frec[Origin].Point[fpRoot]      = origin.Point[fpExpansion];
 
-      if (NewDirection(sfractal[Origin].Direction,DirectionUp))
-        SetEvent(NewOrigin,Major);
-
-      if (IsHigher(sfractal[Trend].High,sfractal[Origin].Resistance,NoUpdate))
-        if (NewDirection(sfractal[Origin].BreakoutDir,DirectionUp))
-          SetEvent(NewOrigin,Critical);
+      SetEvent(BoolToEvent(Event(NewReversal,Major),NewOrigin),Critical);
     }
 
-    if (IsLower(sfractal[Trend].Low,sfractal[Origin].Low))
+    if (IsChanged(frec[Origin].Point[fpExpansion],BoolToDouble(IsEqual(frec[Origin].Direction,DirectionUp),
+                                        fmax(frec[Origin].Point[fpExpansion],frec[Trend].Point[fpExpansion]),
+                                        fmin(frec[Origin].Point[fpExpansion],frec[Trend].Point[fpExpansion]),Digits)))
     {
-      if (sfractal[Origin].Direction==sfractal[Term].Direction)
-        SetEvent(NewExpansion,Critical);
+      frec[Origin].Point[fpRetrace]   = origin.Point[fpExpansion];
+      frec[Origin].Point[fpRecovery]  = origin.Point[fpExpansion];
+    }                                                    
+    else
+    if (IsChanged(frec[Origin].Point[fpRetrace],BoolToDouble(IsEqual(frec[Origin].Direction,DirectionUp),
+                                        fmin(frec[Origin].Point[fpRetrace],frec[Trend].Point[fpRetrace]),
+                                        fmax(frec[Origin].Point[fpRetrace],frec[Trend].Point[fpRetrace]),Digits)))
+      frec[Origin].Point[fpRecovery]  = origin.Point[fpRetrace];
+    else
+      frec[Origin].Point[fpRecovery]  = BoolToDouble(IsEqual(frec[Origin].Direction,DirectionUp),
+                                        fmax(frec[Origin].Point[fpRecovery],frec[Trend].Point[fpRecovery]),
+                                        fmin(frec[Origin].Point[fpRecovery],frec[Trend].Point[fpRecovery]),Digits);
+      
 
-      if (NewDirection(sfractal[Origin].Direction,DirectionDown))
-        SetEvent(NewOrigin,Major);
-
-      if (IsLower(sfractal[Trend].Low,sfractal[Origin].Support,NoUpdate))
-        if (NewDirection(sfractal[Origin].BreakoutDir,DirectionDown))
-          SetEvent(NewOrigin,Critical);
-    }
-    
-    if (sfractal[Origin].Direction==DirectionUp)
-      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,sfractal[Origin].Support,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),Retrace))))
-        SetEvent(NewBias,Critical);
-
-    if (sfractal[Origin].Direction==DirectionDown)
-      if (NewAction(sfractal[Origin].Bias,CalcBias(Price(Fibo23,fmax(sfractal[Origin].High,sfractal[Origin].Resistance),sfractal[Origin].Support,Retrace))))
-        SetEvent(NewBias,Critical);       
-    
-    if (NewState(sfractal[Origin].State,CalcState(sfractal[Origin].State,sfractal[Origin].Direction,Retrace(Origin,Now),Event(NewOrigin),Event(NewExpansion,Critical))))
+    if (NewState(frec[Origin],Event(NewOrigin)))
     {
-      SetEvent(FractalEvent(sfractal[Origin].State),Critical);
+      SetEvent(FractalEvent(frec[Origin].State),Critical);
       SetEvent(NewState,Critical);
     }
   }
@@ -634,11 +541,15 @@ void CSession::LoadHistory(void)
     }
 
     //--- Initialize Fibo records
-    for (int type=Origin;type<FractalTypes;type++)
-      sfractal[type]                 = srec[ActiveSession];
+    for (int type=Origin;type<=Term;type++)
+    {
+      frec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
+      frec[type].Bias                = NoBias;
+      frec[type].State               = NoState;
+      frec[type].Direction           = NoValue;
+      ArrayInitialize(frec[type].Point,Open[sBar]);
+    }
       
-    sCorrection                      = srec[ActiveSession];
-
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();
   }
@@ -790,32 +701,15 @@ double CSession::Pivot(const PeriodType Type)
   }
 
 //+------------------------------------------------------------------+
-//| Price - Returns the Price for the supplied Fractal Point         |
-//+------------------------------------------------------------------+
-double CSession::Price(FractalType Type, FractalPoint FP)
-  {
-    switch (FP)
-    {
-      case fpBase:      return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].Resistance,sfractal[Type].Support,Digits));
-      case fpRoot:      return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].Support,sfractal[Type].Resistance,Digits));
-      case fpExpansion: return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Type].High,sfractal[Type].Low,Digits));
-      case fpRetrace:   return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),sfractal[Term].Low,sfractal[Term].High,Digits));
-      case fpRecovery:  return(BoolToDouble(IsEqual(sfractal[Type].Direction,DirectionUp),srec[ActiveSession].High,srec[ActiveSession].Low,Digits));
-    }
-    
-    return (NoValue);
-  }
-
-//+------------------------------------------------------------------+
 //| Retrace - Calcuates fibo retrace % for supplied Type             |
 //+------------------------------------------------------------------+
 double CSession::Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
       switch (Measure)
       {
-        case Now: return(Retrace(Price(Type,fpRoot),Price(Type,fpExpansion),Close[sBar],Format));
+        case Now: return(Retrace(frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],Close[sBar],Format));
         case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
-        case Max: return(Retrace(Price(Type,fpRoot),Price(Type,fpExpansion),Price(Type,fpRetrace),Format));
+        case Max: return(Retrace(frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],frec[Type].Point[fpRetrace],Format));
       }
 
     return (0.00);
@@ -828,10 +722,10 @@ double CSession::Expansion(FractalType Type, MeasureType Measure, int Format=InD
   {
     switch (Measure)
     {
-      case Now: return(Expansion(Price(Type,fpBase),Price(Type,fpRoot),Close[sBar],Format));
+      case Now: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],Close[sBar],Format));
       case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
-      case Max: return(Expansion(Price(Type,fpBase),Price(Type,fpRoot),BoolToDouble(IsEqual(Price(Type,fpBase),Price(Type,fpExpansion)),
-                                 Price(Type,fpRecovery),Price(Type,fpExpansion),Digits),Format));
+      case Max: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],BoolToDouble(IsEqual(frec[Type].Point[fpBase],frec[Type].Point[fpExpansion]),
+                                 frec[Type].Point[fpRecovery],frec[Type].Point[fpExpansion],Digits),Format));
     }
 
     return (0.00);
@@ -844,10 +738,10 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
   {
     switch (Method)
     {
-      case Expansion:   return(NormalizeDouble(Price(Type,fpRoot)+((Price(Type,fpBase)-Price(Type,fpRoot))*Percent(Fibo)),Digits));
-      case Retrace:     return(NormalizeDouble(Price(Type,fpExpansion)+((Price(Type,fpRoot)-Price(Type,fpExpansion))*Percent(Fibo)),Digits));
-      case Recovery:    return(NormalizeDouble(Price(Type,fpRoot)-((Price(Type,fpRoot)-Price(Type,fpRecovery))*Percent(Fibo)),Digits));
-      case Correction:  return(NormalizeDouble(((Price(Type,fpRoot)-Price(Type,fpExpansion))*FiboCorrection)+Price(Type,fpExpansion),Digits));
+      case Expansion:   return(NormalizeDouble(frec[Type].Point[fpRoot]+((frec[Type].Point[fpBase]-frec[Type].Point[fpRoot])*Percent(Fibo)),Digits));
+      case Retrace:     return(NormalizeDouble(frec[Type].Point[fpExpansion]+((frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion])*Percent(Fibo)),Digits));
+      case Recovery:    return(NormalizeDouble(frec[Type].Point[fpRoot]-((frec[Type].Point[fpRoot]-frec[Type].Point[fpRecovery])*Percent(Fibo)),Digits));
+      case Correction:  return(NormalizeDouble(((frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion])*FiboCorrection)+frec[Type].Point[fpExpansion],Digits));
     }
 
     return (0.00);
@@ -858,16 +752,19 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
 //+------------------------------------------------------------------+
 string CSession::FractalStr(void)
   {  
-    string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*\n";
+    string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*";
     
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-      Append(text,EnumToString(type)+" State: "+
-                  EnumToString(sfractal[type].State)+" ["+ActionText(sfractal[type].Bias)+"] Direction: "+
-                  DirText(sfractal[type].Direction)+"/"+DirText(sfractal[type].BreakoutDir)+"\n"+
-                  "      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%"+"\n"+
-                  "      (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n\n");
+    {
+      Append(text,EnumToString(type),"\n");
+      Append(text,DirText(frec[type].Direction));
+      Append(text,EnumToString(frec[type].State));
+      Append(text," ["+ActionText(frec[type].Bias)+"]");
+      Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%\n","\n");
+      Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
+    }
 
-    Append(text,EnumToString(sType)+" Active "+ActiveEventStr());
+    Append(text,EnumToString(sType)+" Active "+ActiveEventStr(),"\n");
     
     return (text);
   }

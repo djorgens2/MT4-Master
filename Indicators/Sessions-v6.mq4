@@ -62,6 +62,16 @@ enum ShowOptions
        ShowTerm              // Term
      };
 
+struct HoldRec
+       {
+         int       ID;
+         bool      Hold;
+         int       Direction;
+         datetime  Start;
+         double    High;
+         double    Low;
+       };
+
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
 
@@ -87,6 +97,56 @@ double               sessionHigh;
 double               sessionLow;
 string               sessionIndex       = IntegerToString(inpShowData);
 int                  sessionOffset      = inpShowData*40;
+
+HoldRec              hr;
+
+//+------------------------------------------------------------------+
+//| CreateHold - Paints active range (holds) boxes                   |
+//+------------------------------------------------------------------+
+void CreateHold(void)
+ {
+   const color hold[2]  = {C'0,42,0',C'42,0,0'};
+   string      id       = "[s6]ActiveDir:"+(string)++hr.ID;
+     
+   hr.Direction  = session[Origin].Direction;
+   hr.Start      = Time[0];
+   hr.High       = Close[0];
+   hr.Low        = Close[0];
+   
+   ObjectCreate(id,OBJ_RECTANGLE,0,hr.Start,hr.High,hr.Start,hr.Low);
+   
+   ObjectSet(id, OBJPROP_STYLE,STYLE_SOLID);
+   ObjectSet(id, OBJPROP_COLOR,hold[Action(hr.Direction)]);
+   ObjectSet(id, OBJPROP_BACK,true);     
+ }
+ 
+//+------------------------------------------------------------------+
+//| UpdateHold - Paints updated range (holds) boxes                  |
+//+------------------------------------------------------------------+
+void UpdateHold(void)
+ {
+   if (session.Event(NewReversal))
+     hr.Hold            = false;
+
+   if (IsChanged(hr.Hold,IsEqual(session[Origin].Direction,session[Trend].Direction)&&
+                         IsEqual(session[Origin].Direction,session[Term].Direction)))
+     if (hr.Hold) 
+       CreateHold();
+
+   string      id       = "[s6]ActiveDir:"+(string)hr.ID;
+
+   if (hr.Hold)
+   {
+     if (session[NewHour])
+       ObjectSet(id,OBJPROP_TIME2,Time[0]);
+     
+     if (IsHigher(Close[0],hr.High))
+       ObjectSet(id,OBJPROP_PRICE1,hr.High);
+     
+     if (IsLower(Close[0],hr.Low))
+       ObjectSet(id,OBJPROP_PRICE2,hr.Low);
+   }
+ }
 
 //+------------------------------------------------------------------+
 //| CreateRange - Paints the session boxes                           |
@@ -180,13 +240,14 @@ void RefreshScreen(int Bar=0)
     else
     if (ShowFractal<FractalTypes)
     {
-      UpdateLine("lnS_Base:"+sessionIndex,session.Price(ShowFractal,fpBase),STYLE_SOLID,
+      UpdateLine("lnS_Origin:"+sessionIndex,session[ShowFractal].Point[fpOrigin],STYLE_DOT,clrWhite);
+      UpdateLine("lnS_Base:"+sessionIndex,session[ShowFractal].Point[fpBase],STYLE_SOLID,
                              BoolToInt(IsEqual(session[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateLine("lnS_Root:"+sessionIndex,session.Price(ShowFractal,fpRoot),STYLE_SOLID,
+      UpdateLine("lnS_Root:"+sessionIndex,session[ShowFractal].Point[fpRoot],STYLE_SOLID,
                              BoolToInt(IsEqual(session[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateLine("lnS_Expansion:"+sessionIndex,session.Price(ShowFractal,fpExpansion),STYLE_SOLID,clrYellow);
-      UpdateLine("lnS_Retrace:"+sessionIndex,session.Price(ShowFractal,fpRetrace),STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnS_Recovery:"+sessionIndex,session.Price(ShowFractal,fpRecovery),STYLE_DOT,clrGoldenrod);
+      UpdateLine("lnS_Expansion:"+sessionIndex,session[ShowFractal].Point[fpExpansion],STYLE_SOLID,clrYellow);
+      UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrSteelBlue);      
+      UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrGoldenrod);
 
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
       //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
@@ -228,44 +289,70 @@ void RefreshScreen(int Bar=0)
 
       UpdateDirection("lbActiveBrkDir"+sessionIndex,session[ActiveSession].BreakoutDir,Color(session[ActiveSession].BreakoutDir));
     }
+    
+    UpdateHold();
 
-    if (session[NewCorrection])
-      Pause("New Correction Found ["+EnumToString(session.EventLevel(NewCorrection))+"]","NewCorrection Event()");
-    //if (session[NewRetrace])
-    //  Pause("New Retrace Found ["+EnumToString(session.EventLevel(NewRetrace))+"]","NewRetrace Event()");
-    //if (session[NewRecovery])
-    //  Pause("New Recovery Found ["+EnumToString(session.EventLevel(NewRecovery))+"]","NewRecovery Event()");
-    //static FractalState state=NoState;
-    //if (IsChanged(state,session[ActiveSession].State))
-    //  Flag("[s6(a)]-"+EnumToString(state),Color(session[ActiveSession].BreakoutDir));
-    //static int direction=DirectionNone;
-    //if (IsChanged(direction,session[ActiveSession].BreakoutDir))
-    //  if (session[NewReversal])
-    //    Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),Color(session[ActiveSession].BreakoutDir));
-    //  else Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),clrWhite);
-    static int bias=NoBias;
-//    if (IsChanged(bias,session[ActiveSession].Bias))
-//      if (session.Event(NewBias,Nominal))
-//        Flag("[s6(a)]-"+EnumToString(session[ActiveSession].State),Color(Direction(session[ActiveSession].Bias,InAction)));
-//    if (IsChanged(state,session[ActiveSession].State))
+    static bool change = false;
+    //if (session[NewOrigin])
+    //  Flag("NewOrigin",Color(session[Origin].Direction));
+
+    //-- Term Event Flags
+    //if (session.Event(NewTerm,Minor))
+    //  Flag("NewTerm",clrWhite,0,session[Term].Point[fpRoot]);
+    //if (session.Event(NewBreakout,Minor))
+    //  Flag("NewBreakout",Color(session[Term].Direction,IN_DARK_DIR),0,Close[0]);
+    //if (session.Event(NewReversal,Minor))
+    //  Flag("NewReversal",Color(session[Term].Direction,IN_DARK_DIR),0,session[Term].Point[fpBase]);
+    //if (session.Event(NewRally,Minor))
+    //  Flag("NewRally",clrLawnGreen,0,Close[0]);
+    //if (session.Event(NewPullback,Minor))
+    //  Flag("NewPullback",clrOrange,0,Close[0]);
+    
+    //-- Trend Event Flags
+    //if (session.Event(NewTerm,Minor))
+    //  Flag("NewTerm",clrWhite,0,session[Term].Point[fpRoot]);
+    //if (session.Event(NewBreakout,Major))
+    //  Flag("NewBreakout",Color(session[Trend].Direction,IN_DARK_DIR),0,Close[0]);
+    //if (session.Event(NewReversal,Major))
+    //  Flag("NewReversal",Color(session[Trend].Direction,IN_DARK_DIR),0,session[Trend].Point[fpBase]);
+    //if (session.Event(NewRally,Minor))
+    //  Flag("NewRally",clrLawnGreen,0,Close[0]);
+    //if (session.Event(NewPullback,Minor))
+    //  Flag("NewPullback",clrOrange,0,Close[0]);
+ 
+    //-- Origin Event Flags
+    //if (session[NewOrigin])
+    //  Flag("NewOrigin",clrWhite,0,session[Origin].Point[fpBase]);
+    if (session.Event(NewBreakout,Critical))
+      Flag("NewBreakout",Color(session[Trend].Direction,IN_DARK_DIR),0,Close[0]);
+    if (session.Event(NewReversal,Critical))
+      Flag("NewReversal",Color(session[Trend].Direction,IN_CHART_DIR),0,session[Origin].Point[fpBase]);
+    if (session.Event(NewRetrace,Critical))
+      Flag("NewRetrace",clrSteelBlue,0,Close[0]);
+    if (session.Event(NewRally,Critical))
+      Flag("NewRally",clrLawnGreen,0,Close[0]);
+    if (session.Event(NewPullback,Critical))
+      Flag("NewPullback",clrOrange,0,Close[0]);
+    if (session.Event(NewCorrection,Critical))
+      Flag("NewCorrection",clrWhite,0,Close[0]);
+    if (session.Event(NewRecovery,Critical))
+      Flag("NewRecovery",clrDarkGray,0,Close[0]);
+//    if (!IsEqual(session[Trend].Direction,session[Trend].BreakoutDir))
+//      if (IsChanged(change,true))
+//        Flag("NewOrigin",clrWhite,0,session.Price(Origin,fpRoot));
+//
+//    if (IsEqual(session[Origin].Direction,session[Origin].BreakoutDir))
+//      change = false;
+//    if (session.EventLevel(NewReversal)==Major)
+//      Flag("NewReversal",Color(session[Trend].Direction,IN_CHART_DIR),0,session.Price(Trend,fpBase));
+//
+//    if (session.EventLevel(NewBreakout)==Major)
+//      Flag("NewBreakout",Color(session[Trend].Direction,IN_DARK_DIR),0,session.Price(Trend,fpBase));
+
     if (inpShowComment==Yes)
       Comment(session.FractalStr());
   }
 
-//+------------------------------------------------------------------+
-//| Custom indicator iteration function                              |
-//+------------------------------------------------------------------+
-void TestEvent(EventType Event, AlertLevel Level=NoAlert)
-  {
-    string text         = "";
-
-    if ((Level==NoAlert&&session.Event(Event))||session.Event(Event,Level))
-      Append(text,EnumToString(inpType)+" "+session.ActiveEventStr(),"\n");
-
-    if (StringLen(text)>0)
-      Pause("ActiveEvent("+EnumToString(Event)+")\n\n"+text,"Event Check()");
-  }
- 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
 //+------------------------------------------------------------------+
@@ -287,18 +374,9 @@ int OnCalculate(const int rates_total,
 
     RefreshScreen();
 
-//    TestEvent(NewTrend,Critical);
-//    TestEvent(NewTrend,Major);
-//    TestEvent(NewFibonacci);
-//    TestEvent(NewReversal);
-//    TestEvent(NewBreakout);
-//    if (session[NewExpansion])
-      //TestEvent(NewTrap);
-
     return(rates_total);
   }
-  
-       
+
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
@@ -345,6 +423,7 @@ int OnInit()
         if (inpShowOption==ShowTrend)         ShowFractal = Trend;
         if (inpShowOption==ShowTerm)          ShowFractal = Term;
 
+        NewLine("lnS_Origin:"+sessionIndex);
         NewLine("lnS_Base:"+sessionIndex);
         NewLine("lnS_Root:"+sessionIndex);    
         NewLine("lnS_Expansion:"+sessionIndex);
@@ -379,6 +458,13 @@ int OnInit()
     NewLine("lnS_CorrectionLow:"+sessionIndex);    
 
     DeleteRanges();
+    
+    hr.ID                  = 0;
+    hr.Hold                = false;
+    hr.Direction           = NewDirection;
+    hr.Start               = 0;
+    hr.High                = 0.00;
+    hr.Low                 = 0.00;
 
     for (int bar=Bars-1;bar>0;bar--)
       RefreshScreen(bar);
@@ -404,6 +490,7 @@ void OnDeinit(const int reason)
     ObjectDelete("lnS_Support:"+sessionIndex);
     ObjectDelete("lnS_Resistance:"+sessionIndex);
 
+    ObjectDelete("lnS_Origin:"+sessionIndex);
     ObjectDelete("lnS_Base:"+sessionIndex);
     ObjectDelete("lnS_Root:"+sessionIndex);
     ObjectDelete("lnS_Expansion:"+sessionIndex);

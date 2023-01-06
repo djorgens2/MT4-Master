@@ -73,15 +73,14 @@
                    };             
 
   //-- Canonical Fractal Rec
-       //struct FractalRec
-       //{
-       //  int           Direction;
-       //  int           Bar;
-       //  double        Price;
-       //  bool          Peg;
-       //  FractalState  State;
-       //  bool          NewState;
-       //};
+       struct FractalRec
+       {
+         int           Direction;
+         int           Bias;
+         FractalState  State;
+         int           Bar;
+         double        Point[FractalPoints];
+       };
 
 static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
@@ -205,6 +204,31 @@ double Percent(FiboLevel Level, int Format=InPoints)
 //+------------------------------------------------------------------+
 //| NewState - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
+bool NewState(FractalRec &Fractal, bool Reversing)
+  {
+    double retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
+
+    if (Reversing)
+      return (NewState(Fractal.State,(FractalState)Reversal));
+      
+    if (retrace>FiboCorrection)
+      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
+        return (NewState(Fractal.State,(FractalState)Recovery));
+      else
+        return (NewState(Fractal.State,(FractalState)Correction));
+
+    if (retrace>FiboRetrace)
+      return (NewState(Fractal.State,(FractalState)Retrace));
+
+    if (retrace>FiboRecovery)
+      return (NewState(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));
+
+    return (NewState(Fractal.State,(FractalState)Breakout));
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Returns true on change to a Fractal State             |
+//+------------------------------------------------------------------+
 bool NewState(FractalState &State, FractalState Change, bool Update=true)
   {
     if (Change==NoState)
@@ -213,6 +237,9 @@ bool NewState(FractalState &State, FractalState Change, bool Update=true)
     if (Change==Breakout)
       if (State==Reversal)
         return(false);
+
+    if (Change==Reversal&&State==Reversal)
+      return(true);
 
     if (State==Correction)
       if (Change==Reversal||Change==Breakout||Change==Recovery)
