@@ -21,7 +21,6 @@
                      Retrace,         // Pegged retrace (>Rally||Pullack)
                      Recovery,        // Trend resumption post-correction
                      Correction,      // Fractal max stress point/Market Correction
-                     Trap,            // Fractal penetration into containment
                      Breakout,        // Fractal Breakout
                      Reversal,        // Fractal Reversal
                      FractalStates
@@ -78,12 +77,22 @@
          int           Direction;
          int           Bias;
          FractalState  State;
-         int           Bar;
+         EventType     Event;
+         double        Pivot;
          double        Point[FractalPoints];
        };
 
-static const string    FractalTag[FractalTypes] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
-static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewTrap,NewBreakout,NewReversal};
+static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
+static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewBreakout,NewReversal};
+static const color     FractalColor[FractalStates]  = {clrNONE,clrLawnGreen,clrGoldenrod,clrSteelBlue,clrDarkGray,clrWhite,clrYellow,clrRed};
+
+//+------------------------------------------------------------------+
+//| Color - Returns the color assigned to a specific Fractal Event   |
+//+------------------------------------------------------------------+
+color Color(FractalState State)
+  {
+    return FractalColor[State];
+  }
 
 //+------------------------------------------------------------------+
 //| FractalEvent - Returns the Fractal Event on change in Type       |

@@ -205,19 +205,19 @@ public:
     void             Update(void);
 
     //-- Data Collections
-    TickRec          Tick(int Node=0)      { return(tr[Node]); };
-    SegmentRec       Segment(int Node=0)   { return(sr[Node]); };
-    RangeRec         Range(void)           { return(range); };
-    SMARec           SMA(void)             { return(sma); };
-    PolyRec          Poly(void)            { return(poly); };
-    LinearRec        Linear(void)          { return(line); };
-    FractalMaster    Fractal(void)         { return(fm); };
-    MomentumRec      Momentum(void)        { return(mr); };
+    TickRec          Tick(int Node=0)      {return(tr[Node]);};
+    SegmentRec       Segment(int Node=0)   {return(sr[Node]);};
+    RangeRec         Range(void)           {return(range);};
+    SMARec           SMA(void)             {return(sma);};
+    PolyRec          Poly(void)            {return(poly);};
+    LinearRec        Linear(void)          {return(line);};
+    FractalMaster    Fractal(void)         {return(fm);};
+    MomentumRec      Momentum(void)        {return(mr);};
     
     MomentumDetail   Momentum(PriceType Type);
     
-    int              Count(CountType Type) { return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr))); };
-    int              Direction(double &Price[], int Speed=Fast) { return(Direction(Price[0]-Price[Speed-1])); };
+    int              Count(CountType Type) {return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr)));};
+    int              Direction(double &Price[], int Speed=Fast) {return(Direction(Price[0]-Price[Speed-1]));};
 
     //-- Format strings
     string           TickStr(int Count=0);

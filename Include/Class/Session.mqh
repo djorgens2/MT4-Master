@@ -297,6 +297,7 @@ void CSession::UpdateSession(void)
 void CSession::UpdateTerm(void)
   {
     FractalState  state            = NoState;
+    frec[Term].Event               = NoEvent;
 
     //--- Check for Term Reversals
     if (NewDirection(frec[Term].Direction,srec[ActiveSession].BreakoutDir))
@@ -361,6 +362,9 @@ void CSession::UpdateTerm(void)
 
     if (NewState(frec[Term].State,state))
     {
+      frec[Term].Event             = FractalEvent(state);
+      frec[Term].Pivot             = BoolToDouble(Event(NewTerm),frec[Term].Point[fpBase],Close[sBar]);
+
       SetEvent(BoolToEvent(NewAction(frec[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
                               Action(frec[Term].Direction),Action(frec[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
       SetEvent(FractalEvent(state),Minor);
@@ -374,9 +378,9 @@ void CSession::UpdateTerm(void)
 void CSession::UpdateTrend(void)
   {
     FractalState state                = NoState;
+    frec[Trend].Event                 = NoEvent;
 
     //--- Set Common Fractal Points
-    frec[Trend].Point[fpExpansion]    = frec[Term].Point[fpExpansion];
     frec[Trend].Point[fpRetrace]      = frec[Term].Point[fpRetrace];
     frec[Trend].Point[fpRecovery]     = frec[Term].Point[fpRecovery];
 
@@ -394,15 +398,21 @@ void CSession::UpdateTrend(void)
     }
 
     //--- Handle Trend Breakout/Reversal/NewExpansion)
-    if (!IsBetween(frec[Term].Point[fpExpansion],frec[Trend].Point[fpRoot],frec[Trend].Point[fpBase]))
+    if (IsBetween(frec[Term].Point[fpExpansion],frec[Trend].Point[fpRoot],frec[Trend].Point[fpBase]))
+      frec[Trend].Point[fpExpansion]  = frec[Term].Point[fpExpansion];
+    else
     {
       state                           = (FractalState)BoolToInt(NewDirection(frec[Origin].Direction,frec[Trend].Direction),Reversal,Breakout);
 
-      SetEvent(NewExpansion,Major);
+      if (IsChanged(frec[Trend].Point[fpExpansion],frec[Term].Point[fpExpansion]))
+        SetEvent(NewExpansion,Major);
     }
 
     if (NewState(frec[Trend].State,state))
     {
+      frec[Trend].Event               = FractalEvent(state);
+      frec[Trend].Pivot               = BoolToDouble(Event(NewExpansion,Major),frec[Trend].Point[fpBase],frec[Trend].Point[fpExpansion]);
+
       SetEvent(NewState,Major);
       SetEvent(FractalEvent(frec[Trend].State),Major);
       SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major);
@@ -415,6 +425,7 @@ void CSession::UpdateTrend(void)
 void CSession::UpdateOrigin(void)
   {
     FractalRec origin                 = frec[Origin];
+    frec[Origin].Event                = NoEvent;
 
     if (Event(NewTrend))
     {
@@ -445,6 +456,17 @@ void CSession::UpdateOrigin(void)
 
     if (NewState(frec[Origin],Event(NewOrigin)))
     {
+      frec[Origin].Event              = FractalEvent(frec[Origin].State);
+      frec[Origin].Pivot              = BoolToDouble(Event(NewOrigin),frec[Origin].Point[fpBase],frec[Origin].Point[fpRecovery]);
+      
+      if (IsHigher(frec[Origin].Pivot,origin.Pivot))
+        if (IsChanged(frec[Origin].Bias,OP_BUY))
+          SetEvent(NewBias,Critical);
+
+      if (IsLower(frec[Origin].Pivot,origin.Pivot))
+        if (IsChanged(frec[Origin].Bias,OP_SELL))
+          SetEvent(NewBias,Critical);
+
       SetEvent(FractalEvent(frec[Origin].State),Critical);
       SetEvent(NewState,Critical);
     }
@@ -489,21 +511,13 @@ void CSession::UpdateBuffers(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateFractalBuffer(int Direction, double Value)
   {
-    if (sDirFE==Direction)
-    {
-        sFractalBuffer.SetValue(sBarFE,0.00);
-        sFractalBuffer.SetValue(sBar,Value);
+    if (IsEqual(sDirFE,Direction))
+      sFractalBuffer.SetValue(sBarFE,0.00);
 
-        sBarFE                       = sBar;
-      }
-    else
-    if (sBarFE!=sBar)
-    {
-      sFractalBuffer.SetValue(sBar,Value);
-
+    if (IsChanged(sBarFE,sBar))
       sDirFE                       = Direction;
-      sBarFE                       = sBar;
-    }
+
+    sFractalBuffer.SetValue(sBar,Value);
   }
 
 //+------------------------------------------------------------------+
@@ -547,6 +561,8 @@ void CSession::LoadHistory(void)
       frec[type].Bias                = NoBias;
       frec[type].State               = NoState;
       frec[type].Direction           = NoValue;
+      frec[type].Event               = NoEvent;
+      frec[type].Pivot               = Open[sBar];
       ArrayInitialize(frec[type].Point,Open[sBar]);
     }
       
