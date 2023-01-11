@@ -227,7 +227,14 @@ bool NewState(FractalRec &Fractal, bool Reversing)
         return (NewState(Fractal.State,(FractalState)Correction));
 
     if (retrace>FiboRetrace)
-      return (NewState(Fractal.State,(FractalState)Retrace));
+      if (IsEqual(Fractal.State,Retrace))
+        if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRecovery)
+          return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)));
+        else return (false);
+      else
+        if (IsEqual(Fractal.Point[fpRetrace],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[0],High[0]),Digits))
+          return (NewState(Fractal.State,(FractalState)Retrace));
+        else return (false);
 
     if (retrace>FiboRecovery)
       return (NewState(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));

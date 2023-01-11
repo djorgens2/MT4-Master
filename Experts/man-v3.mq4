@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                       man-v3.mq4 |
+//|                                                       man-v2.mq4 |
 //|                                 Copyright 2014, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -9,364 +9,248 @@
 #property strict
 
 #include <manual.mqh>
-#include <Class\Order.mqh>
+#include <Class/TickMA.mqh>
+#include <Class/Order.mqh>
+#include <Class/Session.mqh>
 
-  COrder *order            = new COrder(Discount,Hold,Hold);
+enum PivotType
+     {
+       Buy,
+       Sell,
+       Wait,
+       PivotTypes
+     };
 
-  int Tick                 = 0;
+enum StrategyType
+     {
+       Extend,
+       Contrarian,
+       Mitigation,
+       Hedge
+     };
 
-  int            Tickets[];
-  OrderSummary   NodeNow[2];
-  int            IndexNow[2];
+//--- Configuration
+input string           appHeader          = "";          // +--- Application Config ---+
+input BrokerModel      inpBrokerModel     = Discount;    // Broker Model
+input double           inpZoneStep        = 2.5;         // Zone Step (pips)
+input double           inpMaxZoneMargin   = 5.0;         // Max Zone Margin
 
 
-//+------------------------------------------------------------------+
-//| GetData                                                          |
-//+------------------------------------------------------------------+`
-void GetData(void)
-  {
-    static int index[2]  = {0,0};
-    
-    order.Update();
-    
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-      IndexNow[action]    = order.Index(action);
-      order.GetNode(action,IndexNow[action],NodeNow[action]);
+//--- Regression parameters
+input string           regrHeader         = "";          // +--- Regression Config ---+
+input int              inpPeriods         = 80;          // Retention
+input int              inpDegree          = 6;           // Poiy Regression Degree
+input double           inpAgg             = 2.5;         // Tick Aggregation
 
-      //if (IsChanged(index[action],IndexNow[action]))
-      //  Print(order.ZoneSummaryStr(action));
-    }
-    
-    if (order.Fulfilled())
-    {
-//      Print(DoubleToStr(order[Net].Margin,1)+"%");
-//      Print(DoubleToStr(order[OP_BUY].Lots,Account.LotPrecision)+" $"+DoubleToStr(order[OP_BUY].Value,0));
-//      for (int node=0;node<order.Nodes(OP_BUY);node++)
-//      Print("Zone: $"+DoubleToStr(order.Zone(OP_BUY,node).Value,2));
-    }
-  }
+
+//--- Session Inputs
+input SessionType      inpShowFractal    = Daily;        // Display Session Fractal
+input int              inpAsiaOpen       = 1;            // Asia Session Opening Hour
+input int              inpAsiaClose      = 10;           // Asia Session Closing Hour
+input int              inpEuropeOpen     = 8;            // Europe Session Opening Hour
+input int              inpEuropeClose    = 18;           // Europe Session Closing Hour
+input int              inpUSOpen         = 14;           // US Session Opening Hour
+input int              inpUSClose        = 23;           // US Session Closing Hour
+input int              inpGMTOffset      = 0;            // Offset from GMT+3
+
+struct HoldRec
+       {
+         bool          Hold;
+         int           Direction;
+         datetime      Start;
+         double        High;
+         double        Low;
+       };
+
+struct MasterControl
+       {
+         int           Manager;
+         int           Lead;
+         int           Direction;
+         int           Bias;
+         PivotType     Active;
+         FractalState  State;
+         bool          Broken;
+         double        Pivot[PivotTypes];
+       };
+  
+  CTickMA             *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
+  COrder              *order             = new COrder(inpBrokerModel,Hold,Hold);
+  CSession            *s[SessionTypes];
+
+  MasterControl       master;
+  HoldRec             hr;
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    const  color  pivotcolor[PivotTypes]  = {clrYellow,clrRed,clrDarkGray};
+    string        text                    = "";
 
-    UpdateLine("czDCA:"+(string)OP_BUY,order.DCA(OP_SELL),STYLE_SOLID,clrYellow);  
+    //for (PivotType type=0;type<PivotTypes;type++)
+    //  UpdateLine("lnPivot:"+EnumToString(type),master.Pivot[type],STYLE_SOLID,pivotcolor[type]);
+    if (inpShowFractal==Daily)
+      Append(text,s[inpShowFractal].FractalStr());
+
+    Append(text,HoldStr(),"\n");
+    Append(text,s[Daily].ActiveEventStr(),"\n\n");
+
+    Comment(text);
   }
 
 //+------------------------------------------------------------------+
-//| Stop/TP Test                                                     |
+//| NewPivot - Detects/Updates Active Pivot Type                     |
 //+------------------------------------------------------------------+
-void Test1(void)
+bool NewPivot(PivotType &Type, int Bias)
   {
-    #define NoQueue    false
-    
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[1] Market";
-    eRequest.Type           = OP_BUY;
-    eRequest.Memo           = "Test 1-General Functionality";
-    
-//    order.DisableTrade(OP_BUY);
-    order.SetRiskLimits(OP_BUY,80,80,2);
-  
- //--- Stop/Limit Test
-    if (OrdersTotal()<3)
-    {
-      eRequest.Lots            = order.LotSize(OP_BUY);
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-     
-      order.Submitted(eRequest);
-    }
-    else
-    {
-      eRequest.Memo            = "Test-Tick["+(string)Tick+"]";
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-
-      switch(Tick)
-      {
-        case 4:  order.SetStopLoss(OP_BUY,0.00,20,false);
-                 order.SetTakeProfit(OP_BUY,0.00,20,false);
-                 order.SetOrderMethod(OP_BUY,Full);
-                 break;
-        case 5:  order.SetStopLoss(OP_BUY,17.40,0,false);
-                 order.SetTakeProfit(OP_BUY,18.75,30,false);
-                 order.SetDetailMethod(OP_BUY,Hold,order.Ticket(OP_BUY,Max).Ticket,ByTicket);
-                 break;
-        case 6:  order.SetStopLoss(OP_BUY,17.8,70,false);
-                 order.SetTakeProfit(OP_BUY,18.20,70,false);
-                 order.Submitted(eRequest);
-                 order.SetDetailMethod(OP_BUY,Hold,0,ByZone);
-                 break;
-        case 7:  order.SetStopLoss(OP_BUY,0.00,0,false);
-                 order.SetTakeProfit(OP_BUY,0.00,0,false);
-                 eRequest.TakeProfit   = 18.16;
-                 order.Submitted(eRequest);
-                 break;
-        case 8:  order.SetStopLoss(OP_BUY,0.00,20,Always);
-                 order.SetTakeProfit(OP_BUY,0.00,0,Always);
-                 order.Submitted(eRequest);
-                 break;
-        case 9:  order.SetStopLoss(OP_BUY,17.2,0,Always);
-                 order.SetTakeProfit(OP_BUY,18.20,0,Always);
-                 break;
-        case 10: order.SetStopLoss(OP_BUY,17.2,0,Always);
-                 order.SetTakeProfit(OP_BUY,18.11,0,false);
-                 break;
-        case 11: order.SetRiskLimits(OP_SELL,80,80,4);
-                 order.SetStopLoss(OP_SELL,0.00,30,false);
-                 order.SetTakeProfit(OP_SELL,0.00,30,false);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 12: order.SetStopLoss(OP_SELL,18.40,0,false);
-                 order.SetTakeProfit(OP_SELL,17.50,0,false);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 13: order.SetStopLoss(OP_SELL,18.40,20,false);
-                 order.SetTakeProfit(OP_SELL,0.00,20,false);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-        case 14: order.SetStopLoss(OP_SELL,0.00,50,Always);
-                 order.SetTakeProfit(OP_SELL,0.00,30,false);
-                 eRequest.Type   = OP_SELL;
-                 order.Submitted(eRequest);
-                 break;
-      }
-      for (int ord=0;ord<order[OP_BUY].Count;ord++)
-        Print(order.OrderDetailStr(order.Ticket(order[OP_BUY].Ticket[ord])));
-    }
-    
-//    if (Tick>8)
-//     Print(order.QueueStr());
-  }
-
-//+------------------------------------------------------------------+
-//| Long Queue Orders (Limit/Stop) + Zone Summary tests              |
-//+------------------------------------------------------------------+
-void Test2(void)
-  {
-    int req                 = 0;
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[2] Resub";
-    eRequest.Memo           = "Test 2-Pend/Recur Test";
-    
-    static bool fill   = false;
-
-    order.SetRiskLimits(OP_BUY,80,80,2);
+    if (IsEqual(Type,BoolToInt(IsEqual(Bias,NoBias),Wait,Bias)))
+      return false;
       
-    //--- Queue Order Test
-      if (!fill) 
+    Type              = (PivotType)BoolToInt(IsEqual(Bias,NoBias),Wait,Bias);
+
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTickMA - Updates TickMA data                               |
+//+------------------------------------------------------------------+
+void UpdateTickMA(void)
+  {
+    FractalState state        = NoState;
+    bool         change       = false;
+    static int   bias         = NoBias;
+
+    t.Update();
+
+    if (NewPivot(master.Active,t.Linear().Close.Bias))
+    {
+      if (NewDirection(master.Direction,Direction(t.Linear().Close.Bias,InAction)))
+        master.Broken         = IsEqual(master.State,Retrace);
+
+      state                   = (FractalState)BoolToInt(IsEqual(master.Active,NoAction),Retrace,
+                                              BoolToInt(t[NewLow],Pullback,
+                                              BoolToInt(t[NewHigh],Rally)));
+
+      master.Pivot[master.Active]  = Close[0];
+
+      //-- Active Bias (Checkpoint Bias Changes - useful but analysis needed)
+      if (NewAction(master.Bias,t.Linear().Close.Bias));
+//        Flag("[tm]Active",BoolToInt(IsEqual(t.Linear().Bias,Buy),clrSteelBlue,clrGoldenrod));
+
+//      Flag("[tm]State",Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
+      Arrow("[tm]State",Direction(t.Linear().Close.Bias,InAction),
+                        Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
+    }
+
+    //if (t[NewTick])
+    //if (IsEqual(t.Poly().Bias,t.SMA().Bias))
+    //  if (IsChanged(bias,t.Poly().Bias))
+    //  Flag("[tm]Bias[nano]",Color(Direction(t.Poly().Bias,InAction),IN_CHART_DIR));
+
+  //      Pause("Nano Bias Change","BiasChange()");
+
+    //-- Confirmation test
+    if (IsEqual(t.Linear().Close.Bias,t.Linear().Open.Bias))
+      if (NewAction(master.Manager,t.Linear().Bias))
       {
-        eRequest.Pend.Type       = OP_BUYSTOP;
-        eRequest.Pend.Limit      = 17.970;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 18.112;
-
-        eRequest.Type            = OP_BUYLIMIT;
-        eRequest.Price           = 17.994;
-        eRequest.TakeProfit      = 18.12;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    
-//        Print(order.RequestStr(eRequest));
-        if (order.Submitted(eRequest))
-//          Print(order.RequestStr(eRequest));
-          fill=true;
-          
-        eRequest.Pend.Type       = OP_SELLSTOP;
-        eRequest.Pend.Limit      = 18.160;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 17.765;
-
-        eRequest.Type            = OP_SELLLIMIT;
-        eRequest.Price           = 18.116;
-        eRequest.TakeProfit      = 17.765;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-
-        if (order.Submitted(eRequest))
-//          Print(order.RequestStr(eRequest));
-          fill=true;
+        change              = true;
+//        Flag("[tm]Confirm",BoolToInt(IsEqual(master.Manager,OP_BUY),clrLawnGreen,clrMagenta));
       }
 
-      if (Tick==1260)
-        order.SetStopLoss(OP_BUY,0.00,25,false);
-      if (Tick==1300)
-        order.SetStopLoss(OP_BUY,0.00,50,false,false);
-//      if (order[OP_BUY].Count>0)
-//        Print(order.ZoneSummaryStr());
+      //-- Caution test #1
+      if (IsEqual(t.Linear().Event,NewBias))
+      {
+//        state                 = Reversal;
+//        tick[Trend]           = t.Linear().Close.Bias;
+
+//        if (!change)
+//          Flag("[tm]LineBias",Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
+      }
+
+      //-- Caution test #2; Leader Change
+      if (IsChanged(master.Lead,Action(t.Segment().Direction[Term])));
+//        if (IsEqual(master.Manager,master.Lead))
+//          Flag("[tm]SegLead",Color(t.Segment().Direction[Term],IN_CHART_DIR));
+//        else
+//        if (Close[0]>t.Linear().Close.Lead)
+//          Flag("[tm]SegLead",BoolToInt(IsEqual(master.Manager,Buy),clrOrange,clrFireBrick));
+//        else
+//          Flag("[tm]SegLead",clrDarkGray);
 //
+      if (NewState(master.State,state));
 
-      if (order.Fulfilled())
+    //if (t[AdverseEvent])
+    //  Flag("AdverseEvent",clrMagenta);
+//      if (!IsEqual(state,NoState))
+//        Pause("New State: "+EnumToString(tick.State),"Linear State Change");
+
+//    Comment("Tick State: "+TickStr());
+  }
+ 
+//+------------------------------------------------------------------+
+//| UpdateSession - Updates Session data                             |
+//+------------------------------------------------------------------+
+void UpdateSession(void)
+  {
+    s[Daily].Update();
+
+    if (s[Daily].Event(NewReversal))
+      hr.Hold            = false;
+
+    if (IsChanged(hr.Hold,IsEqual(s[Daily][Origin].Direction,s[Daily][Trend].Direction)&&
+                          IsEqual(s[Daily][Origin].Direction,s[Daily][Term].Direction)))
+      if (hr.Hold)
       {
-//        Print("Fulfilled: "+order.ZoneSummaryStr(order.Zone(OP_BUY,order.NodeIndex(OP_BUY)).Count));
-//        Print(order.OrderStr());
-      } 
+        hr.Direction     = s[Daily][Origin].Direction;
+        hr.Start         = Time[0];
+        hr.High          = Close[0];
+        hr.Low           = Close[0];
+        Pause("New Hold: "+DirText(hr.Direction),"New Session Hold");
+      }
 
-//      Print(order.QueueStr());
+    if (hr.Hold)
+   {
+     if (IsHigher(Close[0],hr.High))
+     {
+       //-- set high strategy
+     };
+     
+     if (IsLower(Close[0],hr.Low))
+     {
+       //-- set low strategy
+     };
+   }
   }
 
 //+------------------------------------------------------------------+
-//| Short Queue Orders (Limit/Stop) + Zone Summary tests             |
+//| ManageOrders - Lead Manager order processor                      |
 //+------------------------------------------------------------------+
-void Test3(void)
+void ManageOrders(int Manager)
   {
-    OrderRequest eRequest   = order.BlankRequest();
+    OrderRequest request = order.BlankRequest(BoolToStr(IsEqual(Manager,Buy),"Purchasing","Sales"));
     
-    eRequest.Requestor      = "Test[3] Shorts";
-    eRequest.Memo           = "Test 3-Short Pend/Recur Test";
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-      
-    //--- Queue Order Test
-    if (IsEqual(order[OP_SELL].Count,0))
-      if (Close[0]>18.09)
+    if (order.Free(Manager)>order.Split(Manager)||IsEqual(order.Entry(Manager).Count,0))
+      switch (Manager)
       {
-        eRequest.Pend.Type       = OP_SELLSTOP;
-        eRequest.Pend.Limit      = 17.982;
-        eRequest.Pend.Step       = 2;
-        eRequest.Pend.Cancel     = 18.112;
-        eRequest.Type            = OP_SELLLIMIT;
-        eRequest.Price           = 0.00;
-        eRequest.TakeProfit      = 18.12;
-        eRequest.Price           = 17.982;
-        eRequest.Expiry          = TimeCurrent()+(Period()*(60*2));
-     
-        order.Submitted(eRequest);
-//        order.PrintLog();
-//        Print(order.QueueStr());
-      }      
+        case Buy:          //request.Type    = OP_BUY;
+                           request.Memo    = "Long Manager";
+                           break;
+      }
+
+    if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
+      if (order.Submitted(request))
+        Print ("Yay");
+      else
+        order.PrintLog();
   }
 
 //+------------------------------------------------------------------+
-//| Duplicate EA request management                                  |
+//| ManageRisk - Risk Manager order processor and risk mitigation    |
 //+------------------------------------------------------------------+
-void Test4(void)
+void ManageRisk(int Manager)
   {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[4] Dups";
-    eRequest.Memo           = "Test 4-Lotsa Dups";
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-      
-    //--- Queue Order Test
-    if (Tick<20)
-    {
-      eRequest.Pend.Type       = OP_SELLSTOP;
-      eRequest.Pend.Limit      = 17.75;
-      eRequest.Pend.Step       = 2;
-      eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELLLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-     
-      order.Submitted(eRequest);
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| Margin management                                                |
-//+------------------------------------------------------------------+
-void Test5(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[5] Margin";
-    
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-    order.SetRiskLimits(OP_SELL,80,80,5);
-      
-    //--- Queue Order Test
-    if (Tick<4)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_BUY;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    else
-    if (Tick<8)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELL;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.982;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));     
-    }
-    
-    eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(InPercent),1)+"%";
-    order.Submitted(eRequest);
-  }
-
-//+------------------------------------------------------------------+
-//| Request Fulfilled/Reject/Expired signals                         |
-//+------------------------------------------------------------------+
-void Test6(void)
-  {
-    OrderRequest eRequest   = order.BlankRequest();
-    
-    eRequest.Requestor      = "Test[6] Margin";
-    
-    
-    order.SetRiskLimits(OP_BUY,80,80,2);
-    order.SetRiskLimits(OP_SELL,80,15,5);
-      
-    //--- Queue Order Test
-    if (Tick<4)
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_BUYLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 17.892;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    else
-    if (IsBetween(Tick,4,8))
-    {
-      //eRequest.Pend.Type       = OP_SELLSTOP;
-      //eRequest.Pend.Limit      = 17.75;
-      //eRequest.Pend.Step       = 2;
-      //eRequest.Pend.Cancel     = 18.20;
-      eRequest.Type            = OP_SELLLIMIT;
-      eRequest.TakeProfit      = 18.12;
-      eRequest.Price           = 18.14;
-      eRequest.Expiry          = TimeCurrent()+(Period()*(60*12));
-    }
-    
-    if (Tick<8)
-    {
-//      eRequest.Memo           = "Margin "+DoubleToStr(order.Margin(Operation(eRequest.Type),Pending,InPercent),1)+"%";
-      order.Submitted(eRequest);
-    }
-    
-    if (order.Pending())
-      order.PrintSnapshotStr();
-
-    if (order.Fulfilled(OP_BUY))
-      Print(order.QueueStr());
-      
-    if (order.Rejected())
-      Print(order.QueueStr());
-      
-    if (order.Expired(OP_SELL))
-      Print(order.QueueStr());
   }
 
 //+------------------------------------------------------------------+
@@ -374,54 +258,31 @@ void Test6(void)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    #define Test 1
+    order.Update();
 
-    Comment("Tick: "+(string)++Tick);
-    
-    switch (Test)
+    //-- Handle Active Management
+    if (IsBetween(master.Manager,Buy,Sell))
     {
-      case 1:  Test1();
-               break;
-      case 2:  Test2();
-               break;
-      case 3:  Test3();
-               break;
-      case 4:  Test4();
-               break;
-      case 5:  Test5();
-               break;
-      case 6:  Test6();
-               break;
+      ManageOrders(master.Manager);
+      ManageRisk(Action(master.Manager,InAction,InContrarian));
     }
+    else
     
-//    if (order[OP_BUY].Count>0)
-//      Print(order.QueueStr());
+    //-- Handle Unassigned Manager
+    {
+      ManageRisk(Buy);
+      ManageRisk(Sell);
+    }
 
-    order.ExecuteOrders(OP_BUY);
-    order.ExecuteOrders(OP_SELL);
+    order.ExecuteOrders(Buy);
+    order.ExecuteOrders(Sell);
+
     order.ExecuteRequests();
- 
-//    if (Tick==5) Print (">>>After:"+order.OrderStr());
-    
-    //if (order.Fulfilled())
-    //{
-    //  Print(order.OrderStr());
-    //  if (order[OP_BUY].Count>0)
-    //order.PrintLog();
-    //  Print(order.ZoneSummaryStr());
-    //}
   }
 
 //+------------------------------------------------------------------+
 //| ExecAppCommands                                                  |
-//+------------------------------------------------------------------+
-void ChartEventObjectClick(string &Command[])
-  {
-  }
-
-//+------------------------------------------------------------------+
-//| ExecAppCommands                                                  |
-//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+ 
 void ExecAppCommands(string &Command[])
   {
   }
@@ -433,22 +294,45 @@ void OnTick()
   {
     string     otParams[];
   
-    InitializeTick();
+    UpdateTickMA();
+    UpdateSession();
 
+    InitializeTick();
     GetManualRequest();
 
     while (AppCommand(otParams,6))
       ExecAppCommands(otParams);
 
-    OrderMonitor();
-    GetData();
+    OrderMonitor(Mode());
 
-    RefreshScreen();
-    
-    if (AutoTrade())
+    if (Mode()==Auto)
       Execute();
-    
-    ReconcileTick();
+
+    RefreshScreen();    
+    ReconcileTick();        
+  }
+
+//+------------------------------------------------------------------+
+//| OrderConfig Order class initialization function                  |
+//+------------------------------------------------------------------+
+void OrderConfig()
+  {
+    order.Enable();
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+    {
+      if (order[action].Lots>0)
+        order.Disable(action,"Open Positions Detected; Preparing execution plan");
+      else
+        order.Enable(action,"System started "+TimeToString(TimeCurrent()));
+
+      //-- Order Config
+      order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
+      order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
+      order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
+      order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
+      order.SetDefaultMethod(action,Hold);
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -456,26 +340,27 @@ void OnTick()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    //-- MouseEvents
-    ChartSetInteger(0,CHART_EVENT_MOUSE_MOVE,1);
-    
     ManualInit();
-    
-    order.Enable();
-    
-    for (int action=OP_BUY;action<=OP_SELL;action++)
-    {
-      order.Enable(action);
-      order.SetEquityTargets(action,inpMinTarget,inpMinProfit);
-      order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
-      order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
-      order.SetZoneStep(action,2.5,60.0);
-    }
-    
-    NewLine("czDCA:0");
+    OrderConfig();
+   
+    //-- Initialize master data
+    master.Manager       = NoAction;
+    master.Lead          = NoAction;
+    master.Direction     = NewDirection;
+    master.Bias          = NewBias;
+    master.Active        = PivotTypes;
+    master.State         = NoState;
+    master.Broken        = false;
 
-    Print(order.MasterStr(OP_BUY));
-    
+    ArrayInitialize(master.Pivot,0.00);
+
+    //-- Initialize pivot data
+    for (PivotType type=0;type<PivotTypes;type++)
+      NewLine("lnPivot:"+EnumToString(type));
+
+    //-- Initialize Session
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+
     return(INIT_SUCCEEDED);
   }
 
@@ -484,7 +369,43 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete (order);
+    delete t;
+    delete order;
+    delete s[Daily];
+  }
+
+//+------------------------------------------------------------------+
+//| TickStr - returns formatted tick data text                       |
+//+------------------------------------------------------------------+
+string TickStr()
+  {
+    string text     = "";
+
+    Append(text,BoolToStr(IsEqual(master.Direction,NewDirection),"Pending",DirText(master.Direction)));
+    Append(text,BoolToStr(IsEqual(master.Bias,NewBias),"Pending",ActionText(master.Bias)),"|");
+    Append(text,ActionText(master.Active),"|");
+    Append(text,BoolToStr(IsEqual(master.State,NoState),"Pending",EnumToString(master.State)),"|");
+    Append(text,BoolToStr(master.Broken,"Broken"),"|");
+
+    for (int type=0;type<PivotTypes;type++)
+      Append(text,DoubleToStr(master.Pivot[type],Digits),"|");
+
+    return text;
+  }
+
+//+------------------------------------------------------------------+
+//| HoldStr - returns formatted hold text                            |
+//+------------------------------------------------------------------+
+string HoldStr()
+  {
+    string text     = "";
+
+    Append(text,BoolToStr(hr.Hold,"Hold["+ActionText(hr.Direction)+"]","Pending"));
+    Append(text,TimeToStr(hr.Start));
+    Append(text,DoubleToStr(hr.High,Digits));
+    Append(text,DoubleToStr(hr.Low,Digits));
+
+    return text;
   }
 
 //+------------------------------------------------------------------+

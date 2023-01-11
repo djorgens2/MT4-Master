@@ -286,7 +286,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
         
         if (IsEqual(poly.Bias,bias))
           FOC.Event         = BoolToEvent(NewState(FOC.State,(FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)),
-                                                             FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
+                                          FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
       }
       else 
         bias                = NoBias;

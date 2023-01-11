@@ -779,8 +779,6 @@ string CSession::FractalStr(void)
       Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }
-
-    Append(text,EnumToString(sType)+" Active "+ActiveEventStr(),"\n");
     
     return (text);
   }
