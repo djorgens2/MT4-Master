@@ -7,6 +7,7 @@
 #property link      "http://www.mql5.com"
 #property strict
 
+#include <Class/Event.mqh>
 #import "user32.dll"
    int MessageBoxW(int Ignore, string Caption, string Title, int Icon);
 #import
@@ -415,6 +416,7 @@ string DirText(int Value, bool Contrarian=false)
     case DirectionUp:    return("Long");
     case NoDirection:    return("Flat");
     case DirectionDown:  return("Short");
+    case NewDirection:   return("Pending");
   }
 
   return("BAD DIRECTION CODE");

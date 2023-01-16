@@ -58,8 +58,10 @@ struct HoldRec
          bool          Hold;
          int           Direction;
          datetime      Start;
+         double        Open;
          double        High;
          double        Low;
+         double        Close;
        };
 
 struct MasterControl
@@ -80,6 +82,17 @@ struct MasterControl
 
   MasterControl       master;
   HoldRec             hr;
+  HoldRec             lead;
+
+  int                 logfile            = NoValue;
+  
+//+------------------------------------------------------------------+
+//| WriteLogfile - appends text to log file                          |
+//+------------------------------------------------------------------+
+void WriteLog(string Line)
+  {
+    FileWrite(logfile,Line);
+  }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -94,7 +107,8 @@ void RefreshScreen(void)
     if (inpShowFractal==Daily)
       Append(text,s[inpShowFractal].FractalStr());
 
-    Append(text,HoldStr(),"\n");
+    Append(text,MasterStr(),"\n");
+    Append(text,HoldStr(hr),"\n");
     Append(text,s[Daily].ActiveEventStr(),"\n\n");
 
     Comment(text);
@@ -170,15 +184,31 @@ void UpdateTickMA(void)
       }
 
       //-- Caution test #2; Leader Change
-      if (IsChanged(master.Lead,Action(t.Segment().Direction[Term])));
-//        if (IsEqual(master.Manager,master.Lead))
-//          Flag("[tm]SegLead",Color(t.Segment().Direction[Term],IN_CHART_DIR));
-//        else
-//        if (Close[0]>t.Linear().Close.Lead)
-//          Flag("[tm]SegLead",BoolToInt(IsEqual(master.Manager,Buy),clrOrange,clrFireBrick));
-//        else
-//          Flag("[tm]SegLead",clrDarkGray);
-//
+      if (IsChanged(master.Lead,Action(t.Segment().Direction[Term])))
+      {
+        lead.Close          = Close[0];
+        
+        WriteLog(HoldStr(lead)+" "+MasterStr());
+
+        lead.Hold           = hr.Hold;
+        lead.Direction      = t.Segment().Direction[Term];
+        lead.Start          = TimeCurrent();
+        lead.Open           = Close[0];
+
+        lead.High           = Close[0];
+        lead.Low            = Close[0];
+
+        if (IsEqual(master.Manager,master.Lead))
+          Flag("[tm]SegLead",Color(t.Segment().Direction[Term],IN_CHART_DIR));
+        else
+        if (Close[0]>t.Linear().Close.Lead)
+          Flag("[tm]SegLead",BoolToInt(IsEqual(master.Manager,Buy),clrOrange,clrFireBrick));
+        else
+          Flag("[tm]SegLead",clrDarkGray);
+      }
+      
+      lead.High             = fmax(lead.High,Close[0]);
+      lead.Low              = fmin(lead.Low,Close[0]);
       if (NewState(master.State,state));
 
     //if (t[AdverseEvent])
@@ -205,23 +235,25 @@ void UpdateSession(void)
       {
         hr.Direction     = s[Daily][Origin].Direction;
         hr.Start         = Time[0];
+        hr.Open          = Close[0];
         hr.High          = Close[0];
         hr.Low           = Close[0];
-        Pause("New Hold: "+DirText(hr.Direction),"New Session Hold");
+//        Pause("New Hold: "+DirText(hr.Direction),"New Session Hold");
       }
+      else hr.Close      = Close[0];
 
     if (hr.Hold)
-   {
-     if (IsHigher(Close[0],hr.High))
-     {
-       //-- set high strategy
-     };
+    {
+      if (IsHigher(Close[0],hr.High))
+      {
+        //-- set high strategy
+      };
      
-     if (IsLower(Close[0],hr.Low))
-     {
-       //-- set low strategy
-     };
-   }
+      if (IsLower(Close[0],hr.Low))
+      {
+        //-- set low strategy
+      };
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -361,6 +393,20 @@ int OnInit()
     //-- Initialize Session
     s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
 
+    lead.Hold           = false;
+    lead.Direction      = NewDirection;
+    lead.Start          = TimeCurrent();
+    lead.High           = Close[0];
+    lead.Low            = Close[0];
+
+    logfile = FileOpen("man-v3_logfile.csv", FILE_CSV|FILE_READ|FILE_WRITE);
+    if (logfile<0)
+    {
+      FileSeek(logfile,0,SEEK_END);
+      Alert("open man-v3_logfile.csv failed");
+      return(INIT_FAILED);
+    }
+   
     return(INIT_SUCCEEDED);
   }
 
@@ -372,23 +418,26 @@ void OnDeinit(const int reason)
     delete t;
     delete order;
     delete s[Daily];
+    
+    FileFlush(logfile);
+    FileClose(logfile);
   }
 
 //+------------------------------------------------------------------+
-//| TickStr - returns formatted tick data text                       |
+//| MasterStr - returns formatted master data                        |
 //+------------------------------------------------------------------+
-string TickStr()
+string MasterStr()
   {
     string text     = "";
 
     Append(text,BoolToStr(IsEqual(master.Direction,NewDirection),"Pending",DirText(master.Direction)));
-    Append(text,BoolToStr(IsEqual(master.Bias,NewBias),"Pending",ActionText(master.Bias)),"|");
-    Append(text,ActionText(master.Active),"|");
-    Append(text,BoolToStr(IsEqual(master.State,NoState),"Pending",EnumToString(master.State)),"|");
-    Append(text,BoolToStr(master.Broken,"Broken"),"|");
+    Append(text,BoolToStr(IsEqual(master.Bias,NewBias),"Pending",ActionText(master.Bias)));
+    Append(text,BoolToStr(IsEqual(master.Active,PivotTypes),"Pending",EnumToString(master.Active)));
+    Append(text,BoolToStr(IsEqual(master.State,NoState),"Pending",EnumToString(master.State)));
+    Append(text,BoolToStr(master.Broken,"Broken"));
 
     for (int type=0;type<PivotTypes;type++)
-      Append(text,DoubleToStr(master.Pivot[type],Digits),"|");
+      Append(text,DoubleToStr(master.Pivot[type],Digits));
 
     return text;
   }
@@ -396,14 +445,17 @@ string TickStr()
 //+------------------------------------------------------------------+
 //| HoldStr - returns formatted hold text                            |
 //+------------------------------------------------------------------+
-string HoldStr()
+string HoldStr(HoldRec &Rec)
   {
     string text     = "";
 
-    Append(text,BoolToStr(hr.Hold,"Hold["+ActionText(hr.Direction)+"]","Pending"));
-    Append(text,TimeToStr(hr.Start));
-    Append(text,DoubleToStr(hr.High,Digits));
-    Append(text,DoubleToStr(hr.Low,Digits));
+    Append(text,BoolToStr(Rec.Hold,"Hold["+DirText(Rec.Direction)+"]","Pending"));
+    Append(text,DirText(Rec.Direction));
+    Append(text,TimeToStr(Rec.Start));
+    Append(text,DoubleToStr(Rec.Open,Digits));
+    Append(text,DoubleToStr(Rec.High,Digits));
+    Append(text,DoubleToStr(Rec.Low,Digits));
+    Append(text,DoubleToStr(Rec.Close,Digits));
 
     return text;
   }
