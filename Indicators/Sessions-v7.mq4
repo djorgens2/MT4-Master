@@ -219,13 +219,13 @@ void RefreshScreen(int Bar=0)
       else
       if (ShowFractal<FractalTypes)
       {
-        UpdateLine("lnS_Base:-v7",session[inpShowLines].Price(ShowFractal,fpBase),STYLE_SOLID,
-                               BoolToInt(IsEqual(session[inpShowLines][ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-        UpdateLine("lnS_Root:-v7",session[inpShowLines].Price(ShowFractal,fpRoot),STYLE_SOLID,
+        UpdateLine("lnS_Base:-v7",session[inpShowLines][ShowFractal].Point[fpBase],STYLE_SOLID,clrYellow);
+        UpdateLine("lnS_Root:-v7",session[inpShowLines][ShowFractal].Point[fpRoot],STYLE_SOLID,
                                BoolToInt(IsEqual(session[inpShowLines][ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-        UpdateLine("lnS_Expansion:-v7",session[inpShowLines].Price(ShowFractal,fpExpansion),STYLE_SOLID,clrYellow);
-        UpdateLine("lnS_Retrace:-v7",session[inpShowLines].Price(ShowFractal,fpRetrace),STYLE_SOLID,clrSteelBlue);      
-        UpdateLine("lnS_Recovery:-v7",session[inpShowLines].Price(ShowFractal,fpRecovery),STYLE_DOT,clrGoldenrod);
+        UpdateLine("lnS_Expansion:-v7",session[inpShowLines][ShowFractal].Point[fpExpansion],STYLE_SOLID,
+                               BoolToInt(IsEqual(session[inpShowLines][ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+        UpdateLine("lnS_Retrace:-v7",session[inpShowLines][ShowFractal].Point[fpRetrace],STYLE_DOT,clrGoldenrod);      
+        UpdateLine("lnS_Recovery:-v7",session[inpShowLines][ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
         //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
         //  UpdateLine("lnS_"+EnumToString(fl)+":-v7",session[inpShowSession].Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);

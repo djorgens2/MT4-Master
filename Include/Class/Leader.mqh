@@ -1009,10 +1009,10 @@ void CLeader::Update(void)
     UpdateLeader();
     UpdateRange();
 
-    if (Count(Segments)>Slow)
+    if (Count(Leaders)>Slow)
       UpdateSMA();
 
-    if (Count(Segments)>tmaPeriods)
+    if (Count(Leaders)>tmaDegree*4)
     {
       UpdatePoly();
       UpdateLinear();

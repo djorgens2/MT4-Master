@@ -740,8 +740,7 @@ double CSession::Expansion(FractalType Type, MeasureType Measure, int Format=InD
     {
       case Now: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],Close[sBar],Format));
       case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
-      case Max: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],BoolToDouble(IsEqual(frec[Type].Point[fpBase],frec[Type].Point[fpExpansion]),
-                                 frec[Type].Point[fpRecovery],frec[Type].Point[fpExpansion],Digits),Format));
+      case Max: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],Format));
     }
 
     return (0.00);

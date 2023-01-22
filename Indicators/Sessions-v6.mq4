@@ -243,21 +243,22 @@ void RefreshScreen(int Bar=0)
     if (ShowFractal<FractalTypes)
     {
       UpdateLine("lnS_Origin:"+sessionIndex,session[ShowFractal].Point[fpOrigin],STYLE_DOT,clrWhite);
-      UpdateLine("lnS_Base:"+sessionIndex,session[ShowFractal].Point[fpBase],STYLE_SOLID,
-                             BoolToInt(IsEqual(session[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+      UpdateLine("lnS_Base:"+sessionIndex,session[ShowFractal].Point[fpBase],STYLE_SOLID,clrYellow);
       UpdateLine("lnS_Root:"+sessionIndex,session[ShowFractal].Point[fpRoot],STYLE_SOLID,
                              BoolToInt(IsEqual(session[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateLine("lnS_Expansion:"+sessionIndex,session[ShowFractal].Point[fpExpansion],STYLE_SOLID,clrYellow);
-      UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrSteelBlue);      
-      UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrGoldenrod);
+      UpdateLine("lnS_Expansion:"+sessionIndex,session[ShowFractal].Point[fpExpansion],STYLE_SOLID,
+                             BoolToInt(IsEqual(session[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+      UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrGoldenrod);      
+      UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
       if (inpShowEvents==Yes)
       {
         if (session[ShowFractal].Event!=NoEvent)
-          Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",Color(session[ShowFractal].State),0,session[ShowFractal].Pivot);
+          Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
+                  Color(session[ShowFractal].State),0,session[ShowFractal].Pivot);
 
         if (session.Event(NewBias,Critical))
-          Flag("NewBias",clrMagenta,0,session[Origin].Pivot);
+          Flag("Origin[NewBias]."+EnumToString(session[Origin].State),clrMagenta,0,session[Origin].Pivot);
       }
 
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)

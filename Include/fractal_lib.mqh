@@ -84,32 +84,65 @@
 
 static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewBreakout,NewReversal};
-static const color     FractalColor[FractalStates]  = {clrNONE,clrLawnGreen,clrGoldenrod,clrSteelBlue,clrDarkGray,clrWhite,clrYellow,clrRed};
 
 //+------------------------------------------------------------------+
 //| Color - Returns the color assigned to a specific Fractal Event   |
 //+------------------------------------------------------------------+
 color Color(FractalState State)
   {
-    return FractalColor[State];
+    static const color  statecolor[FractalStates]  = {clrNONE,clrLawnGreen,clrFireBrick,clrGoldenrod,clrSteelBlue,clrWhite,clrYellow,clrRed};
+
+    return statecolor[State];
   }
 
 //+------------------------------------------------------------------+
-//| FractalEvent - Returns the Fractal Event on change in Type       |
+//| Color - Returns the color assigned to a specific Fractal Type    |
+//+------------------------------------------------------------------+
+color Color(FractalType Type)
+  {
+    static const color     fractalcolor[FractalTypes]  = {clrWhite,clrRed,clrRed,clrDarkGray,clrYellow,clrForestGreen,clrFireBrick,clrGoldenrod,clrSteelBlue,clrGoldenrod,clrSteelBlue,clrDarkGray};
+
+    return fractalcolor[Type];
+  }
+
+//+------------------------------------------------------------------+
+//| Color - Returns the color assigned to a specific Fractal Point   |
+//+------------------------------------------------------------------+
+color Color(FractalPoint Fractal)
+  {
+    static const color     fractalcolor[FractalPoints]  = {clrWhite,clrYellow,clrForestGreen,clrFireBrick,clrGoldenrod,clrSteelBlue};
+
+    return fractalcolor[Fractal];
+  }
+
+//+------------------------------------------------------------------+
+//| Style - Returns the linestyle assigned to a specific Fractal Type|
+//+------------------------------------------------------------------+
+ENUM_LINE_STYLE Style(FractalType Type)
+  {
+    static const ENUM_LINE_STYLE style[FractalTypes]   = {STYLE_SOLID,STYLE_SOLID,STYLE_DASH,STYLE_DOT,STYLE_SOLID,STYLE_SOLID,STYLE_SOLID,STYLE_SOLID,STYLE_SOLID,STYLE_DOT,STYLE_DOT,STYLE_SOLID};
+
+    return style[Type];
+  }
+
+//+------------------------------------------------------------------+
+//| Style - Returns linestyle for supplie Fractal Point              |
+//+------------------------------------------------------------------+
+ENUM_LINE_STYLE Style(FractalPoint Fractal)
+  {
+    static const ENUM_LINE_STYLE style[FractalPoints]  = {STYLE_SOLID,STYLE_SOLID,STYLE_DASH,STYLE_SOLID,STYLE_DOT,STYLE_DOT};
+
+    return style[Fractal];
+  }
+
+//+------------------------------------------------------------------+
+//| FractalAlert - Returns Alert Level for supplied Fractal Type     |
 //+------------------------------------------------------------------+
 AlertLevel FractalAlert(FractalType Type)
   {
-    switch (Type)
-    {
-      case Origin:       return(Critical);
-      case Trend:        return(Major);
-      case Term:         return(Minor);
-      case Prior:        return(Nominal);
-      case Base:         return(Warning);
-      case Root:         return(Nominal);
-      case Expansion:    return(Warning);
-      default:           return(Notify);
-    };
+    static const AlertLevel alertlevel[FractalTypes]    = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,Notify,Notify,Notify,Notify,Notify};
+
+    return alertlevel[Type];
   }
 
 //+------------------------------------------------------------------+
