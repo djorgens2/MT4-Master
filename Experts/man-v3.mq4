@@ -9,7 +9,7 @@
 #property strict
 
 #include <manual.mqh>
-#include <Class/TickMA.mqh>
+#include <Class/Leader.mqh>
 #include <Class/Order.mqh>
 #include <Class/Session.mqh>
 
@@ -76,7 +76,7 @@ struct MasterControl
          double        Pivot[PivotTypes];
        };
   
-  CTickMA             *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
+  CLeader             *l                 = new CLeader(inpPeriods,inpDegree,inpAgg);
   COrder              *order             = new COrder(inpBrokerModel,Hold,Hold);
   CSession            *s[SessionTypes];
 
@@ -136,26 +136,26 @@ void UpdateTickMA(void)
     bool         change       = false;
     static int   bias         = NoBias;
 
-    t.Update();
+    l.Update();
 
-    if (NewPivot(master.Active,t.Linear().Close.Bias))
+    if (NewPivot(master.Active,l.Linear().Close.Bias))
     {
-      if (NewDirection(master.Direction,Direction(t.Linear().Close.Bias,InAction)))
+      if (NewDirection(master.Direction,Direction(l.Linear().Close.Bias,InAction)))
         master.Broken         = IsEqual(master.State,Retrace);
 
       state                   = (FractalState)BoolToInt(IsEqual(master.Active,NoAction),Retrace,
-                                              BoolToInt(t[NewLow],Pullback,
-                                              BoolToInt(t[NewHigh],Rally)));
+                                              BoolToInt(l[NewLow],Pullback,
+                                              BoolToInt(l[NewHigh],Rally)));
 
       master.Pivot[master.Active]  = Close[0];
 
       //-- Active Bias (Checkpoint Bias Changes - useful but analysis needed)
-      if (NewAction(master.Bias,t.Linear().Close.Bias));
-//        Flag("[tm]Active",BoolToInt(IsEqual(t.Linear().Bias,Buy),clrSteelBlue,clrGoldenrod));
+      if (NewAction(master.Bias,l.Linear().Close.Bias));
+//        Flag("[tm]Active",BoolToInt(IsEqual(l.Linear().Bias,Buy),clrSteelBlue,clrGoldenrod));
 
 //      Flag("[tm]State",Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
-      Arrow("[tm]State",Direction(t.Linear().Close.Bias,InAction),
-                        Color(Direction(t.Linear().Close.Bias,InAction),IN_CHART_DIR));
+      Arrow("[tm]State",Direction(l.Linear().Close.Bias,InAction),
+                        Color(Direction(l.Linear().Close.Bias,InAction),IN_CHART_DIR));
     }
 
     //if (t[NewTick])
@@ -166,15 +166,15 @@ void UpdateTickMA(void)
   //      Pause("Nano Bias Change","BiasChange()");
 
     //-- Confirmation test
-    if (IsEqual(t.Linear().Close.Bias,t.Linear().Open.Bias))
-      if (NewAction(master.Manager,t.Linear().Bias))
+    if (IsEqual(l.Linear().Close.Bias,l.Linear().Open.Bias))
+      if (NewAction(master.Manager,l.Linear().Bias))
       {
         change              = true;
 //        Flag("[tm]Confirm",BoolToInt(IsEqual(master.Manager,OP_BUY),clrLawnGreen,clrMagenta));
       }
 
       //-- Caution test #1
-      if (IsEqual(t.Linear().Event,NewBias))
+      if (IsEqual(l.Linear().Event,NewBias))
       {
 //        state                 = Reversal;
 //        tick[Trend]           = t.Linear().Close.Bias;
@@ -183,28 +183,31 @@ void UpdateTickMA(void)
 //          Flag("[tm]LineBias",Color(Direction(t.Linear().Bias,InAction),IN_CHART_DIR));
       }
 
+      if (l.Event(NewTrend,Major))
+        Flag("[tm]SegTrend",Color(l.Segment().Direction[Trend],IN_CHART_DIR));
+
       //-- Caution test #2; Leader Change
-      if (IsChanged(master.Lead,Action(t.Segment().Direction[Term])))
+      if (IsChanged(master.Lead,Action(l.Segment().Direction[Term])))
       {
         lead.Close          = Close[0];
         
         WriteLog(HoldStr(lead)+" "+MasterStr());
 
         lead.Hold           = hr.Hold;
-        lead.Direction      = t.Segment().Direction[Term];
+        lead.Direction      = l.Segment().Direction[Term];
         lead.Start          = TimeCurrent();
         lead.Open           = Close[0];
 
         lead.High           = Close[0];
         lead.Low            = Close[0];
 
-        if (IsEqual(master.Manager,master.Lead))
-          Flag("[tm]SegLead",Color(t.Segment().Direction[Term],IN_CHART_DIR));
-        else
-        if (Close[0]>t.Linear().Close.Lead)
-          Flag("[tm]SegLead",BoolToInt(IsEqual(master.Manager,Buy),clrOrange,clrFireBrick));
-        else
-          Flag("[tm]SegLead",clrDarkGray);
+        //if (IsEqual(master.Manager,master.Lead))
+        //  Flag("[tm]SegLead",Color(l.Segment().Direction[Term],IN_CHART_DIR));
+        //else
+        //if (Close[0]>l.Linear().Close.Lead)
+        //  Flag("[tm]SegLead",BoolToInt(IsEqual(master.Manager,Buy),clrOrange,clrFireBrick));
+        //else
+        //  Flag("[tm]SegLead",clrDarkGray);
       }
       
       lead.High             = fmax(lead.High,Close[0]);
@@ -415,7 +418,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete t;
+    delete l;
     delete order;
     delete s[Daily];
     
