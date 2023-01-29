@@ -253,12 +253,12 @@ void RefreshScreen(int Bar=0)
 
       if (inpShowEvents==Yes)
       {
-        if (session[ShowFractal].Event!=NoEvent)
-          Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
-                  Color(session[ShowFractal].State),0,session[ShowFractal].Pivot);
-
-        if (session.Event(NewBias,Critical))
-          Flag("Origin[NewBias]."+EnumToString(session[Origin].State),clrMagenta,0,session[Origin].Pivot);
+//        if (session[ShowFractal].Event!=NoEvent)
+//          Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
+//                  Color(session[ShowFractal].State),0,session[ShowFractal].Pivot);
+//
+//        if (session.Event(NewBias,Critical))
+//          Flag("Origin[NewBias]."+EnumToString(session[Origin].State),clrMagenta,0,session[Origin].Pivot);
       }
 
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)

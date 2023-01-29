@@ -72,15 +72,15 @@
                    };             
 
   //-- Canonical Fractal Rec
-       struct FractalRec
-       {
-         int           Direction;
-         int           Bias;
-         FractalState  State;
-         EventType     Event;
-         double        Pivot;
-         double        Point[FractalPoints];
-       };
+  struct FractalRec
+         {
+           int           Direction;
+           int           Bias;
+           FractalState  State;
+           EventType     Event;
+           double        Pivot;
+           double        Point[FractalPoints];
+         };
 
 static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewBreakout,NewReversal};
@@ -246,9 +246,10 @@ double Percent(FiboLevel Level, int Format=InPoints)
 //+------------------------------------------------------------------+
 //| NewState - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
-bool NewState(FractalRec &Fractal, bool Reversing)
+bool NewState(FractalRec &Fractal, int Bar=0, bool Reversing=false)
   {
     double retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
+    double pivot         = NoValue;
 
     if (Reversing)
       return (NewState(Fractal.State,(FractalState)Reversal));
@@ -260,23 +261,42 @@ bool NewState(FractalRec &Fractal, bool Reversing)
         return (NewState(Fractal.State,(FractalState)Correction));
 
     if (retrace>FiboRetrace)
-      if (IsEqual(Fractal.State,Retrace))
+    {
+      if (IsEqual(Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],Low[Bar]),Digits))
         if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRecovery)
+        {
+          if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback))
+            Flag("Before:"+EnumToString(Fractal.State)+" After:"+EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)),clrGoldenrod,Bar,Close[Bar]);
           return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)));
-        else return (false);
-      else
-        if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRecovery)
-          if (IsEqual(Fractal.Point[fpRecovery],Close[0],Digits))
-            return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)));
-          else return (false);
-        else
-        if (IsEqual(Fractal.Point[fpRetrace],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[0],High[0]),Digits))
-          return (NewState(Fractal.State,(FractalState)Retrace));
-        else return (false);
+        }
+      
+      if (IsEqual(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Digits))
+      {
+        if (Fractal.State!=Retrace)
+        Flag("NewRetrace",clrRed,Bar,Close[Bar]);
+        return (NewState(Fractal.State,(FractalState)Retrace));
+      }
+
+//Print((string)Bar+": "+DoubleToStr(Retrace(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar]),InPercent),1)+"%  "+
+//      DoubleToStr(Fractal.Point[fpRetrace],Digits)+"  "+DoubleToStr(Fractal.Point[fpRecovery],Digits)+"  "+DoubleToStr(BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar]),Digits));
+
+      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
+        if (Retrace(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar],Digits))>FiboRetrace)
+        {
+        if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally))
+          Flag(EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)),clrYellow,Bar,Close[Bar]);
+          return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));
+        }
+
+      return (false);
+    }
 
     if (retrace>FiboRecovery)
+        {
+        if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally))
+          Flag(EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)),clrDarkGray,Bar,Close[Bar]);
       return (NewState(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));
-
+      }
     return (NewState(Fractal.State,(FractalState)Breakout));
   }
 

@@ -440,24 +440,28 @@ void CSession::UpdateOrigin(void)
                                         fmax(frec[Origin].Point[fpExpansion],frec[Trend].Point[fpExpansion]),
                                         fmin(frec[Origin].Point[fpExpansion],frec[Trend].Point[fpExpansion]),Digits)))
     {
-      frec[Origin].Point[fpRetrace]   = origin.Point[fpExpansion];
-      frec[Origin].Point[fpRecovery]  = origin.Point[fpExpansion];
+      frec[Origin].Point[fpRetrace]   = frec[Origin].Point[fpExpansion];
+      frec[Origin].Point[fpRecovery]  = frec[Origin].Point[fpExpansion];
     }                                                    
     else
     if (IsChanged(frec[Origin].Point[fpRetrace],BoolToDouble(IsEqual(frec[Origin].Direction,DirectionUp),
                                         fmin(frec[Origin].Point[fpRetrace],frec[Trend].Point[fpRetrace]),
                                         fmax(frec[Origin].Point[fpRetrace],frec[Trend].Point[fpRetrace]),Digits)))
-      frec[Origin].Point[fpRecovery]  = origin.Point[fpRetrace];
+      frec[Origin].Point[fpRecovery]  = frec[Origin].Point[fpRetrace];
     else
       frec[Origin].Point[fpRecovery]  = BoolToDouble(IsEqual(frec[Origin].Direction,DirectionUp),
                                         fmax(frec[Origin].Point[fpRecovery],frec[Trend].Point[fpRecovery]),
                                         fmin(frec[Origin].Point[fpRecovery],frec[Trend].Point[fpRecovery]),Digits);
       
 
-    if (NewState(frec[Origin],Event(NewOrigin)))
+    if (NewState(frec[Origin],sBar,Event(NewOrigin)))
     {
       frec[Origin].Event              = FractalEvent(frec[Origin].State);
-      frec[Origin].Pivot              = BoolToDouble(Event(NewOrigin),frec[Origin].Point[fpBase],frec[Origin].Point[fpRecovery]);
+      frec[Origin].Pivot              = BoolToDouble(Event(NewOrigin), frec[Origin].Point[fpBase],
+                                        BoolToDouble(Event(NewRetrace),frec[Origin].Point[fpRetrace],
+                                                                       frec[Origin].Point[fpRecovery]));
+
+//      Flag("[s]Origin:"+EnumToString(frec[Origin].Event),clrLawnGreen,sBar,frec[Origin].Pivot);
       
       if (IsHigher(frec[Origin].Pivot,origin.Pivot))
         if (IsChanged(frec[Origin].Bias,OP_BUY))
@@ -724,7 +728,7 @@ double CSession::Retrace(FractalType Type, MeasureType Measure, int Format=InDec
       switch (Measure)
       {
         case Now: return(Retrace(frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],Close[sBar],Format));
-        case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
+        case Min: return(Retrace(frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],frec[Type].Point[fpRecovery],Format));
         case Max: return(Retrace(frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],frec[Type].Point[fpRetrace],Format));
       }
 
@@ -775,7 +779,7 @@ string CSession::FractalStr(void)
       Append(text,DirText(frec[type].Direction));
       Append(text,EnumToString(frec[type].State));
       Append(text," ["+ActionText(frec[type].Bias)+"]");
-      Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%\n","\n");
+      Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }
     

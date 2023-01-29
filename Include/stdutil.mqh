@@ -84,11 +84,9 @@
                 
        enum     MeasureType
                 {
-                  NoMeasure,
                   Now,
                   Min,    
                   Max,    
-                  All,
                   MeasureTypes      //--- must be last
               };
 
