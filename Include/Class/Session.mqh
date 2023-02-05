@@ -64,14 +64,16 @@ public:
              int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
-             double           Pivot(const PeriodType Type);                          //--- Mid/Mean by Period Type
-             int              Age(void)                          {return(sBarFE);}   //--- Number of periods since the last fractal event
+             PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};  //--- Mid/Mean by Period Type
+             double           Pivot(const PeriodType Type);                                            //--- Mid/Mean by Period Type
+             int              Age(void)                          {return(sBarFE);}                     //--- Number of periods since the last fractal event
              
              double           Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns fibonacci retrace
              double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns fibonacci expansion
              double           Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
 
-             string           FractalStr(void);
+             string           PivotStr(int Node, FractalState State=NoState);
+             string           FractalStr(int Pivots=NoValue);
              string           SessionStr(PeriodType Type);
 
              FractalRec       operator[](const FractalType Type) {return(frec[Type]);}
@@ -93,6 +95,7 @@ private:
              int              sBarHour;
              
              FractalRec       frec[3];
+             PivotRec         prec[];
              
              int              sBarFE;          //--- Fractal Expansion Bar
              int              sDirFE;          //--- Fractal Direction (Painted)
@@ -363,7 +366,7 @@ void CSession::UpdateTerm(void)
     if (NewState(frec[Term].State,state))
     {
       frec[Term].Event             = FractalEvent(state);
-      frec[Term].Pivot             = BoolToDouble(Event(NewTerm),frec[Term].Point[fpBase],Close[sBar]);
+      frec[Term].Price             = BoolToDouble(Event(NewTerm),frec[Term].Point[fpBase],Close[sBar]);
 
       SetEvent(BoolToEvent(NewAction(frec[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
                               Action(frec[Term].Direction),Action(frec[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
@@ -411,7 +414,7 @@ void CSession::UpdateTrend(void)
     if (NewState(frec[Trend].State,state))
     {
       frec[Trend].Event               = FractalEvent(state);
-      frec[Trend].Pivot               = BoolToDouble(Event(NewExpansion,Major),frec[Trend].Point[fpBase],frec[Trend].Point[fpExpansion]);
+      frec[Trend].Price               = BoolToDouble(Event(NewExpansion,Major),frec[Trend].Point[fpBase],frec[Trend].Point[fpExpansion]);
 
       SetEvent(NewState,Major);
       SetEvent(FractalEvent(frec[Trend].State),Major);
@@ -454,24 +457,11 @@ void CSession::UpdateOrigin(void)
                                         fmin(frec[Origin].Point[fpRecovery],frec[Trend].Point[fpRecovery]),Digits);
       
 
-    if (NewState(frec[Origin],sBar,Event(NewOrigin)))
+    if (NewState(frec[Origin],prec,sBar,Event(NewOrigin),Always,Always))
     {
-      frec[Origin].Event              = FractalEvent(frec[Origin].State);
-      frec[Origin].Pivot              = BoolToDouble(Event(NewOrigin), frec[Origin].Point[fpBase],
-                                        BoolToDouble(Event(NewRetrace),frec[Origin].Point[fpRetrace],
-                                                                       frec[Origin].Point[fpRecovery]));
+      Flag("[s]Origin:"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
 
-//      Flag("[s]Origin:"+EnumToString(frec[Origin].Event),clrLawnGreen,sBar,frec[Origin].Pivot);
-      
-      if (IsHigher(frec[Origin].Pivot,origin.Pivot))
-        if (IsChanged(frec[Origin].Bias,OP_BUY))
-          SetEvent(NewBias,Critical);
-
-      if (IsLower(frec[Origin].Pivot,origin.Pivot))
-        if (IsChanged(frec[Origin].Bias,OP_SELL))
-          SetEvent(NewBias,Critical);
-
-      SetEvent(FractalEvent(frec[Origin].State),Critical);
+      SetEvent(frec[Origin].Event,Critical);
       SetEvent(NewState,Critical);
     }
   }
@@ -566,10 +556,12 @@ void CSession::LoadHistory(void)
       frec[type].State               = NoState;
       frec[type].Direction           = NoValue;
       frec[type].Event               = NoEvent;
-      frec[type].Pivot               = Open[sBar];
+      frec[type].Price               = Open[sBar];
       ArrayInitialize(frec[type].Point,Open[sBar]);
     }
-      
+
+    NewPivot(prec,Open[sBar],NoState,frec[Origin].Direction,sBar);
+    
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();
   }
@@ -767,9 +759,36 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
   }
 
 //+------------------------------------------------------------------+
+//| PivotStr - Returns Screen formatted Pivot Detail                 |
+//+------------------------------------------------------------------+
+string CSession::PivotStr(int Node, FractalState State=NoState)
+  {  
+    string text            = "";
+    PivotRec pivot;
+    
+    if (Node>NoValue)
+      if (IsEqual(State,NoState))
+        if (Node>ArraySize(prec))
+          return "Error: PivotStr node exceeds maximum";
+        else pivot         = prec[Node];
+      else pivot           = GetPivot(prec,State,Node);
+    else return "Error: Invalid node for PivotStr";
+
+    Append(text,BoolToStr(IsEqual(Node,0),"Active","Node["+(string)Node+"]"),"\n");
+    Append(text,ActionText(pivot.Bias));
+    Append(text,EnumToString(pivot.State));
+    Append(text,DoubleToStr(pivot.Open,Digits));
+    Append(text,DoubleToStr(pivot.High,Digits));
+    Append(text,DoubleToStr(pivot.Low,Digits));
+    Append(text,DoubleToStr(pivot.Close,Digits));
+        
+    return (text);
+  }
+
+//+------------------------------------------------------------------+
 //| FractalStr - Returns Screen formatted Fibonacci Detail           |
 //+------------------------------------------------------------------+
-string CSession::FractalStr(void)
+string CSession::FractalStr(int Pivots=NoValue)
   {  
     string text            = "*---------- "+EnumToString(this.Type())+" ["+BoolToStr(IsOpen(),"Open","Closed")+"] Session Fractal ----------*";
     
@@ -778,11 +797,20 @@ string CSession::FractalStr(void)
       Append(text,EnumToString(type),"\n");
       Append(text,DirText(frec[type].Direction));
       Append(text,EnumToString(frec[type].State));
+      Append(text,BoolToStr(frec[type].Peg,"Pegged"));
       Append(text," ["+ActionText(frec[type].Bias)+"]");
       Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }
-    
+
+    if (Pivots>NoValue)
+    {
+      Append(text,"*---------- Origin Fractal Pivots ["+(string)ArraySize(prec)+"]--------------*","\n");
+
+      for (int node=0;node<=fmin(ArraySize(prec),Pivots);node++)
+        Append(text,PivotStr(node),"\n");
+    }
+        
     return (text);
   }
 

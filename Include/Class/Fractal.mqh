@@ -17,21 +17,11 @@
 //+------------------------------------------------------------------+
 //| CFractal Class Methods and Properties                            |
 //+------------------------------------------------------------------+
-class CFractal  : public CEvent
+class CFractal : public CEvent
   {
 
 private:
 
-       struct CFractalRec
-       {
-         int           Direction;
-         int           Bar;
-         double        Price;
-         bool          Peg;
-         FractalState  State;
-         EventType     Event;
-       };
-       
        struct COriginRec
        {
          int           Direction;           //--- Origin Direction
@@ -42,14 +32,14 @@ private:
        };
 
        COriginRec      dOrigin;             //--- Derived origin data
-       CFractalRec     f[FractalTypes];     //--- Fractal Array
+       FractalRec      f[FractalTypes];     //--- Fractal Array
 
        CArrayDouble   *fBuffer;
 
        //--- Private fractal methods
        void            InitFractal();                          //--- initializes the fractal
 
-       void            InsertFractal(CFractalRec &Fractal);     //--- inserts a new fractal leg
+       void            InsertFractal(FractalRec &Fractal);     //--- inserts a new fractal leg
 
        void            UpdateFractal(int Direction);           //--- Updates fractal leg direction changes
        void            UpdateRetrace(FractalType Type, int Bar, double Price=0.00);   //--- Updates interior fractal changes
@@ -132,7 +122,7 @@ public:
        string           FractalStr(void);
        string           PriceStr(FractalType Type=FractalTypes);
        
-       CFractalRec operator[](const FractalType Type) const { return(f[Type]); }
+       FractalRec operator[](const FractalType Type) const { return(f[Type]); }
   };
 
 //+------------------------------------------------------------------+
@@ -146,17 +136,17 @@ void CFractal::CalcOrigin(void)
     if (Is(Origin,Convergent))
       if (Event(NewDivergence,Major))
         if (Direction(Divergent)==DirectionUp)
-          dOrigin.Low        = f[Expansion].Price;
+          dOrigin.Low        = f[Expansion].Pivot;
         else
-          dOrigin.High       = f[Expansion].Price;
+          dOrigin.High       = f[Expansion].Pivot;
 
     if (Event(NewReversal,Warning))
       if (Direction(Expansion)==DirectionUp)
-        dOrigin.Low          = f[Root].Price;
+        dOrigin.Low          = f[Root].Pivot;
       else
-        dOrigin.High         = f[Root].Price;
+        dOrigin.High         = f[Root].Pivot;
 
-    if (IsBetween(f[Expansion].Price,dOrigin.High,dOrigin.Low))
+    if (IsBetween(f[Expansion].Pivot,dOrigin.High,dOrigin.Low))
       CalcState(Origin,dOrigin.State);
     else
     {
@@ -193,7 +183,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
                       break;
         case Trend:
         case Term:    if (IsBetween(Price(Base,fpBase),Price(Type,fpBase),Price(Type,fpRoot)))
-                        state           = Trap;
+                        f[Type].Trap    = true;
                       else
                         state           = Reversal;
                       break;
@@ -212,7 +202,7 @@ void CFractal::CalcState(FractalType Type, FractalState &State, double EventPric
                       break;
         case Trend:
         case Term:    if (IsBetween(Price(Base,fpBase),Price(Type,fpBase),Price(Type,fpRoot)))
-                        state           = Trap;
+                        f[Type].Trap    = true;
                       else
                         state           = Breakout;
                       break;
@@ -301,7 +291,7 @@ void CFractal::UpdateRetrace(FractalType Type, int Bar, double Price=0.00)
       //--- Initialize retrace data by type
       f[type].Direction           = NoDirection;
       f[type].Bar                 = NoValue;
-      f[type].Price               = 0.00;
+      f[type].Pivot               = 0.00;
 
       if (IsEqual(type,Expansion))
         SetEvent(NewExpansion);
@@ -317,7 +307,7 @@ void CFractal::UpdateRetrace(FractalType Type, int Bar, double Price=0.00)
 
     f[Type].Direction             = Direction(Type);
     f[Type].Bar                   = Bar;
-    f[Type].Price                 = Price;
+    f[Type].Pivot                 = Price;
 
     fRetrace                      = Price;
     fRecovery                     = Price;
@@ -349,17 +339,17 @@ void CFractal::CalcRetrace(void)
         if (IsEqual(f[type].Bar,NoValue))
           UpdateRetrace(type,fBarNow,High[fBarNow]);
         else
-        if (IsHigher(High[fBarNow],f[type].Price))
+        if (IsHigher(High[fBarNow],f[type].Pivot))
           UpdateRetrace(type,fBarNow,High[fBarNow]);
       
       if (IsEqual(Direction(type),DirectionDown))
         if (IsEqual(f[type].Bar,NoValue))
           UpdateRetrace(type,fBarNow,Low[fBarNow]);
         else
-        if (IsLower(Low[fBarNow],f[type].Price))
+        if (IsLower(Low[fBarNow],f[type].Pivot))
           UpdateRetrace(type,fBarNow,Low[fBarNow]);
 
-      if (IsHigher(fabs(f[Previous(type)].Price-f[type].Price),fRange,NoUpdate))
+      if (IsHigher(fabs(f[Previous(type)].Pivot-f[type].Pivot),fRange,NoUpdate))
       {
         if (type>Expansion)
           f[Previous(type)].Peg = true;
@@ -368,7 +358,7 @@ void CFractal::CalcRetrace(void)
         typemin                 = type;
       }
       else
-      if (IsBetween(fabs(f[Previous(type)].Price-f[type].Price),fRange,fRangeMin))
+      if (IsBetween(fabs(f[Previous(type)].Pivot-f[type].Pivot),fRange,fRangeMin))
         typemin                 = type;
 
       if (IsEqual(f[type].Bar,fBarNow)||IsEqual(type,Lead))
@@ -418,9 +408,10 @@ void CFractal::CalcRetrace(void)
 //+------------------------------------------------------------------+
 //| InsertFractal - inserts a new fractal node                       |
 //+------------------------------------------------------------------+
-void CFractal::InsertFractal(CFractalRec &Fractal)
+void CFractal::InsertFractal(FractalRec &Fractal)
   {
     Fractal.Peg            = false;
+    Fractal.Trap           = false;
         
     f[Origin]              = f[Trend];
     f[Trend]               = f[Term];
@@ -463,10 +454,10 @@ void CFractal::InitFractal(void)
         fDirection            = DirectionUp;
 
         f[Root].Bar           = fBarLow;
-        f[Root].Price         = Low[fBarLow];
+        f[Root].Pivot         = Low[fBarLow];
 
         f[Expansion].Bar      = fBarHigh;
-        f[Expansion].Price    = High[fBarHigh];
+        f[Expansion].Pivot    = High[fBarHigh];
 
         dOrigin.Low           = Low[fBarLow];
         dOrigin.High          = dOrigin.Low+fRange;
@@ -477,10 +468,10 @@ void CFractal::InitFractal(void)
         fDirection            = DirectionDown;
 
         f[Root].Bar           = fBarHigh;
-        f[Root].Price         = High[fBarHigh];
+        f[Root].Pivot         = High[fBarHigh];
 
         f[Expansion].Bar      = fBarLow;
-        f[Expansion].Price    = Low[fBarLow];
+        f[Expansion].Pivot    = Low[fBarLow];
 
         dOrigin.High          = High[fBarHigh];
         dOrigin.Low           = dOrigin.High-fRange;
@@ -537,7 +528,7 @@ void CFractal::CalcFractal(void)
         {            
           if (f[Expansion].Peg)
           {
-            fBuffer.SetValue(f[Divergent].Bar,f[Divergent].Price);
+            fBuffer.SetValue(f[Divergent].Bar,f[Divergent].Pivot);
             fBarLow            = f[Divergent].Bar;
 
             UpdateFractal(DirectionUp);
@@ -567,7 +558,7 @@ void CFractal::CalcFractal(void)
         {
           if (f[Expansion].Peg)
           {
-            fBuffer.SetValue(f[Divergent].Bar,f[Divergent].Price);
+            fBuffer.SetValue(f[Divergent].Bar,f[Divergent].Pivot);
             fBarHigh         = f[Divergent].Bar;
             
             UpdateFractal(DirectionDown);
@@ -761,8 +752,8 @@ double CFractal::Price(FractalType Type, FractalPoint FP)
         case fpOrigin:
         case fpRoot:      return (BoolToDouble(dOrigin.Direction==DirectionUp,dOrigin.Low,dOrigin.High,Digits));
         case fpBase:      return (BoolToDouble(dOrigin.Direction==DirectionUp,dOrigin.High,dOrigin.Low,Digits));
-        case fpExpansion: return (BoolToDouble(Is(Origin,Divergent),Price(Origin,fpBase),f[Expansion].Price,Digits));
-        case fpRetrace:   return (BoolToDouble(Is(Origin,Divergent),f[Expansion].Price,Price(Divergent,fpBase),Digits));
+        case fpExpansion: return (BoolToDouble(Is(Origin,Divergent),Price(Origin,fpBase),f[Expansion].Pivot,Digits));
+        case fpRetrace:   return (BoolToDouble(Is(Origin,Divergent),f[Expansion].Pivot,Price(Divergent,fpBase),Digits));
         case fpRecovery:  return (BoolToDouble(Is(Origin,Divergent),Price(Divergent,fpBase),Price(Convergent,fpBase),Digits));
       }
     else
@@ -770,9 +761,9 @@ double CFractal::Price(FractalType Type, FractalPoint FP)
     {
       switch (FP)
       {
-        case fpOrigin:    return (BoolToDouble(IsEqual(f[Term].Price,0.00),f[Root].Price,f[Term].Price,Digits));
-        case fpBase:      return (NormalizeDouble(f[Prior].Price,Digits));
-        case fpRoot:      return (NormalizeDouble(f[Expansion].Price,Digits));
+        case fpOrigin:    return (BoolToDouble(IsEqual(f[Term].Pivot,0.00),f[Root].Pivot,f[Term].Pivot,Digits));
+        case fpBase:      return (NormalizeDouble(f[Prior].Pivot,Digits));
+        case fpRoot:      return (NormalizeDouble(f[Expansion].Pivot,Digits));
         case fpExpansion: return (NormalizeDouble(Price(Divergent,fpBase),Digits));
         case fpRetrace:   return (NormalizeDouble(Price(Convergent,fpBase),Digits));
         case fpRecovery:  return (NormalizeDouble(Price(Inversion,fpBase),Digits));
@@ -783,26 +774,26 @@ double CFractal::Price(FractalType Type, FractalPoint FP)
     {
       switch (FP)
       {
-        case fpOrigin:    return (BoolToDouble(Type==Base,f[Prior].Price,Price(Trend,fpRoot),Digits));
+        case fpOrigin:    return (BoolToDouble(Type==Base,f[Prior].Pivot,Price(Trend,fpRoot),Digits));
         case fpBase:      switch (Type)
                           {
-                            case Trend:   if (!IsEqual(f[Origin].Price,0.00)) return(NormalizeDouble(f[Origin].Price,Digits));
-                            case Term:    if (!IsEqual(f[Term].Price,0.00))   return(NormalizeDouble(f[Term].Price,Digits));
+                            case Trend:   if (!IsEqual(f[Origin].Pivot,0.00)) return(NormalizeDouble(f[Origin].Pivot,Digits));
+                            case Term:    if (!IsEqual(f[Term].Pivot,0.00))   return(NormalizeDouble(f[Term].Pivot,Digits));
                           }
-                          return(NormalizeDouble(f[Base].Price,Digits));
+                          return(NormalizeDouble(f[Base].Pivot,Digits));
         case fpRoot:      if (Direction(Type)==DirectionDown)
                           {
-                            if (Type==Trend) return (NormalizeDouble(fmax(f[Trend].Price,fmax(f[Prior].Price,f[Root].Price)),Digits));
-                            if (Type==Term)  return (NormalizeDouble(fmax(f[Prior].Price,f[Root].Price),Digits));
+                            if (Type==Trend) return (NormalizeDouble(fmax(f[Trend].Pivot,fmax(f[Prior].Pivot,f[Root].Pivot)),Digits));
+                            if (Type==Term)  return (NormalizeDouble(fmax(f[Prior].Pivot,f[Root].Pivot),Digits));
                           }
                           else
                           if (Direction(Type)==DirectionUp)
                           {
-                            if (Type==Trend) return (BoolToDouble(IsEqual(f[Trend].Price,0,00),Price(Term,fpRoot),fmin(f[Trend].Price,Price(Term,fpRoot)),Digits));
-                            if (Type==Term)  return (BoolToDouble(IsEqual(f[Prior].Price,0.00),f[Root].Price,fmin(f[Prior].Price,f[Root].Price),Digits));
+                            if (Type==Trend) return (BoolToDouble(IsEqual(f[Trend].Pivot,0,00),Price(Term,fpRoot),fmin(f[Trend].Pivot,Price(Term,fpRoot)),Digits));
+                            if (Type==Term)  return (BoolToDouble(IsEqual(f[Prior].Pivot,0.00),f[Root].Pivot,fmin(f[Prior].Pivot,f[Root].Pivot),Digits));
                           }
-                          return (NormalizeDouble(f[Root].Price,Digits));
-        case fpExpansion: return (NormalizeDouble(f[Expansion].Price,Digits));
+                          return (NormalizeDouble(f[Root].Pivot,Digits));
+        case fpExpansion: return (NormalizeDouble(f[Expansion].Pivot,Digits));
         case fpRetrace:   return (NormalizeDouble(Price(Divergent,fpBase),Digits));
         case fpRecovery:  return (NormalizeDouble(Price(Convergent,fpBase),Digits));
       }
@@ -822,7 +813,7 @@ double CFractal::Price(FractalType Type, FractalPoint FP)
         if (IsEqual(fp,FP))
           switch (next)
           {
-            case 0:  return (NormalizeDouble(f[type].Price,Digits));
+            case 0:  return (NormalizeDouble(f[type].Pivot,Digits));
             case 1:  return (NormalizeDouble(fRetrace,Digits));
             case 2:  return (NormalizeDouble(fRecovery,Digits));
             default: return (NormalizeDouble(Close[fBarNow],Digits));
@@ -955,7 +946,7 @@ string CFractal::FractalStr(void)
     for (FractalType type=Origin;type<FractalTypes;type++)
     {
       Append(text,EnumToString(type)+"/"+DirText(Direction(type))+":"+EnumToString(f[type].State));
-      Append(text,DoubleToStr(f[type].Price,Digits)+"]","[");
+      Append(text,DoubleToStr(f[type].Pivot,Digits)+"]","[");
     }
 
     Append(text,"\n","");
@@ -1007,7 +998,7 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
     const  string    rsSeg[FractalTypes] = {"o","tr","tm","p","b","r","e","d","c","iv","cv","lead"};
     const  string    rsFP[FractalPoints] = {"o","b","r","e","rt","rc"};
 
-    rsReport   += "\n  Origin:\n";
+    rsReport   += "\n  Origin:"+BoolToStr(f[Origin].Trap,"Trap")+"\n";
     rsReport   +="      (o): "+BoolToStr(dOrigin.Direction==DirectionUp,"Long","Short");
 
     Append(rsReport,BoolToStr(Is(Origin,Divergent),"Divergent","Convergent"));
@@ -1039,10 +1030,10 @@ void CFractal::RefreshScreen(bool WithEvents=false, bool LogOutput=false)
       if (f[type].Bar>NoValue)
       {
         if (type == Dominant(Trend))
-          rsReport  += "\n  Trend "+EnumToString(f[Trend].State)+":\n";
+          rsReport  += "\n  Trend "+EnumToString(f[Trend].State)+":"+BoolToStr(f[Trend].Trap,"Trap")+"\n";
         else
         if (type == Dominant(Term))
-          rsReport  += "\n  Term "+EnumToString(f[Term].State)+":\n";
+          rsReport  += "\n  Term "+EnumToString(f[Term].State)+":"+BoolToStr(f[Term].Trap,"Trap")+"\n";
         else
         if (type == fLegNow)
           if (type < Lead)

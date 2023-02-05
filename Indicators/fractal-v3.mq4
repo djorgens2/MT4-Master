@@ -65,23 +65,23 @@ double    indConvergentBuffer[];
 void RefreshFibo(void)
   {
     ObjectSet("fFiboRetrace",OBJPROP_TIME1,Time[f[Root].Bar]);
-    ObjectSet("fFiboRetrace",OBJPROP_PRICE1,f[Root].Price);
+    ObjectSet("fFiboRetrace",OBJPROP_PRICE1,f[Root].Pivot);
     ObjectSet("fFiboRetrace",OBJPROP_TIME2,Time[f[Expansion].Bar]);
-    ObjectSet("fFiboRetrace",OBJPROP_PRICE2,f[Expansion].Price);
+    ObjectSet("fFiboRetrace",OBJPROP_PRICE2,f[Expansion].Pivot);
 
     if (f.Is(Divergent,Max))
     {
       ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[f[Expansion].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Expansion].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Expansion].Pivot);
       ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[f[Divergent].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Divergent].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Divergent].Pivot);
     }
     else
     {
       ObjectSet("fFiboExpansion",OBJPROP_TIME1,Time[f[Base].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Base].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE1,f[Base].Pivot);
       ObjectSet("fFiboExpansion",OBJPROP_TIME2,Time[f[Root].Bar]);
-      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Root].Price);
+      ObjectSet("fFiboExpansion",OBJPROP_PRICE2,f[Root].Pivot);
     }
   }
   
@@ -140,8 +140,8 @@ void SetBuffer(double &Buffer[], FractalType Start, FractalType End)
 
     if (f[Start].Bar>NoValue && f[End].Bar>NoValue)
     {
-      Buffer[f[Start].Bar] = f[Start].Price;
-      Buffer[f[End].Bar]   = f[End].Price;
+      Buffer[f[Start].Bar] = f[Start].Pivot;
+      Buffer[f[End].Bar]   = f[End].Pivot;
     }
   }
 

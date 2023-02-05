@@ -19,8 +19,8 @@
                      Rally,           // Advancing fractal
                      Pullback,        // Declining fractal
                      Retrace,         // Pegged retrace (>Rally||Pullack)
-                     Recovery,        // Trend resumption post-correction
                      Correction,      // Fractal max stress point/Market Correction
+                     Recovery,        // Trend resumption post-correction
                      Breakout,        // Fractal Breakout
                      Reversal,        // Fractal Reversal
                      FractalStates
@@ -72,25 +72,37 @@
                    };             
 
   //-- Canonical Fractal Rec
+  struct PivotRec
+         {
+           int           Bias;
+           FractalState  State;
+           int           Bar;
+           double        Open;
+           double        High;
+           double        Low;
+           double        Close;
+         };
+
   struct FractalRec
          {
            int           Direction;
            int           Bias;
            FractalState  State;
            EventType     Event;
-           double        Pivot;
+           double        Price;
+           bool          Peg;
+           bool          Trap;
            double        Point[FractalPoints];
          };
 
 static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
-static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewRecovery,NewCorrection,NewBreakout,NewReversal};
 
 //+------------------------------------------------------------------+
 //| Color - Returns the color assigned to a specific Fractal Event   |
 //+------------------------------------------------------------------+
 color Color(FractalState State)
   {
-    static const color  statecolor[FractalStates]  = {clrNONE,clrLawnGreen,clrFireBrick,clrGoldenrod,clrSteelBlue,clrWhite,clrYellow,clrRed};
+    static const color  statecolor[FractalStates]  = {clrNONE,clrLawnGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed};
 
     return statecolor[State];
   }
@@ -150,6 +162,8 @@ AlertLevel FractalAlert(FractalType Type)
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
   {
+    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal};
+  
     return (FractalEvent[State]);
   }
 
@@ -188,14 +202,41 @@ FiboLevel Level(double Percent)
   }
 
 //+------------------------------------------------------------------+
-//| Price - Derived price for a variable fibonacci level             |
+//| Price - Returns price for supplied fibonacci level               |
 //+------------------------------------------------------------------+
-double Price(FiboLevel Level, double Root, double Extension, int Method=Expansion)
+double Price(FiboLevel Level, double Root, double Expansion, int Method)
   {
     if (Method == Retrace)     
-      return (NormalizeDouble(Extension-((Extension-Root)*Percent(Level)),Digits));
+      return (NormalizeDouble(Expansion-((Expansion-Root)*Percent(Level)),Digits));
 
-    return (NormalizeDouble(Root+((Extension-Root)*Percent(Level)),Digits));
+    return (NormalizeDouble(Root+((Expansion-Root)*Percent(Level)),Digits));
+  }
+
+//+------------------------------------------------------------------+
+//| Price - Returns price for supplied Bar, Direction, Fractal State |
+//+------------------------------------------------------------------+
+double Price(FractalState State, int Direction, int Bar)
+  {
+    double price          = NoValue;
+
+    if (IsEqual(Bar,0))
+      price               = Close[0];
+    else
+    
+    //--- Note: Not perfect - long bar historical pricing (retrace, correction, rally/pullback(On Close?) missing;
+    if (IsEqual(State,Rally))
+      price               = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+    else
+    if (IsEqual(State,Pullback))
+      price               = BoolToDouble(IsEqual(Direction,DirectionUp),Close[Bar],Low[Bar],Digits);
+    else
+    if (IsBetween(State,Retrace,Correction))
+      price               = BoolToDouble(IsEqual(Direction,DirectionUp),Low[Bar],Close[Bar],Digits);
+    else
+    if (IsBetween(State,Recovery,Reversal))
+      price               = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+
+    return NormalizeDouble(price,Digits);
   }
 
 //+------------------------------------------------------------------+
@@ -244,66 +285,161 @@ double Percent(FiboLevel Level, int Format=InPoints)
   }
 
 //+------------------------------------------------------------------+
-//| NewState - Returns true on change to a Fractal State             |
+//| GetPivot - Returns requested Pivot for supplied State from Start |
 //+------------------------------------------------------------------+
-bool NewState(FractalRec &Fractal, int Bar=0, bool Reversing=false)
+PivotRec GetPivot(PivotRec &Pivot[], FractalState State, int Start=0)
   {
-    double retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
-    double pivot         = NoValue;
-
-    if (Reversing)
-      return (NewState(Fractal.State,(FractalState)Reversal));
-      
-    if (retrace>FiboCorrection)
-      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
-        return (NewState(Fractal.State,(FractalState)Recovery));
-      else
-        return (NewState(Fractal.State,(FractalState)Correction));
-
-    if (retrace>FiboRetrace)
-    {
-      if (IsEqual(Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],Low[Bar]),Digits))
-        if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRecovery)
-        {
-          if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback))
-            Flag("Before:"+EnumToString(Fractal.State)+" After:"+EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)),clrGoldenrod,Bar,Close[Bar]);
-          return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback)));
-        }
-      
-      if (IsEqual(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Digits))
+    int      size            = ArraySize(Pivot);
+    
+    if (size>Start)
+      for (int node=Start;node<size;node++)
       {
-        if (Fractal.State!=Retrace)
-        Flag("NewRetrace",clrRed,Bar,Close[Bar]);
-        return (NewState(Fractal.State,(FractalState)Retrace));
+        if (IsEqual(State,Pivot[node].State))
+          return Pivot[node];
+          
+        if (IsEqual(Pivot[node].State,Reversal))
+          if (IsEqual(State,Breakout))
+            return Pivot[node];
       }
 
-//Print((string)Bar+": "+DoubleToStr(Retrace(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar]),InPercent),1)+"%  "+
-//      DoubleToStr(Fractal.Point[fpRetrace],Digits)+"  "+DoubleToStr(Fractal.Point[fpRecovery],Digits)+"  "+DoubleToStr(BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar]),Digits));
+    return Pivot[0];
+  }
 
-      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
-        if (Retrace(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar],Digits))>FiboRetrace)
-        {
-        if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally))
-          Flag(EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)),clrYellow,Bar,Close[Bar]);
-          return (IsChanged(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));
-        }
+//+------------------------------------------------------------------+
+//| NewPivot - Inserts a new Fractal Pivot record                    |
+//+------------------------------------------------------------------+
+void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction, int Bar)
+  {
+    int      size            = ArraySize(Pivot);
 
-      return (false);
+    ArrayResize(Pivot,size+1,32768);
+    
+    if (size>0)
+    {
+      ArrayCopy(Pivot,Pivot,1,0,size);
+      
+      Pivot[0].Bias          = Action(Price-Pivot[1].Open);
     }
-
-    if (retrace>FiboRecovery)
-        {
-        if (Fractal.State!=(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally))
-          Flag(EnumToString((FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)),clrDarkGray,Bar,Close[Bar]);
-      return (NewState(Fractal.State,(FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally)));
-      }
-    return (NewState(Fractal.State,(FractalState)Breakout));
+    else Pivot[0].Bias       = NoBias;
+    
+    Pivot[0].State           = State;
+    Pivot[0].Open            = Price;
+    Pivot[0].High            = Price(State,Direction,Bar);
+    Pivot[0].Low             = Price(State,Direction,Bar);
+    Pivot[0].Close           = Close[Bar];
+    Pivot[0].Bar             = Bar;    
   }
 
 //+------------------------------------------------------------------+
 //| NewState - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
-bool NewState(FractalState &State, FractalState Change, bool Update=true)
+bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, bool Update=true, bool Force=true)
+  {
+    FractalRec frec          = Fractal;
+    frec.Event               = NoEvent;
+    double     retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
+
+    //-- Handle Reversals
+    if (Reversing)
+    {
+      frec.State             = Reversal;
+      frec.Price             = Fractal.Point[fpBase];
+      frec.Peg               = false;
+    }
+
+    //-- Handle Correction/Recovery
+    else    
+    if (retrace>FiboCorrection)
+      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
+      {
+        frec.State           = Recovery;
+        frec.Price           = Price(Fibo23,Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Retrace);
+      }
+      else
+      {
+        frec.State           = Correction;
+        frec.Price           = Price(Fibo23,Fractal.Point[fpExpansion],Fractal.Point[fpRoot],Retrace);
+      }
+    else
+
+    //-- Handle Retraces
+    if (retrace>FiboRetrace)
+    {
+      frec.State             = NoState;
+
+      if (IsEqual(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Digits))
+      {
+        frec.State           = Retrace;
+        frec.Price           = BoolToDouble(IsChanged(frec.Peg,true),Price(Fibo50,Fractal.Point[fpExpansion],Fractal.Point[fpRoot],Retrace),
+                               BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),GetPivot(Pivot,Retrace,0).Low,GetPivot(Pivot,Retrace,0).High),Digits);
+      }
+      else
+      if (IsEqual(Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],Low[Bar]),Digits))
+      {
+        if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRetrace&&
+           ((IsEqual(Fractal.Direction,DirectionUp)&&Fractal.Point[fpRecovery]>Fractal.Point[fpBase])||
+            (IsEqual(Fractal.Direction,DirectionDown)&&Fractal.Point[fpRecovery]<Fractal.Point[fpBase])))
+        {
+          frec.State         = Breakout;
+          frec.Price         = BoolToDouble(IsChanged(frec.Peg,false),Fractal.Point[fpBase],
+                               BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),GetPivot(Pivot,Breakout,0).High,GetPivot(Pivot,Breakout,0).Low),Digits);
+        }
+        else
+        if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRecovery)
+        {
+          if (IsEqual(Fractal.State,Retrace))
+          {
+            frec.State       = (FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Rally,Pullback);
+            frec.Price       = Price(Fibo23,Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Retrace);
+          }
+        }
+      }
+      else
+      if (Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRecovery])<FiboRecovery)
+        if (Retrace(Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),Low[Bar],High[Bar],Digits))>FiboRetrace)
+        {
+          frec.State         = (FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally);
+          frec.Price         = Price(Fibo50,Fractal.Point[fpRetrace],Fractal.Point[fpRecovery],Retrace);
+        }
+    }
+    else
+
+    //-- Handle Rally/Pullback after Breakout/Reversal
+    if (retrace>FiboRecovery)
+    {
+      frec.State             = (FractalState)BoolToInt(IsEqual(Fractal.Direction,DirectionUp),Pullback,Rally);
+      frec.Price             = Price(Fibo23,Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Retrace);
+    }
+    else
+
+    //-- Handle Breakout
+    {
+      frec.State             = Breakout;
+      frec.Price             = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),GetPivot(Pivot,Breakout,0).High,GetPivot(Pivot,Breakout,0).Low,Digits);
+      frec.Peg               = false;
+    }
+
+    if (NewState(Fractal.State,frec.State,Update,Force))
+    {
+      NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
+
+      frec.Event             = FractalEvent(frec.State);
+      Fractal                = frec;
+
+      return true;
+    }
+
+    Pivot[0].High            = fmax(Pivot[0].High,High[Bar]);
+    Pivot[0].Low             = fmin(Pivot[0].Low,Low[Bar]);
+    Pivot[0].Close           = Close[Bar];
+
+    return false;
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Returns true on change to a Fractal State             |
+//+------------------------------------------------------------------+
+bool NewState(FractalState &State, FractalState Change, bool Update=true, bool Force=false)
   {
     if (Change==NoState)
       return(false);
@@ -320,13 +456,13 @@ bool NewState(FractalState &State, FractalState Change, bool Update=true)
         return(IsChanged(State,Change,Update));
       else return(false);
 
-    if (State==Retrace)
-      if (Change==Reversal||Change==Breakout||Change==Correction)
-        return(IsChanged(State,Change,Update));
-      else return(false);
-
     if (Change==Recovery)
       return (false);
+
+    if (State==Retrace)
+      if (Force||Change==Reversal||Change==Breakout||Change==Correction)
+        return(IsChanged(State,Change,Update));
+      else return(false);
 
     return(IsChanged(State,Change,Update));
   }

@@ -84,6 +84,7 @@ input YesNoType      inpShowRange       = No;              // Show Session Range
 input YesNoType      inpShowHold        = No;              // Show Congruent Fractal Zones
 input YesNoType      inpShowBuffer      = No;              // Show Fractal Lines (Buffer)
 input YesNoType      inpShowPivots      = No;              // Show Session Pivots
+input int            inpShowFractal     = NoValue;         // Show Fractal Pivot by period (No Value=No)
 input ShowOptions    inpShowOption      = ShowNone;        // Show Fractal/Session Boundaries/Flags
 input YesNoType      inpShowEvents      = No;              // Show Event Flags
 input YesNoType      inpShowComment     = No;              // Show Fibonacci Data In Comment
@@ -272,6 +273,14 @@ void RefreshScreen(int Bar=0)
       UpdatePriceLabel("plS_PriorMid:"+sessionIndex,session.Pivot(PriorSession),clrGoldenrod);
     }
 
+    if (inpShowFractal==Yes)
+    {
+      UpdatePriceLabel("plS_Pivot.Open:"+sessionIndex,session.Pivot().Open,clrWhite);
+      UpdatePriceLabel("plS_Pivot.High:"+sessionIndex,session.Pivot().High,clrGreen);
+      UpdatePriceLabel("plS_Pivot.Low:"+sessionIndex,session.Pivot().Low,clrRed);
+      UpdatePriceLabel("plS_Pivot.Close:"+sessionIndex,session.Pivot().Close,clrYellow);
+    }
+
     if (inpShowData>NoLabel)
     {
       UpdateLabel("lbSessionType"+sessionIndex,EnumToString(session.Type())+" "+proper(ActionText(session[ActiveSession].Bias))+" "+
@@ -298,7 +307,7 @@ void RefreshScreen(int Bar=0)
       UpdateHold();
 
     if (inpShowComment==Yes)
-      Comment(session.FractalStr());
+      Comment(session.FractalStr(8));
   }
 
 //+------------------------------------------------------------------+
@@ -401,6 +410,11 @@ int OnInit()
       NewLabel("lbSessionTime"+sessionIndex,"",100,215+sessionOffset,clrDarkGray,SCREEN_UR,0);
       NewLabel("lbActiveState"+sessionIndex,"",25,215+sessionOffset,clrDarkGray,SCREEN_UR,0);
     }
+
+    NewPriceLabel("plS_Pivot.Open:"+sessionIndex);
+    NewPriceLabel("plS_Pivot.High:"+sessionIndex);
+    NewPriceLabel("plS_Pivot.Low:"+sessionIndex);
+    NewPriceLabel("plS_Pivot.Close:"+sessionIndex);
 
     NewLine("lnS_CorrectionHigh:"+sessionIndex);
     NewLine("lnS_CorrectionLow:"+sessionIndex);    
