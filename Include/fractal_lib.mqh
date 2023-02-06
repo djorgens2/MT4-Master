@@ -85,14 +85,15 @@
 
   struct FractalRec
          {
-           int           Direction;
-           int           Bias;
-           FractalState  State;
-           EventType     Event;
-           double        Price;
-           bool          Peg;
-           bool          Trap;
-           double        Point[FractalPoints];
+           int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
+           int           Bias;                     //-- Bias based on Close[] to Active Pivot
+           int           Lead;                     //-- Bias based on Last Pivot High/Low hit
+           FractalState  State;                    //-- State
+           EventType     Event;                    //-- Current Tick Event; disposes on next tick
+           double        Price;                    //-- Last Pivot Price
+           bool          Peg;                      //-- Retrace peg
+           bool          Trap;                     //-- Trap flag (not yet implemented)
+           double        Point[FractalPoints];     //-- Fractal Points (Prices)
          };
 
 static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
@@ -429,9 +430,11 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       return true;
     }
 
-    Pivot[0].High            = fmax(Pivot[0].High,High[Bar]);
-    Pivot[0].Low             = fmin(Pivot[0].Low,Low[Bar]);
+    Fractal.Lead             = BoolToInt(IsHigher(High[Bar],Pivot[0].High),OP_BUY,Fractal.Lead);
+    Fractal.Lead             = BoolToInt(IsLower(Low[Bar],Pivot[0].Low),OP_SELL,Fractal.Lead);
     Pivot[0].Close           = Close[Bar];
+
+    NewBias(Fractal.Bias,Action(Close[Bar]-Fractal.Price,InDirection));
 
     return false;
   }
@@ -465,6 +468,25 @@ bool NewState(FractalState &State, FractalState Change, bool Update=true, bool F
       else return(false);
 
     return(IsChanged(State,Change,Update));
+  }
+
+//+------------------------------------------------------------------+
+//| NewBias - Reurns true on bias change; Force allows NoBias        |
+//+------------------------------------------------------------------+
+bool NewBias(int &Check, int Change, bool Force=false)
+  {
+    if (IsBetween(Change,NoBias,OP_SELL))
+    {
+      if (Force)
+        return IsChanged(Check,Change);
+
+      if (IsEqual(Change,NoBias))
+        return false;
+
+      return IsChanged(Check,Change);
+    }
+    
+    return false;
   }
 
 //+------------------------------------------------------------------+

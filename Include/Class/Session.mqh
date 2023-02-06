@@ -368,11 +368,13 @@ void CSession::UpdateTerm(void)
       frec[Term].Event             = FractalEvent(state);
       frec[Term].Price             = BoolToDouble(Event(NewTerm),frec[Term].Point[fpBase],Close[sBar]);
 
-      SetEvent(BoolToEvent(NewAction(frec[Term].Bias,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
+      SetEvent(BoolToEvent(NewAction(frec[Term].Lead,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
                               Action(frec[Term].Direction),Action(frec[Term].Direction,InDirection,InContrarian))),NewBias),Minor);
       SetEvent(FractalEvent(state),Minor);
       SetEvent(NewState,Minor);
     }
+    
+    NewBias(frec[Term].Bias,Action(Close[sBar]-frec[Term].Price,InDirection));
   }
 
 //+------------------------------------------------------------------+
@@ -397,7 +399,7 @@ void CSession::UpdateTrend(void)
 
       state                           = (FractalState)BoolToInt(IsEqual(frec[Term].Direction,DirectionUp),Rally,Pullback);
 
-      SetEvent(BoolToEvent(NewAction(frec[Trend].Bias,Action(frec[Term].Direction)),NewBias),Major);
+      SetEvent(BoolToEvent(NewAction(frec[Trend].Lead,Action(frec[Term].Direction)),NewBias),Major);
     }
 
     //--- Handle Trend Breakout/Reversal/NewExpansion)
@@ -420,6 +422,8 @@ void CSession::UpdateTrend(void)
       SetEvent(FractalEvent(frec[Trend].State),Major);
       SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major);
     }
+    
+    NewBias(frec[Term].Bias,Action(Close[sBar]-frec[Term].Price,InDirection));
   }
   
 //+------------------------------------------------------------------+
@@ -798,7 +802,8 @@ string CSession::FractalStr(int Pivots=NoValue)
       Append(text,DirText(frec[type].Direction));
       Append(text,EnumToString(frec[type].State));
       Append(text,BoolToStr(frec[type].Peg,"Pegged"));
-      Append(text," ["+ActionText(frec[type].Bias)+"]");
+      Append(text,"["+ActionText(frec[type].Lead)+"]");
+      Append(text,BoolToStr(IsEqual(type,Origin)&&!IsEqual(frec[type].Bias,frec[type].Lead),"Hedge "+"["+ActionText(frec[type].Bias)+"]"));
       Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }

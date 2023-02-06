@@ -254,19 +254,8 @@ int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
 //+------------------------------------------------------------------+
 //| ActionText - returns the text of an ActionCode                   |
 //+------------------------------------------------------------------+
-string ActionText(int Action, int Format=IN_ACTION)
+string ActionText(int Action)
   {
-    if (Format==IN_DIRECTION)
-    {
-      if (Action==OP_BUY||Action==OP_BUYLIMIT||Action==OP_BUYSTOP)
-        return (DirText(DirectionUp));
-
-      if (Action==OP_SELL||Action==OP_SELLLIMIT||Action==OP_SELLSTOP)
-        return (DirText(DirectionDown));
-      
-      return (DirText(NoDirection));
-    }
-
     switch (Action)
     {
       case OP_BUY           : return("BUY");
