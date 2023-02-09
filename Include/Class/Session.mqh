@@ -463,7 +463,7 @@ void CSession::UpdateOrigin(void)
 
     if (NewState(frec[Origin],prec,sBar,Event(NewOrigin),Always,Always))
     {
-      Flag("[s]Origin:"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
+      Flag("[s]"+EnumToString(sType)+":"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
 
       SetEvent(frec[Origin].Event,Critical);
       SetEvent(NewState,Critical);

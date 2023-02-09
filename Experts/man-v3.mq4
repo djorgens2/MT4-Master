@@ -88,7 +88,8 @@ void UpdateTickMA(void)
 //+------------------------------------------------------------------+
 void UpdateSession(void)
   {
-    s[Daily].Update();
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      s[type].Update();
   }
 
 //+------------------------------------------------------------------+
@@ -212,6 +213,10 @@ int OnInit()
    
     //-- Initialize Session
     s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+
     manager.Lead    = NoManager;
 
     return(INIT_SUCCEEDED);

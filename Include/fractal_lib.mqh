@@ -342,7 +342,6 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
     frec.Event               = NoEvent;
     
     double     retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
-    double     recovery;
 
     //-- Handle Reversals
     if (Reversing)
@@ -384,22 +383,12 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       if (IsEqual(Fractal.Point[fpRecovery],BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],Low[Bar]),Digits))
       {
         if (Retrace(Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Fractal.Point[fpRecovery])>FiboRetrace&&
-           ((IsEqual(Fractal.Direction,DirectionUp)&&Fractal.Point[fpRecovery]>Fractal.Point[fpBase])||
-            (IsEqual(Fractal.Direction,DirectionDown)&&Fractal.Point[fpRecovery]<Fractal.Point[fpBase])))
+           ((IsEqual(Fractal.Direction,DirectionUp)&&Fractal.Point[fpRecovery]>fmax(Fractal.Point[fpBase],GetPivot(Pivot,Breakout,0).High))||
+            (IsEqual(Fractal.Direction,DirectionDown)&&Fractal.Point[fpRecovery]<fmin(Fractal.Point[fpBase],GetPivot(Pivot,Breakout,0).Low))))
         {
-          retrace            = Price(Fibo50,Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Retrace);
-//          recovery           = 
           frec.State         = Breakout;
-          
-          if (IsEqual(Bar,0))
-            frec.Price       = retrace; //<<-- see 17.009 on left
-          else
-            frec.Price       = BoolToDouble(IsChanged(frec.Peg,false),GetPivot(Pivot,Breakout,0).Open,
+          frec.Price         = BoolToDouble(IsEqual(GetPivot(Pivot,Breakout,0).State,Reversal),GetPivot(Pivot,Breakout,0).Open,
                                BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),GetPivot(Pivot,Breakout,0).High,GetPivot(Pivot,Breakout,0).Low),Digits);
-          frec.Price         = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),fmax(frec.Price,retrace),fmin(frec.Price,retrace),Digits);
-//          frec.Price         = GetPivot(Pivot,Breakout,0).Open;
-//          frec.Price         = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),GetPivot(Pivot,Breakout,0).High,GetPivot(Pivot,Breakout,0).Low,Digits);
-//          frec.Price         = Price(Fibo50,Fractal.Point[fpExpansion],Fractal.Point[fpRetrace],Retrace);
           frec.Peg           = false;
         }
         else
