@@ -71,23 +71,27 @@
                      FiboLevels
                    };             
 
-  //-- Canonical Fractal Rec
+  //-- Canonical Pivot Rec
   struct PivotRec
          {
-           int           Bias;
-           FractalState  State;
-           int           Bar;
-           double        Open;
-           double        High;
-           double        Low;
-           double        Close;
+           int           Direction;                //-- Direction [Immutable, once assigned]
+           FractalState  State;                    //-- State [Immutable, once assigned]
+           int           Lead;                     //-- Action set by last NewHigh/NewLow event
+           int           Bias;                     //-- Action set by Close[] - Pivot.Open
+           EventType     Event;                    //-- Current Tick Event; disposes on next tick
+           int           Bar;                      //-- Not implemented; Event Bar
+           double        Open;                     //-- Open Price set on NewPivot [Immutable, once assigned]
+           double        High;                     //-- Updated on NewHigh
+           double        Low;                      //-- Updated on NewLow
+           double        Close;                    //-- Updated on Update [once per tick]
          };
 
+  //-- Canonical Fractal Rec
   struct FractalRec
          {
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
-           int           Bias;                     //-- Bias based on Close[] to Active Pivot
            int           Lead;                     //-- Bias based on Last Pivot High/Low hit
+           int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
            FractalState  State;                    //-- State
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
            double        Price;                    //-- Last Pivot Price
@@ -103,7 +107,7 @@ static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)"
 //+------------------------------------------------------------------+
 color Color(FractalState State)
   {
-    static const color  statecolor[FractalStates]  = {clrNONE,clrLawnGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed};
+    static const color  statecolor[FractalStates]  = {clrNONE,clrGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed};
 
     return statecolor[State];
   }
@@ -286,24 +290,74 @@ double Percent(FiboLevel Level, int Format=InPoints)
   }
 
 //+------------------------------------------------------------------+
+//| UpdatePivot - updates Pivot details on the tick                  |
+//+------------------------------------------------------------------+
+void UpdatePivot(PivotRec &Pivot, int Direction, int Bar=0)
+  {
+    double price        = Price(Pivot.State,Direction,Bar);
+    
+    Pivot.Event         = NoEvent;
+    
+    if (IsHigher(price,Pivot.High))
+      Pivot.Event       = NewHigh;
+
+    if (IsLower(price,Pivot.Low))
+      Pivot.Event       = NewLow;
+
+    if (Pivot.Event>NoEvent)
+      if (NewAction(Pivot.Lead,BoolToInt(IsEqual(Pivot.Event,NewHigh),OP_BUY,OP_SELL)))
+        Pivot.Event     = NewLead;
+
+    Pivot.Close         = price;
+    Pivot.Event         = BoolToEvent(NewBias(Pivot.Bias,Action(price-Pivot.Open)),NewBias,Pivot.Event);
+  }
+
+//+------------------------------------------------------------------+
 //| GetPivot - Returns requested Pivot for supplied State from Start |
 //+------------------------------------------------------------------+
-PivotRec GetPivot(PivotRec &Pivot[], FractalState State, int Start=0)
+PivotRec GetPivot(PivotRec &Pivot[], FractalState State, int Start=0, MeasureType Measure=Now)
   {
-    int      size            = ArraySize(Pivot);
+    PivotRec pivot       = {NoDirection,NoState,NoAction,NoBias,NoEvent,NoValue,NoValue,NoValue,NoValue,NoValue};
+
+    int      size        = ArraySize(Pivot);
+    double   low,high;
     
     if (size>Start)
+    {
+      pivot              = Pivot[0];
+      
       for (int node=Start;node<size;node++)
       {
+        if (IsEqual(Measure,Now))
+          pivot          = Pivot[node];
+        else
+        {
+          if (IsEqual(Measure,Max))
+          {
+            low          = fmin(pivot.Low,Pivot[node].Low);
+            high         = fmax(pivot.High,Pivot[node].High);
+          }
+          else
+          {
+            low          = fmax(pivot.Low,Pivot[node].Low);
+            high         = fmin(pivot.High,Pivot[node].High);
+          }
+
+          pivot          = Pivot[node];
+          pivot.Low      = low;
+          pivot.High     = high;
+        }
+
         if (IsEqual(State,Pivot[node].State))
-          return Pivot[node];
-          
+          return pivot;
+
         if (IsEqual(Pivot[node].State,Reversal))
           if (IsEqual(State,Breakout))
-            return Pivot[node];
+            return pivot;
       }
+    }
 
-    return Pivot[0];
+    return pivot;
   }
 
 //+------------------------------------------------------------------+
@@ -319,12 +373,13 @@ void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction
     {
       ArrayCopy(Pivot,Pivot,1,0,size);
       
-      Pivot[0].Bias          = Action(Price-Pivot[1].Open);
+      Pivot[0].Direction     = Direction(Price-Pivot[1].Open);
     }
-    else Pivot[0].Bias       = NoBias;
+    else Pivot[0].Direction  = NoDirection;
 
     Direction                = BoolToInt(IsEqual(State,Retrace),Direction(Direction,InDirection,InContrarian),Direction);
 
+    Pivot[0].Bias            = Action(Direction);
     Pivot[0].State           = State;
     Pivot[0].Open            = Price;
     Pivot[0].High            = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Price(State,Direction,Bar),Digits);
@@ -436,11 +491,16 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       return true;
     }
 
-    Fractal.Lead             = BoolToInt(IsHigher(High[Bar],Pivot[0].High),OP_BUY,Fractal.Lead);
-    Fractal.Lead             = BoolToInt(IsLower(Low[Bar],Pivot[0].Low),OP_SELL,Fractal.Lead);
-    Pivot[0].Close           = Close[Bar];
-
-    NewBias(Fractal.Bias,Action(Close[Bar]-Fractal.Price,InDirection));
+    UpdatePivot(Pivot[0],Fractal.Direction,Bar);
+    
+    if (Bar>0)
+    {
+      Fractal.Lead           = BoolToInt(IsHigher(High[Bar],Pivot[0].High),OP_BUY,Fractal.Lead);
+      Fractal.Lead           = BoolToInt(IsLower(Low[Bar],Pivot[0].Low),OP_SELL,Fractal.Lead);
+    } 
+    else Fractal.Lead        = Pivot[0].Lead;
+    
+    Fractal.Bias             = Pivot[0].Bias;
 
     return false;
   }
@@ -566,4 +626,3 @@ bool IsChanged(FractalType &Check, FractalType Change, bool Update=true)
 
     return (true);
   }
-

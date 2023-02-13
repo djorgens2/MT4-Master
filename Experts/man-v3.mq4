@@ -20,13 +20,25 @@ enum ManagerState
        Buy,
        Sell,
        Wait,
+       Hedge,
        ManagerStates
      };
 
-struct ManagerRec
+struct ManagerDetail
+       {
+         ManagerState  State;
+         double        DCA;
+         FiboLevel     Level;
+         OrderSummary  Zone;
+         bool          Hedge;
+       };
+
+struct ManagerMaster
        {
          int           Lead;
-         ManagerState  State[2];
+         ManagerDetail Manager[2];
+         PivotRec      Main;
+         bool          Hedge;
        };
 
 //--- Configuration
@@ -58,7 +70,7 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   COrder              *order             = new COrder(inpBrokerModel,Hold,Hold);
   CSession            *s[SessionTypes];
   
-  ManagerRec          manager;
+  ManagerMaster        master;
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -67,8 +79,11 @@ void RefreshScreen(void)
   {
     string        text                    = "";
 
+    Append(text,"*----------- Main [Origin] Pivot ----------------*");
+    Append(text,s[Daily].PivotStr("Main",master.Main)+"\n\n","\n");
+    
     if (inpShowFractal==Daily)
-      Append(text,s[inpShowFractal].FractalStr());
+      Append(text,s[inpShowFractal].FractalStr(5));
 
     Append(text,s[Daily].ActiveEventStr(),"\n\n");
 
@@ -76,20 +91,30 @@ void RefreshScreen(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTickMA - Updates TickMA data                               |
+//| UpdateMaster - Updates Master/Manager data                       |
 //+------------------------------------------------------------------+
-void UpdateTickMA(void)
+void UpdateMaster(void)
   {
-    t.Update();
-  }
- 
-//+------------------------------------------------------------------+
-//| UpdateSession - Updates Session data                             |
-//+------------------------------------------------------------------+
-void UpdateSession(void)
-  {
+    //-- Update Classes
     for (SessionType type=Daily;type<SessionTypes;type++)
       s[type].Update();
+
+    order.Update();
+    t.Update();
+
+    master.Lead                       = Action(s[Daily][Origin].Direction,InDirection);
+    
+    //-- Handle Main [Origin-Level/Macro] Events
+    if (s[Daily].Event(NewBreakout,Critical)||s[Daily].Event(NewReversal,Critical))
+      master.Main                     = s[Daily].Pivot();
+    else UpdatePivot(master.Main,s[Daily][Origin].Direction);
+
+    for (int action=Buy;IsBetween(action,Buy,Sell);action++)
+    {
+      master.Manager[action].DCA      = order.DCA(action);
+      master.Manager[action].Zone     = order.Entry(action);
+      master.Manager[action].Level    = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[action].DCA));
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -126,13 +151,11 @@ void ManageRisk(int Manager)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    order.Update();
-
     //-- Handle Active Management
-    if (IsBetween(manager.Lead,Buy,Sell))
+    if (IsBetween(master.Lead,Buy,Sell))
     {
-      ManageOrders(manager.Lead);
-      ManageRisk(Action(manager.Lead,InAction,InContrarian));
+      ManageOrders(master.Lead);
+      ManageRisk(Action(master.Lead,InAction,InContrarian));
     }
     else
     
@@ -162,8 +185,7 @@ void OnTick()
   {
     string     otParams[];
   
-    UpdateTickMA();
-    UpdateSession();
+    UpdateMaster();
 
     InitializeTick();
     GetManualRequest();
@@ -212,12 +234,12 @@ int OnInit()
     OrderConfig();
    
     //-- Initialize Session
-    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset,Always);
     s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
-    manager.Lead    = NoManager;
+    master.Main     = s[Daily].Pivot(Breakout,0,Max);
 
     return(INIT_SUCCEEDED);
   }

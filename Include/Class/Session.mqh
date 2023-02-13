@@ -52,7 +52,7 @@ public:
                double         Resistance;
              };
              
-             CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset);
+             CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false);
             ~CSession();
 
              SessionType      Type(void)                         {return (sType);}
@@ -64,7 +64,9 @@ public:
              int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
-             PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};  //--- Mid/Mean by Period Type
+             PivotRec         Pivot(FractalState State, int Start=0, MeasureType Measure=Now)
+                                {return GetPivot(prec,State,Start,Measure);};
+             PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};                //--- Pivot by Node
              double           Pivot(const PeriodType Type);                                            //--- Mid/Mean by Period Type
              int              Age(void)                          {return(sBarFE);}                     //--- Number of periods since the last fractal event
              
@@ -72,7 +74,7 @@ public:
              double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns fibonacci expansion
              double           Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
 
-             string           PivotStr(int Node, FractalState State=NoState);
+             string           PivotStr(string Title, PivotRec &Pivot);
              string           FractalStr(int Pivots=NoValue);
              string           SessionStr(PeriodType Type);
 
@@ -85,6 +87,7 @@ private:
              SessionType      sType;
              
              bool             sSessionIsOpen;
+             bool             sShowFlags;
 
              int              sHourOpen;
              int              sHourClose;
@@ -120,6 +123,7 @@ private:
              void             UpdateTrend(void);
              void             UpdateOrigin(void);
              void             UpdateFibonacci(void);
+             void             UpdatePanel(void);
 
              void             UpdateBuffers(void);
              void             UpdateFractalBuffer(int Direction, double Value);
@@ -463,7 +467,8 @@ void CSession::UpdateOrigin(void)
 
     if (NewState(frec[Origin],prec,sBar,Event(NewOrigin),Always,Always))
     {
-      Flag("[s]"+EnumToString(sType)+":"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
+      if (sShowFlags)
+        Flag("[s]"+EnumToString(sType)+":"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
 
       SetEvent(frec[Origin].Event,Critical);
       SetEvent(NewState,Critical);
@@ -484,6 +489,19 @@ void CSession::UpdateFibonacci(void)
       if (Percent(fmin(fEventFibo[type],Fibo823))<Expansion(type,Now))
         if (IsChanged(fEventFibo[type],fmin(fEventFibo[type]+1,Fibo823)))
           SetEvent(NewFibonacci,FractalAlert(type));
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdatePanel - Updates control panel display                      |
+//+------------------------------------------------------------------+
+void CSession::UpdatePanel(void)
+  {
+    //-- Update Control Panel (Session)
+    if (ObjectGet("bxhAI-Session"+EnumToString(sType),OBJPROP_BGCOLOR)==clrBoxOff||Event(NewFractal)||Event(NewHour))
+    {
+      UpdateBox("bxhAI-Session"+EnumToString(sType),Color(Direction(Term),IN_DARK_DIR));
+      UpdateBox("bxbAI-OpenInd"+EnumToString(sType),BoolToInt(IsOpen(),clrYellow,clrBoxOff));
     }
   }
 
@@ -573,7 +591,7 @@ void CSession::LoadHistory(void)
 //+------------------------------------------------------------------+
 //| Session Class Constructor                                        |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false)
   {
     //--- Init global session values
     sType                            = Type;
@@ -581,6 +599,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sHourClose                       = HourClose;
     sHourOffset                      = HourOffset;
     sSessionIsOpen                   = false;
+    sShowFlags                       = ShowFlags;
     
     sSessionRange                    = new CArrayDouble(0);
     sSessionRange.Truncate           = false;
@@ -656,6 +675,7 @@ void CSession::Update(void)
     UpdateTrend();
     UpdateOrigin();
     UpdateFibonacci();
+    UpdatePanel();
   }
   
 //+------------------------------------------------------------------+
@@ -765,26 +785,19 @@ double CSession::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
 //+------------------------------------------------------------------+
 //| PivotStr - Returns Screen formatted Pivot Detail                 |
 //+------------------------------------------------------------------+
-string CSession::PivotStr(int Node, FractalState State=NoState)
+string CSession::PivotStr(string Title, PivotRec &Pivot)
   {  
     string text            = "";
-    PivotRec pivot;
-    
-    if (Node>NoValue)
-      if (IsEqual(State,NoState))
-        if (Node>ArraySize(prec))
-          return "Error: PivotStr node exceeds maximum";
-        else pivot         = prec[Node];
-      else pivot           = GetPivot(prec,State,Node);
-    else return "Error: Invalid node for PivotStr";
 
-    Append(text,BoolToStr(IsEqual(Node,0),"Active","Node["+(string)Node+"]"),"\n");
-    Append(text,ActionText(pivot.Bias));
-    Append(text,EnumToString(pivot.State));
-    Append(text,DoubleToStr(pivot.Open,Digits));
-    Append(text,DoubleToStr(pivot.High,Digits));
-    Append(text,DoubleToStr(pivot.Low,Digits));
-    Append(text,DoubleToStr(pivot.Close,Digits));
+    Append(text,Title,"\n");
+    Append(text,DirText(Pivot.Direction));
+    Append(text,ActionText(Pivot.Lead));
+    Append(text,EnumToString(Pivot.State));
+    Append(text,"["+ActionText(Pivot.Bias)+"]");
+    Append(text,DoubleToStr(Pivot.Open,Digits));
+    Append(text,DoubleToStr(Pivot.High,Digits));
+    Append(text,DoubleToStr(Pivot.Low,Digits));
+    Append(text,DoubleToStr(Pivot.Close,Digits));
         
     return (text);
   }
@@ -813,7 +826,7 @@ string CSession::FractalStr(int Pivots=NoValue)
       Append(text,"*---------- Origin Fractal Pivots ["+(string)ArraySize(prec)+"]--------------*","\n");
 
       for (int node=0;node<=fmin(ArraySize(prec),Pivots);node++)
-        Append(text,PivotStr(node),"\n");
+        Append(text,PivotStr(BoolToStr(IsEqual(node,0),"Active","Node["+(string)node+"]"),prec[node]),"\n");
     }
         
     return (text);

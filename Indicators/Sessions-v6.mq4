@@ -90,7 +90,7 @@ input YesNoType      inpShowEvents      = No;              // Show Event Flags
 input YesNoType      inpShowComment     = No;              // Show Fibonacci Data In Comment
 input DataPosition   inpShowData        = NoLabel;         // Show Session Data Labels (Position)
 
-CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset);
+CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowEvents==Yes);
 
 bool                 sessionOpen        = false;
 int                  sessionRange       = 0;
