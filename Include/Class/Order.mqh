@@ -33,7 +33,7 @@ protected:
                         FIFO
                       };
 
-  //-- Trade Manager States
+  //-- Order Manager Operations/Methods
   enum                OrderMethod
                       {
                         Hold,          // Hold (unless max risk)
@@ -47,7 +47,7 @@ protected:
                         OrderMethods
                       };
 
-  //--- Queue Statuses
+  //--- Request Queue Statuses
   enum                QueueStatus
                       {
                         //-- Request Submit States
@@ -74,16 +74,16 @@ protected:
                         QueueStates
                       };
 
-private:
-
-  //--- Order Metrics
+  //--- Margin Calculation Method Types
   enum                MarginType
                       {
                         Margin,
                         MarginLong,
                         MarginShort
                       };
+private:
 
+  //--- Account Configuration, Derived Metrics, and Directives
   struct              AccountMetrics
                       {
                         bool            TradeEnabled;
@@ -261,7 +261,7 @@ public:
                       ~COrder();
 
           void         Update(void);
-          void         ExecuteOrders(int Action);
+          void         ExecuteOrders(int Action, bool Hold=Off);
           void         ExecuteRequests(void);
 
           bool         Enabled(int Action);
@@ -336,7 +336,6 @@ public:
           void         SetRiskLimits(int Action, double MaxRisk, double MaxMargin, double LotScale=0.00);
           void         SetDefaults(int Action, double DefaultLotSize, double DefaultStop, double DefaultTarget);
           void         SetZoneLimits(int Action, double Step, double MaxZoneMargin);
-          void         SetEquityHold(int Action, bool On=true) {Master[Action].EquityHold=On;};
 
           //-- Formatted Output Text
           void         PrintLog(void);
@@ -1587,8 +1586,10 @@ void COrder::ExecuteRequests(void)
 //+------------------------------------------------------------------+
 //| ExecuteOrders - Updates/Closes orders by Action                  |
 //+------------------------------------------------------------------+
-void COrder::ExecuteOrders(int Action)
-  {  
+void COrder::ExecuteOrders(int Action, bool Hold=Off)
+  {
+    Master[Action].EquityHold              = Hold;
+
     //-- Set stops/targets
     for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
       UpdateOrder(Master[Action].Order[detail],Working);

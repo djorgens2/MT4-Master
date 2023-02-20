@@ -15,29 +15,32 @@
 
 #define   NoManager     NoAction
 
-enum ManagerState
+enum OrderCommand
      {
-       Buy,
-       Sell,
-       Wait,
+       Buy,             //-- Purchase Manager
+       Sell,            //-- Sales Manager
        Hedge,
-       ManagerStates
+       Cover,
+       Capture,
+       Wait
      };
 
 struct ManagerDetail
        {
-         ManagerState  State;
+         OrderCommand  Command;
          double        DCA;
          FiboLevel     Level;
-         OrderSummary  Zone;
-         bool          Hedge;
+         OrderSummary  Entry;
+         bool          Hold;
        };
 
 struct ManagerMaster
        {
-         int           Lead;
-         ManagerDetail Manager[2];
-         PivotRec      Main;
+         int           Director;                        //-- Principal Manager
+         OrderCommand  Directive;                       //-- Fractal level determination
+//         int           Lead;                            //-- Non-Corrected Daily Origin Manager [Bias]
+         ManagerDetail Manager[2]; 
+         PivotRec      Pivot;
          bool          Hedge;
        };
 
@@ -80,7 +83,7 @@ void RefreshScreen(void)
     string        text                    = "";
 
     Append(text,"*----------- Main [Origin] Pivot ----------------*");
-    Append(text,s[Daily].PivotStr("Main",master.Main)+"\n\n","\n");
+    Append(text,s[Daily].PivotStr("Main",master.Pivot)+"\n\n","\n");
     
     if (inpShowFractal==Daily)
       Append(text,s[inpShowFractal].FractalStr(5));
@@ -101,42 +104,66 @@ void UpdateMaster(void)
 
     order.Update();
     t.Update();
-
-    master.Lead                       = Action(s[Daily][Origin].Direction,InDirection);
     
     //-- Handle Main [Origin-Level/Macro] Events
     if (s[Daily].Event(NewBreakout,Critical)||s[Daily].Event(NewReversal,Critical))
-      master.Main                     = s[Daily].Pivot();
-    else UpdatePivot(master.Main,s[Daily][Origin].Direction);
-
-    for (int action=Buy;IsBetween(action,Buy,Sell);action++)
     {
-      master.Manager[action].DCA      = order.DCA(action);
-      master.Manager[action].Zone     = order.Entry(action);
-      master.Manager[action].Level    = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[action].DCA));
+      master.Director                   = Action(s[Daily][Origin].Direction);
+      master.Pivot                      = s[Daily].Pivot();
+    }
+    else 
+    {
+      if (s[Daily][NewCorrection])
+        master.Director                 = Action(s[Daily][Origin].Direction,InDirection,InContrarian);
+
+      UpdatePivot(master.Pivot,s[Daily][Origin].Direction);
+    }
+
+    if (t[NewTick])
+    {
+      master.Hedge                      = !IsEqual(s[Daily][Origin].Bias,s[Daily][Origin].Lead);
+    }
+
+    //-- Set Master Command
+    if (t[NewSegment])
+    {
+    };
+
+    for (int role=Buy;IsBetween(role,Buy,Sell);role++)
+    {
+      master.Manager[role].Command = Wait;
+      master.Manager[role].DCA     = order.DCA(role);
+      master.Manager[role].Entry   = order.Entry(role);
+      master.Manager[role].Level   = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[role].DCA));
     }
   }
 
 //+------------------------------------------------------------------+
 //| ManageOrders - Lead Manager order processor                      |
 //+------------------------------------------------------------------+
-void ManageOrders(int Manager)
+void ManageOrders(int Role)
   {
-    OrderRequest request = order.BlankRequest(BoolToStr(IsEqual(Manager,Buy),"Purchasing","Sales"));
-    
-    if (order.Free(Manager)>order.Split(Manager)||IsEqual(order.Entry(Manager).Count,0))
-      switch (Manager)
+    OrderRequest  request    = order.BlankRequest(BoolToStr(IsEqual(Role,Buy),"Purchase","Sales"));
+    ManagerDetail manager    = master.Manager[Role];
+
+    //--- R1: Free Zone?
+    if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
+    {
+      request.Action         = Role;
+      request.Requestor      = "Auto Open ("+request.Requestor+")";
+      
+      switch (Role)
       {
-        case Buy:          //request.Type    = OP_BUY;
-                           request.Memo    = "Long Manager";
-                           break;
+        case Buy:          break;
+        case Sell:         break;
       }
+    }
 
     if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
-      if (order.Submitted(request))
-        Print ("Yay");
-      else
+      if (!order.Submitted(request))
         order.PrintLog();
+        
+    order.ExecuteOrders(Role,manager.Hold);
   }
 
 //+------------------------------------------------------------------+
@@ -144,6 +171,7 @@ void ManageOrders(int Manager)
 //+------------------------------------------------------------------+
 void ManageRisk(int Manager)
   {
+    order.ExecuteOrders(Manager);
   }
 
 //+------------------------------------------------------------------+
@@ -152,10 +180,10 @@ void ManageRisk(int Manager)
 void Execute(void)
   {
     //-- Handle Active Management
-    if (IsBetween(master.Lead,Buy,Sell))
+    if (IsBetween(master.Director,Buy,Sell))
     {
-      ManageOrders(master.Lead);
-      ManageRisk(Action(master.Lead,InAction,InContrarian));
+      ManageOrders(master.Director);
+      ManageRisk(Action(master.Director,InAction,InContrarian));
     }
     else
     
@@ -164,9 +192,6 @@ void Execute(void)
       ManageRisk(Buy);
       ManageRisk(Sell);
     }
-
-    order.ExecuteOrders(Buy);
-    order.ExecuteOrders(Sell);
 
     order.ExecuteRequests();
   }
@@ -239,7 +264,7 @@ int OnInit()
     s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
-    master.Main     = s[Daily].Pivot(Breakout,0,Max);
+    master.Pivot    = s[Daily].Pivot(Breakout,0,Max);
 
     return(INIT_SUCCEEDED);
   }

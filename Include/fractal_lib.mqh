@@ -93,6 +93,7 @@
            int           Lead;                     //-- Bias based on Last Pivot High/Low hit
            int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
            FractalState  State;                    //-- State
+           FractalState  Base;                     //-- Rally/Pullback Base State [Breakout|Reversal|Retrace]
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
            double        Price;                    //-- Last Pivot Price
            bool          Peg;                      //-- Retrace peg
@@ -296,7 +297,8 @@ void UpdatePivot(PivotRec &Pivot, int Direction, int Bar=0)
   {
     double price        = Price(Pivot.State,Direction,Bar);
     
-    Pivot.Event         = NoEvent;
+    Pivot.Close         = price;
+    Pivot.Event         = BoolToEvent(NewBias(Pivot.Bias,Action(price-Pivot.Open)),NewBias);
     
     if (IsHigher(price,Pivot.High))
       Pivot.Event       = NewHigh;
@@ -307,9 +309,6 @@ void UpdatePivot(PivotRec &Pivot, int Direction, int Bar=0)
     if (Pivot.Event>NoEvent)
       if (NewAction(Pivot.Lead,BoolToInt(IsEqual(Pivot.Event,NewHigh),OP_BUY,OP_SELL)))
         Pivot.Event     = NewLead;
-
-    Pivot.Close         = price;
-    Pivot.Event         = BoolToEvent(NewBias(Pivot.Bias,Action(price-Pivot.Open)),NewBias,Pivot.Event);
   }
 
 //+------------------------------------------------------------------+
@@ -486,6 +485,7 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
 
       frec.Event             = FractalEvent(frec.State);
+      frec.Base              = (FractalState)BoolToInt(IsBetween(frec.State,Retrace,Reversal),frec.State,Fractal.Base);
       Fractal                = frec;
 
       return true;

@@ -53,14 +53,10 @@
 //--- Option type defs
 #define InContrarian       true      //--- Return as contrarian direction/action
 #define NoUpdate          false      //--- Return without update
+#define On                 true      //--- Turn Feature On
+#define Off               false      //--- Turn Feature Off
 
 //--- Common terminology; global constants
-
-       enum     OnOffType
-                {
-                  On,
-                  Off
-                };
 
        enum     YesNoType
                 {

@@ -252,15 +252,10 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrGoldenrod);      
       UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
-      if (inpShowEvents==Yes)
-      {
-//        if (session[ShowFractal].Event!=NoEvent)
-//          Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
-//                  Color(session[ShowFractal].State),0,session[ShowFractal].Pivot);
-//
-//        if (session.Event(NewBias,Critical))
-//          Flag("Origin[NewBias]."+EnumToString(session[Origin].State),clrMagenta,0,session[Origin].Pivot);
-      }
+      //if (inpShowEvents==Yes)
+      //  if (session[ShowFractal].Event!=NoEvent)
+      //    Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
+      //            Color(session[ShowFractal].State),0,session[ShowFractal].);
 
       //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
       //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
@@ -307,7 +302,7 @@ void RefreshScreen(int Bar=0)
       UpdateHold();
 
     if (inpShowComment==Yes)
-      Comment(session.FractalStr(8));
+      Comment(session.FractalStr(5)+"\n\n"+session.ActiveEventStr());
   }
 
 //+------------------------------------------------------------------+

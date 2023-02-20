@@ -64,14 +64,15 @@ public:
              int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
-             PivotRec         Pivot(FractalState State, int Start=0, MeasureType Measure=Now)
+             PivotRec         Pivot(FractalState State, int Start=0, MeasureType Measure=Now)          //--- Origin Pivot by State/Measure
                                 {return GetPivot(prec,State,Start,Measure);};
-             PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};                //--- Pivot by Node
+             PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};                //--- Origin Pivot by Node
              double           Pivot(const PeriodType Type);                                            //--- Mid/Mean by Period Type
              int              Age(void)                          {return(sBarFE);}                     //--- Number of periods since the last fractal event
              
-             double           Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns fibonacci retrace
-             double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns fibonacci expansion
+             double           Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns expansion fibonacci
+             double           Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns retrace fibonacci
+             double           Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal);   //--- returns recovery fibonacci
              double           Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
 
              string           PivotStr(string Title, PivotRec &Pivot);
@@ -426,8 +427,15 @@ void CSession::UpdateTrend(void)
       SetEvent(FractalEvent(frec[Trend].State),Major);
       SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major);
     }
+
+    FiboLevel retrace  = Level(Retrace(Trend,Max));
+    FiboLevel recovery = Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery]));
     
-    NewBias(frec[Term].Bias,Action(Close[sBar]-frec[Term].Price,InDirection));
+    if (IsEqual(retrace-recovery,0))
+      NewBias(frec[Trend].Bias,BoolToInt(retrace>0,Action(frec[Trend].Direction,InDirection,InContrarian),Action(frec[Trend].Direction)));
+    else
+    if (retrace-recovery>1)
+      NewBias(frec[Trend].Bias,Action(Close[sBar]-fdiv(frec[Trend].Point[fpRetrace]+frec[Trend].Point[fpRecovery],2,Digits)));
   }
   
 //+------------------------------------------------------------------+
@@ -759,8 +767,23 @@ double CSession::Expansion(FractalType Type, MeasureType Measure, int Format=InD
     switch (Measure)
     {
       case Now: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],Close[sBar],Format));
-      case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
+      case Min: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],frec[Type].Point[fpRetrace],Format));
       case Max: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],Format));
+    }
+
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Recovery - Calcuates fibo recovery% for supplied Type            |
+//+------------------------------------------------------------------+
+double CSession::Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal)
+  {
+    switch (Measure)
+    {
+      case Now: return(Expansion(frec[Type].Point[fpExpansion],frec[Type].Point[fpRoot],Close[sBar],Format));
+//      case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
+      case Max: return(Expansion(frec[Type].Point[fpExpansion],frec[Type].Point[fpRoot],frec[Type].Point[fpRecovery],Format));
     }
 
     return (0.00);
@@ -816,7 +839,9 @@ string CSession::FractalStr(int Pivots=NoValue)
       Append(text,EnumToString(frec[type].State));
       Append(text,BoolToStr(frec[type].Peg,"Pegged"));
       Append(text,"["+ActionText(frec[type].Lead)+"]");
-      Append(text,BoolToStr(IsEqual(type,Origin)&&!IsEqual(frec[type].Bias,frec[type].Lead),"Hedge "+"["+ActionText(frec[type].Bias)+"]"));
+      if (type==Trend)
+        Append(text,(string)Level(Retrace(Trend,Max))+":"+(string)Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery])));
+      Append(text,BoolToStr(IsEqual(frec[type].Bias,frec[type].Lead),"","Hedge "+"["+ActionText(frec[type].Bias)+"]"));
       Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }
