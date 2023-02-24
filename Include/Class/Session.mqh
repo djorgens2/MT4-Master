@@ -387,6 +387,9 @@ void CSession::UpdateTerm(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateTrend(void)
   {
+    FiboLevel retrace;
+    FiboLevel recovery;
+
     FractalState state                = NoState;
     frec[Trend].Event                 = NoEvent;
 
@@ -402,14 +405,23 @@ void CSession::UpdateTrend(void)
       frec[Trend].Point[fpBase]       = frec[Term].Point[fpOrigin];
       frec[Trend].Point[fpRoot]       = frec[Term].Point[fpRoot];
 
-      state                           = (FractalState)BoolToInt(IsEqual(frec[Term].Direction,DirectionUp),Rally,Pullback);
-
       SetEvent(BoolToEvent(NewAction(frec[Trend].Lead,Action(frec[Term].Direction)),NewBias),Major);
     }
 
     //--- Handle Trend Breakout/Reversal/NewExpansion)
     if (IsBetween(frec[Term].Point[fpExpansion],frec[Trend].Point[fpRoot],frec[Trend].Point[fpBase]))
-      frec[Trend].Point[fpExpansion]  = frec[Term].Point[fpExpansion];
+    {
+      if (IsChanged(frec[Trend].Point[fpExpansion],frec[Term].Point[fpExpansion]))
+        state                         = (FractalState)BoolToInt(IsEqual(frec[Trend].Direction,DirectionUp),Rally,Pullback);
+      else
+      {
+        retrace       = Level(Expansion(Trend,Max));
+        recovery      = Level(Retrace(Trend,Max));
+
+        if (retrace>1&&recovery>1)
+          state                       = (FractalState)BoolToInt(IsEqual(frec[Trend].Direction,DirectionUp),Pullback,Rally);
+      }
+    }
     else
     {
       state                           = (FractalState)BoolToInt(NewDirection(frec[Origin].Direction,frec[Trend].Direction),Reversal,Breakout);
@@ -428,8 +440,8 @@ void CSession::UpdateTrend(void)
       SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major);
     }
 
-    FiboLevel retrace  = Level(Retrace(Trend,Max));
-    FiboLevel recovery = Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery]));
+    retrace       = Level(Retrace(Trend,Max));
+    recovery      = Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery]));
     
     if (IsEqual(retrace-recovery,0))
       NewBias(frec[Trend].Bias,BoolToInt(retrace>0,Action(frec[Trend].Direction,InDirection,InContrarian),Action(frec[Trend].Direction)));
@@ -491,8 +503,8 @@ void CSession::UpdateFibonacci(void)
     //-- Test/Reset for Expansion Fibos/Events
     for (FractalType type=Origin;type<=Term;type++)
     {
-      if (Event(NewTerm))
-        fEventFibo[type]                  = fmax(Level(Expansion(type,Max))+1,Fibo161);
+      if (IsEqual(frec[type].Event,NewReversal)||(type>Origin&&Event(NewTerm)))
+        fEventFibo[type]                  = Fibo161;
 
       if (Percent(fmin(fEventFibo[type],Fibo823))<Expansion(type,Now))
         if (IsChanged(fEventFibo[type],fmin(fEventFibo[type]+1,Fibo823)))
@@ -839,10 +851,12 @@ string CSession::FractalStr(int Pivots=NoValue)
       Append(text,EnumToString(frec[type].State));
       Append(text,BoolToStr(frec[type].Peg,"Pegged"));
       Append(text,"["+ActionText(frec[type].Lead)+"]");
+//      Append(text,EnumToString(FiboEvent(type)));
       if (type==Trend)
-        Append(text,(string)Level(Retrace(Trend,Max))+":"+(string)Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery])));
+        Append(text,(string)Level(Expansion(Trend,Max))+":"+(string)Level(Retrace(Trend,Max)));
+      //  Append(text,(string)Level(Retrace(Trend,Max))+":"+(string)Level(Retrace(frec[Trend].Point[fpRoot],frec[Trend].Point[fpExpansion],frec[Trend].Point[fpRecovery])));
       Append(text,BoolToStr(IsEqual(frec[type].Bias,frec[type].Lead),"","Hedge "+"["+ActionText(frec[type].Bias)+"]"));
-      Append(text,"      (r) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
+      Append(text,"     (rt) "+DoubleToStr(Retrace(type,Now,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Max,InPercent),1)+"%  "+DoubleToStr(Retrace(type,Min,InPercent),1)+"%\n","\n");
       Append(text,"     (e) "+DoubleToStr(Expansion(type,Now,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Max,InPercent),1)+"%  "+DoubleToStr(Expansion(type,Min,InPercent),1)+"%\n");
     }
 

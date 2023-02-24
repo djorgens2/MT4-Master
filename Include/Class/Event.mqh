@@ -166,20 +166,20 @@ void CEvent::ClearEvents(void)
 //+------------------------------------------------------------------+
 string CEvent::ActiveEventStr(bool WithHeader=true)
   {
-    string aeActiveEvents   = "\n------------------------------";
+    string text   = "\n------------------------------";
     
     if (WithHeader)
-      aeActiveEvents        = Symbol()+" Events"+aeActiveEvents;
+      text        = Symbol()+" Events"+text;
     
     if (this.ActiveEvent())
     {
       for (EventType event=NewDirection;event<EventTypes;event++)
         if (eEvents[event])
-          Append(aeActiveEvents, EnumToString(eAlerts[event])+":"+EnumToString(event), "\n");
+          Append(text, EnumToString(eAlerts[event])+":"+EnumToString(event), "\n");
     }
-    else Append(aeActiveEvents, "No Active Events", "\n");
+    else Append(text, "No Active Events", "\n");
     
-    return (aeActiveEvents);
+    return (text);
   }
 
 //+------------------------------------------------------------------+

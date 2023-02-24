@@ -369,10 +369,10 @@ int OnInit()
 
     SetIndexLabel (0,""); 
     SetIndexLabel (1,""); 
-    SetIndexLabel (2,""); 
-//    SetIndexLabel (3,""); 
+//    SetIndexLabel (2,"");
+//    SetIndexLabel (3,"");
 //    SetIndexLabel (4,""); 
-    SetIndexLabel (5,""); 
+//    SetIndexLabel (5,"");
     SetIndexLabel (6,""); 
     SetIndexLabel (7,""); 
     SetIndexLabel (8,""); 

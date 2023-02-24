@@ -36,9 +36,10 @@ struct ManagerDetail
 
 struct ManagerMaster
        {
-         int           Director;                        //-- Principal Manager
+         int           Director;                        //-- Principal Manager (Action)
          OrderCommand  Directive;                       //-- Fractal level determination
-//         int           Lead;                            //-- Non-Corrected Daily Origin Manager [Bias]
+         int           Lead;                            //-- Confirmed [Bias] 
+         int           Bias;                            //-- Active [Bias]
          ManagerDetail Manager[2]; 
          PivotRec      Pivot;
          bool          Hedge;
@@ -74,6 +75,7 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   CSession            *s[SessionTypes];
   
   ManagerMaster        master;
+  ManagerMaster        legacy;
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -82,6 +84,16 @@ void RefreshScreen(void)
   {
     string        text                    = "";
 
+    //-- Update M3 Indicators
+    UpdateDirection("[m3]Lead",Direction(legacy.Lead,InAction),Color(Direction(legacy.Lead,InAction)),12);
+    UpdateDirection("[m3]Bias",Direction(legacy.Bias,InAction),Color(Direction(legacy.Bias,InAction)),24);
+
+    UpdateLabel("[m3]ActivePivot",EnumToString(s[Daily].Pivot().State)+" ["+DoubleToStr(s[Daily].Pivot().Open,Digits)+"] "+
+                                  DoubleToStr(pip(Close[0]-s[Daily].Pivot().Open),1),Color(Close[0]-s[Daily].Pivot().Open),12);
+    UpdateLabel("[m3]MasterPivot",EnumToString(master.Pivot.State)+" ["+DoubleToStr(master.Pivot.Open,Digits)+"] "+
+                                  DoubleToStr(pip(Close[0]-master.Pivot.Open),1),Color(Close[0]-master.Pivot.Open),12);
+
+    //-- Update Comment
     Append(text,"*----------- Main [Origin] Pivot ----------------*");
     Append(text,s[Daily].PivotStr("Main",master.Pivot)+"\n\n","\n");
     
@@ -197,6 +209,33 @@ void Execute(void)
   }
 
 //+------------------------------------------------------------------+
+//| ExecuteLegacy -                                                  |
+//+------------------------------------------------------------------+ 
+void ExecuteLegacy(void)
+    {
+      OrderMonitor(Mode());
+      bool bias, lead;
+
+      if (t[NewTick])
+      {
+        bias   = NewAction(legacy.Bias,Action(t.SMA().Close[1]-t.SMA().Open[1]));
+        lead   = NewAction(legacy.Lead,BoolToInt(IsEqual(legacy.Bias,Action(t.Poly().Close[1]-t.Poly().Open[1])),legacy.Bias,legacy.Lead));
+        
+        if ((bias&&lead))
+          if (IsEqual(legacy.Bias,legacy.Lead))
+            Pause("Director Change: "+EnumToString((OrderCommand)legacy.Director)+"\n"+
+                  "   Bias: "+EnumToString((OrderCommand)legacy.Bias)+"\n"+
+                  "   Lead: "+EnumToString((OrderCommand)legacy.Lead),"New Director");
+          else Print("Hmmm, mismatch lead/bias");
+        else
+        if (bias)
+          Pause("Bias Change: "+EnumToString((OrderCommand)legacy.Bias),"New Bias");
+        else
+          Pause("Lead Change: "+EnumToString((OrderCommand)legacy.Lead),"New Lead");
+      }
+    }
+
+//+------------------------------------------------------------------+
 //| ExecAppCommands                                                  |
 //+------------------------------------------------------------------+ 
 void ExecAppCommands(string &Command[])
@@ -218,7 +257,8 @@ void OnTick()
     while (AppCommand(otParams,6))
       ExecAppCommands(otParams);
 
-    OrderMonitor(Mode());
+    if (Mode()==Legacy)
+      ExecuteLegacy();
 
     if (Mode()==Auto)
       Execute();
@@ -265,6 +305,14 @@ int OnInit()
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
     master.Pivot    = s[Daily].Pivot(Breakout,0,Max);
+    
+    DrawBox("[m3]Stat",496,1,240,80,C'0,0,60',BORDER_FLAT);
+
+    NewLabel("[m3]Bias","^",500,5,clrLawnGreen);
+    NewLabel("[m3]Lead","^",520,5,clrLawnGreen);
+
+    NewLabel("[m3]ActivePivot","Active",540,15,clrLawnGreen);
+    NewLabel("[m3]MasterPivot","Master",540,40,clrLawnGreen);
 
     return(INIT_SUCCEEDED);
   }

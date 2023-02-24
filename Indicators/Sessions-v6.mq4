@@ -89,6 +89,7 @@ input ShowOptions    inpShowOption      = ShowNone;        // Show Fractal/Sessi
 input YesNoType      inpShowEvents      = No;              // Show Event Flags
 input YesNoType      inpShowComment     = No;              // Show Fibonacci Data In Comment
 input DataPosition   inpShowData        = NoLabel;         // Show Session Data Labels (Position)
+input YesNoType      inpEventAlert      = No;              // Alert on Event
 
 CSession            *session            = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowEvents==Yes);
 
@@ -229,6 +230,8 @@ void DeleteRanges()
 //+------------------------------------------------------------------+
 void RefreshScreen(int Bar=0)
   {
+    string alert         = "";
+
     if (inpShowRange==Yes)
       UpdateRange(Bar);
 
@@ -252,14 +255,23 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrGoldenrod);      
       UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
-      //if (inpShowEvents==Yes)
-      //  if (session[ShowFractal].Event!=NoEvent)
-      //    Flag(EnumToString(ShowFractal)+"["+EnumToString(session[ShowFractal].Event)+"]",
-      //            Color(session[ShowFractal].State),0,session[ShowFractal].);
+      if (inpShowEvents==Yes)
+        if (session.EventLevel(NewFibonacci)>Minor)
+        {
+          alert = EnumToString((FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Trend))+"["+
+                  EnumToString(Level(session.Expansion((FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Trend),Max)))+"]";
+          Flag(alert,clrMagenta,0,Close[0]);
+        }
 
-      //for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-      //  UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
+      for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
+        UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
+
+      Append(alert,BoolToStr(session[ShowFractal].Event>NoEvent||session[Origin].Event>NoEvent,session.ActiveEventStr()+"\n\n"));
     }
+
+    if (inpEventAlert==Yes)
+      if (alert!="")
+        Alert(alert);
 
     if (inpShowPivots==Yes)
     {
@@ -323,6 +335,9 @@ int OnCalculate(const int rates_total,
       session.Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     else
       session.Update();
+
+      if (!IsEqual(session[Trend].Point[fpExpansion],session[Term].Point[fpExpansion],Digits))
+        Pause("Things that make you go hmmm...","Trend/Term Expansion Variance??");
 
     RefreshScreen();
 

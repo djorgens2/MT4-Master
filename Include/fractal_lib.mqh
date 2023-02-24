@@ -71,6 +71,14 @@
                      FiboLevels
                    };             
 
+  ////-- Canonical Fibonacci Rec
+  //struct FibonacciRec
+  //       {
+  //         FiboLevel     Level;                    //-- Fibo Level Now
+  //         EventType     Event;                    //-- Fibo Expansion Event; disposes on next tick
+  //         double        Open;                     //-- Open Price set on NewFibonacci Event
+  //       };
+
   //-- Canonical Pivot Rec
   struct PivotRec
          {
@@ -93,7 +101,6 @@
            int           Lead;                     //-- Bias based on Last Pivot High/Low hit
            int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
            FractalState  State;                    //-- State
-           FractalState  Base;                     //-- Rally/Pullback Base State [Breakout|Reversal|Retrace]
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
            double        Price;                    //-- Last Pivot Price
            bool          Peg;                      //-- Retrace peg
@@ -485,7 +492,6 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
 
       frec.Event             = FractalEvent(frec.State);
-      frec.Base              = (FractalState)BoolToInt(IsBetween(frec.State,Retrace,Reversal),frec.State,Fractal.Base);
       Fractal                = frec;
 
       return true;
