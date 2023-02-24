@@ -269,7 +269,7 @@ void RefreshScreen(int Bar=0)
       Append(alert,BoolToStr(session[ShowFractal].Event>NoEvent||session[Origin].Event>NoEvent,session.ActiveEventStr()+"\n\n"));
     }
 
-    if (inpEventAlert==Yes)
+    if (Bar==0&&inpEventAlert==Yes)
       if (alert!="")
         Alert(alert);
 
@@ -335,9 +335,6 @@ int OnCalculate(const int rates_total,
       session.Update(indOffMidBuffer,indPriorMidBuffer,indFractalBuffer);
     else
       session.Update();
-
-      if (!IsEqual(session[Trend].Point[fpExpansion],session[Term].Point[fpExpansion],Digits))
-        Pause("Things that make you go hmmm...","Trend/Term Expansion Variance??");
 
     RefreshScreen();
 
