@@ -114,6 +114,11 @@ void UpdateMaster(void)
     for (SessionType type=Daily;type<SessionTypes;type++)
       s[type].Update();
 
+    if (s[Daily][NewFibonacci])
+    {
+        //-- New Fibo Pivot
+    }
+
     order.Update();
     t.Update();
     
@@ -324,5 +329,7 @@ void OnDeinit(const int reason)
   {
     delete t;
     delete order;
-    delete s[Daily];
+    
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
   }

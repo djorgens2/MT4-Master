@@ -358,6 +358,17 @@ string BoolToStr(bool IsTrue, string TrueValue, string FalseValue="")
   }
 
 //+------------------------------------------------------------------+
+//| Or - returns integer based on supplied condition                 |
+//+------------------------------------------------------------------+
+int Or(bool IsTrue, int TrueValue, int FalseValue)
+  {
+    if (IsTrue)
+      return (TrueValue);
+
+    return (FalseValue);
+  }
+
+//+------------------------------------------------------------------+
 //| BoolToInt - returns user defined int for the supplied value      |
 //+------------------------------------------------------------------+
 int BoolToInt(bool IsTrue, int TrueValue, int FalseValue=0)

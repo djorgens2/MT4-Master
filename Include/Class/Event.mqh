@@ -92,6 +92,7 @@ public:
                      CEvent(){ClearEvents();};
                     ~CEvent(){};
 
+      bool           NewEvent(EventType &Event, EventType Type, AlertLevel Level=Notify);
       void           SetEvent(EventType Event, AlertLevel Level=Notify);
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
@@ -113,6 +114,21 @@ public:
   };
 
 //+------------------------------------------------------------------+
+//| NewEvent - Returns true on Event change                          |
+//+------------------------------------------------------------------+
+bool CEvent::NewEvent(EventType &Event, EventType Type, AlertLevel Level=Notify)
+  {
+    if (IsEqual(Event,Type))
+      return false;
+      
+    Event           = Type;
+
+    SetEvent(Event,Level);
+
+    return true;
+  }
+
+//+------------------------------------------------------------------+
 //| SetEvent - Sets the triggering event to true                     |
 //+------------------------------------------------------------------+
 void CEvent::SetEvent(EventType Event, AlertLevel Level=Notify)
@@ -126,7 +142,7 @@ void CEvent::SetEvent(EventType Event, AlertLevel Level=Notify)
     eMaxAlert               = fmax(Level,eMaxAlert);
     eLastEvent              = Event;
   }
-  
+
 //+------------------------------------------------------------------+
 //| ClearEvent - Sets a specific event to false                      |
 //+------------------------------------------------------------------+

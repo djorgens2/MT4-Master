@@ -256,10 +256,11 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
       if (inpShowEvents==Yes)
-        if (session.EventLevel(NewFibonacci)>Minor)
+//        if (session.EventLevel(NewFibonacci)>Minor)
+        if (session[NewFibonacci])
         {
-          alert = EnumToString((FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Trend))+"["+
-                  EnumToString(Level(session.Expansion((FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Trend),Max)))+"]";
+          FractalType type = (FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Or(session.EventLevel(NewFibonacci)==Major,Trend,Term));
+          alert            = EnumToString(type)+"["+EnumToString(Level(session.Expansion(type,Max)))+"]";
           Flag(alert,clrMagenta,0,Close[0]);
         }
 

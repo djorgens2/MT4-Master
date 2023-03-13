@@ -8,10 +8,9 @@
 #property version   "1.00"
 #property strict
 
+#include <fractal_lib.mqh>
 #include <Class/Event.mqh>
 #include <Class/ArrayDouble.mqh>
-#include <std_utility.mqh>
-#include <fractal_lib.mqh>
 
 //+------------------------------------------------------------------+
 //| Session Class - Collects session data, states, and events        |
@@ -51,7 +50,7 @@ public:
                double         Support;         //--- Support/Resistance determines reversal, breakout & continuation
                double         Resistance;
              };
-             
+
              CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false);
             ~CSession();
 
@@ -106,7 +105,7 @@ private:
 
              //--- Private class collections
              SessionRec       srec[PeriodTypes];
-             FiboLevel        fEventFibo[FractalTypes];
+             FiboLevel        fevent[FractalTypes];
              
              CArrayDouble    *sOffMidBuffer;
              CArrayDouble    *sPriorMidBuffer;
@@ -487,8 +486,7 @@ void CSession::UpdateOrigin(void)
 
     if (NewState(frec[Origin],prec,sBar,Event(NewOrigin),Always,Always))
     {
-      if (sShowFlags)
-        Flag("[s]"+EnumToString(sType)+":"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price);
+      Flag("[s]"+EnumToString(sType)+":"+EnumToString(frec[Origin].Event),Color(frec[Origin].State),sBar,frec[Origin].Price,sShowFlags);
 
       SetEvent(frec[Origin].Event,Critical);
       SetEvent(NewState,Critical);
@@ -504,11 +502,14 @@ void CSession::UpdateFibonacci(void)
     for (FractalType type=Origin;type<=Term;type++)
     {
       if (IsEqual(frec[type].Event,NewReversal)||(type>Origin&&Event(NewTerm)))
-        fEventFibo[type]                  = Fibo161;
+        fevent[type]                  = Fibo161;
 
-      if (Percent(fmin(fEventFibo[type],Fibo823))<Expansion(type,Now))
-        if (IsChanged(fEventFibo[type],fmin(fEventFibo[type]+1,Fibo823)))
-          SetEvent(NewFibonacci,FractalAlert(type));
+      if (Percent(fmin(fevent[type],Fibo823))<Expansion(type,Max))
+        if (IsChanged(fevent[type],fmin(fevent[type]+1,Fibo823)))
+          if (NewEvent(frec[type].Event,NewFibonacci,FractalAlert(type)))
+            Flag("[s6]"+EnumToString(type)+"["+EnumToString(Level(Expansion(type,Max)))+"]",
+               BoolToInt(IsEqual(frec[type].Direction,DirectionUp),clrMediumAquamarine,clrDeepPink),sBar,
+               Forecast(type,Expansion,Level(Expansion(type,Max))),sShowFlags);
     }
   }
 

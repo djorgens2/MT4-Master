@@ -71,13 +71,18 @@
                      FiboLevels
                    };             
 
-  ////-- Canonical Fibonacci Rec
-  //struct FibonacciRec
-  //       {
-  //         FiboLevel     Level;                    //-- Fibo Level Now
-  //         EventType     Event;                    //-- Fibo Expansion Event; disposes on next tick
-  //         double        Open;                     //-- Open Price set on NewFibonacci Event
-  //       };
+  //-- Canonical Fibonacci Pivot
+  struct FibonacciRec
+         {
+           FractalType   Type;                     //-- Fractal Type
+           int           Direction;                //-- Fractal Direction
+           int           Bias;                     //-- Fibo Bias
+           EventType     Event;                    //-- Event
+           FiboLevel     Level;                    //-- Fibo Level Now
+           double        Percent;                  //-- Actual Fibonacci Percentage
+           double        Open;                     //-- Open Price set on NewFibonacci Event
+           double        Forecast;                 //-- Calculated Fibonacci Price
+         };
 
   //-- Canonical Pivot Rec
   struct PivotRec
@@ -87,7 +92,7 @@
            int           Lead;                     //-- Action set by last NewHigh/NewLow event
            int           Bias;                     //-- Action set by Close[] - Pivot.Open
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
-           int           Bar;                      //-- Not implemented; Event Bar
+           datetime      Time;                     //-- Pivot Open Time
            double        Open;                     //-- Open Price set on NewPivot [Immutable, once assigned]
            double        High;                     //-- Updated on NewHigh
            double        Low;                      //-- Updated on NewLow
@@ -391,7 +396,7 @@ void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction
     Pivot[0].High            = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Price(State,Direction,Bar),Digits);
     Pivot[0].Low             = BoolToDouble(IsEqual(Direction,DirectionUp),Price(State,Direction,Bar),Low[Bar],Digits);
     Pivot[0].Close           = Close[Bar];
-    Pivot[0].Bar             = Bar;    
+    Pivot[0].Time            = TimeCurrent();
   }
 
 //+------------------------------------------------------------------+
