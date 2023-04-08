@@ -15,6 +15,8 @@
 
 #define   NoManager     NoAction
 
+string    indSN      = "CPanel-v3";
+
 enum OrderCommand
      {
        Buy,             //-- Purchase Manager
@@ -23,6 +25,16 @@ enum OrderCommand
        Cover,
        Capture,
        Wait
+     };
+     
+enum SourceType
+     {
+       Tick,
+       Segment,
+       Poly,
+       Linear,
+       Fractal,
+       SourceTypes
      };
 
 struct ManagerDetail
@@ -40,6 +52,8 @@ struct ManagerMaster
          OrderCommand  Directive;                       //-- Fractal level determination
          int           Lead;                            //-- Confirmed [Bias] 
          int           Bias;                            //-- Active [Bias]
+         FractalType   Fractal;                         //-- Fractal Lead
+         FractalState  State;                           //-- Fractal State
          ManagerDetail Manager[2]; 
          PivotRec      Pivot;
          bool          Hedge;
@@ -94,15 +108,78 @@ void RefreshScreen(void)
                                   DoubleToStr(pip(Close[0]-master.Pivot.Open),1),Color(Close[0]-master.Pivot.Open),12);
 
     //-- Update Comment
-    Append(text,"*----------- Main [Origin] Pivot ----------------*");
-    Append(text,s[Daily].PivotStr("Main",master.Pivot)+"\n\n","\n");
-    
+    Append(text,"*----------- Master Manager Detail ----------------*");
+    Append(text,"Main "+EnumToString(master.Fractal),"\n");
+    Append(text,EnumToString(master.State));
+    Append(text,BoolToStr(IsEqual(master.Director,Buy),"Purchasing",BoolToStr(IsEqual(master.Director,Sell),"Sales","Unassigned")));
+    Append(text,BoolToStr(IsEqual(master.Directive,Buy),"Long",BoolToStr(IsEqual(master.Directive,Sell),"Short",EnumToString(master.Directive))));
+    Append(text,ActionText(master.Lead)," [");
+    Append(text,ActionText(master.Bias)+"]",":");
+    Append(text,s[Daily].PivotStr("Lead",master.Pivot),"\n");
+
+    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+      Append(text,s[Daily].PivotStr(EnumToString(type),s[Daily].Pivot(type)),"\n");
+
     if (inpShowFractal==Daily)
-      Append(text,s[inpShowFractal].FractalStr(5));
+      Append(text,s[inpShowFractal].FractalStr(5),"\n\n");
 
     Append(text,s[Daily].ActiveEventStr(),"\n\n");
 
     Comment(text);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdatePanel - Updates control panel display                      |
+//+------------------------------------------------------------------+
+void UpdatePanel(void)
+  {
+    static FractalType fractal   = Prior;
+    static int         winid     = NoValue;
+
+    //-- Update Control Panel (Application)
+    if (IsChanged(winid,ChartWindowFind(0,indSN)))
+      order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
+
+    if (winid>NoValue)
+      if (IsChanged(fractal,master.Fractal))
+        UpdateLabel("lbhFractal",EnumToString(master.Fractal),Color(s[Daily][master.Fractal].Direction));
+  }
+
+//+------------------------------------------------------------------+
+//| SetStrategy - Sets the Manager Strategy                          |
+//+------------------------------------------------------------------+
+void SetStrategy(void)
+  {
+    FractalState strategy        = NoState;
+
+    if (NewState(master.State,s[Daily][Origin].State));
+    
+    if (IsEqual(Close[0],s[Daily][Origin].Point[fpExpansion]))
+    {
+      //-- Do Breakout
+      strategy                 = Breakout;
+    }
+    else
+    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRetrace]))
+    {
+      //-- Do Retrace
+      strategy                 = Retrace;
+    }
+    else
+    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRecovery]))
+    {
+      //-- Do Recovery
+      strategy                 = Recovery;
+    }
+    else
+    if (s[Daily].Retrace(Origin,Max)>FiboCorrection)
+    {
+      //-- Do Correction
+      strategy                 = Correction;
+    }
+
+    if (NewState(master.State,strategy))
+      Flag("New State "+EnumToString(strategy),clrYellow);
   }
 
 //+------------------------------------------------------------------+
@@ -115,9 +192,12 @@ void UpdateMaster(void)
       s[type].Update();
 
     if (s[Daily][NewFibonacci])
-    {
-        //-- New Fibo Pivot
-    }
+      for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+        if (IsEqual(s[Daily].Pivot(type).Event,NewFibonacci))
+        {
+          master.Fractal             = type;
+          break;
+        }
 
     order.Update();
     t.Update();
@@ -135,16 +215,6 @@ void UpdateMaster(void)
 
       UpdatePivot(master.Pivot,s[Daily][Origin].Direction);
     }
-
-    if (t[NewTick])
-    {
-      master.Hedge                      = !IsEqual(s[Daily][Origin].Bias,s[Daily][Origin].Lead);
-    }
-
-    //-- Set Master Command
-    if (t[NewSegment])
-    {
-    };
 
     for (int role=Buy;IsBetween(role,Buy,Sell);role++)
     {
@@ -219,24 +289,27 @@ void Execute(void)
 void ExecuteLegacy(void)
     {
       OrderMonitor(Mode());
-      bool bias, lead;
+
+      bool smabias, polylead;
+      bool tbias, slead;
 
       if (t[NewTick])
       {
-        bias   = NewAction(legacy.Bias,Action(t.SMA().Close[1]-t.SMA().Open[1]));
-        lead   = NewAction(legacy.Lead,BoolToInt(IsEqual(legacy.Bias,Action(t.Poly().Close[1]-t.Poly().Open[1])),legacy.Bias,legacy.Lead));
+        //smabias    = NewAction(legacy.Bias,Action(t.SMA().Close[1]-t.SMA().Open[1]));
+        //polylead   = NewAction(legacy.Lead,BoolToInt(IsEqual(legacy.Bias,Action(t.Poly().Close[1]-t.Poly().Open[1])),legacy.Bias,legacy.Lead));
+        //tbias      = NewAction(
         
-        if ((bias&&lead))
-          if (IsEqual(legacy.Bias,legacy.Lead))
-            Pause("Director Change: "+EnumToString((OrderCommand)legacy.Director)+"\n"+
-                  "   Bias: "+EnumToString((OrderCommand)legacy.Bias)+"\n"+
-                  "   Lead: "+EnumToString((OrderCommand)legacy.Lead),"New Director");
-          else Print("Hmmm, mismatch lead/bias");
-        else
-        if (bias)
-          Pause("Bias Change: "+EnumToString((OrderCommand)legacy.Bias),"New Bias");
-        else
-          Pause("Lead Change: "+EnumToString((OrderCommand)legacy.Lead),"New Lead");
+        //if ((bias&&lead))
+        //  if (IsEqual(legacy.Bias,legacy.Lead))
+        //    Pause("Director Change: "+EnumToString((OrderCommand)legacy.Director)+"\n"+
+        //          "   Bias: "+EnumToString((OrderCommand)legacy.Bias)+"\n"+
+        //          "   Lead: "+EnumToString((OrderCommand)legacy.Lead),"New Director");
+        //  else Print("Hmmm, mismatch lead/bias");
+        //else
+        //if (bias)
+        //  Pause("Bias Change: "+EnumToString((OrderCommand)legacy.Bias),"New Bias");
+        //else
+        //  Pause("Lead Change: "+EnumToString((OrderCommand)legacy.Lead),"New Lead");
       }
     }
 
@@ -253,8 +326,9 @@ void ExecAppCommands(string &Command[])
 void OnTick()
   {
     string     otParams[];
-  
+
     UpdateMaster();
+    UpdatePanel();
 
     InitializeTick();
     GetManualRequest();
@@ -277,14 +351,14 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OrderConfig()
   {
-    order.Enable();
+    order.Enable("System Enabled "+TimeToString(TimeCurrent()));
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
     {
       if (order[action].Lots>0)
-        order.Disable(action,"Open Positions Detected; Preparing execution plan");
+        order.Disable(action,"Open "+proper(ActionText(action))+" Positions; Preparing execution plan");
       else
-        order.Enable(action,"System started "+TimeToString(TimeCurrent()));
+        order.Enable(action,"Action Enabled "+TimeToString(TimeCurrent()));
 
       //-- Order Config
       order.SetDefaults(action,inpLotSize,inpDefaultStop,inpDefaultTarget);
@@ -300,14 +374,24 @@ void OrderConfig()
 //+------------------------------------------------------------------+
 int OnInit()
   {
+    datetime time   = NoValue;
+
     ManualInit();
     OrderConfig();
    
     //-- Initialize Session
-    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset,Always);
+    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
     s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
     s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
     s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+
+    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+      {
+        Print(EnumToString(type)+" "+TimeToStr(s[Daily].Pivot(type).Time));
+
+      if (IsHigher(s[Daily].Pivot(type).Time,time))
+        master.Lead = type;
+      }
 
     master.Pivot    = s[Daily].Pivot(Breakout,0,Max);
     

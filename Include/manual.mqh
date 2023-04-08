@@ -286,6 +286,14 @@ void GetManualRequest(string Command="")
           }
           else          
           
+          //--- Hedge orders
+          if (InStr(params[0],"HED"))
+          {
+            if (IsBetween(Action(LotCount(NoAction,Net)),OP_BUY,OP_SELL))
+              OpenOrder(Action(LotCount(NoAction,Net),InDirection,InContrarian),"Hedge",fabs(LotCount(NoAction,Net)));
+          }
+          else          
+          
           //--- Pending orders
           if (InStr(params[0],"MIT"))
           {
@@ -334,7 +342,7 @@ void GetManualRequest(string Command="")
             if (ArraySize(params)>2)
               comment = params[2];
 
-            OpenOrder(ActionCode(params[0]), comment, lots); 
+            OpenOrder(ActionCode(params[0]), comment, lots);
           }
           else
           

@@ -114,6 +114,8 @@ private:
              int            Direction[FractalTypes];
              int            Bar[FractalTypes];
              double         Point[FractalTypes];
+             double         Support;
+             double         Resistance;
            };
 
     struct FractalMaster
@@ -203,6 +205,7 @@ public:
                     ~CTickMA();
 
     void             Update(void);
+    int              Bar(PivotType Pivot);
 
     //-- Data Collections
     TickRec          Tick(int Node=0)      {return(tr[Node]);};
@@ -572,6 +575,9 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
     ArrayInitialize(fractal.Bar,NoValue);
     ArrayInitialize(fractal.Point,NoValue);
 
+    fractal.Support                 = Price[0];
+    fractal.Resistance              = Price[0];
+
     for (type=Expansion;type>NoValue;type--)
       for (bar=bar;bar<tmaPeriods;bar++)
         if (NewDirection(direction,Direction(Price[bar]-Price[bar+1])))
@@ -600,6 +606,13 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
 
           break;
         }
+
+    for (type=Origin;type<FractalTypes;type++)
+      if (fractal.Bar[type]>NoValue)
+      {
+        fractal.Support             = fmin(fractal.Support,fractal.Point[type]);
+        fractal.Resistance          = fmax(fractal.Resistance,fractal.Point[type]);
+      }
 
     fractal.Type                    = (FractalType)fmin(Expansion+(Expansion-fmax(hightype,lowtype)),Lead);
     fractal.Direction[Term]         = BoolToInt(IsHigher(Price[0],fractal.Point[Root],NoUpdate),DirectionUp,DirectionDown);
@@ -922,7 +935,7 @@ void CTickMA::UpdateFractal(void)
           if (NewState(fm.State,Breakout))
             fm.Event        = NewBreakout;
         }
-        
+
         SetEvent(NewFractal,Major);
       }
       else 
@@ -930,7 +943,7 @@ void CTickMA::UpdateFractal(void)
         if (NewState(fm.State,Retrace))
           fm.Event          = FractalEvent(fm.Type);
       }
-        
+
       SetEvent(fm.Event,Major);
     }
   }
@@ -1018,6 +1031,25 @@ void CTickMA::Update(void)
       
       UpdateFractal();
     }
+  }
+
+//+------------------------------------------------------------------+
+//| Bar - Returns the bar for the supplied PivotType                 |
+//+------------------------------------------------------------------+
+int CTickMA::Bar(PivotType Pivot)
+  {
+    for (FractalType type=Origin;type<FractalTypes;type++)
+      switch(Pivot)
+      {
+        case Resistance:  if (IsEqual(fm.High.Resistance,fm.High.Point[type],Digits))
+                            return fm.High.Bar[type];
+                          break;
+
+        case Support:     if (IsEqual(fm.Low.Support,fm.Low.Point[type],Digits))
+                            return fm.Low.Bar[type];
+      }
+
+    return NoValue;
   }
 
 //+------------------------------------------------------------------+
@@ -1249,7 +1281,10 @@ string CTickMA::FractalDetailStr(FractalDetail &Fractal)
       Append(text,(string)Fractal.Bar[type],"|");
       Append(text,DoubleToStr(Fractal.Point[type],Digits),"|");
     }
-    
+
+    Append(text,DoubleToStr(Fractal.Support,Digits),"|");
+    Append(text,DoubleToStr(Fractal.Resistance,Digits),"|");
+
     return text;
   }
 

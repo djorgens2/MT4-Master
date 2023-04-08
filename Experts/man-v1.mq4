@@ -44,7 +44,7 @@ void ExecAppCommands(string &Command[])
 void OnTick()
   {
     string     otParams[];
-  
+
     InitializeTick();
 
     GetManualRequest();
@@ -53,14 +53,14 @@ void OnTick()
       ExecAppCommands(otParams);
 
     OrderMonitor(Legacy);
-    GetData(); 
+    GetData();
 
     RefreshScreen();
-    
+
     if (AutoTrade())
       Execute();
-    
-    ReconcileTick();        
+
+    ReconcileTick();
   }
 
 //+------------------------------------------------------------------+

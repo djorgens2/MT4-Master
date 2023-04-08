@@ -255,15 +255,6 @@ void RefreshScreen(int Bar=0)
       UpdateLine("lnS_Retrace:"+sessionIndex,session[ShowFractal].Point[fpRetrace],STYLE_DOT,clrGoldenrod);      
       UpdateLine("lnS_Recovery:"+sessionIndex,session[ShowFractal].Point[fpRecovery],STYLE_DOT,clrSteelBlue);
 
-      if (inpShowEvents==Yes)
-//        if (session.EventLevel(NewFibonacci)>Minor)
-        if (session[NewFibonacci])
-        {
-          FractalType type = (FractalType)BoolToInt(session.EventLevel(NewFibonacci)==Critical,Origin,Or(session.EventLevel(NewFibonacci)==Major,Trend,Term));
-          alert            = EnumToString(type)+"["+EnumToString(Level(session.Expansion(type,Max)))+"]";
-          Flag(alert,clrMagenta,0,Close[0]);
-        }
-
       for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
         UpdateLine("lnS_"+EnumToString(fl)+":"+sessionIndex,session.Forecast(ShowFractal,Expansion,fl),STYLE_DASH,clrYellow);
 

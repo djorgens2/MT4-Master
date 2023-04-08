@@ -481,15 +481,15 @@ int GetPeriod(string Value)
 }
 
 //+------------------------------------------------------------------+
-//| New Arrow - paints an arrow on the chart in the price area       |
+//| Arrow - paints an arrow on the chart in the price area           |
 //+------------------------------------------------------------------+
-void Arrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00)
+void Arrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00, int Window=0)
   {      
     if (Price==0.00)
       Price = Close[Bar];
 
     ObjectDelete (ArrowName);
-    ObjectCreate (ArrowName, OBJ_ARROW, 0, Time[Bar], Price);
+    ObjectCreate (ArrowName, OBJ_ARROW, Window, Time[Bar], Price);
     ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
     ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
   }
@@ -686,14 +686,14 @@ void PrintF(string Text, bool Condition)
 //+------------------------------------------------------------------+
 //| DrawBox - Draws a box used to frame text                         |
 //+------------------------------------------------------------------+
-void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, int Border, int WinId=0)
+void DrawBox(string Name, int PosX, int PosY, int Width, int Height, int Color, int Border, int Corner=SCREEN_UL, int WinId=0)
   {
     ObjectCreate(Name,OBJ_RECTANGLE_LABEL,WinId,0,0,0,0);
     ObjectSet(Name,OBJPROP_XDISTANCE,PosX);
     ObjectSet(Name,OBJPROP_YDISTANCE,PosY);
     ObjectSet(Name,OBJPROP_XSIZE,Width);
     ObjectSet(Name,OBJPROP_YSIZE,Height);
-    ObjectSet(Name,OBJPROP_CORNER,SCREEN_UL);
+    ObjectSet(Name,OBJPROP_CORNER,Corner);
     ObjectSet(Name,OBJPROP_STYLE,STYLE_SOLID);
     ObjectSet(Name,OBJPROP_BORDER_TYPE,Border);
     ObjectSet(Name,OBJPROP_BGCOLOR,Color);

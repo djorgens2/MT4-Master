@@ -11,16 +11,6 @@
 //| constants                                                        |
 //+------------------------------------------------------------------+
 
-//--- additional arrowcodes
-#define SYMBOL_ROOT           128
-#define SYMBOL_POINT1         129
-#define SYMBOL_POINT2         130
-#define SYMBOL_POINT3         131
-#define SYMBOL_POINT4         132
-#define SYMBOL_POINT5         133
-#define SYMBOL_POINT6         134
-
-
 //--- Standard diectional defines
 #define DirectionDown        -1
 #define DirectionUp           1
@@ -44,11 +34,6 @@
 //--- Boolean format defines
 #define InTrueFalse          11      //--- Stated as True or False
 #define InYesNo              12      //--- Stated as Yes or No
-
-//--- String format defines
-#define InUpper              13      //--- Returns in Upper
-#define InLower              14      //--- Returns in Lower
-#define InProper             15      //--- Returns in Proper
 
 //--- Option type defs
 #define InContrarian       true      //--- Return as contrarian direction/action
@@ -269,6 +254,22 @@ bool IsHigher(double Compare, double &Check, bool Update=true, int Precision=0)
     {    
       if (Update)
         Check    = NormalizeDouble(Compare,Precision);
+        
+      return (true);
+    }
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsHigher - returns true if compare value higher than check       |
+//+------------------------------------------------------------------+
+bool IsHigher(datetime Compare, datetime &Check, bool Update=true)
+  {
+      
+    if (Compare>Check)
+    {    
+      if (Update)
+        Check    = Compare;
         
       return (true);
     }
