@@ -186,7 +186,10 @@ void GetManualRequest(string Command="")
     string fRecord;
     double lots           = 0.00;
     string comment        = "MANUAL";
-    
+
+    bool go               = true;
+    bool verify           = false;
+
     bool   lComment       = false;
     bool   bComment       = false;
     bool   holdeqprofit   = eqprofit;
@@ -239,6 +242,18 @@ void GetManualRequest(string Command="")
           for (int i=0;i<ArraySize(params);i++)
             fRecord += params[i]+"|";
           Print(fRecord);
+
+          if (params[0]=="VERIFY")
+          {
+            verify = true;
+            go     = false;
+          }
+          else
+          if (verify)
+            go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
+
+          //--- Verify Mode
+          if (go)
 
           //--- Trade mode
           if (params[0] == "AUTO")
@@ -387,6 +402,17 @@ void GetManualRequest(string Command="")
                                  if (params[1]=="TICKET")
                                    CloseOrder((int)StringToInteger(params[2]),true);
                                  break;
+
+              case 4:            if (params[1]=="PROFIT")
+                                   CloseOrders(CloseProfit, ActionCode(params[2]),StrToDouble(params[3]));
+                                 if (params[1]=="LOSS")
+                                   CloseOrders(CloseLoss, ActionCode(params[2]),StrToDouble(params[3]));
+                                 break;
+
+              case 5:            if (params[1]=="PROFIT")
+                                   CloseOrders(CloseProfit, ActionCode(params[2]),StrToDouble(params[3]),params[4]);
+                                 if (params[1]=="LOSS")
+                                   CloseOrders(CloseLoss, ActionCode(params[2]),StrToDouble(params[3]),params[4]);
             }
           }
           else
@@ -632,20 +658,20 @@ void GetManualRequest(string Command="")
                       break;
             }
           else
-          
+
           //---- Close Half/Full only profitable trades if EQ% is met.
           if (params[0]=="EQP")
             SetProfitPolicy(eqprofit);
           else
-          
+
           if (params[0]=="EQH")
             SetProfitPolicy(eqhalf);
           else
-          
+
           if (params[0]=="EQR")
             SetProfitPolicy(eqretain);
           else
-          
+
           //---- Sets EQ% default; overrides input param defaults
           if (params[0]=="EQ")
             switch (ArraySize(params))
@@ -665,14 +691,14 @@ void GetManualRequest(string Command="")
           {
             ArrayResize(commands,ArraySize(commands)+1);
             commands[ArraySize(commands)-1] = fRecord;
-          }    
-        }        
-    }    
-    
+          }
+        }
+    }
+
     FileClose(fHandle);
-        
+
     fHandle=FileOpen(manComFile,FILE_CSV|FILE_WRITE);
-        
+
     if(fHandle!=INVALID_HANDLE)
     {
       FileWrite(fHandle,"");

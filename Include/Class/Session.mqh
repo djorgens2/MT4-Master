@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2018, Dennis Jorgenson"
 #property link      "https://www.mql5.com"
-#property version   "1.00"
+#property version   "6.01"
 #property strict
 
 #include <fractal_lib.mqh>
@@ -63,6 +63,7 @@ public:
              int              SessionHour(EventType Event=NoEvent);
              bool             IsOpen(void);
              
+             FibonacciRec     Fibonacci(FractalType Type)        {return fibo[Type];};                 //--- Fibonacci by Fractal Type
              PivotRec         Pivot(FractalState State, int Start=0, MeasureType Measure=Now)          //--- Origin Pivot by State/Measure
                                 {return GetPivot(prec,State,Start,Measure);};
              PivotRec         Pivot(const int Node=0)            {return(prec[Node]);};                //--- Origin Pivot by Node
@@ -868,7 +869,7 @@ string CSession::FractalStr(int ShowPivots=NoValue)
 
     if (ShowPivots>NoValue)
     {
-      Append(text,"*---------- Origin Fractal Pivots ["+(string)ArraySize(prec)+"]--------------*","\n");
+      Append(text,"*---------- Origin Active Pivots ["+(string)ArraySize(prec)+"]--------------*","\n");
 
       for (int node=0;node<=fmin(ArraySize(prec),ShowPivots);node++)
         Append(text,PivotStr(BoolToStr(IsEqual(node,0),"Active","Node["+(string)node+"]"),prec[node]),"\n");

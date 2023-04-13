@@ -578,7 +578,7 @@ bool NewFibonacci(FractalRec &Fractal, FibonacciRec &Fibo, int Method=Expansion,
                                  Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]),Digits);
 
     Fibo.Pivot.Event         = NoEvent;
-    
+
     if (IsChanged(Fibo.Level,Level(fibo)))
     {
       Fractal.Event          = NewFibonacci;

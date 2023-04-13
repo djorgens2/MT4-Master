@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "1.00"
+#property version   "3.00"
 #property strict
 
 #include <manual.mqh>
@@ -17,46 +17,53 @@
 
 string    indSN      = "CPanel-v3";
 
-enum OrderCommand
+enum DirectiveType
      {
-       Buy,             //-- Purchase Manager
-       Sell,            //-- Sales Manager
-       Hedge,
-       Cover,
-       Capture,
-       Wait
+       Build,           //-- Increase Position
+       Hedge,           //-- Contrarian drawdown management
+       Cover,           //-- Aggressive balancing on excessive drawdown
+       Capture,         //-- Contrarian profit protection
+       Mitigate,        //-- Risk management on pattern change
+       Wait             //-- Hold, wait for signal
      };
      
+enum RoleType
+     {
+       Buyer,           //-- Purchasing Manager
+       Sales,           //-- Selling Manager
+       Unnassigned      //-- No Manager
+     };
+
 enum SourceType
      {
-       Tick,
-       Segment,
-       Poly,
-       Linear,
-       Fractal,
+       NoSource,        // None
+       Tick,            // Tick
+       Segment,         // Segment
+       Poly,            // Poly
+       Linear,          // Linear
+       Fractal,         // Fractal
        SourceTypes
      };
 
-struct ManagerDetail
+struct RoleRec
        {
-         OrderCommand  Command;
-         double        DCA;
-         FiboLevel     Level;
-         OrderSummary  Entry;
-         bool          Hold;
+         DirectiveType Directive;
+         double        DCA;                //-- Role DCA
+         FiboLevel     Level;              //-- DCA Fibo Level
+         OrderSummary  Entry;              //-- Role Entry Zone Summary
+         bool          Hold;               //-- Hold Role Profit
        };
 
-struct ManagerMaster
+struct MasterRec
        {
-         int           Director;                        //-- Principal Manager (Action)
-         OrderCommand  Directive;                       //-- Fractal level determination
+         RoleType      Director;                        //-- Process Manager (Owner|Lead)
+         DirectiveType Directive;                       //-- Fractal level determination
          int           Lead;                            //-- Confirmed [Bias] 
          int           Bias;                            //-- Active [Bias]
          FractalType   Fractal;                         //-- Fractal Lead
          FractalState  State;                           //-- Fractal State
-         ManagerDetail Manager[2]; 
+         RoleRec       Manager[2]; 
          PivotRec      Pivot;
-         bool          Hedge;
        };
 
 //--- Configuration
@@ -88,8 +95,8 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   COrder              *order             = new COrder(inpBrokerModel,Hold,Hold);
   CSession            *s[SessionTypes];
   
-  ManagerMaster        master;
-  ManagerMaster        legacy;
+  MasterRec            master;
+  MasterRec            legacy;
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -108,11 +115,11 @@ void RefreshScreen(void)
                                   DoubleToStr(pip(Close[0]-master.Pivot.Open),1),Color(Close[0]-master.Pivot.Open),12);
 
     //-- Update Comment
-    Append(text,"*----------- Master Manager Detail ----------------*");
-    Append(text,"Main "+EnumToString(master.Fractal),"\n");
+    Append(text,"*----------- Master Fractal Pivots ----------------*");
+    Append(text,"Fractal "+EnumToString(master.Fractal),"\n");
     Append(text,EnumToString(master.State));
-    Append(text,BoolToStr(IsEqual(master.Director,Buy),"Purchasing",BoolToStr(IsEqual(master.Director,Sell),"Sales","Unassigned")));
-    Append(text,BoolToStr(IsEqual(master.Directive,Buy),"Long",BoolToStr(IsEqual(master.Directive,Sell),"Short",EnumToString(master.Directive))));
+    Append(text,EnumToString(master.Director));
+    Append(text,EnumToString(master.Directive));
     Append(text,ActionText(master.Lead)," [");
     Append(text,ActionText(master.Bias)+"]",":");
     Append(text,s[Daily].PivotStr("Lead",master.Pivot),"\n");
@@ -205,33 +212,36 @@ void UpdateMaster(void)
     //-- Handle Main [Origin-Level/Macro] Events
     if (s[Daily].Event(NewBreakout,Critical)||s[Daily].Event(NewReversal,Critical))
     {
-      master.Director                   = Action(s[Daily][Origin].Direction);
+      master.Director                   = (RoleType)Action(s[Daily][Origin].Direction);
       master.Pivot                      = s[Daily].Pivot();
     }
     else 
     {
       if (s[Daily][NewCorrection])
-        master.Director                 = Action(s[Daily][Origin].Direction,InDirection,InContrarian);
+        master.Director                 = (RoleType)Action(s[Daily][Origin].Direction,InDirection,InContrarian);
+
+      if (s[Daily][NewRecovery])
+        master.Director                 = (RoleType)Action(s[Daily][Origin].Direction);
 
       UpdatePivot(master.Pivot,s[Daily][Origin].Direction);
     }
 
-    for (int role=Buy;IsBetween(role,Buy,Sell);role++)
+    for (RoleType role=Buyer;IsBetween(role,Buyer,Sales);role++)
     {
-      master.Manager[role].Command = Wait;
-      master.Manager[role].DCA     = order.DCA(role);
-      master.Manager[role].Entry   = order.Entry(role);
-      master.Manager[role].Level   = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[role].DCA));
+      master.Manager[role].Directive    = Wait;
+      master.Manager[role].DCA          = order.DCA(role);
+      master.Manager[role].Level        = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[role].DCA));
+      master.Manager[role].Entry        = order.Entry(role);
     }
   }
 
 //+------------------------------------------------------------------+
 //| ManageOrders - Lead Manager order processor                      |
 //+------------------------------------------------------------------+
-void ManageOrders(int Role)
+void ManageOrders(RoleType Role)
   {
-    OrderRequest  request    = order.BlankRequest(BoolToStr(IsEqual(Role,Buy),"Purchase","Sales"));
-    ManagerDetail manager    = master.Manager[Role];
+    OrderRequest  request    = order.BlankRequest(EnumToString(Role));
+    RoleRec       manager    = master.Manager[Role];
 
     //--- R1: Free Zone?
     if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
@@ -241,8 +251,8 @@ void ManageOrders(int Role)
       
       switch (Role)
       {
-        case Buy:          break;
-        case Sell:         break;
+        case Buyer:          break;
+        case Sales:         break;
       }
     }
 
@@ -267,7 +277,7 @@ void ManageRisk(int Manager)
 void Execute(void)
   {
     //-- Handle Active Management
-    if (IsBetween(master.Director,Buy,Sell))
+    if (IsBetween(master.Director,Buyer,Sales))
     {
       ManageOrders(master.Director);
       ManageRisk(Action(master.Director,InAction,InContrarian));
@@ -276,8 +286,8 @@ void Execute(void)
     
     //-- Handle Unassigned Manager
     {
-      ManageRisk(Buy);
-      ManageRisk(Sell);
+      ManageRisk(OP_BUY);
+      ManageRisk(OP_SELL);
     }
 
     order.ExecuteRequests();
@@ -290,9 +300,12 @@ void ExecuteLegacy(void)
     {
       OrderMonitor(Mode());
 
-      bool smabias, polylead;
-      bool tbias, slead;
-
+      //if (t[NewSegment]
+      //  switch(alert)
+      //  {
+      //    Segment:          Alert(Symbol()+">New Segment"
+      //}
+      //else
       if (t[NewTick])
       {
         //smabias    = NewAction(legacy.Bias,Action(t.SMA().Close[1]-t.SMA().Open[1]));
@@ -374,26 +387,23 @@ void OrderConfig()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    datetime time   = NoValue;
+    datetime time      = NoValue;
 
     ManualInit();
     OrderConfig();
    
     //-- Initialize Session
-    s[Daily]        = new CSession(Daily,0,23,inpGMTOffset);
-    s[Asia]         = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
-    s[Europe]       = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
-    s[US]           = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+    s[Daily]           = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]            = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]          = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]              = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-      {
-        Print(EnumToString(type)+" "+TimeToStr(s[Daily].Pivot(type).Time));
+      if (s[Daily].Fibonacci(type).Level>Fibo61)
+        if (IsHigher(s[Daily].Pivot(type).Time,time))
+          master.Fractal = type;
 
-      if (IsHigher(s[Daily].Pivot(type).Time,time))
-        master.Lead = type;
-      }
-
-    master.Pivot    = s[Daily].Pivot(Breakout,0,Max);
+    master.Pivot       = s[Daily].Pivot(Breakout,0,Max);
     
     DrawBox("[m3]Stat",496,1,240,80,C'0,0,60',BORDER_FLAT);
 

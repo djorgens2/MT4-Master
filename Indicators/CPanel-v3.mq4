@@ -204,6 +204,9 @@ void RefreshScreen(void)
       UpdateRay("tmaPlanRes:"+(string)indWinId,t.Range().Resistance,inpPeriods-1);
       UpdateRay("tmaRangeMid:"+(string)indWinId,t.Range().Mean,inpPeriods-1);
       UpdateRay("tmaClose:"+(string)indWinId,Close[0],inpPeriods-1);
+      
+      Arrow("tmaFrRes:"+(string)indWinId,ArrowDown,clrLawnGreen,t.Bar(Resistance),t.Fractal().High.Resistance+point(6),indWinId);
+      Arrow("tmaFrSup:"+(string)indWinId,ArrowUp,clrRed,t.Bar(Support),t.Fractal().Low.Support,indWinId);
     }
 
     if (inpShowRulers==Yes)
@@ -320,7 +323,7 @@ void UpdateSegment(void)
       lowbuffer    = fmin(lowbuffer,plPolyCloseBuffer[node]);
       lowbuffer    = fmin(lowbuffer,plLineOpenBuffer[node]);
       lowbuffer    = fmin(lowbuffer,plLineCloseBuffer[node]);
-      }
+    }
 
     plHighBuffer[0]        = fmax(highbuffer,t.Range().High)+point(2);
     plLowBuffer[0]         = fmin(lowbuffer,t.Range().Low);
@@ -660,8 +663,11 @@ int OnInit()
     
     for (int obj=0;obj<inpPeriods;obj++)
     {
-      ObjectCreate("tmaFrHi:"+(string)indWinId+"-"+(string)obj,OBJ_TEXT,indWinId,0,0);
-      ObjectCreate("tmaFrLo:"+(string)indWinId+"-"+(string)obj,OBJ_TEXT,indWinId,0,0);
+      if (inpShowRulers==Yes)
+      {
+        ObjectCreate("tmaFrHi:"+(string)indWinId+"-"+(string)obj,OBJ_TEXT,indWinId,0,0);
+        ObjectCreate("tmaFrLo:"+(string)indWinId+"-"+(string)obj,OBJ_TEXT,indWinId,0,0);
+      }
 
       ObjectCreate("tmaHL:"+(string)indWinId+"-"+(string)obj,OBJ_TREND,indWinId,0,0);
       ObjectSet("tmaHL:"+(string)indWinId+"-"+(string)obj,OBJPROP_RAY,false);
