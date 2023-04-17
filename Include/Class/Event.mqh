@@ -30,14 +30,13 @@ protected:
        enum     EventType
                 {
                   NoEvent,
-                  AdverseEvent,
-                  NewDirection,
-                  NewLeader,
-                  NewSegment,
-                  NewParabolic,
-                  NewTick,
-                  NewFractal,
-                  NewFibonacci,
+                  AdverseEvent,  //-- Very bad event
+                  NewDirection,  //-- Directional change; Nano thru Macro
+                  NewTick,       //-- Tick level event; aggregate or trade
+                  NewSegment,    //-- Segment level event; aggregate of Ticks
+                  NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
+                  NewFractal,    //-- Fractal Direction change
+                  NewFibonacci,  //-- Fibonacci Level change only
                   NewPivot,
                   NewState,
                   NewAction,
@@ -239,10 +238,9 @@ const string EventText[EventTypes] =
                "No Event",
                "Adverse Event",
                "New Direction",
-               "New Leader",
+               "New Tick",
                "New Segment",
                "New Parabolic",
-               "New Tick",
                "New Fractal",
                "New Fibonacci",
                "New Pivot",

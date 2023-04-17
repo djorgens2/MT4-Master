@@ -294,7 +294,7 @@ void CSession::UpdateSession(void)
     }
 
     if (IsEqual(state,Reversal))                     //-- catch double/triple+ outside reversals
-        SetEvent(NewReversal,Nominal);
+      SetEvent(NewReversal,Nominal);
 
     if (NewAction(srec[ActiveSession].Bias,CalcBias(BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
       SetEvent(NewBias,Nominal);
@@ -594,15 +594,19 @@ void CSession::LoadHistory(void)
       srec[type].Support             = Low[sBar];
     }
 
-    //--- Initialize Fibo records
-    for (int type=Origin;type<=Term;type++)
+    //--- Initialize Fractal records
+    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
     {
-      frec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
-      frec[type].Bias                = NoBias;
+      frec[type].Type                = type;
       frec[type].State               = NoState;
-      frec[type].Direction           = NoValue;
+      frec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
+      frec[type].Lead                = NoBias;
+      frec[type].Bias                = NoBias;
       frec[type].Event               = NoEvent;
       frec[type].Price               = Open[sBar];
+      frec[type].Peg                 = false;
+      frec[type].Trap                = false;
+      frec[type].Updated             = Time[sBar];
       ArrayInitialize(frec[type].Point,Open[sBar]);
     }
 
@@ -653,7 +657,6 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sFractalBuffer.SetPrecision(Digits);
     sFractalBuffer.Initialize(0.00);
     
-    Print("Server Time: "+TimeToString(ServerTime()));
     LoadHistory();
   }
 

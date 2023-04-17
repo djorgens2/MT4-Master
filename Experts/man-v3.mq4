@@ -34,15 +34,28 @@ enum RoleType
        Unnassigned      //-- No Manager
      };
 
+enum FeatureConfig
+     {
+       Disabled,        // Disabled
+       Enabled          // Enabled
+     };
+
+enum ClassType
+     {
+       TickMA,          // TickMA Class
+       Session,         // Session Class
+       Order,           // Order Class
+       ClassTypes       // All Classes
+     };
+
 enum SourceType
      {
-       NoSource,        // None
        Tick,            // Tick
        Segment,         // Segment
        Poly,            // Poly
        Linear,          // Linear
        Fractal,         // Fractal
-       SourceTypes
+       SourceTypes      // All Alerts
      };
 
 struct RoleRec
@@ -56,14 +69,12 @@ struct RoleRec
 
 struct MasterRec
        {
-         RoleType      Director;                        //-- Process Manager (Owner|Lead)
-         DirectiveType Directive;                       //-- Fractal level determination
-         int           Lead;                            //-- Confirmed [Bias] 
-         int           Bias;                            //-- Active [Bias]
-         FractalType   Fractal;                         //-- Fractal Lead
-         FractalState  State;                           //-- Fractal State
-         RoleRec       Manager[2]; 
-         PivotRec      Pivot;
+         RoleType      Director;           //-- Process Manager (Owner|Lead)
+         DirectiveType Directive;          //-- Fractal level determination
+         FractalType   Fractal;            //-- Fractal Lead
+         FractalState  State;              //-- Fractal State
+         RoleRec       Manager[2];         //-- Manager Detail Data
+         PivotRec      Pivot;              //-- Active Pivot
        };
 
 //--- Configuration
@@ -71,6 +82,8 @@ input string           appHeader          = "";          // +--- Application Con
 input BrokerModel      inpBrokerModel     = Discount;    // Broker Model
 input double           inpZoneStep        = 2.5;         // Zone Step (pips)
 input double           inpMaxZoneMargin   = 5.0;         // Max Zone Margin
+input FeatureConfig    inpTickAlert       = Disabled;    // Tick Alert Level
+input FeatureConfig    inpSegmentAlert    = Disabled;    // Segment Alert Level
 
 
 //--- Regression parameters
@@ -105,23 +118,12 @@ void RefreshScreen(void)
   {
     string        text                    = "";
 
-    //-- Update M3 Indicators
-    UpdateDirection("[m3]Lead",Direction(legacy.Lead,InAction),Color(Direction(legacy.Lead,InAction)),12);
-    UpdateDirection("[m3]Bias",Direction(legacy.Bias,InAction),Color(Direction(legacy.Bias,InAction)),24);
-
-    UpdateLabel("[m3]ActivePivot",EnumToString(s[Daily].Pivot().State)+" ["+DoubleToStr(s[Daily].Pivot().Open,Digits)+"] "+
-                                  DoubleToStr(pip(Close[0]-s[Daily].Pivot().Open),1),Color(Close[0]-s[Daily].Pivot().Open),12);
-    UpdateLabel("[m3]MasterPivot",EnumToString(master.Pivot.State)+" ["+DoubleToStr(master.Pivot.Open,Digits)+"] "+
-                                  DoubleToStr(pip(Close[0]-master.Pivot.Open),1),Color(Close[0]-master.Pivot.Open),12);
-
     //-- Update Comment
     Append(text,"*----------- Master Fractal Pivots ----------------*");
     Append(text,"Fractal "+EnumToString(master.Fractal),"\n");
     Append(text,EnumToString(master.State));
     Append(text,EnumToString(master.Director));
     Append(text,EnumToString(master.Directive));
-    Append(text,ActionText(master.Lead)," [");
-    Append(text,ActionText(master.Bias)+"]",":");
     Append(text,s[Daily].PivotStr("Lead",master.Pivot),"\n");
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
@@ -130,7 +132,8 @@ void RefreshScreen(void)
     if (inpShowFractal==Daily)
       Append(text,s[inpShowFractal].FractalStr(5),"\n\n");
 
-    Append(text,s[Daily].ActiveEventStr(),"\n\n");
+    Append(text,"Daily "+s[Daily].ActiveEventStr(),"\n\n");
+    Append(text,"Tick "+t.ActiveEventStr(),"\n\n");
 
     Comment(text);
   }
@@ -157,36 +160,34 @@ void UpdatePanel(void)
 //+------------------------------------------------------------------+
 void SetStrategy(void)
   {
-    FractalState strategy        = NoState;
-
-    if (NewState(master.State,s[Daily][Origin].State));
-    
-    if (IsEqual(Close[0],s[Daily][Origin].Point[fpExpansion]))
-    {
-      //-- Do Breakout
-      strategy                 = Breakout;
-    }
-    else
-    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRetrace]))
-    {
-      //-- Do Retrace
-      strategy                 = Retrace;
-    }
-    else
-    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRecovery]))
-    {
-      //-- Do Recovery
-      strategy                 = Recovery;
-    }
-    else
-    if (s[Daily].Retrace(Origin,Max)>FiboCorrection)
-    {
-      //-- Do Correction
-      strategy                 = Correction;
-    }
-
-    if (NewState(master.State,strategy))
-      Flag("New State "+EnumToString(strategy),clrYellow);
+//    FractalState strategy        = NoState;
+//
+//    if (IsEqual(Close[0],s[Daily][Origin].Point[fpExpansion]))
+//    {
+//      //-- Do Breakout
+//      strategy                 = Breakout;
+//    }
+//    else
+//    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRetrace]))
+//    {
+//      //-- Do Retrace
+//      strategy                 = Retrace;
+//    }
+//    else
+//    if (IsEqual(Close[0],s[Daily][Origin].Point[fpRecovery]))
+//    {
+//      //-- Do Recovery
+//      strategy                 = Recovery;
+//    }
+//    else
+//    if (s[Daily].Retrace(Origin,Max)>FiboCorrection)
+//    {
+//      //-- Do Correction
+//      strategy                 = Correction;
+//    }
+//
+//    if (NewState(master.State,strategy))
+//      Flag("New State "+EnumToString(strategy),clrYellow);
   }
 
 //+------------------------------------------------------------------+
@@ -205,6 +206,9 @@ void UpdateMaster(void)
           master.Fractal             = type;
           break;
         }
+
+    if (IsChanged(master.State,s[Daily][Origin].State))
+      Flag("New Origin State ["+EnumToString(s[Daily][Origin].State)+"]",Color(master.State));
 
     order.Update();
     t.Update();
@@ -252,7 +256,7 @@ void ManageOrders(RoleType Role)
       switch (Role)
       {
         case Buyer:          break;
-        case Sales:         break;
+        case Sales:          break;
       }
     }
 
@@ -298,16 +302,44 @@ void Execute(void)
 //+------------------------------------------------------------------+ 
 void ExecuteLegacy(void)
     {
+      string text   = "";
+
       OrderMonitor(Mode());
 
-      //if (t[NewSegment]
-      //  switch(alert)
-      //  {
-      //    Segment:          Alert(Symbol()+">New Segment"
-      //}
-      //else
+      if (t[NewFractal])
+      {
+        if (inpSegmentAlert==Enabled)
+        switch (t.EventLevel(NewFractal))
+        {
+          case Nominal:  text  = "Segment [Nominal]: "+BoolToStr(t[NewRally],"Rally",
+                                  BoolToStr(t[NewPullback],"Pullback",EnumToString(t.Fractal().Type)));
+                         break;
+          
+          case Minor:    text  = "Term [Minor]: Reversal "+BoolToStr(t[NewTrend],"Special Case: Trend(Minor)");
+                         break;
+          
+          case Major:    text  = "Trend [Major]: "+BoolToStr(t.Fractal().Trap,"Trap",
+                                  BoolToStr(IsEqual(t.Fractal().Type,Expansion),EnumToString(t.Fractal().State),EnumToString(t.Fractal().Type)));
+                         break;
+        }
+      }
+      else
+      if (t[FractalEvent(t.Fractal().Type)])
+      {
+        if (inpSegmentAlert==Enabled)
+          text  = "Fractal ["+EnumToString(t.EventLevel(FractalEvent(t.Fractal().Type)))+"]: "+EnumToString(FractalEvent(t.Fractal().Type));
+      }
+      else
+      if (t[NewSegment])
+      {
+        if (inpSegmentAlert==Enabled)
+          text  = "Segment"; // ["+EnumToString(t.EventLevel(NewTerm))+"]: "+BoolToStr(t[NewRally],"Rally",BoolToStr(t[NewPullback],"Pullback","???")));
+      }
+      else
       if (t[NewTick])
       {
+        if (inpTickAlert==Enabled)
+          text  = "Tick Level ["+(string)t.Segment().Count+"]";
         //smabias    = NewAction(legacy.Bias,Action(t.SMA().Close[1]-t.SMA().Open[1]));
         //polylead   = NewAction(legacy.Lead,BoolToInt(IsEqual(legacy.Bias,Action(t.Poly().Close[1]-t.Poly().Open[1])),legacy.Bias,legacy.Lead));
         //tbias      = NewAction(
@@ -323,6 +355,12 @@ void ExecuteLegacy(void)
         //  Pause("Bias Change: "+EnumToString((OrderCommand)legacy.Bias),"New Bias");
         //else
         //  Pause("Lead Change: "+EnumToString((OrderCommand)legacy.Lead),"New Lead");
+      }
+
+      if (StringLen(text)>0)
+      {
+        Alert(Symbol()+">New "+text);
+        //Print(t.ActiveEventStr());
       }
     }
 
@@ -404,14 +442,6 @@ int OnInit()
           master.Fractal = type;
 
     master.Pivot       = s[Daily].Pivot(Breakout,0,Max);
-    
-    DrawBox("[m3]Stat",496,1,240,80,C'0,0,60',BORDER_FLAT);
-
-    NewLabel("[m3]Bias","^",500,5,clrLawnGreen);
-    NewLabel("[m3]Lead","^",520,5,clrLawnGreen);
-
-    NewLabel("[m3]ActivePivot","Active",540,15,clrLawnGreen);
-    NewLabel("[m3]MasterPivot","Master",540,40,clrLawnGreen);
 
     return(INIT_SUCCEEDED);
   }

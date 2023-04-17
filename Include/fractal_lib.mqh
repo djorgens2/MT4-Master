@@ -80,14 +80,16 @@
   //-- Canonical Fractal Rec
   struct FractalRec
          {
+           FractalType   Type;                     //-- Type
+           FractalState  State;                    //-- State
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
            int           Lead;                     //-- Bias based on Last Pivot High/Low hit
            int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
-           FractalState  State;                    //-- State
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
            double        Price;                    //-- Last Pivot Price
            bool          Peg;                      //-- Retrace peg
            bool          Trap;                     //-- Trap flag (not yet implemented)
+           datetime      Updated;                  //-- Last Update;
            double        Point[FractalPoints];     //-- Fractal Points (Prices)
          };
 
@@ -109,6 +111,7 @@
   //-- Canonical Fibonacci Pivot
   struct FibonacciRec
          {
+           FractalType   Type;                     //-- Type
            PivotRec      Pivot;                    //-- Fractal Pivot
            FiboLevel     Level;                    //-- Fibo Level Now
            double        Percent;                  //-- Actual Fibonacci Percentage
@@ -499,6 +502,7 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
 
       frec.Event             = FractalEvent(frec.State);
+      frec.Updated           = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
       Fractal                = frec;
 
       return true;
@@ -521,7 +525,7 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
 //+------------------------------------------------------------------+
 //| NewState - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
-bool NewState(FractalState &State, FractalState Change, bool Update=true, bool Force=false)
+bool NewState(FractalState &State, FractalState Change, bool Force=false, bool Update=true)
   {
     if (Change==NoState)
       return(false);
@@ -530,7 +534,8 @@ bool NewState(FractalState &State, FractalState Change, bool Update=true, bool F
       if (State==Reversal)
         return(false);
 
-    if (Change==Reversal&&State==Reversal)
+    //-- Outside Reversal Manager - force only on Direction Change
+    if (Force&&Change==Reversal&&State==Reversal)
       return(true);
 
     if (State==Correction)
@@ -582,7 +587,10 @@ bool NewFibonacci(FractalRec &Fractal, FibonacciRec &Fibo, int Method=Expansion,
     if (IsChanged(Fibo.Level,Level(fibo)))
     {
       Fractal.Event          = NewFibonacci;
+      Fractal.Updated        = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
 
+      Fibo.Type              = Fractal.Type;
+     
       Fibo.Percent           = fibo;
       Fibo.Forecast          = Price(Fibo.Level,Fractal.Point[fpRoot],BoolToDouble(IsEqual(Method,Expansion),Fractal.Point[fpBase],Fractal.Point[fpExpansion]),Method);
   

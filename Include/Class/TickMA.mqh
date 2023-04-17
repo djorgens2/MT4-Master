@@ -127,6 +127,7 @@ private:
              EventType      Event;
              FractalDetail  High;
              FractalDetail  Low;
+             bool           Trap;
              double         Support;
              double         Resistance;
              double         Expansion;
@@ -518,7 +519,7 @@ void CTickMA::NewTick()
     tr[0].Close               = Close[tmaBar];
     
     if (ArraySize(tr)>1)
-      SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow));
+      SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow),Notify);
 
     SetEvent(NewTick,Notify);
   }
@@ -622,10 +623,16 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
       SetEvent(FractalEvent(Fractal.Type),Major);
       
     if (IsChanged(Fractal.Direction[Term],fractal.Direction[Term]))
-      SetEvent(NewTerm,Major);
+    {
+      SetEvent(NewTerm,Minor);
+      SetEvent(NewFractal,Minor);
+    }
 
     if (IsChanged(Fractal.Direction[Trend],fractal.Direction[Trend]))
+    {
       SetEvent(NewTrend,Major);
+      SetEvent(NewFractal,Major);
+    }
 
     Fractal                         = fractal;
   }
@@ -720,11 +727,17 @@ void CTickMA::UpdateSegment(void)
     }
 
     if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))
+    {
       SetEvent(NewTerm,Nominal);
+      SetEvent(NewFractal,Nominal);
+    }
 
     if (!IsBetween(fm.Expansion,fm.Support,fm.Resistance,Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
-        SetEvent(NewTrend,Nominal);
+      {
+        SetEvent(NewTrend,Minor);
+        SetEvent(NewFractal,Minor);
+      }
 
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
@@ -919,7 +932,7 @@ void CTickMA::UpdateLinear(void)
 void CTickMA::UpdateFractal(void)
   {
     fm.Event               = NoEvent;
-    fm.Bias                = Action(Direction(fm.High.Bar[Expansion]-fm.Low.Bar[Expansion]));
+    fm.Bias                = Action(Direction(fm.Low.Bar[Expansion]-fm.High.Bar[Expansion]));
 
     if (IsChanged(fm.Type,(FractalType)BoolToInt(IsEqual(fm.High.Type,fm.Low.Type),fm.High.Type,fm.Type)))
     {
@@ -938,7 +951,7 @@ void CTickMA::UpdateFractal(void)
 
         SetEvent(NewFractal,Major);
       }
-      else 
+      else
       {
         if (NewState(fm.State,Retrace))
           fm.Event          = FractalEvent(fm.Type);
@@ -946,6 +959,10 @@ void CTickMA::UpdateFractal(void)
 
       SetEvent(fm.Event,Major);
     }
+
+    if (IsEqual(fm.High.Direction[Trend],fm.Low.Direction[Trend]))
+      fm.Trap               = !IsEqual(fm.Direction,fm.High.Direction[Trend]);
+    else fm.Trap            = false;
   }
 
 //+------------------------------------------------------------------+

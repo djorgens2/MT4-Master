@@ -179,8 +179,9 @@ void RefreshScreen(void)
     UpdateDirection("tmaLinearBiasNet"+(string)IndWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),24);
     
     //-- Fractal
-    UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
-    UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
+    UpdateDirection("tmaFractalDir"+(string)IndWinId,t.Fractal().Direction,BoolToInt(t.Fractal().Trap,clrYellow,Color(t.Fractal().Direction)),18);
+    UpdateLabel("tmaFractalState"+(string)IndWinId,EnumToString(t.Fractal().Type)+" "+BoolToStr(t.Fractal().Trap,"Trap",EnumToString(t.Fractal().State)),
+                BoolToInt(t.Fractal().Trap,clrYellow,Color(t.Fractal().Direction)),12);
     UpdateDirection("tmaFractalBias"+(string)IndWinId,Direction(t.Fractal().Bias,InAction),Color(Direction(t.Fractal().Bias,InAction)),18);
 
     //-- Fractal Bounds
@@ -221,7 +222,7 @@ void RefreshScreen(void)
     }
 
     //-- General
-    UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
 
     string text   = "";
