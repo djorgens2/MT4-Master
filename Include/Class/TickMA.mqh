@@ -170,7 +170,7 @@ private:
     void             CalcSMA(void);
     void             CalcPoly(PriceType Type, double &Poly[]);
     void             CalcLinear(double &Source[], double &Target[]);
-    void             CalcFractal(FractalDetail &Fractal, double &Price[]);
+    void             CalcFractal(FractalDetail &Detail, double &Price[]);
     void             CalcMomentum(MomentumDetail &Detail, double &SMA[]);
 
     void             NewTick();
@@ -541,7 +541,7 @@ void CTickMA::NewSegment(void)
     sr[0].High                = tr[0].High;
     sr[0].Low                 = tr[0].Low;
     sr[0].Close               = tr[0].Close;
-    sr[0].Event               = NoEvent;
+    sr[0].Event               = NewSegment;
 
     if (ArraySize(tr)>1)
     {
@@ -558,11 +558,11 @@ void CTickMA::NewSegment(void)
   }
 
 //+------------------------------------------------------------------+
-//| CalcFractal - Computes Fractal Points of the supplied Price array|
+//| CalcFractal - Computes Fractal Points for supplied Price array   |
 //+------------------------------------------------------------------+
-void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
+void CTickMA::CalcFractal(FractalDetail &Detail, double &Price[])
   {
-    FractalDetail fractal;
+    FractalDetail detail;
     FractalType   type;
     FractalType   hightype          = Expansion;
     FractalType   lowtype           = Expansion;
@@ -572,20 +572,20 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
     double        high              = Price[0];
     double        low               = Price[0];
 
-    ArrayInitialize(fractal.Direction,NoDirection);
-    ArrayInitialize(fractal.Bar,NoValue);
-    ArrayInitialize(fractal.Point,NoValue);
+    ArrayInitialize(detail.Direction,NoDirection);
+    ArrayInitialize(detail.Bar,NoValue);
+    ArrayInitialize(detail.Point,NoValue);
 
-    fractal.Support                 = Price[0];
-    fractal.Resistance              = Price[0];
+    detail.Support                 = Price[0];
+    detail.Resistance              = Price[0];
 
     for (type=Expansion;type>NoValue;type--)
       for (bar=bar;bar<tmaPeriods;bar++)
         if (NewDirection(direction,Direction(Price[bar]-Price[bar+1])))
         {
-          fractal.Direction[type]   = direction;
-          fractal.Point[type]       = Price[bar];
-          fractal.Bar[type]         = bar;
+          detail.Direction[type]   = direction;
+          detail.Point[type]       = Price[bar];
+          detail.Bar[type]         = bar;
 
           hightype                  = (FractalType)BoolToInt(IsHigher(Price[bar],high),type,hightype);
           lowtype                   = (FractalType)BoolToInt(IsLower(Price[bar],low),type,lowtype);
@@ -597,44 +597,47 @@ void CTickMA::CalcFractal(FractalDetail &Fractal, double &Price[])
       for (bar=bar;bar<tmaPeriods;bar++)
         if (NewDirection(direction,Direction(Price[bar]-Price[bar+1])))
         {
-          ArrayCopy(fractal.Direction,fractal.Direction,1,0,FractalTypes-1);
-          ArrayCopy(fractal.Point,fractal.Point,1,0,FractalTypes-1);
-          ArrayCopy(fractal.Bar,fractal.Bar,1,0,FractalTypes-1);
+          ArrayCopy(detail.Direction,detail.Direction,1,0,FractalTypes-1);
+          ArrayCopy(detail.Point,detail.Point,1,0,FractalTypes-1);
+          ArrayCopy(detail.Bar,detail.Bar,1,0,FractalTypes-1);
 
-          fractal.Direction[Origin] = direction;
-          fractal.Point[Origin]     = Price[bar];
-          fractal.Bar[Origin]       = bar;
+          detail.Direction[Origin] = direction;
+          detail.Point[Origin]     = Price[bar];
+          detail.Bar[Origin]       = bar;
 
           break;
         }
 
     for (type=Origin;type<FractalTypes;type++)
-      if (fractal.Bar[type]>NoValue)
+      if (detail.Bar[type]>NoValue)
       {
-        fractal.Support             = fmin(fractal.Support,fractal.Point[type]);
-        fractal.Resistance          = fmax(fractal.Resistance,fractal.Point[type]);
+        detail.Support             = fmin(detail.Support,detail.Point[type]);
+        detail.Resistance          = fmax(detail.Resistance,detail.Point[type]);
       }
 
-    fractal.Type                    = (FractalType)fmin(Expansion+(Expansion-fmax(hightype,lowtype)),Lead);
-    fractal.Direction[Term]         = BoolToInt(IsHigher(Price[0],fractal.Point[Root],NoUpdate),DirectionUp,DirectionDown);
-    fractal.Direction[Trend]        = fractal.Direction[Expansion];
+    detail.Type                    = (FractalType)fmin(Expansion+(Expansion-fmax(hightype,lowtype)),Lead);
+    detail.Direction[Term]         = BoolToInt(IsHigher(Price[0],detail.Point[Root],NoUpdate),DirectionUp,DirectionDown);
+    detail.Direction[Trend]        = detail.Direction[Expansion];
 
-    if (IsChanged(Fractal.Type,fractal.Type))
-      SetEvent(FractalEvent(Fractal.Type),Major);
+    if (IsChanged(detail.Type,detail.Type))
+    {
+      SetEvent(FractalEvent(detail.Type),Notify);
+      SetEvent(NewState,Minor);
+    }
       
-    if (IsChanged(Fractal.Direction[Term],fractal.Direction[Term]))
+    if (IsChanged(Detail.Direction[Term],detail.Direction[Term]))
     {
       SetEvent(NewTerm,Minor);
       SetEvent(NewFractal,Minor);
     }
 
-    if (IsChanged(Fractal.Direction[Trend],fractal.Direction[Trend]))
+    if (IsChanged(Detail.Direction[Trend],detail.Direction[Trend]))
     {
       SetEvent(NewTrend,Major);
       SetEvent(NewFractal,Major);
     }
 
-    Fractal                         = fractal;
+    Detail                         = detail;
   }
 
 //+------------------------------------------------------------------+
@@ -644,7 +647,7 @@ void CTickMA::CalcMomentum(MomentumDetail &Detail, double &SMA[])
   {
     double momentum       = (SMA[0]-SMA[1])-(SMA[1]-SMA[2]);
     double change         = momentum-Detail.Now;
-    
+
     Detail.Event          = NoEvent;
 
     if (IsEqual(change,0.00))
@@ -653,7 +656,7 @@ void CTickMA::CalcMomentum(MomentumDetail &Detail, double &SMA[])
     Detail.Event          = BoolToEvent(IsEqual(Direction(change),DirectionUp),NewRally,NewPullback);
     Detail.Now            = momentum;
     Detail.Change         = change;
-      
+
     if (NewAction(Detail.Bias,Action(change)))
       Detail.Event        = NewBias;
 
@@ -735,22 +738,23 @@ void CTickMA::UpdateSegment(void)
     if (!IsBetween(fm.Expansion,fm.Support,fm.Resistance,Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
       {
-        SetEvent(NewTrend,Minor);
-        SetEvent(NewFractal,Minor);
+        SetEvent(NewTrend,Nominal);
+        SetEvent(NewFractal,Warning);
       }
 
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
 
-    SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Notify);
+    SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
 
-    sr[0].Event            = BoolToEvent(Event(NewDirection,Nominal),  NewDirection,
-                               BoolToEvent(Event(NewPullback,Nominal), NewPullback,
-                               BoolToEvent(Event(NewRally,Nominal),    NewRally,
-                               BoolToEvent(Event(NewSegment,Nominal),  NewSegment,
-                               BoolToEvent(Event(NewLow,Nominal),      NewLow,
-                               BoolToEvent(Event(NewHigh,Nominal),     NewHigh,
-                               BoolToEvent(Event(NewBias,Nominal),     NewBias,NoEvent)))))));
+    sr[0].Event            = BoolToEvent(Event(NewTrend,Nominal),      NewTrend,
+                             BoolToEvent(Event(NewTerm,Nominal),       NewTerm,
+                             BoolToEvent(Event(NewSegment,Nominal),    NewSegment,
+                             BoolToEvent(Event(NewPullback,Nominal),   NewPullback,
+                             BoolToEvent(Event(NewRally,Nominal),      NewRally,
+                             BoolToEvent(Event(NewLow,Nominal),        NewLow,
+                             BoolToEvent(Event(NewHigh,Nominal),       NewHigh,
+                             BoolToEvent(Event(NewBias,Nominal),       NewBias,NoEvent))))))));
   }
 
 //+------------------------------------------------------------------+
@@ -794,13 +798,11 @@ void CTickMA::UpdateRange(void)
     {
       if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
         if (IsChanged(range.State,Reversal))
-        {
-          SetEvent(NewReversal,Critical);
-          SetEvent(NewDirection,Critical);
-        }
+          range.Event     = NewReversal;
 
       if (IsEqual(range.State,Retrace))
-        SetEvent(BoolToEvent(IsChanged(range.State,Breakout),NewBreakout),Critical);
+        if (IsChanged(range.State,Breakout))
+          range.Event     = NewBreakout;
 
       range.Retrace       = Close[tmaBar];
       range.Age           = 0;
@@ -815,7 +817,7 @@ void CTickMA::UpdateRange(void)
         range.Event       = NewRetrace;
     }
 
-    SetEvent(range.Event,Critical);
+    SetEvent(range.Event,(AlertLevel)BoolToInt(IsEqual(range.Event,NewContraction),Major,Critical));
   }
 
 //+------------------------------------------------------------------+
