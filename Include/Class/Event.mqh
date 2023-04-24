@@ -24,7 +24,8 @@ protected:
                   Warning,
                   Minor,
                   Major,
-                  Critical
+                  Critical,
+                  AlertLevels
                 };
 
        enum     EventType
@@ -41,7 +42,6 @@ protected:
                   NewState,
                   NewAction,
                   NewBias,
-                  NewRange,
                   NewOrigin,
                   NewTrend,
                   NewTerm,
@@ -108,7 +108,8 @@ public:
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       
-      bool           operator[](const EventType Event) {return(eEvents[Event]);}
+      bool           operator[](const EventType Event)  {return(eEvents[Event]);}
+      bool           operator[](const AlertLevel Level) {return(Level==eMaxAlert);}
   };
 
 //+------------------------------------------------------------------+
@@ -172,9 +173,9 @@ string CEvent::ActiveEventStr(bool WithHeader=true)
     
     if (this.ActiveEvent())
     {
-      for (EventType event=NewDirection;event<EventTypes;event++)
+      for (EventType event=NoEvent;event<EventTypes;event++)
         if (eEvents[event])
-          Append(text, EnumToString(eAlerts[event])+":"+EnumToString(event), "\n");
+          Append(text,EnumToString(eAlerts[event])+":"+EnumToString(event),"\n");
     }
     else Append(text, "No Active Events", "\n");
     
@@ -247,7 +248,6 @@ const string EventText[EventTypes] =
                "New State",
                "New Action",
                "New Bias",
-               "New Range",
                "New Origin",
                "New Trend",
                "New Term",

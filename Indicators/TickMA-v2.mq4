@@ -191,9 +191,6 @@ void RefreshScreen(void)
       UpdateRay("tmaPlanRes:"+(string)IndWinId,t.Range().Resistance,inpPeriods-1);
       UpdateRay("tmaRangeMid:"+(string)IndWinId,t.Range().Mean,inpPeriods-1);
       UpdateRay("tmaClose:"+(string)IndWinId,Close[0],inpPeriods-1);
-
-      Arrow("tmaFrRes:"+(string)IndWinId,ArrowDown,clrLawnGreen,t.Bar(Resistance),t.Fractal().High.Resistance+point(6),IndWinId);
-      Arrow("tmaFrSup:"+(string)IndWinId,ArrowUp,clrRed,t.Bar(Support),t.Fractal().Low.Support,IndWinId);
     }
 
     //-- Fractal Rulers
@@ -214,10 +211,12 @@ void RefreshScreen(void)
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (type<=t.Fractal().High.Type)
-          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrHi:"+(string)IndWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",
+            BoolToInt(IsEqual(t.Fractal().High.Bar[type],t.Bar(Resistance)),clrGoldenrod,clrRed));
 
         if (type<=t.Fractal().Low.Type)
-          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrLo:"+(string)IndWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",
+            BoolToInt(IsEqual(t.Fractal().Low.Bar[type],t.Bar(Support)),clrGoldenrod,clrRed));
       }
     }
 
@@ -264,7 +263,7 @@ void UpdateTickMA(void)
     ResetBuffer(plPolyOpenBuffer,t.Poly().Open);
     ResetBuffer(plPolyCloseBuffer,t.Poly().Close);
     ResetBuffer(plLineOpenBuffer,t.Linear().Open.Price);
-    ResetBuffer(plLineCloseBuffer,t.Linear().Close.Price);    
+    ResetBuffer(plLineCloseBuffer,t.Linear().Close.Price);
   }
 
 //+------------------------------------------------------------------+

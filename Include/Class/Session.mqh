@@ -600,10 +600,11 @@ void CSession::LoadHistory(void)
       frec[type].Type                = type;
       frec[type].State               = NoState;
       frec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
+      frec[type].Price               = Open[sBar];
       frec[type].Lead                = NoBias;
       frec[type].Bias                = NoBias;
       frec[type].Event               = NoEvent;
-      frec[type].Price               = Open[sBar];
+      frec[type].Alert               = NoAlert;
       frec[type].Peg                 = false;
       frec[type].Trap                = false;
       frec[type].Updated             = Time[sBar];

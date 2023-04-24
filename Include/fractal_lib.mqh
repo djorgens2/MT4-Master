@@ -23,6 +23,7 @@
                      Recovery,        // Trend resumption post-correction
                      Breakout,        // Fractal Breakout
                      Reversal,        // Fractal Reversal
+                     Contraction,     // Consolidating Range
                      FractalStates
                    };
   
@@ -83,10 +84,11 @@
            FractalType   Type;                     //-- Type
            FractalState  State;                    //-- State
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
+           double        Price;                    //-- Event Price
            int           Lead;                     //-- Bias based on Last Pivot High/Low hit
            int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
-           EventType     Event;                    //-- Current Tick Event; disposes on next tick
-           double        Price;                    //-- Last Pivot Price
+           EventType     Event;                    //-- Last Event; disposes on next tick
+           AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
            bool          Peg;                      //-- Retrace peg
            bool          Trap;                     //-- Trap flag (not yet implemented)
            datetime      Updated;                  //-- Last Update;
@@ -125,7 +127,7 @@ static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)"
 //+------------------------------------------------------------------+
 color Color(FractalState State)
   {
-    static const color  statecolor[FractalStates]  = {clrNONE,clrGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed};
+    static const color  statecolor[FractalStates]  = {clrNONE,clrGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed,clrSkyBlue};
 
     return statecolor[State];
   }
@@ -185,7 +187,7 @@ AlertLevel FractalAlert(FractalType Type)
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
   {
-    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal};
+    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewContraction};
   
     return (FractalEvent[State]);
   }
@@ -410,9 +412,10 @@ void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction
 bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, bool Update=true, bool Force=true)
   {
     FractalRec frec          = Fractal;
-    frec.Event               = NoEvent;
-    
     double     retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
+
+    frec.Event               = NoEvent;
+    frec.Alert               = NoAlert;
 
     //-- Handle Reversals
     if (Reversing)
@@ -502,6 +505,7 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
       NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
 
       frec.Event             = FractalEvent(frec.State);
+      frec.Alert             = FractalAlert(frec.Type);
       frec.Updated           = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
       Fractal                = frec;
 

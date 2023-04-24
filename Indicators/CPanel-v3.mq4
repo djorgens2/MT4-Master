@@ -226,10 +226,12 @@ void RefreshScreen(void)
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (type<=t.Fractal().High.Type)
-          ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",
+            BoolToInt(IsEqual(t.Fractal().High.Bar[type],t.Bar(Resistance)),clrGoldenrod,clrRed));
 
         if (type<=t.Fractal().Low.Type)
-          ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",
+            BoolToInt(IsEqual(t.Fractal().Low.Bar[type],t.Bar(Support)),clrGoldenrod,clrRed));
       }
     }
 

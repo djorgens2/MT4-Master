@@ -41,35 +41,40 @@
 #define On                 true      //--- Turn Feature On
 #define Off               false      //--- Turn Feature Off
 
-//--- Common terminology; global constants
+  //--- Common terminology; global constants
+  enum     YesNoType
+           {
+             Yes,
+             No
+           };
 
-       enum     YesNoType
-                {
-                  Yes,
-                  No
-                };
+  enum     FeatureConfig
+           {
+             Disabled,        // Disabled
+             Enabled          // Enabled
+           };
 
-       //--- Quantitative measure types
-       enum     SummaryType
-                { 
-                  Loss,     //--
-                  Net,      //-- Hard Sequence
-                  Profit,   //-- ** DO NOT MODIFY
-                  Total,    //--            
-                  Count,
-                  Area,
-                  Highest,
-                  Lowest,
-                  SummaryTypes
-                };
+  //--- Quantitative measure types
+  enum     SummaryType
+           { 
+             Loss,     //--
+             Net,      //-- Hard Sequence
+             Profit,   //-- ** DO NOT MODIFY
+             Total,    //--            
+             Count,
+             Area,
+             Highest,
+             Lowest,
+             SummaryTypes
+           };
                 
-       enum     MeasureType
-                {
-                  Now,
-                  Min,    
-                  Max,    
-                  MeasureTypes      //--- must be last
-              };
+  enum     MeasureType
+           {
+             Now,
+             Min,    
+             Max,    
+             MeasureTypes      //--- must be last
+           };
 
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |

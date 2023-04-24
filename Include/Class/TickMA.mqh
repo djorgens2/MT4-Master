@@ -252,7 +252,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
     double minFOC           = fabs(FOC.Min);
     double nowFOC           = fabs(FOC.Now);
     
-    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Nominal);
+    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Notify);
     
     FOC.Event               = NoEvent;
 
@@ -263,10 +263,12 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
       FOC.Origin            = FOC.Price[tmaPeriods-1];
       FOC.Now               = (atan(fdiv(pip(FOC.Lead-FOC.Origin),tmaPeriods))*180)/M_PI;
       
+      //-- Adverse Linear-Price Divergence
       if (Event(NewExpansion,Critical))
         if (!IsEqual(Direction(FOC.Now),range.Direction))
           SetEvent(AdverseEvent,Critical);
 
+      //-- Linear Directional Slope Change (Lead-Prior Node)
       if (NewDirection(FOC.Direction,Direction(FOC.Lead-FOC.Price[1])))
       {
         maxFOC              = NoValue;
@@ -296,7 +298,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
         bias                = NoBias;
 
       if (IsChanged(FOC.Bias,bias))
-        FOC.Event           = NewBias;
+        FOC.Event           = BoolToEvent(IsEqual(FOC.Event,NoEvent),NewBias,FOC.Event);
 
       SetEvent(FOC.Event,alertlevel);
     }
