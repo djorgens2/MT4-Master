@@ -17,60 +17,76 @@
 
 string    indSN      = "CPanel-v3";
 
-enum DirectiveType
-     {
-       Build,           //-- Increase Position
-       Hedge,           //-- Contrarian drawdown management
-       Cover,           //-- Aggressive balancing on excessive drawdown
-       Capture,         //-- Contrarian profit protection
-       Mitigate,        //-- Risk management on pattern change
-       Wait             //-- Hold, wait for signal
-     };
-     
-enum RoleType
-     {
-       Buyer,           //-- Purchasing Manager
-       Sales,           //-- Selling Manager
-       Unnassigned      //-- No Manager
-     };
+enum      DirectiveType
+          {
+            Build,          //-- Increase Position
+            Hedge,          //-- Contrarian drawdown management
+            Cover,          //-- Aggressive balancing on excessive drawdown
+            Capture,        //-- Contrarian profit protection
+            Mitigate,       //-- Risk management on pattern change
+            Wait            //-- Hold, wait for signal
+          };
 
-enum SignalType
-     {
-       Tick,            // Tick
-       Segment,         // Segment
-       SMA,             // Simple MA
-       Poly,            // Poly
-       Linear,          // Linear
-       Fractal,         // Fractal
-       Fibonacci,       // Fibonacci
-       SignalTypes      // All Alerts
-     };
+enum      SignalAction
+          {   
+            Breakaway,      //-- Breakout 
+            CrossCheck,     //-- Cross Check for SMA, Poly, TL, et al
+            Trigger,        //-- Event Triggering Action
+            Review          //-- Reviewable event
+          };
 
-struct RoleRec
-       {
-         DirectiveType Directive;          //-- Role Responsibility/Strategy
-         double        DCA;                //-- Role DCA
-         FiboLevel     DCALevel;           //-- DCA Fibo Level
-         OrderSummary  Entry;              //-- Role Entry Zone Summary
-         bool          Hold;               //-- Hold Role Profit
-       };
+enum      RoleType
+          {
+            Buyer,             //-- Purchasing Manager
+            Sales,             //-- Selling Manager
+            Unnassigned        //-- No Manager
+          };
 
-struct SignalRec
-       {
-         FractalRec    Tick[SignalTypes];
-         FractalRec    Session[SignalTypes];
-       };
+enum      SignalType
+          {
+            Tick,            // Tick
+            Segment,         // Segment
+            SMA,             // Simple MA
+            Poly,            // Poly
+            Linear,          // Linear
+            Range,           // Trading Range
+            Fractal,         // Fractal
+            Fibonacci,       // Fibonacci
+            SignalTypes      // All Alerts
+          };
 
-struct MasterRec
-       {
-         RoleType      Director;           //-- Process Manager (Owner|Lead)
-         RoleRec       Manager[2];         //-- Manager Detail Data
-         SignalType    Tick;               //-- Last Tick Signal
-         SignalType    Session;            //-- Last Session Signal
-         FractalType   Fractal;            //-- Fractal Lead
-         FractalState  State;              //-- Fractal State
-         PivotRec      Pivot;              //-- Active Pivot
-       };
+struct    RoleRec
+          {
+            DirectiveType Directive;          //-- Role Responsibility/Strategy
+            double        DCA;                //-- Role DCA
+            FiboLevel     DCALevel;           //-- DCA Fibo Level
+            OrderSummary  Entry;              //-- Role Entry Zone Summary
+            bool          Hold;               //-- Hold Role Profit
+          };
+
+struct    SignalRec
+          {
+            SignalType    Type;
+            SignalAction  Action;
+            EventType     Event;
+            AlertLevel    Alert;
+            FractalState  State;
+            int           Direction;
+            int           Bias;
+            double        Price;
+            string        Text;
+            datetime      Updated;
+          };
+
+struct    MasterRec
+          {
+            RoleType      Director;           //-- Process Manager (Owner|Lead)
+            RoleRec       Manager[2];         //-- Manager Detail Data
+            FractalType   Fractal;            //-- Fractal Lead
+            FractalState  State;              //-- Fractal State
+            bool          Trap;               //-- Bull/Bear Trap Flag
+            PivotRec      Pivot;              //-- Active Pivot
+          };
 
 //--- Configuration
 input string           appHeader          = "";          // +--- Application Config ---+
@@ -105,37 +121,9 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   
   MasterRec            master;
   MasterRec            legacy;
-  SignalRec            signal;
-  FractalRec           fractal;
+  SignalRec            tick;               //-- Last Tick Signal
+  SignalRec            session;            //-- Last Session Signal
   
-  string               ltext;
-  datetime             ltime;
-
-//+------------------------------------------------------------------+
-//| Alert - Writes events to log in debug; alerts on Live Market     |
-//+------------------------------------------------------------------+
-void Alert(FractalRec &Signal, AlertLevel Level)
-  {
-    string text     = "";
-
-    if (IsBetween(Signal.Alert,Level,AlertLevels))
-    {
-      Append(text,Symbol()+">");
-      Append(text,TimeToStr(TimeCurrent()));
-      Append(text,StringSubstr(EnumToString(Signal.Event),3));
-      
-      Append(text,"["+EnumToString(Signal.Alert)+"]: ");
-
-      switch (Signal.Alert)
-      {
-        case Notify:    Append(text,"Tick Level ["+(string)(t.Segment().Count)+"]");
-        case Nominal:   break;
-      }
-      
-//      if (LegacyTime>NoValue&&IsEqual(LegacyTime,Signal.Updated))
-//        Alert(text);
-    }
-  }
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -176,8 +164,13 @@ void UpdatePanel(void)
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
 
     if (winid>NoValue)
+    {
       if (IsChanged(type,master.Fractal))
         UpdateLabel("lbhFractal",EnumToString(master.Fractal),Color(s[Daily][master.Fractal].Direction));
+
+      UpdateLabel("lbvOC-BUY-Manager",BoolToStr(master.Director==Buyer,CharToStr(108)),clrGold,11,"Wingdings");
+      UpdateLabel("lbvOC-SELL-Manager",BoolToStr(master.Director==Sales,CharToStr(108)),clrGold,11,"Wingdings");
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -301,13 +294,20 @@ void ManageRisk(int Manager)
   }
 
 //+------------------------------------------------------------------+
-//| SetSignal - Updates Signal detail on Tick                        |
+//| InitSignal - Inits a FractalRec for supplied Signal              |
 //+------------------------------------------------------------------+
-void SetSignal(FractalRec &Signal, EventType Event, AlertLevel Level)
+void InitSignal(SignalRec &Signal)
   {
-    Signal.Event              = Event;
-    Signal.Alert              = Level;
-    Signal.Updated            = TimeCurrent();
+    Signal.Type        = NoValue;
+    Signal.Action      = NoValue;
+    Signal.Event       = NoEvent;
+    Signal.Alert       = NoAlert;
+    Signal.State       = NoState;
+    Signal.Direction   = NoDirection;
+    Signal.Bias        = NoBias;
+    Signal.Text        = "";
+    Signal.Price       = Close[0];
+    Signal.Updated     = TimeCurrent();
   }
 
 //+------------------------------------------------------------------+
@@ -315,47 +315,142 @@ void SetSignal(FractalRec &Signal, EventType Event, AlertLevel Level)
 //+------------------------------------------------------------------+
 void UpdateSignal(CTickMA &Signal)
   {
-//-- FractalType   Type;                     //-- Type
-//-- FractalState  State;                    //-- State
-//-- int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
-//-- double        Price;                    //-- Event Price
-//-- int           Lead;                     //-- Bias based on Last Pivot High/Low hit
-//-- int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
-//-- EventType     Event;                    //-- Last Event; disposes on next tick
-//-- AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
-//-- bool          Peg;                      //-- Retrace peg
-//-- bool          Trap;                     //-- Trap flag (not yet implemented)
-//-- datetime      Updated;                  //-- Last Update;
-//-- double        Point[FractalPoints];     //-- Fractal Points (Prices)
-//    FractalRec     fractal;
-
-    InitSignal(fractal);
-
-    if (Signal[NewTick])
-      SetSignal(fractal,NewTick,Notify);
-
-    if (Signal[NewSegment])
-      SetSignal(fractal,NewSegment,Nominal);
-
-    if (Signal.Event(NewTerm,Nominal))
-      SetSignal(fractal,NewSegment,Minor);
-
-    if (Signal[FractalEvent(Signal.Fractal().Type)])
-      SetSignal(fractal,NewFractal,Signal.EventLevel(FractalEvent(Signal.Fractal().Type)));
-      
-    if (Signal[NewFractal])
-      SetSignal(fractal,NewFractal,Signal.EventLevel(NewFractal));
-
+    SignalRec signal;
+    
+    InitSignal(signal);
+    
+    signal.Action   = Review;
+    
     if (Signal[Critical])
-      switch (Signal.Range().Event)
+    {
+      signal.Type              = Range;
+      signal.Action            = Breakaway;
+      signal.Alert             = Critical;
+      signal.State             = Signal.Range().State;
+      signal.Direction         = Signal.Range().Direction;
+      signal.Bias              = Action(Signal.Range().Direction);
+
+//      if (Signal[NewContraction])  ltext = "Origin [Critical]: Contraction";
+
+      if (Signal[NewBias])
       {
-        case AdverseEvent:    
-        case NewBreakout:    
-        case NewReversal:   SetSignal(fractal,NewFractal,Critical);
-                            break;
+        signal.Action          = CrossCheck;
+        signal.Event           = NewBias;
+        signal.Bias            = Signal.Linear().Close.Bias;
+        signal.Text            = "Origin [Critical]: Bias";
       }
+
+      if (Signal[NewRetrace])
+      {
+        signal.Event           = NewRetrace;
+        signal.Bias            = Action(Signal.Range().Direction,InDirection,InContrarian);
+        signal.Text            = "Origin [Critical]: Retrace";
+      }
+
+      if (Signal[NewExpansion])
+      {
+        signal.Event           = NewExpansion;
+        signal.Text            = "Origin [Critical]: Expansion";
+      }
+
+      if (Signal[AdverseEvent])
+      {
+        signal.Event           = NewCorrection;
+        signal.Bias            = Action(Signal.Range().Direction,InDirection,InContrarian);
+        signal.Text            = "Origin [Critical]: Adverse Expansion";
+      }
+
+      if (Signal[NewBreakout])
+      {
+        signal.Event           = NewBreakout;
+        signal.Text            = "Origin [Critical]: Breakout";
+      }
+
+      if (Signal[NewReversal])
+      {
+        signal.Event           = NewReversal;
+        signal.Text            = "Origin [Critical]: Reversal";
+      }
+    }
+    else
+    if (Signal[NewFractal])
+    {
+      signal.Alert             = Signal.EventLevel(NewFractal);
+      signal.State             = Signal.Fractal().State;
+      signal.Direction         = Signal.Fractal().Direction;
+      signal.Bias              = Signal.Fractal().Bias;
+
+      switch (signal.Alert)
+      {
+        case Nominal:  //-- Leader Change triggering event
+                       signal.Type       = Segment;
+                       signal.Alert      = Signal.HighAlert();
+                       signal.Action     = Trigger;
+                       signal.Event      = NewDirection;
+                       signal.State      = (FractalState)BoolToInt(Signal[NewRally],Rally,Pullback);
+                       signal.Bias       = BoolToInt(Signal[NewRally],OP_BUY,BoolToInt(Signal[NewPullback],OP_SELL));
+                       signal.Text       = "Segment [Minor]: "+EnumToString(signal.State);
+                       break;
+
+        case Warning:  signal.Type       = Segment;
+                       signal.Event      = NewState;
+                       signal.State      = (FractalState)BoolToInt(Signal[NewRally],Rally,Pullback);
+                       signal.Text       = "Segment [Warning]: "+BoolToStr(Signal[NewRally],"Rally",
+                                              BoolToStr(Signal[NewPullback],"Pullback",EnumToString(Signal.Fractal().Type)));
+                       break;
+
+        case Minor:    signal.Type       = Fractal;
+                       signal.Event      = NewTerm;
+                       signal.Text       = "Term [Minor]: Reversal";
+                       break;
+
+        case Major:    signal.Type       = Fractal;
+                       signal.Event      = NewTrend;
+                       signal.Text       = "Trend [Major]: "+BoolToStr(Signal.Fractal().Trap,"Trap",BoolToStr(IsEqual(Signal.Fractal().Type,Expansion),
+                                              EnumToString(Signal.Fractal().State),EnumToString(Signal.Fractal().Type)));
+                       break;
+      }
+    }
+    else
+    {
+      signal.Alert      = Signal.HighAlert();
+      signal.Direction  = Signal.Segment().Direction[Trend];
+      signal.Bias       = Action(Signal.Segment().Direction[Term]);
+      signal.State      = (FractalState)BoolToInt(Signal[NewHigh],Rally,BoolToInt(Signal[NewLow],Pullback));
+
+      if (Signal[NewSegment])
+      {
+        signal.Type     = Segment;
+        signal.Event    = NewSegment;
+        signal.Text     = "Segment ["+BoolToStr(Signal[NewHigh],"+",BoolToStr(Signal[NewLow],"-","#"))+"]";
+      }
+      else
+      if (Signal[NewTick])
+      {
+        signal.Type     = Tick;
+        signal.Event    = NewTick;
+        signal.Text     = "Tick Level ["+BoolToStr(Signal.Segment().Direction[Term]==DirectionUp,"+",
+                           BoolToStr(Signal.Segment().Direction[Term]==DirectionDown,"-","#"))+(string)Signal.Segment().Count+"]";
+      }
+      else
+      if (Signal[Minor])
+      { 
+        signal.Type     = SMA;
+        signal.Action   = CrossCheck;
+        signal.Text     = BoolToStr(Signal.Linear().Close.Event>NoEvent,"Linear "+StringSubstr(EnumToString(Signal.Linear().Close.Event),3),"SMA Check")+
+                            " [Minor]: "+BoolToStr(Signal[NewHigh],"High",BoolToStr(Signal[NewLow],"Low","???"));
+
+        Arrow("SMA:"+(string)Signal.Count(Ticks),ArrowDash,BoolToInt(Signal[NewHigh],clrYellow,clrRed));
+      }
+    }
+
+    if (signal.Type>NoValue)
+    {
+      tick                    = signal;
+      Alert(Symbol()+">"+SignalStr(tick));
       
-//    Alert(fractal,inpAlertTick);
+//      Pause(signal.Text,"NewTick()");
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -392,74 +487,7 @@ void Execute(void)
 //+------------------------------------------------------------------+ 
 void ExecuteLegacy(void)
   {
-    string text    = Symbol()+">"+TimeToStr(ltime)+";"+DoubleToStr(Close[0],Digits);
-    ltime          = TimeCurrent();
-    ltext          = "";
-
     OrderMonitor(Mode());
-
-    if (t[Critical])
-    {
-//      if (t[NewContraction])  ltext = "Origin [Critical]: Contraction";
-      if (t[NewExpansion])    ltext = "Origin [Critical]: Expansion";
-      if (t[NewRetrace])      ltext = "Origin [Critical]: Retrace";
-      if (t[AdverseEvent])    ltext = "Origin [Critical]: Adverse Event";
-      if (t[NewBreakout])     ltext = "Origin [Critical]: Breakout";
-      if (t[NewReversal])     ltext = "Origin [Critical]: Reversal";
-    }
-    else
-    if (t[NewFractal])
-      switch (t.EventLevel(NewFractal))
-      {
-        case Nominal:  ltext  = "Segment [Minor]: "+BoolToStr(t[NewRally],"Rally",
-                                 BoolToStr(t[NewPullback],"Pullback","???"));
-                       break;
-
-        case Warning:  ltext  = "Segment [Warning]: "+BoolToStr(t[NewRally],"Rally",
-                                 BoolToStr(t[NewPullback],"Pullback",EnumToString(t.Fractal().Type)));
-                       break;
-
-        case Minor:    ltext  = "Term [Minor]: Reversal";
-                       break;
-
-        case Major:    ltext  = "Trend [Major]: "+BoolToStr(t.Fractal().Trap,"Trap",
-                                 BoolToStr(IsEqual(t.Fractal().Type,Expansion),EnumToString(t.Fractal().State),EnumToString(t.Fractal().Type)));
-                       break;
-      }
-    else
-    if (t[FractalEvent(t.Fractal().Type)])
-    {
-      ltext   = BoolToStr(t.Linear().Close.Event>NoEvent,"FOC "+EnumToString(t.Linear().Close.Event));
-//      Append(ltext,BoolToStr(
-      ltext  += " ["+EnumToString(t.EventLevel(FractalEvent(t.Fractal().Type)))+"]: "+EnumToString(FractalEvent(t.Fractal().Type));
-    }
-    else
-    if (t[NewSegment])
-      ltext  = "Segment "+BoolToStr(t[NewHigh],"High",BoolToStr(t[NewLow],"Low","???"));
-    else
-    if (t[NewTick])
-      ltext  = "Tick Level ["+BoolToStr(t.Segment().Direction[Term]==DirectionUp,"+",BoolToStr(t.Segment().Direction[Term]==DirectionDown,"-","#"))+(string)t.Segment().Count+"]";
-
-//    if (StringLen(ltext)>0||t.Linear().Close.Event>NoEvent)
-//    {
-//      ltime           = TimeCurrent();
-////      Alert(Symbol()+">"+TimeToStr(ltime)+" "+ltext);
-//      Alert(Symbol()+">"+TimeToStr(ltime)+"|"+ltext+
-//                     "|"+EventText[t.Linear().Close.Event]+" "+EnumToString(t.Linear().Close.State)+" ["+ActionText(t.Linear().Close.Direction)+":"+ActionText(t.Linear().Close.Bias)+"]"+
-//                     "|"+EventText[t.Linear().Close.Event]);
-//    }
-
-    if (t.ActiveEvent())
-    {
-      for (EventType event=NoEvent;event<EventTypes;event++)
-        if (t[event])
-          Append(text,EnumToString(event)+"["+EnumToString(t.EventLevel(event))+"]",":");
-
-      Alert(text+"|"+ltext);
-//        Alert(Symbol()+">"+TimeToStr(ltime)+"|"+ltext+
-//                     "|"+EventText[t.Linear().Close.Event]+" "+EnumToString(t.Linear().Close.State)+" ["+ActionText(t.Linear().Close.Direction)+":"+ActionText(t.Linear().Close.Bias)+"]"+
-//                     "|"+EventText[t.Linear().Close.Event]);
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -521,26 +549,6 @@ void OrderConfig()
   }
 
 //+------------------------------------------------------------------+
-//| InitSignal - Inits a FractalRec for supplied Signal              |
-//+------------------------------------------------------------------+
-void InitSignal(FractalRec &Signal)
-  {
-    Signal.Type        = NoValue;
-    Signal.State       = NoState;
-    Signal.Direction   = NoDirection;
-    Signal.Price       = Close[0];
-    Signal.Lead        = NoBias;
-    Signal.Bias        = NoBias;
-    Signal.Event       = NoEvent;
-    Signal.Alert       = NoAlert;
-    Signal.Peg         = false;
-    Signal.Trap        = false;
-    Signal.Updated     = NoValue;
-
-    ArrayInitialize(Signal.Point,NoValue);
-  }
-
-//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -563,11 +571,8 @@ int OnInit()
 
     master.Pivot       = s[Daily].Pivot(Breakout,0,Max);
 
-    for (SignalType type=0;type<SignalTypes;type++)
-    {
-      InitSignal(signal.Tick[type]);
-      InitSignal(signal.Session[type]);
-    };
+    InitSignal(tick);
+    InitSignal(session);
 
     return(INIT_SUCCEEDED);
   }
@@ -582,4 +587,26 @@ void OnDeinit(const int reason)
     
     for (SessionType type=Daily;type<SessionTypes;type++)
       delete s[type];
+  }
+
+//+------------------------------------------------------------------+
+//| SignalStr - Returns formated SignalRec string                    |
+//+------------------------------------------------------------------+
+string SignalStr(SignalRec &Signal)
+  {
+    string text   = TimeToStr(Signal.Updated);
+   
+    Append(text,DoubleToStr(Signal.Price,Digits),"|");
+    Append(text,EnumToString(Signal.Alert),"|");
+    Append(text,Signal.Text,"|");
+    Append(text,EnumToString(Signal.Type),"|");
+
+    Append(text,BoolToStr(Signal.Action==NoValue,"No Action",EnumToString(Signal.Action)),"|");
+    Append(text,EnumToString(Signal.Alert),"|");
+    Append(text,EnumToString(Signal.Event),"|");
+    Append(text,EnumToString(Signal.State),"|");
+    Append(text,DirText(Signal.Direction),"|");
+    Append(text,ActionText(Signal.Bias),"|");
+    
+    return text;
   }

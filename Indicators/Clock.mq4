@@ -26,7 +26,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    UpdateLabel("Clock",TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
     return(rates_total);
   }

@@ -92,13 +92,13 @@ input int          inpPeriods        =  80;         // Retention
 input int          inpDegree         =   6;         // Poiy Regression Degree
 input double       inpAgg            = 2.5;         // Tick Aggregation
 input YesNoType    inpShowZones      = Yes;         // Show Zone Lines
-input YesNoType    inpShowTickBounds =  No;         // Show Tick Boundary
 input YesNoType    inpShowSegBounds  = Yes;         // Show Segment Boundary
 input YesNoType    inpShowRulers     = Yes;         // Show Fractal Rulers
 
 //--- Indicator defs
-int            indWinId              = -1;
+int            indWinId              = NoValue;
 string         indSN                 = "CPanel-v3";
+int            indSegHist            = 0;
 
 //--- Indicator buffers
 double         plHighBuffer[];
@@ -204,16 +204,13 @@ void RefreshScreen(void)
       UpdateRay("tmaPlanRes:"+(string)indWinId,t.Range().Resistance,inpPeriods-1);
       UpdateRay("tmaRangeMid:"+(string)indWinId,t.Range().Mean,inpPeriods-1);
       UpdateRay("tmaClose:"+(string)indWinId,Close[0],inpPeriods-1);
-      
-      Arrow("tmaFrRes:"+(string)indWinId,ArrowDown,clrLawnGreen,t.Bar(Resistance),t.Fractal().High.Resistance+point(6),indWinId);
-      Arrow("tmaFrSup:"+(string)indWinId,ArrowUp,clrRed,t.Bar(Support),t.Fractal().Low.Support,indWinId);
     }
 
     if (inpShowRulers==Yes)
     {
       for (int bar=0;bar<inpPeriods;bar++)
       {
-        ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
+        ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)bar,"-",9,"Stencil",BoolToInt(IsEqual(bar,indSegHist),clrWhite,clrRed));
         ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)bar,"-",9,"Stencil",clrRed);
 
         ObjectSet("tmaFrHi:"+(string)indWinId+"-"+(string)bar,OBJPROP_PRICE1,highbuffer+point(2));
@@ -222,6 +219,8 @@ void RefreshScreen(void)
         ObjectSet("tmaFrHi:"+(string)indWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);
         ObjectSet("tmaFrLo:"+(string)indWinId+"-"+(string)bar,OBJPROP_TIME1,Time[bar]);        
       }
+
+      if (t[NewSegment]) indSegHist++;
 
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
@@ -469,8 +468,9 @@ int OnInit()
       NewLabel("lbhOC-"+ActionText(action)+"-ZoneNow","Zone",294,(146*(action+1))+144,clrGold,SCREEN_UL,indWinId);
 
       NewLabel("lbvOC-"+ActionText(action)+"-Enabled","Enabled",50,(146*(action+1))+30,clrDarkGray,SCREEN_UL,indWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-Manager","",170,(146*(action+1))+29,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-Strategy","Strategy",234,(146*(action+1))+30,clrDarkGray,SCREEN_UL,indWinId);
-      NewLabel("lbvOC-"+ActionText(action)+"-Hold","O",336,(146*(action+1))+26,clrDarkGray,SCREEN_UL,indWinId);
+      NewLabel("lbvOC-"+ActionText(action)+"-Hold","",336,(146*(action+1))+29,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-EqTarget","999.9%",20,(146*(action+1))+56,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-EqMin","99.9%",70,(146*(action+1))+56,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-Target","9.99999",116,(146*(action+1))+56,clrDarkGray,SCREEN_UL,indWinId);
@@ -489,6 +489,8 @@ int OnInit()
       NewLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin","99.9%",236,(146*(action+1))+130,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-ZoneNow","-99",294,(146*(action+1))+130,clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvOC-"+ActionText(action)+"-EntryZone","Entry 9.99999",220,(146*(action+1))+156,clrDarkGray,SCREEN_UL,indWinId);
+
+      UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),clrDarkGray,11,"Wingdings");
     }
 
     //-- Zone Margin frames
@@ -608,6 +610,7 @@ int OnInit()
     //-- App Data Area
     DrawBox("bxhPivot",300,330,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
     //DrawBox("bxfOC-Short",5,320,352,144,C'42,0,0',BORDER_FLAT,SCREEN_UL,indWinId);
+    DrawBox("bxhLR",300,470,295,12,C'0,42,0',BORDER_FLAT,SCREEN_LR,indWinId);
 
     NewLabel("lbhBias","Bias",160,345,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("lbhLead","Lead",160,360,clrDarkGray,SCREEN_UR,indWinId);
@@ -649,12 +652,6 @@ int OnInit()
       NewPriceLabel("tmaPL(rs):"+(string)indWinId,0.00,false,indWinId);
       NewPriceLabel("tmaPL(e):"+(string)indWinId,0.00,false,indWinId);
       NewPriceLabel("tmaNewBoundary",0.00,false);
-    }
-
-    if (inpShowTickBounds==Yes)
-    {
-      NewPriceLabel("tmaPL(th):"+(string)indWinId,0.00,false,indWinId);
-      NewPriceLabel("tmaPL(tl):"+(string)indWinId,0.00,false,indWinId);
     }
 
     //--- Create Display Visuals

@@ -624,7 +624,7 @@ void CTickMA::CalcFractal(FractalDetail &Detail, double &Price[])
     if (IsChanged(detail.Type,detail.Type))
     {
       SetEvent(FractalEvent(detail.Type),Notify);
-      SetEvent(NewState,Minor);
+      SetEvent(NewState,Nominal);
     }
       
     if (IsChanged(Detail.Direction[Term],detail.Direction[Term]))
@@ -711,6 +711,7 @@ void CTickMA::UpdateSegment(void)
         fm.Expansion       = fmax(fm.Expansion,sr[0].High);
 
       SetEvent(NewHigh,Nominal);
+      SetEvent(NewBoundary,Nominal);
     }
 
     if (IsLower(tr[0].Low,sr[0].Low))
@@ -729,6 +730,7 @@ void CTickMA::UpdateSegment(void)
         fm.Expansion       = fmin(fm.Expansion,sr[0].Low);
 
       SetEvent(NewLow,Nominal);
+      SetEvent(NewBoundary,Nominal);
     }
 
     if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))

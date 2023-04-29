@@ -40,6 +40,7 @@ COrder        *order                   = new COrder(inpBrokerModel,inpMethodLong
 
 bool           PauseOn                 = true;
 int            Tick                    = 0;
+bool           EQHold[2]               = {Off,Off};
 
 int            Tickets[];
 OrderSummary   NodeNow[2];
@@ -576,25 +577,25 @@ void Test9(void)
     order.SetDefaults(OP_SELL ,0,0,0);
 
     if (Tick==1)
-      order.SetEquityHold(OP_BUY);
+      EQHold[OP_BUY]        = On;
     
     if (Bid>18.12)
     {
-      order.SetEquityHold(OP_BUY,false);
-      order.SetEquityHold(OP_SELL);
+      EQHold[OP_BUY]        = Off;
+      EQHold[OP_SELL]       = On;
     }
       
     if (Tick==11415)
-      order.SetEquityHold(OP_SELL,false);
-
+      EQHold[OP_SELL]       = Off;
+    
     if (Tick==18000)
     {
-      order.SetEquityHold(OP_SELL);
+      EQHold[OP_SELL]       = On;
       order.SetOrderMethod(OP_SELL,Full,ByProfit);
     }
     
     if (Bid<17.60)
-      order.SetEquityHold(OP_SELL,false);
+      EQHold[OP_SELL]       = Off;
 
     //--- Queue Order Test
       if (!fill) 
