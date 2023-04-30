@@ -234,7 +234,7 @@ void RefreshScreen(void)
       }
     }
 
-    UpdateLabel("Clock"+(string)indWinId,TimeToStr(Time[0]),clrDodgerBlue,16);
+    UpdateLabel("Clock"+(string)indWinId,TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price"+(string)indWinId,Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
   }
 
