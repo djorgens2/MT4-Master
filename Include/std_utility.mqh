@@ -485,13 +485,16 @@ int GetPeriod(string Value)
 //+------------------------------------------------------------------+
 void Arrow(string ArrowName, ArrowType Type, int Color, int Bar=0, double Price=0.00, int Window=0)
   {      
-    if (Price==0.00)
-      Price = Close[Bar];
+    if (Bar>NoValue)
+    {
+      if (Price==0.00)
+        Price = Close[Bar];
 
-    ObjectDelete (ArrowName);
-    ObjectCreate (ArrowName, OBJ_ARROW, Window, Time[Bar], Price);
-    ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
-    ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
+      ObjectDelete (ArrowName);
+      ObjectCreate (ArrowName, OBJ_ARROW, Window, Time[Bar], Price);
+      ObjectSet    (ArrowName, OBJPROP_ARROWCODE, Type);
+      ObjectSet    (ArrowName, OBJPROP_COLOR,Color);
+    }
   }
 
 //+------------------------------------------------------------------+

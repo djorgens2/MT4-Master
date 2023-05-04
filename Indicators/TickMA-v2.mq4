@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
 #property link      ""
-#property version   "2.01"
+#property version   "2.02"
 #property strict
 #property indicator_separate_window
 #property indicator_buffers 10
@@ -131,9 +131,9 @@ void RefreshScreen(void)
   {
     if (inpSegBounds)
     {
-      UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Fractal().Support,clrRed);
-      UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Fractal().Resistance,clrLawnGreen);
-      UpdatePriceLabel("tmaPL(e):"+(string)indWinId,t.Fractal().Expansion,clrGoldenrod);
+      UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Segment().Support,clrRed);
+      UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Segment().Resistance,clrLawnGreen);
+      UpdatePriceLabel("tmaPL(e):"+(string)indWinId,t.Segment().Expansion,clrGoldenrod);
     }
 
     //-- Range/Poly
@@ -180,9 +180,8 @@ void RefreshScreen(void)
     UpdateDirection("tmaLinearBiasNet"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),24);
 
     //-- Fractal
-    UpdateDirection("tmaFractalDir"+(string)indWinId,t.Fractal().Direction,BoolToInt(t.Fractal().Trap,clrYellow,Color(t.Fractal().Direction)),18);
-    UpdateLabel("tmaFractalState"+(string)indWinId,EnumToString(t.Fractal().Type)+" "+BoolToStr(t.Fractal().Trap,"Trap",EnumToString(t.Fractal().State)),
-                BoolToInt(t.Fractal().Trap,clrYellow,Color(t.Fractal().Direction)),12);
+    UpdateDirection("tmaFractalDir"+(string)indWinId,t.Fractal().Direction,Color(t.Fractal().Direction),18);
+    UpdateLabel("tmaFractalState"+(string)indWinId,EnumToString(t.Fractal().Type)+" "+EnumToString(t.Fractal().State),Color(t.Fractal().Direction),12);
     UpdateDirection("tmaFractalBias"+(string)indWinId,Direction(t.Fractal().Bias,InAction),Color(Direction(t.Fractal().Bias,InAction)),18);
 
     //-- Fractal Bounds
@@ -215,11 +214,11 @@ void RefreshScreen(void)
       {
         if (type<=t.Fractal().High.Type)
           ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)t.Fractal().High.Bar[type],FractalTag[type],9,"Stencil",
-            BoolToInt(IsEqual(t.Fractal().High.Bar[type],t.Bar(Resistance)),clrGoldenrod,clrRed));
+            BoolToInt(IsEqual(t.Fractal().High.Bar[type],t.Find(t.Fractal().Resistance[3],t.SMA().High)),clrGoldenrod,clrRed));
 
         if (type<=t.Fractal().Low.Type)
           ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)t.Fractal().Low.Bar[type],FractalTag[type],9,"Stencil",
-            BoolToInt(IsEqual(t.Fractal().Low.Bar[type],t.Bar(Support)),clrGoldenrod,clrRed));
+            BoolToInt(IsEqual(t.Fractal().Low.Bar[type],t.Find(t.Fractal().Support[3],t.SMA().Low)),clrGoldenrod,clrRed));
       }
     }
 
@@ -231,6 +230,14 @@ void RefreshScreen(void)
 
     if (t.ActiveEvent())
       text        = t.ActiveEventStr();
+
+    Append(text,"Supports:","\n");
+    for (int i=0;i<4;i++)
+      Append(text,DoubleToStr(t.Fractal().Support[i],Digits));
+
+    Append(text,"Resistances:","\n");
+    for (int i=0;i<4;i++)
+      Append(text,DoubleToStr(t.Fractal().Resistance[i],Digits));
 
     if (inpShowComment)
       Comment(text);

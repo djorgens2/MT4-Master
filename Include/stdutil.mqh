@@ -308,20 +308,6 @@ string lpad(string Value, string Pad, int Length)
   }
 
 //+------------------------------------------------------------------+
-//| swap - swaps one double value for the other with precision       |
-//+------------------------------------------------------------------+
-void swap(double &Value1, double &Value2, int Precision=0.00)
-  {
-    double swap   = Value1;
-    
-    if (Precision == 0)
-      Precision  = Digits;
-      
-    Value1        = NormalizeDouble(Value2,Precision);
-    Value2        = NormalizeDouble(swap,Precision);
-  }
-
-//+------------------------------------------------------------------+
 //| BoolToDT - returns the datetime of a user-defined condition      |
 //+------------------------------------------------------------------+
 datetime BoolToDate(bool IsTrue, datetime TrueValue, datetime FalseValue)

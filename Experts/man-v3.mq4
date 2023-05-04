@@ -406,8 +406,8 @@ void UpdateSignal(CTickMA &Signal)
 
         case Major:    signal.Type       = Fractal;
                        signal.Event      = NewTrend;
-                       signal.Text       = "Trend [Major]: "+BoolToStr(Signal.Fractal().Trap,"Trap",BoolToStr(IsEqual(Signal.Fractal().Type,Expansion),
-                                              EnumToString(Signal.Fractal().State),EnumToString(Signal.Fractal().Type)));
+                       signal.Text       = "Trend [Major]: "+BoolToStr(IsEqual(Signal.Fractal().Type,Expansion),
+                                              EnumToString(Signal.Fractal().State),EnumToString(Signal.Fractal().Type));
                        break;
       }
     }
@@ -446,6 +446,9 @@ void UpdateSignal(CTickMA &Signal)
 
     if (signal.Type>NoValue)
     {
+      if (IsChanged(tick.Text,signal.Text))
+        Pause(signal.Text,"New Signal()");
+
       tick                    = signal;
       Alert(Symbol()+">"+SignalStr(tick));
       
