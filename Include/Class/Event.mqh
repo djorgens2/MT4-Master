@@ -32,39 +32,40 @@ protected:
                 {
                   NoEvent,
                   AdverseEvent,  //-- Very bad event
+                  NewHigh,
+                  NewLow,
+                  NewBoundary,
                   NewDirection,  //-- Directional change; Nano thru Macro
-                  NewTick,       //-- Tick level event; aggregate or trade
-                  NewSegment,    //-- Segment level event; aggregate of Ticks
-                  NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
-                  NewFractal,    //-- Fractal Direction change
-                  NewFibonacci,  //-- Fibonacci Level change only
-                  NewPivot,
                   NewState,
                   NewAction,
                   NewBias,
+                  NewTick,       //-- Tick level event; aggregate or trade
+                  NewSegment,    //-- Segment level event; aggregate of Ticks
+                  NewPivot,
+                  NewFractal,    //-- Fractal Direction change
+                  NewContraction,
+                  NewFibonacci,  //-- Fibonacci Level change only
                   NewOrigin,
                   NewTrend,
                   NewTerm,
                   NewBase,
+                  NewExpansion,
                   NewDivergence,
                   NewConvergence,
                   NewInversion,
                   NewConversion,
-                  NewExpansion,
-                  NewContraction,
+                  NewLead,
+                  NewRally,
+                  NewPullback,
                   NewRetrace,
                   NewCorrection,
                   NewRecovery,
-                  NewLead,
-                  NewHigh,
-                  NewLow,
-                  NewBoundary,
                   NewBreakout,
                   NewReversal,
-                  NewRally,
-                  NewPullback,
-                  NewIdle,
                   NewFlatline,
+                  NewConsolidation,
+                  NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
+                  NewChannel,
                   SessionOpen,
                   SessionClose,
                   NewDay,
@@ -140,7 +141,7 @@ void CEvent::ClearEvent(EventType Event)
     eAlerts[Event]          = NoAlert;
     eMaxAlert               = NoAlert;
     
-    for (EventType event=NewDirection;event<EventTypes;event++)
+    for (EventType event=NoEvent;event<EventTypes;event++)
       if (eEvents[event])
       {
         eEvents[NoEvent]    = false;
@@ -191,7 +192,7 @@ string CEvent::EventStr(void)
     
     if (this.ActiveEvent())
     {
-      for (EventType event=NewDirection;event<EventTypes;event++)
+      for (EventType event=NoEvent;event<EventTypes;event++)
         if (eEvents[event])
           Append(text, EnumToString(eAlerts[event])+":"+EnumToString(event),"|");
     }
@@ -238,39 +239,40 @@ const string EventText[EventTypes] =
              {
                "No Event",
                "Adverse Event",
+               "New High",
+               "New Low",
+               "New Boundary",
                "New Direction",
-               "New Tick",
-               "New Segment",
-               "New Parabolic",
-               "New Fractal",
-               "New Fibonacci",
-               "New Pivot",
                "New State",
                "New Action",
                "New Bias",
+               "New Tick",
+               "New Segment",
+               "New Pivot",
+               "New Fractal",
+               "New Contraction",
+               "New Fibonacci",
                "New Origin",
                "New Trend",
                "New Term",
                "New Base",
+               "New Expansion",
                "New Divergence",
                "New Convergence",
                "New Inversion",
                "New Conversion",
-               "New Expansion",
-               "New Contraction",
+               "New Lead",
+               "New Rally",
+               "New Pullback",
                "New Retrace",
                "New Correction",
                "New Recovery",
-               "New Lead",
-               "New High",
-               "New Low",
-               "New Boundary",
                "New Breakout",
                "New Reversal",
-               "New Rally",
-               "New Pullback",
-               "New Idle",
                "New Flatline",
+               "New Consolidation",
+               "New Parabolic",
+               "New Channel",
                "Session Open",
                "Session Close",
                "New Day",

@@ -359,11 +359,15 @@ string dollar(double Value, int Length, bool WithCents=false)
 //+------------------------------------------------------------------+
 //| center - center a string                                         |
 //+------------------------------------------------------------------+
-string center(string Value, int Length)
+string center(string Text, int Length, string Filler=" ")
 {
-  int cValueLen     = StringLen(Value);
+  string text    = "";
+  double pad     = BoolToDouble(StringLen(Text)<Length,fdiv(Length-StringLen(Text),2),0,2);
+
+  for (int pos=0;pos<pad;pos++)
+    text        += Filler;
   
-  return(LPad(Value," ",cValueLen+((Length-StringLen(Value))/2)));
+  return text+" "+Text+" "+text;
 }
 
 //+------------------------------------------------------------------+
@@ -414,12 +418,12 @@ string DirText(int Value, bool Contrarian=false)
 //+------------------------------------------------------------------+
 //| Color - returns the color based on the supplied Value            |
 //+------------------------------------------------------------------+
-color Color(double Value, int Style=IN_DIRECTION, bool Contrarian=false)
+color Color(double Value, int Method=IN_DIRECTION, bool Contrarian=false)
 {
   if (Contrarian)
     Value       *= -1.0;  
   
-  switch (Style)
+  switch (Method)
   {
     case IN_PROXIMITY:     if (Close[0]>Value+point(6))   return(clrLawnGreen);
                            if (Close[0]>Value+point(3))   return(clrYellowGreen);

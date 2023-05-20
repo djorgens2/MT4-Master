@@ -23,7 +23,10 @@
                      Recovery,        // Trend resumption post-correction
                      Breakout,        // Fractal Breakout
                      Reversal,        // Fractal Reversal
-                     Contraction,     // Consolidating Range
+                     Flatline,        // Horizontal Trade/Idle market
+                     Consolidation,   // Consolidating Range
+                     Parabolic,       // Parabolic Expansion
+                     Channel,         // Congruent Price Channel
                      FractalStates
                    };
   
@@ -59,8 +62,11 @@
 
   enum             PivotType
                    {
+                     Mean,
                      Support,
-                     Resistance
+                     Resistance,
+                     Extension,
+                     PivotTypes
                    };
 
   enum             FiboLevel
@@ -187,7 +193,7 @@ AlertLevel FractalAlert(FractalType Type)
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
   {
-    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewContraction};
+    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
   
     return (FractalEvent[State]);
   }
