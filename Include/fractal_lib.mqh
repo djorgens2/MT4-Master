@@ -303,6 +303,27 @@ double Retrace(double Root, double Expansion, double Retrace, int Format=InDecim
   }
 
 //+------------------------------------------------------------------+
+//| Bias - returns the fractal bias from supplied state/direction    |
+//+------------------------------------------------------------------+
+int Bias(int Direction, FractalState State)
+  {
+    switch (State)
+    {
+      case Parabolic:       // Parabolic Expansion
+      case Channel:         // Congruent Price Channel
+      case Recovery:
+      case Breakout:
+      case Reversal:    return Action(Direction);
+      case Rally:       return OP_BUY;
+      case Pullback:    return OP_SELL;
+      case Retrace:
+      case Correction:  return Action(Direction,InDirection,InContrarian);
+    }
+
+    return NoBias;
+  }
+
+//+------------------------------------------------------------------+
 //| Percent - returns the Fibo percent for the supplied level        |
 //+------------------------------------------------------------------+
 double Percent(FiboLevel Level, int Format=InPoints)

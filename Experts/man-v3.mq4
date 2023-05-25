@@ -78,6 +78,7 @@ struct    SignalRec
             double           Price;
             string           Text;
             datetime         Updated;
+            bool             Fired;
           };
 
 struct    MasterRec
@@ -128,6 +129,23 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   
 
 //+------------------------------------------------------------------+
+//| Alert - Overload to include pause                                |
+//+------------------------------------------------------------------+
+void Alert(string Text, bool Pause, int Action=NoAction)
+  {
+    if (Pause)
+      if (IsBetween(Action,OP_BUY,OP_SELL))
+      {
+        int id = Pause("Actionable Item: "+ActionText(Action)+"\n\n"+Text,"Take Action?",MB_OKCANCEL|MB_ICONEXCLAMATION);
+        if (id==IDOK)
+          OpenOrder(Action,"Event Response");
+      }
+      else Pause(Text,"Alert Trap");
+    else
+      Alert(Text);
+  }
+
+//+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
@@ -170,7 +188,7 @@ void UpdatePanel(void)
       if (IsChanged(type,master.Fractal))
         UpdateLabel("lbhFractal",EnumToString(master.Fractal),Color(s[Daily][master.Fractal].Direction));
 
-      for (RoleType role=0;IsBetween(role,Buyer,Seller);role++)
+      for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
         UpdateLabel("lbvOC-"+ActionText(role)+"-Strategy",EnumToString(master.Manager[role].Strategy),clrDarkGray);
 
       UpdateLabel("lbvOC-BUY-Manager",BoolToStr(IsEqual(master.Lead,Buyer),CharToStr(108)),clrGold,11,"Wingdings");
@@ -285,6 +303,7 @@ void InitSignal(SignalRec &Signal)
     Signal.Text        = "";
     Signal.Price       = Close[0];
     Signal.Updated     = TimeCurrent();
+    Signal.Fired       = false;
   }
 
 //+------------------------------------------------------------------+
@@ -423,12 +442,15 @@ void UpdateSignal(CTickMA &Signal)
     }
 
     static string last   = "";
-    if (signal.Class>NoValue)
+    if (IsEqual(signal.Class,NoValue))
+      sig_t.Fired       = false;
+    else
     {
       sig_t             = signal;
+      sig_t.Fired       = true;
       
-      if (IsChanged(last,signal.Text))
-        Alert(Symbol()+">"+SignalStr(sig_t));
+      if (IsChanged(last,signal.Text)||t.ActiveEvent())
+        Alert(Symbol()+">"+SignalStr(sig_t)+"|"+t.EventStr());//,IsBetween(signal.Bias,OP_BUY,OP_SELL),signal.Bias);
     }
   }
 

@@ -103,6 +103,7 @@ private:
            {
              FractalState   State;
              int            Direction;
+             int            Bias;
              int            Bar;
              double         Price;
            };
@@ -154,7 +155,6 @@ private:
 
 
     void             InitFractal(FractalDetail &Detail[]);
-    FractalDetail    SetFractal(FractalState State, int Direction, int Bar, double Price);
 
     void             CalcFractal(FractalDetail &Detail[], double &Price[]);
     void             CalcFOC(PriceType Type, FOCRec &FOC);
@@ -245,6 +245,7 @@ void CTickMA::InitFractal(FractalDetail &Detail[])
 
     for (FractalType type=Origin;type<FractalTypes;type++)
     {
+      Detail[type].Bias       = NoBias;
       Detail[type].State      = NoState;
       Detail[type].Direction  = NewDirection;
       Detail[type].Bar        = NoValue;
@@ -253,29 +254,15 @@ void CTickMA::InitFractal(FractalDetail &Detail[])
   }
 
 //+------------------------------------------------------------------+
-//| SetFractal - Returns fractal node with supplied values           |
-//+------------------------------------------------------------------+
-FractalDetail CTickMA::SetFractal(FractalState State, int Direction, int Bar, double Price)
-  {
-    FractalDetail detail;
-    
-    detail.State        = State;
-    detail.Direction    = Direction;
-    detail.Bar          = Bar;
-    detail.Price        = Price;
-    
-    return detail;
-  }
-
-//+------------------------------------------------------------------+
 //| CalcFractal - Computes Fractal Points for supplied Price array   |
 //+------------------------------------------------------------------+
 void CTickMA::CalcFractal(FractalDetail &Detail[], double &Price[])
   {
+    FractalDetail detail[];
     int           direction         = NoDirection;
     int           bar               = 0;
     
-    InitFractal(Detail);
+    InitFractal(detail);
 
     for (FractalType type=Origin;type<FractalTypes;type++)
       for (bar=bar;bar<tmaPeriods;bar++)
@@ -291,12 +278,27 @@ void CTickMA::CalcFractal(FractalDetail &Detail[], double &Price[])
       for (bar=bar;bar>NoValue;bar--)
         if (IsEqual(bar,0)||NewDirection(direction,Direction(Price[bar]-Price[bar-1])))
         {
-          Detail[type] = SetFractal(NoState,direction,bar,Price[bar]);
+          if (IsChanged(Detail[type].Direction,direction))
+            if (IsEqual(type,Expansion))
+              if (IsEqual(direction,range.Direction))
+                detail[type].State  = Breakout;
+              else
+                detail[type].State  = Reversal;
+            else
+              detail[type].State    = (FractalState)BoolToInt(IsEqual(direction,DirectionUp),Rally,Pullback);
+
+          detail[type].Direction    = direction;
+          detail[type].Bias         = BoolToInt(IsEqual(detail[type].State,Reversal),Action(range.Direction,InDirection,InContrarian),Action(direction));
+          detail[type].Bar          = bar;
+          detail[type].Price        = Price[bar];
           break;
         }
 
       if (IsEqual(bar,0))
+      {
+        ArrayCopy(Detail,detail);
         break;
+      }
     }
   }
 
@@ -737,14 +739,15 @@ void CTickMA::UpdateRange(void)
   {
     double rangehigh      = BoolToDouble(IsEqual(tmaBar,0),Close[tmaBar],High[tmaBar],Digits);
     double rangelow       = BoolToDouble(IsEqual(tmaBar,0),Close[tmaBar],Low[tmaBar],Digits);
+    int    direction      = NoDirection;
 
     range.Event           = NoEvent;
 
     if (IsHigher(rangehigh,range.High))
-      range.Event         = NewExpansion;
+      direction           = DirectionUp;
 
     if (IsLower(rangelow,range.Low))
-      range.Event         = NewExpansion;
+      direction           = DirectionDown;
 
     if (Event(NewTick))
     {
@@ -766,19 +769,7 @@ void CTickMA::UpdateRange(void)
       range.Resistance    = Price(Fibo23,range.Low,range.High,Retrace);
     }
 
-    if (IsEqual(range.Event,NewExpansion)||tmaBar>0)
-    {
-      if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
-        if (IsChanged(range.State,Reversal))
-          range.Event     = NewReversal;
-
-      if (IsEqual(range.State,Retrace))
-        if (IsChanged(range.State,Breakout))
-          range.Event     = NewBreakout;
-
-      range.Retrace       = Close[tmaBar];
-    }
-    else
+    if (IsEqual(direction,NoDirection))
     {
       range.Retrace       = BoolToDouble(IsEqual(range.Direction,DirectionUp),
                               fmin(Close[tmaBar],range.Retrace),
@@ -786,6 +777,19 @@ void CTickMA::UpdateRange(void)
 
       if (IsChanged(range.State,(FractalState)BoolToInt(IsEqual(range.Direction,Direction(range.Retrace-range.Mean)),range.State,Retrace)))
         range.Event       = NewRetrace;
+    }
+    else
+    {
+      range.Event         = NewExpansion;
+      range.Retrace       = Close[tmaBar];
+    
+      if (NewDirection(range.Direction,direction))
+        if (IsChanged(range.State,Reversal))
+          range.Event     = NewReversal;
+
+      if (IsEqual(range.State,Retrace))
+        if (IsChanged(range.State,Breakout))
+          range.Event     = NewBreakout;
     }
 
     SetEvent(range.Event,Critical);
@@ -915,47 +919,52 @@ void CTickMA::UpdateFractal(void)
 
     for (FractalType type=Root;type<FractalTypes;type++)
     {
-      detail[type].Direction   = direction;
-      detail[type].Bar         = bar;
-      detail[type].Price       = BoolToDouble(IsEqual(direction,DirectionUp),sma.High[bar],sma.Low[bar]);
-      detail[type].State       = (FractalState)BoolToInt(IsEqual(type,Root),range.State,
-                                               BoolToInt(IsEqual(type,Expansion),BoolToInt(IsBetween(BoolToDouble(IsEqual(direction,DirectionUp),
-                                                      tr[bar].High,tr[bar].Low),sma.High[bar],sma.Low[bar]),state,range.State),fm.Fractal[type].State));
+      detail[type].Direction     = direction;
+      detail[type].Bar           = bar;
+      detail[type].Price         = BoolToDouble(IsEqual(direction,DirectionUp),sma.High[bar],sma.Low[bar]);
+      detail[type].State         = (FractalState)BoolToInt(type>Root,fm.Fractal[type].State);
       
       if (IsChanged(fm.Fractal[type].Price,detail[type].Price))
         if (IsEqual(type,Root))
-          SetEvent(BoolToEvent(NewDirection(fm.Fractal[Root].Direction,direction),NewDirection),Major);
+          detail[type].State     = (FractalState)BoolToInt(IsChanged(fm.Direction,Direction(direction,InDirection,InContrarian)),Reversal);
         else
         if (IsEqual(type,Expansion))
-          SetEvent(NewExpansion,Major);
+          detail[type].State     = Breakout;
         else
         if (IsEqual(fm.Fractal[Expansion].Direction,DirectionUp))
-          detail[type].State   = (FractalState)BoolToInt(detail[type].Price<range.Support,Correction,
+          detail[type].State     = (FractalState)BoolToInt(detail[type].Price<range.Support,Correction,
                                              BoolToInt(detail[type].Price<range.Mean,Retrace,
                                              BoolToInt(detail[type].Price<range.Resistance,Pullback,state)));
         else 
         if (IsEqual(fm.Fractal[Expansion].Direction,DirectionDown))
-          detail[type].State = (FractalState)BoolToInt(detail[type].Price>range.Resistance,Correction,
+          detail[type].State     = (FractalState)BoolToInt(detail[type].Price>range.Resistance,Correction,
                                              BoolToInt(detail[type].Price>range.Mean,Retrace,
                                              BoolToInt(detail[type].Price>range.Support,Rally,state)));
 
+      detail[type].Bias   = Bias(direction,detail[type].State);
+
       if (IsEqual(bar,0)||IsEqual(type,Lead))
       {
-        fm.Direction      = detail[Expansion].Direction;
-        fm.Bias           = Action(direction);
-        fm.State          = detail[Expansion].State;
+        if (IsEqual(detail[Root].State,Reversal))
+          if (NewState(fm.State,Reversal,IsEqual(detail[type].State,Breakout)))
+            SetEvent(NewReversal,Major);
+
+        if (IsBetween(detail[type].State,Retrace,Breakout))
+          if (NewState(fm.State,detail[type].State))
+            SetEvent(NewFractal,Major);
+
+        fm.Bias           = Bias(direction,fm.State);
 
         if (IsChanged(fm.Type,type))
-          SetEvent(NewFractal,(AlertLevel)BoolToInt(IsBetween(type,Breakout,Reversal),Major,Minor));
+          SetEvent(FractalEvent(fm.State),Major);
 
         ArrayCopy(fm.Fractal,detail);
         break;
       }
 
-      direction         = Direction(direction,InDirection,InContrarian);
-      bar               = BoolToInt(IsEqual(direction,DirectionUp),ArrayMaximum(sma.High,bar),ArrayMinimum(sma.Low,bar));
+      direction           = Direction(direction,InDirection,InContrarian);
+      bar                 = BoolToInt(IsEqual(direction,DirectionUp),ArrayMaximum(sma.High,bar),ArrayMinimum(sma.Low,bar));
     }
-
   }
 
 //+------------------------------------------------------------------+
@@ -1138,8 +1147,11 @@ string CTickMA::RangeStr(void)
     Append(text,EnumToString(range.Event),"|");
     Append(text,DoubleToStr(range.High,Digits),"|");
     Append(text,DoubleToStr(range.Low,Digits),"|");
+    Append(text,DoubleToStr(pip(range.Size),1),"|");
     Append(text,DoubleToStr(range.Mean,Digits),"|");
     Append(text,DoubleToStr(range.Retrace,Digits),"|");
+    Append(text,DoubleToStr(range.Support,Digits),"|");
+    Append(text,DoubleToStr(range.Resistance,Digits),"|");
 
     return text;
   }
