@@ -434,7 +434,7 @@ void CSession::UpdateTrend(void)
         SetEvent(NewExpansion,Major);
     }
 
-    if (NewState(frec[Trend].State,state))
+    if (NewState(frec[Trend].State,state,IsEqual(state,Reversal)))
     {
       frec[Trend].Event               = FractalEvent(state);
       frec[Trend].Price               = BoolToDouble(Event(NewExpansion,Major),frec[Trend].Point[fpBase],frec[Trend].Point[fpExpansion]);
@@ -606,13 +606,10 @@ void CSession::LoadHistory(void)
       frec[type].Event               = NoEvent;
       frec[type].Alert               = NoAlert;
       frec[type].Peg                 = false;
-      frec[type].Trap                = false;
       frec[type].Updated             = Time[sBar];
       ArrayInitialize(frec[type].Point,Open[sBar]);
     }
 
-    NewPivot(prec,Open[sBar],NoState,frec[Origin].Direction,sBar);
-    
     for(sBar=Bars-1;sBar>0;sBar--)
       Update();
   }

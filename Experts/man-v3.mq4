@@ -41,7 +41,8 @@ enum      RoleType
           {
             Buyer,           //-- Purchasing Manager
             Seller,          //-- Selling Manager
-            Unnassigned      //-- No Manager
+            Unnassigned,     //-- No Manager
+            RoleTypes
           };
 
 enum      SignalClass
@@ -72,6 +73,7 @@ struct    SignalRec
             ResponseType     Response;
             EventType        Event;
             AlertLevel       Alert;
+            FractalType      Type;       //-- Fractal Lead
             FractalState     State;
             int              Direction;
             int              Bias;
@@ -85,10 +87,9 @@ struct    MasterRec
           {
             RoleType         Lead;          //-- Process Manager (Owner|Lead)
             ManagerRec       Manager[2];    //-- Manager Detail Data
-            FractalType      Fractal;       //-- Fractal Lead
-            FractalState     State;         //-- Fractal State
-            bool             Trap;          //-- Bull/Bear Trap Flag
-            PivotRec         Pivot;         //-- Active Pivot
+            FractalState     State;
+            SignalRec        Session;
+            SignalRec        Tick;
           };
 
 //--- Configuration
@@ -123,10 +124,7 @@ input int              inpGMTOffset      = 0;            // Offset from GMT+3
   CSession            *s[SessionTypes];
   
   MasterRec            master;
-  MasterRec            legacy;
-  SignalRec            sig_t;               //-- Last Tick Signal
-  SignalRec            sig_s;               //-- Last Session Signal
-  
+  MasterRec            legacy;  
 
 //+------------------------------------------------------------------+
 //| Alert - Overload to include pause                                |
@@ -154,10 +152,9 @@ void RefreshScreen(void)
 
     //-- Update Comment
     Append(text,"*----------- Master Fractal Pivots ----------------*");
-    Append(text,"Fractal "+EnumToString(master.Fractal),"\n");
-    Append(text,EnumToString(master.State));
+    Append(text,"Fractal "+EnumToString(master.Session.Type),"\n");
+    Append(text,EnumToString(master.Session.State));
     Append(text,EnumToString(master.Lead));
-    Append(text,s[Daily].PivotStr("Lead",master.Pivot),"\n");
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
       Append(text,s[Daily].PivotStr(EnumToString(type),s[Daily].Pivot(type)),"\n");
@@ -185,8 +182,8 @@ void UpdatePanel(void)
 
     if (winid>NoValue)
     {
-      if (IsChanged(type,master.Fractal))
-        UpdateLabel("lbhFractal",EnumToString(master.Fractal),Color(s[Daily][master.Fractal].Direction));
+      if (IsChanged(type,master.Session.Type))
+        UpdateLabel("lbhFractal",EnumToString(master.Session.Type),Color(s[Daily][master.Session.Type].Direction));
 
       for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
         UpdateLabel("lbvOC-"+ActionText(role)+"-Strategy",EnumToString(master.Manager[role].Strategy),clrDarkGray);
@@ -194,6 +191,26 @@ void UpdatePanel(void)
       UpdateLabel("lbvOC-BUY-Manager",BoolToStr(IsEqual(master.Lead,Buyer),CharToStr(108)),clrGold,11,"Wingdings");
       UpdateLabel("lbvOC-SELL-Manager",BoolToStr(IsEqual(master.Lead,Seller),CharToStr(108)),clrGold,11,"Wingdings");
     }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateStrategy - Updates Manager Strategy                        |
+//+------------------------------------------------------------------+
+void UpdateStrategy(void)
+  {
+    StrategyType strategy[2] = {Wait,Wait};
+
+    for (RoleType role=Buyer;role<RoleTypes;role++)
+      //-- Offense
+      if (IsEqual(role,master.Lead))
+      {
+      
+      }
+      else
+
+      //-- Defense
+      {
+      }
   }
 
 //+------------------------------------------------------------------+
@@ -205,87 +222,15 @@ void UpdateMaster(void)
     for (SessionType type=Daily;type<SessionTypes;type++)
       s[type].Update();
 
-    if (s[Daily][NewFibonacci])
-      for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-        if (IsEqual(s[Daily].Pivot(type).Event,NewFibonacci))
-        {
-          master.Fractal             = type;
-          break;
-        }
-
-    if (IsChanged(master.State,s[Daily][Origin].State))
-      Flag("New Origin State ["+EnumToString(s[Daily][Origin].State)+"]",Color(master.State));
-
     order.Update();
     t.Update();
-    
-    //-- Handle Main [Origin-Level/Macro] Events
-    if (s[Daily].Event(NewBreakout,Critical)||s[Daily].Event(NewReversal,Critical))
-    {
-      master.Lead                       = (RoleType)Action(s[Daily][Origin].Direction);
-      master.Pivot                      = s[Daily].Pivot();
-    }
-    else 
-    {
-      if (s[Daily][NewCorrection])
-        master.Lead                     = (RoleType)Action(s[Daily][Origin].Direction,InDirection,InContrarian);
-
-      if (s[Daily][NewRecovery])
-        master.Lead                     = (RoleType)Action(s[Daily][Origin].Direction);
-
-      UpdatePivot(master.Pivot,s[Daily][Origin].Direction);
-    }
 
     for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
     {
-      master.Manager[role].Strategy     = Wait;
       master.Manager[role].DCA          = order.DCA(role);
       master.Manager[role].DCALevel     = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[role].DCA));
       master.Manager[role].Entry        = order.Entry(role);
     }
-  }
-
-//+------------------------------------------------------------------+
-//| ManageOrders - Lead Manager order processor                      |
-//+------------------------------------------------------------------+
-void ManageOrders(RoleType Role, StrategyType Strategy=NoValue)
-  {
-    OrderRequest  request    = order.BlankRequest(EnumToString(Role));
-    StrategyType  strategy   = (StrategyType)BoolToInt(IsEqual(order.Entry(Role).Count,0),Opener,
-                                             BoolToInt(IsEqual(Strategy,NoValue),master.Manager[Role].Strategy,Strategy));
-
-    //--- R1: Free Zone
-    if (order.Free(Role)>order.Split(Role))
-    {
-      request.Action         = Action(Role,InAction);
-      request.Requestor      = "Auto Open ("+request.Requestor+")";
-
-      switch (strategy)
-      {
-        case Opener:         
-                             break;
-        case Build:          break;
-        case Hedge:          break;
-        case Cover:          break;
-        case Capture:        break;
-        case Mitigate:       break;
-        case Wait:           break;
-      }
-    }
-
-    if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
-      if (!order.Submitted(request))
-        order.PrintLog();
-
-    order.ExecuteOrders(Role,master.Manager[Role].Hold);
-  }
-
-//+------------------------------------------------------------------+
-//| ManageRisk - Risk Manager order processor and risk mitigation    |
-//+------------------------------------------------------------------+
-void ManageRisk(int Manager)
-  {
-    order.ExecuteOrders(Manager);
   }
 
 //+------------------------------------------------------------------+
@@ -297,9 +242,11 @@ void InitSignal(SignalRec &Signal)
     Signal.Response    = NoValue;
     Signal.Event       = NoEvent;
     Signal.Alert       = NoAlert;
+    Signal.Type        = NoValue;
     Signal.State       = NoState;
     Signal.Direction   = NoDirection;
     Signal.Bias        = NoBias;
+    Signal.Price       = NoValue;
     Signal.Text        = "";
     Signal.Price       = Close[0];
     Signal.Updated     = TimeCurrent();
@@ -441,16 +388,16 @@ void UpdateSignal(CTickMA &Signal)
       }
     }
 
-    static string last   = "";
+    static string last      = "";
     if (IsEqual(signal.Class,NoValue))
-      sig_t.Fired       = false;
+      master.Tick.Fired     = false;
     else
     {
-      sig_t             = signal;
-      sig_t.Fired       = true;
+      master.Tick           = signal;
+      master.Tick.Fired     = true;
       
-      if (IsChanged(last,signal.Text)||t.ActiveEvent())
-        Alert(Symbol()+">"+SignalStr(sig_t)+"|"+t.EventStr());//,IsBetween(signal.Bias,OP_BUY,OP_SELL),signal.Bias);
+      if (IsChanged(last,signal.Text)||Signal.ActiveEvent())
+        Alert(Symbol()+">"+SignalStr(master.Tick)+"|"+Signal.EventStr(),IsBetween(signal.Bias,OP_BUY,OP_SELL),signal.Bias);
     }
   }
 
@@ -459,6 +406,86 @@ void UpdateSignal(CTickMA &Signal)
 //+------------------------------------------------------------------+
 void UpdateSignal(CSession &Signal)
   {
+    SignalRec signal;
+
+    InitSignal(signal);
+
+    signal.Response          = Review;
+
+    if (Signal[NewFibonacci])
+      for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+        if (IsEqual(Signal.Pivot(type).Event,NewFibonacci))
+        {
+          signal.Type        = type;
+          signal.State       = Extension;
+          break;
+        }
+
+    //-- Handle Main [Origin-Level/Macro] Events
+    if (Signal.Event(NewBreakout,Critical)||Signal.Event(NewReversal,Critical))
+      master.Lead               = (RoleType)Action(Signal[Origin].Direction);
+    else 
+    {
+      if (Signal[NewCorrection])
+        master.Lead             = (RoleType)Action(s[Daily][Origin].Direction,InDirection,InContrarian);
+
+      if (Signal[NewRecovery])
+        master.Lead             = (RoleType)Action(s[Daily][Origin].Direction);
+    }
+
+    if (Signal[Critical])
+    {
+      signal.Class             = Range;
+      signal.Response          = Breakaway;
+      signal.Alert             = Critical;
+      //signal.State             = Signal.Range().State;
+      //signal.Direction         = Signal.Range().Direction;
+      //signal.Bias              = Action(Signal.Range().Direction);
+    }
+
+    if (IsChanged(master.Session.State,Signal[Origin].State))
+      Flag("New Origin State ["+EnumToString(Signal[Origin].State)+"]",Color(signal.State));
+  }
+
+//+------------------------------------------------------------------+
+//| ManageOrders - Lead Manager order processor                      |
+//+------------------------------------------------------------------+
+void ManageOrders(RoleType Role, StrategyType Strategy=NoValue)
+  {
+    OrderRequest  request    = order.BlankRequest(EnumToString(Role));
+
+    //--- R1: Free Zone
+    if (order.Free(Role)>order.Split(Role))
+    {
+      request.Action         = Action(Role,InAction);
+      request.Requestor      = "Auto Open ("+request.Requestor+")";
+
+      switch (master.Manager[Role].Strategy)
+      {
+        case Opener:         
+                             break;
+        case Build:          break;
+        case Hedge:          break;
+        case Cover:          break;
+        case Capture:        break;
+        case Mitigate:       break;
+        case Wait:           break;
+      }
+    }
+
+    if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
+      if (!order.Submitted(request))
+        order.PrintLog();
+
+    order.ExecuteOrders(Role,master.Manager[Role].Hold);
+  }
+
+//+------------------------------------------------------------------+
+//| ManageRisk - Risk Manager order processor and risk mitigation    |
+//+------------------------------------------------------------------+
+void ManageRisk(int Manager)
+  {
+    order.ExecuteOrders(Manager);
   }
 
 //+------------------------------------------------------------------+
@@ -514,6 +541,7 @@ void OnTick()
     UpdateMaster();
     UpdateSignal(t);         //-- TickMA Alerts
     UpdateSignal(s[Daily]);  //-- Session Alerts
+    UpdateStrategy();
     UpdatePanel();
 
     if (Mode()==Legacy)
@@ -554,26 +582,30 @@ void OrderConfig()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    datetime time      = NoValue;
+    datetime time        = NoValue;
 
     ManualInit();
     OrderConfig();
    
     //-- Initialize Session
-    s[Daily]           = new CSession(Daily,0,23,inpGMTOffset);
-    s[Asia]            = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
-    s[Europe]          = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
-    s[US]              = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+    s[Daily]             = new CSession(Daily,0,23,inpGMTOffset);
+    s[Asia]              = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]            = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]                = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
+    //-- Initialize Session
+    s[Daily].Update();
+    
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
       if (s[Daily].Fibonacci(type).Level>Fibo61)
         if (IsHigher(s[Daily].Pivot(type).Time,time))
-          master.Fractal = type;
+          master.Session.Type = type;
 
-    master.Pivot       = s[Daily].Pivot(Breakout,0,Max);
+    master.Lead          = (RoleType)BoolToInt(IsEqual(s[Daily][Origin].State,Correction),Action(s[Daily][Origin].Direction,InDirection,InContrarian),Action(s[Daily][Origin].Direction));
+    master.State         = NoState;
 
-    InitSignal(sig_t);
-    InitSignal(sig_s);
+    InitSignal(master.Tick);
+    InitSignal(master.Session);
 
     return(INIT_SUCCEEDED);
   }

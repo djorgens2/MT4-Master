@@ -23,6 +23,7 @@
                      Recovery,        // Trend resumption post-correction
                      Breakout,        // Fractal Breakout
                      Reversal,        // Fractal Reversal
+                     Extension,       // Fibonacci Extension
                      Flatline,        // Horizontal Trade/Idle market
                      Consolidation,   // Consolidating Range
                      Parabolic,       // Parabolic Expansion
@@ -65,7 +66,7 @@
                      Mean,
                      Support,
                      Resistance,
-                     Extension,
+                     Running,
                      PivotTypes
                    };
 
@@ -84,23 +85,6 @@
                      FiboLevels
                    };             
 
-  //-- Canonical Fractal Rec
-  struct FractalRec
-         {
-           FractalType   Type;                     //-- Type
-           FractalState  State;                    //-- State
-           int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
-           double        Price;                    //-- Event Price
-           int           Lead;                     //-- Bias based on Last Pivot High/Low hit
-           int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
-           EventType     Event;                    //-- Last Event; disposes on next tick
-           AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
-           bool          Peg;                      //-- Retrace peg
-           bool          Trap;                     //-- Trap flag (not yet implemented)
-           datetime      Updated;                  //-- Last Update;
-           double        Point[FractalPoints];     //-- Fractal Points (Prices)
-         };
-
   //-- Canonical Pivot Rec
   struct PivotRec
          {
@@ -109,11 +93,11 @@
            int           Lead;                     //-- Action set by last NewHigh/NewLow event
            int           Bias;                     //-- Action set by Close[] - Pivot.Open
            EventType     Event;                    //-- Current Tick Event; disposes on next tick
-           datetime      Time;                     //-- Pivot Open Time
            double        Open;                     //-- Open Price set on NewPivot [Immutable, once assigned]
            double        High;                     //-- Updated on NewHigh
            double        Low;                      //-- Updated on NewLow
            double        Close;                    //-- Updated on Update [once per tick]
+           datetime      Time;                     //-- Pivot Open Time
          };
 
   //-- Canonical Fibonacci Pivot
@@ -126,6 +110,23 @@
            double        Forecast;                 //-- Calculated Fibonacci Price
          };
 
+  //-- Canonical Fractal Rec
+  struct FractalRec
+         {
+           FractalType   Type;                     //-- Type
+           FractalState  State;                    //-- State
+           int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
+           double        Price;                    //-- Event Price
+           int           Lead;                     //-- Bias based on Last Pivot High/Low hit
+           int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
+           EventType     Event;                    //-- Last Event; disposes on next tick
+           AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
+           bool          Peg;                      //-- Retrace peg
+           FibonacciRec  Extension;                //-- Fibo Extension Pivot
+           datetime      Updated;                  //-- Last Update;
+           double        Point[FractalPoints];     //-- Fractal Points (Prices)
+         };
+
 static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 
 //+------------------------------------------------------------------+
@@ -133,7 +134,7 @@ static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)"
 //+------------------------------------------------------------------+
 color Color(FractalState State)
   {
-    static const color  statecolor[FractalStates]  = {clrNONE,clrGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed,clrSkyBlue};
+    static const color  statecolor[FractalStates]  = {clrNONE,clrGreen,clrFireBrick,clrGoldenrod,clrWhite,clrSteelBlue,clrYellow,clrRed,clrSkyBlue,clrNONE,clrNONE,clrNONE,clrNONE};
 
     return statecolor[State];
   }
@@ -193,7 +194,7 @@ AlertLevel FractalAlert(FractalType Type)
 //+------------------------------------------------------------------+
 EventType FractalEvent(FractalState State)
   {
-    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
+    static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewExtension,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
   
     return (FractalEvent[State]);
   }
@@ -264,7 +265,7 @@ double Price(FractalState State, int Direction, int Bar)
     if (IsBetween(State,Retrace,Correction))
       price               = BoolToDouble(IsEqual(Direction,DirectionUp),Low[Bar],Close[Bar],Digits);
     else
-    if (IsBetween(State,Recovery,Reversal))
+    if (IsBetween(State,Recovery,Extension))
       price               = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
 
     return NormalizeDouble(price,Digits);
@@ -313,7 +314,8 @@ int Bias(int Direction, FractalState State)
       case Channel:         // Congruent Price Channel
       case Recovery:
       case Breakout:
-      case Reversal:    return Action(Direction);
+      case Reversal:
+      case Extension:   return Action(Direction);
       case Rally:       return OP_BUY;
       case Pullback:    return OP_SELL;
       case Retrace:
@@ -406,9 +408,9 @@ PivotRec GetPivot(PivotRec &Pivot[], FractalState State, int Start=0, MeasureTyp
   }
 
 //+------------------------------------------------------------------+
-//| NewPivot - Inserts a new Fractal Pivot record                    |
+//| AddPivot - Inserts a new Fractal Pivot record                    |
 //+------------------------------------------------------------------+
-void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction, int Bar)
+void AddPivot(PivotRec &Pivot[], FractalState State, int Direction, double Price, int Bar=0)
   {
     int      size            = ArraySize(Pivot);
 
@@ -426,11 +428,11 @@ void NewPivot(PivotRec &Pivot[], double Price, FractalState State, int Direction
 
     Pivot[0].Bias            = Action(Direction);
     Pivot[0].State           = State;
-    Pivot[0].Time            = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
     Pivot[0].Open            = Price;
     Pivot[0].High            = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Price(State,Direction,Bar),Digits);
     Pivot[0].Low             = BoolToDouble(IsEqual(Direction,DirectionUp),Price(State,Direction,Bar),Low[Bar],Digits);
     Pivot[0].Close           = Close[Bar];
+    Pivot[0].Time            = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
   }
 
 //+------------------------------------------------------------------+
@@ -529,7 +531,7 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
 
     if (NewState(Fractal.State,frec.State,Update,Force))
     {
-      NewPivot(Pivot,frec.Price,frec.State,frec.Direction,Bar);
+      AddPivot(Pivot,frec.State,frec.Direction,frec.Price,Bar);
 
       frec.Event             = FractalEvent(frec.State);
       frec.Alert             = FractalAlert(frec.Type);
@@ -630,11 +632,11 @@ bool NewFibonacci(FractalRec &Fractal, FibonacciRec &Fibo, int Method=Expansion,
       Fibo.Pivot.State       = Fractal.State;
       Fibo.Pivot.Lead        = Action(Fractal.Direction);
       Fibo.Pivot.Bias        = Action(Fractal.Direction);
-      Fibo.Pivot.Time        = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
       Fibo.Pivot.Open        = BoolToDouble(IsEqual(Bar,0),Close[0],Fibo.Forecast,Digits);
       Fibo.Pivot.High        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],fmax(Close[Bar],Fibo.Forecast),Digits);
       Fibo.Pivot.Low         = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),fmin(Close[Bar],Fibo.Forecast),Low[Bar],Digits);
       Fibo.Pivot.Close       = Price(Fractal.State,Fractal.Direction,Bar);
+      Fibo.Pivot.Time        = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
 
       return true;
     }

@@ -62,6 +62,7 @@ protected:
                   NewRecovery,
                   NewBreakout,
                   NewReversal,
+                  NewExtension,
                   NewFlatline,
                   NewConsolidation,
                   NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
@@ -269,6 +270,7 @@ const string EventText[EventTypes] =
                "New Recovery",
                "New Breakout",
                "New Reversal",
+               "New Extension",
                "New Flatline",
                "New Consolidation",
                "New Parabolic",

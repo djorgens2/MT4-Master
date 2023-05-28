@@ -464,9 +464,9 @@ void COrder::UpdatePanel(void)
       UpdateLabel("lbvAI-Eq",LPad(NegLPad(Account.Equity,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
       UpdateLabel("lbvAI-EqBal",LPad(DoubleToStr(Account.EquityBalance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
 
-      UpdateLabel("lbvAI-Eq%",center(DoubleToStr(Account.EquityClosed*100,1),7)+"%",Color(Summary[Net].Equity),16);
-      UpdateLabel("lbvAI-EqOpen%",center(DoubleToStr(Account.EquityOpen*100,1),6)+"%",Color(Summary[Net].Equity),12);
-      UpdateLabel("lbvAI-EqVar%",center(DoubleToStr(Account.EquityVariance*100,1),6)+"%",Color(Summary[Net].Equity),12);
+      UpdateLabel("lbvAI-Eq%",center(DoubleToStr(Account.EquityClosed*100,1)+"%",7),Color(Summary[Net].Equity),16);
+      UpdateLabel("lbvAI-EqOpen%",center(DoubleToStr(Account.EquityOpen*100,1)+"%",6),Color(Summary[Net].Equity),12);
+      UpdateLabel("lbvAI-EqVar%",center(DoubleToStr(Account.EquityVariance*100,1)+"%",6),Color(Summary[Net].Equity),12);
       UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(pip(Account.Spread),1)," ",5),Color(Summary[Net].Equity),14);
       UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account.Margin*100,1)+"%"," ",6),Color(Summary[Net].Equity),14);
 

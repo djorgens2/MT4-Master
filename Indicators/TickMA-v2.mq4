@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                    TickMA-v1.mq4 |
+//|                                                    TickMA-v2.mq4 |
 //|                                                 Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -101,7 +101,7 @@ input bool      inpFractalBounds  = true;        // Show Fractal Bounds
 input bool      inpFractalRulers  = true;        // Show Fractal Rulers
 
 //--- Indicator defs
-string         indSN              = "TickMA-v1: "+(string)inpPeriods+":"+(string)inpDegree+":"+(string)inpAgg;
+string         indSN              = "TickMA-v2: "+(string)inpPeriods+":"+(string)inpDegree+":"+(string)inpAgg;
 int            indWinId           = NoValue;
 int            indSegHist         = NoValue;
 
@@ -139,7 +139,7 @@ void RefreshScreen(void)
     {
       UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t[Support],clrRed);
       UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t[Resistance],clrLawnGreen);
-      UpdatePriceLabel("tmaPL(ex):"+(string)indWinId,t[Extension],clrGoldenrod);
+      UpdatePriceLabel("tmaPL(ex):"+(string)indWinId,t[Running],clrGoldenrod);
     }
 
     //-- Fractal
@@ -180,7 +180,7 @@ void RefreshScreen(void)
                   proper(ActionText(Action(t.Segment().Direction[Lead]))),Color(t.Segment().Direction[Lead]),12);
     UpdateDirection("tmaTickBias"+(string)indWinId,t.Segment().Direction[Lead],Color(Direction(t.Tick().Close-t.Tick().Open)),18);
     UpdateLabel("tmaSegmentState"+(string)indWinId,proper(DirText(t.Segment().Direction[Term]))+" "+
-                  BoolToStr(IsBetween(t[Extension],t[Support],t[Resistance]),
+                  BoolToStr(IsBetween(t[Running],t[Support],t[Resistance]),
                   BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Trend]),
                       "Conforming: "+proper(ActionText(Action(t.Segment().Direction[Term]))),
                       "Contrarian: "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
