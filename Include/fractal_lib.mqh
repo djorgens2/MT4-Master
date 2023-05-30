@@ -66,7 +66,7 @@
                      Mean,
                      Support,
                      Resistance,
-                     Running,
+                     Active,
                      PivotTypes
                    };
 

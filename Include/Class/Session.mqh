@@ -85,7 +85,7 @@ public:
                                  
 private:
 
-             //--- Panel Indicator
+             //--- Panel Indicators
              string           indSN;
 
              //--- Private Class properties
@@ -565,7 +565,7 @@ void CSession::UpdateFractalBuffer(int Direction, double Value)
 //+------------------------------------------------------------------+
 void CSession::LoadHistory(void)
   {    
-    int direction                    = NoDirection;
+    int direction                    = BoolToInt(Close[sBar]<Open[sBar],DirectionDown,DirectionUp);
 
     //--- Initialize period operationals
     sBar                             = Bars-1;
@@ -576,16 +576,10 @@ void CSession::LoadHistory(void)
     sBarFE                           = sBar;
     sDirFE                           = NoDirection;
 
-    if (Close[sBar]<Open[sBar])
-      direction                      = DirectionDown;
-
-    if (Close[sBar]>Open[sBar])
-      direction                      = DirectionUp;
-
     //--- Initialize session records
     for (int type=0;type<PeriodTypes;type++)
     {
-      srec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
+      srec[type].Direction           = direction;
       srec[type].BreakoutDir         = NoDirection;
       srec[type].State               = Breakout;
       srec[type].High                = High[sBar];
@@ -599,7 +593,7 @@ void CSession::LoadHistory(void)
     {
       frec[type].Type                = type;
       frec[type].State               = NoState;
-      frec[type].Direction           = BoolToInt(IsEqual(Open[sBar],Close[sBar]),DirectionUp,direction);
+      frec[type].Direction           = direction;
       frec[type].Price               = Open[sBar];
       frec[type].Lead                = NoBias;
       frec[type].Bias                = NoBias;

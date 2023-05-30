@@ -672,14 +672,14 @@ void CTickMA::UpdateSegment(void)
         if (IsHigher(sr[0].High,sr[1].High,NoUpdate,Digits))
           if (NewDirection(tmaDirection[Term],DirectionUp))
           {
-            seg[Support]     = seg[Running];
-            seg[Running]   = sr[0].High;
+            seg[Support]     = seg[Active];
+            seg[Active]      = sr[0].High;
 
             SetEvent(NewRally,Nominal);
           }
 
       if (IsEqual(tmaDirection[Term],DirectionUp))
-        seg[Running]       = fmax(seg[Running],sr[0].High);
+        seg[Active]          = fmax(seg[Active],sr[0].High);
 
       SetEvent(NewHigh,Nominal);
       SetEvent(NewBoundary,Nominal);
@@ -691,14 +691,14 @@ void CTickMA::UpdateSegment(void)
         if (IsLower(sr[0].Low,sr[1].Low,NoUpdate,Digits))
           if (NewDirection(tmaDirection[Term],DirectionDown))
           {
-            seg[Resistance]  = seg[Running];
-            seg[Running]   = sr[0].Low;
+            seg[Resistance]  = seg[Active];
+            seg[Active]      = sr[0].Low;
 
             SetEvent(NewPullback,Nominal);
           }
 
       if (IsEqual(tmaDirection[Term],DirectionDown))
-        seg[Running]       = fmin(seg[Running],sr[0].Low);
+        seg[Active]          = fmin(seg[Active],sr[0].Low);
 
       SetEvent(NewLow,Nominal);
       SetEvent(NewBoundary,Nominal);
@@ -710,7 +710,7 @@ void CTickMA::UpdateSegment(void)
       SetEvent(NewFractal,Nominal);
     }
 
-    if (!IsBetween(seg[Running],seg[Support],seg[Resistance],Digits))
+    if (!IsBetween(seg[Active],seg[Support],seg[Resistance],Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
       {
         SetEvent(NewTrend,Nominal);
@@ -1003,9 +1003,9 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
     ArrayResize(sma.Close,tmaPeriods);
 
     //-- Preload History (Initialize)
-    seg[Support]                = Low[tmaBar];
-    seg[Resistance]             = High[tmaBar];
-    seg[Running]                = Close[tmaBar];
+    seg[Support]              = Low[tmaBar];
+    seg[Resistance]           = High[tmaBar];
+    seg[Active]               = Close[tmaBar];
 
     for (tmaBar=Bars-1;tmaBar>0;tmaBar--)
       Update();
