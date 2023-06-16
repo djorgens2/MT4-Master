@@ -115,20 +115,20 @@ void CSession::CreateRange(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateRange(void)
   {
-    string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
-
-    if (Event(NewHour))
-      if (sIsOpen||Event(SessionClose))
-        ObjectSet(range,OBJPROP_TIME2,Time[sBar]);
-
-    if (sIsOpen)
-    {
-      if (Event(NewHigh))
-        ObjectSet(range,OBJPROP_PRICE1,srec[ActiveSession].High);
-     
-      if (Event(NewLow))
-        ObjectSet(range,OBJPROP_PRICE2,srec[ActiveSession].Low);
-    }
+//    string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+//
+//    if (Event(NewHour))
+//      if (sIsOpen||Event(SessionClose))
+//        ObjectSet(range,OBJPROP_TIME2,Time[sBar]);
+//
+//    if (sIsOpen)
+//    {
+//      if (Event(NewHigh))
+//        ObjectSet(range,OBJPROP_PRICE1,srec[ActiveSession].High);
+//     
+//      if (Event(NewLow))
+//        ObjectSet(range,OBJPROP_PRICE2,srec[ActiveSession].Low);
+//    }
  }
 
 //+------------------------------------------------------------------+
