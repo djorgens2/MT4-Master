@@ -74,7 +74,7 @@ protected:
                      Mean,
                      Support,
                      Resistance,
-                     Running,
+                     Active,
                      PivotTypes
                    };
 
@@ -125,8 +125,6 @@ protected:
            FractalState  State;                    //-- State
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
            double        Price;                    //-- Event Price
-           int           Lead;                     //-- Bias based on Last Pivot High/Low hit
-           int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
            EventType     Event;                    //-- Last Event; disposes on next tick
            AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
            bool          Peg;                      //-- Retrace peg
@@ -135,25 +133,42 @@ protected:
            double        Point[FractalPoints];     //-- Fractal Points (Prices)
          };
 
-//static const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
+  struct BufferRec
+         {
+           double        Point[];
+         };
+
 
 private:
 
+        int          fbar;
+
         FractalRec   frec[FractalTypes];
+        PivotRec     prec[];
+
         AlertLevel   Alert(FractalType Type);
         EventType    Event(FractalState State);
         EventType    Event(FractalType Type);
+
+        double       Price(FiboLevel Level, double Root, double Reference, FractalState Method);
+        double       Price(FractalState State, int Direction, int Bar);
+
+        void         UpdateTerm(double Support, double Resistance);
+        void         UpdateTrend(void);
+        void         UpdateOrigin(void);
+
 
 public:
                      CFractal(void);
                     ~CFractal();
                     
-         void        Update(FractalType Type, int Direction, double Price, int Bar=0);
-
+         void        Calc(FractalType Type, int Direction, double Price, int Bar=0);
+         void        Update(double Support, double Resistance, int Bar);
          double      Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns expansion fibonacci
          double      Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns retrace fibonacci
          double      Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal);   //--- returns recovery fibonacci
          double      Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
+         string      PivotStr(string Title, PivotRec &Pivot);
   };
 
 
@@ -191,37 +206,62 @@ EventType CFractal::Event(FractalType Type)
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Price - Returns price from supplied level, Root/[Base|Expansion] |
 //+------------------------------------------------------------------+
-CFractal::CFractal(void)
+double CFractal::Price(FiboLevel Level, double Root, double Reference, FractalState Method)
   {
-    for (FractalType type=Origin;type<FractalTypes;type++)
-    {
-      frec[type].State               = NoState;
-      frec[type].Direction           = BoolToInt(Close[Bars]<Open[Bars],DirectionDown,DirectionUp);
-      frec[type].Price               = Open[Bars];
-      frec[type].Lead                = NoBias;
-      frec[type].Bias                = NoBias;
-      frec[type].Event               = NoEvent;
-      frec[type].Alert               = NoAlert;
-      frec[type].Peg                 = false;
-      frec[type].Updated             = Time[Bars];
+    const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
 
-      ArrayInitialize(frec[type].Point,Open[Bars]);
+    switch (Method)
+    {
+      case Retrace:   return NormalizeDouble(Reference-((Reference-Root)*percent[Level]),Digits);
+      case Extension: return NormalizeDouble(Root+((Reference-Root)*percent[Level]),Digits);
+      default:        return NoValue;
     }
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| Price - Returns historical price of supplied State,Direction,Bar |
 //+------------------------------------------------------------------+
-CFractal::~CFractal()
+double CFractal::Price(FractalState State, int Direction, int Bar)
+  {
+    if (IsEqual(Bar,0))
+      return Close[0];
+      
+    //--- Note: Not perfect - long bar historical pricing (retrace, correction, rally/pullback(On Close?) missing;
+    switch (State)
+    {
+      case Rally:                 return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+      case Pullback:              return BoolToDouble(IsEqual(Direction,DirectionUp),Close[Bar],Low[Bar],Digits);
+      case Retrace:
+      case Correction:            return BoolToDouble(IsEqual(Direction,DirectionUp),Low[Bar],Close[Bar],Digits);
+      case Recovery:
+      case Breakout:
+      case Reversal:
+      case Extension:             return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+    }
+
+    return Close[Bar];
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateOrigin: Calc Origin fractal                                |
+//+------------------------------------------------------------------+
+void CFractal::UpdateOrigin(void)
   {
   }
 
 //+------------------------------------------------------------------+
-//| Update: Calc fractal by supplied fractal, direction and price    |
+//| UpdateOrigin: Calc Trend fractal                                 |
 //+------------------------------------------------------------------+
-void CFractal::Update(FractalType Type, int Direction, double Price, int Bar=0)
+void CFractal::UpdateTrend(void)
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateTerm: Calc Term fractal                                    |
+//+------------------------------------------------------------------+
+void CFractal::Calc(FractalType Type, int Direction, double Price, int Bar=0)
   {
     FractalState  state              = NoState;
     
@@ -306,6 +346,114 @@ void CFractal::Update(FractalType Type, int Direction, double Price, int Bar=0)
   }
 
 //+------------------------------------------------------------------+
+//| UpdateTerm: Calc Term Fractal                                    |
+//+------------------------------------------------------------------+
+void CFractal::UpdateTerm(double Support, double Resistance)
+  {
+    FractalState  state              = NoState;
+    
+    if (High[fbar]>Resistance)
+      if (Low[fbar]<Support)
+        if (Event(NewHigh))
+
+          //-- Handle Outside Reversals
+          if (Event(NewLow))
+          {
+            Print(TimeToStr(Time[fbar])+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Support,Digits)+":"+DoubleToStr(Resistance,Digits));
+            if (IsBetween(Close[fbar],Support,Resistance))
+              Flag("[fr3]Interior Close",clrGoldenrod,fbar,Close[fbar],Always);
+            else
+              Flag("[fr3]Exterior Close",clrDodgerBlue,fbar,Close[fbar],Always);
+
+            Flag("[fr3]Outside Support",clrRed,fbar,Support,Always);
+            Flag("[fr3]Outside Resisance",clrYellow,fbar,Resistance,Always);
+          }
+
+          //-- Handle Outside Anomaly Uptrend
+          else
+          {
+//            Flag("[fr3]Anomaly Resistance",clrWhite,Bar,High[Bar],Always);
+          }
+        else
+
+        //-- Handle Outside Anomaly Downtrend
+        if (Event(NewLow))
+        {
+//          Flag("[fr3]Anomaly Support",clrWhite,Bar,Low[Bar],Always);   
+        }
+
+        //-- Handle Outside Anomaly Rally/Pullback
+        else
+        {
+//          Flag("[fr3]Anomaly Interior",clrGoldenrod,Bar,Close[Bar],Always);
+        }
+      else
+
+      //-- Handle Uptrend Expansions
+      {
+      }
+    else
+    
+    //-- Handle Downtrend Expansions
+    if (Low[fbar]<Support)
+      if (Event(NewHigh))
+      {
+      }
+      else
+      if (Event(NewLow))
+      {
+      }
+      else
+      {
+      }
+    
+    //-- Handle Rally/Pullback
+    else
+    {
+    }
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+CFractal::CFractal(void)
+  {
+    for (FractalType type=Origin;type<FractalTypes;type++)
+    {
+      frec[type].State               = NoState;
+      frec[type].Direction           = BoolToInt(Close[Bars-1]<Open[Bars-1],DirectionDown,DirectionUp);
+      frec[type].Price               = Open[Bars-1];
+      frec[type].Event               = NoEvent;
+      frec[type].Alert               = NoAlert;
+      frec[type].Peg                 = false;
+      frec[type].Updated             = Time[Bars-1];
+
+      ArrayInitialize(frec[type].Point,Open[Bars-1]);
+    }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+CFractal::~CFractal()
+  {
+  }
+
+//+------------------------------------------------------------------+
+//| Update - Calculates the fractal based on Term Support/Resistance |
+//+------------------------------------------------------------------+
+void CFractal::Update(double Support, double Resistance, int Bar)
+  {
+    fbar                         = Bar;
+    
+    frec[Term].Point[fpBase]     = BoolToDouble(frec[Term].Direction==DirectionUp,Resistance,Support,Digits);
+    frec[Term].Point[fpRoot]     = BoolToDouble(frec[Term].Direction==DirectionUp,Support,Resistance,Digits);
+    
+    UpdateTerm(Support,Resistance);
+    UpdateTrend();
+    UpdateOrigin();
+  }
+
+//+------------------------------------------------------------------+
 //| Retrace - Calcuates fibo retrace % for supplied Type             |
 //+------------------------------------------------------------------+
 double CFractal::Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal)
@@ -371,4 +519,26 @@ double CFractal::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
 
     return (0.00);
   }
+
+//+------------------------------------------------------------------+
+//| PivotStr - Returns Screen formatted Pivot Detail                 |
+//+------------------------------------------------------------------+
+string CFractal::PivotStr(string Title, PivotRec &Pivot)
+  {  
+    string text            = "";
+
+    Append(text,Title,"\n");
+    Append(text,DirText(Pivot.Direction));
+    Append(text,ActionText(Pivot.Lead));
+    Append(text,EnumToString(Pivot.State));
+    Append(text,"["+ActionText(Pivot.Bias)+"]");
+    Append(text,DoubleToStr(Pivot.Open,Digits));
+    Append(text,DoubleToStr(Pivot.High,Digits));
+    Append(text,DoubleToStr(Pivot.Low,Digits));
+    Append(text,DoubleToStr(Pivot.Close,Digits));
+        
+    return (text);
+  }
+
+const string    FractalTag[FractalTypes]     = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 

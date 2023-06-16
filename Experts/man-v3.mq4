@@ -345,6 +345,7 @@ void UpdateSignal(CTickMA &Signal)
                        signal.Response   = Trigger;
                        signal.Event      = NewTerm;
                        signal.Text       = "Term [Minor]: "+EnumToString(Signal.Fractal().Type);
+                       Print("Minor New Fractal??? WTF?");
                        break;
 
         case Major:    signal.Class      = Fractal;
@@ -396,8 +397,8 @@ void UpdateSignal(CTickMA &Signal)
       master.Tick           = signal;
       master.Tick.Fired     = true;
       
-      if (IsChanged(last,signal.Text)||Signal.ActiveEvent())
-        Alert(Symbol()+">"+SignalStr(master.Tick)+"|"+Signal.EventStr(),IsBetween(signal.Bias,OP_BUY,OP_SELL),signal.Bias);
+      //if (IsChanged(last,signal.Text)||Signal.ActiveEvent())
+      //  Alert(Symbol()+">"+SignalStr(master.Tick)+"|"+Signal.EventStr(),IsBetween(signal.Bias,OP_BUY,OP_SELL),signal.Bias);
     }
   }
 
@@ -597,7 +598,7 @@ int OnInit()
     s[Daily].Update();
     
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-      if (s[Daily].Fibonacci(type).Level>Fibo61)
+//      if (s[Daily].Fibonacci(type).Level>Fibo61)
         if (IsHigher(s[Daily].Pivot(type).Time,time))
           master.Session.Type = type;
 

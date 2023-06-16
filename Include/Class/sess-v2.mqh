@@ -8,7 +8,7 @@
 #property version   "2.00"
 #property strict
 
-#include <Class/Fractal.mqh>
+#include <Class/frac-v2.mqh>
 
 class CSession : public CFractal
   {
@@ -18,9 +18,9 @@ protected:
          //-- Period Types
          enum PeriodType
          {
+           OffSession,    // Off-Session
            PriorSession,  // Prior (Closed) Session
            ActiveSession, // Active (Open) Session
-           OffSession,    // Off-Session
            PeriodTypes    // None
          };
 
@@ -36,17 +36,17 @@ protected:
 
          struct SessionRec
          {
-           int           Direction;
-           int           Bias;
-           double        High;
-           double        Low;
+           int            Direction;
+           int            Bias;
+           int            Lead;
+           double         High;
+           double         Low;
          };
-
 
 private:
 
          //--- Panel Indicators
-         string          indSN;
+         string           indSN;
 
          //--- Private Class properties
          SessionType      sType;
@@ -57,28 +57,145 @@ private:
          int              sHourOpen;
          int              sHourClose;
          int              sHourOffset;
+
          int              sBar;
          int              sBars;
-         int              sDay;
-         int              sHour;
+         int              sBarDay;
+         int              sBarHour;
 
+         void             CreateRange(void);
+         void             UpdateRange(void);
+         void             UpdateBuffers(void);
+
+         void             InitSession(EventType Event);
+         void             UpdateSession(void);
          void             OpenSession(void);
          void             CloseSession(void);
 
          SessionRec       srec[PeriodTypes];
+         BufferRec        sbuf[PeriodTypes];
          
 public:
 
-                          CSession(SessionType Session, FractalType Type);
+                          CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false);
                          ~CSession();
-                    
+
          void             Update(void);
 
-         datetime         ServerTime(void);
-         int              SessionHour();
+         datetime         ServerTime(void)  {return Time[sBar]+(PERIOD_H1*60*sHourOffset);};
+         int              SessionHour(void) {return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);};
+      
          bool             IsOpen(void);
 
+         double           Pivot(const PeriodType Period) {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
+
+         BufferRec        Buffer(PeriodType Period) const {return sbuf[Period];};
+         SessionRec       operator[](const PeriodType Period) const {return srec[Period];};
+
+         string           BufferStr(PeriodType Period);
+         string           SessionStr(string Title="");
   };
+
+//+------------------------------------------------------------------+
+//| CreateRange - Paints the session boxes                           |
+//+------------------------------------------------------------------+
+void CSession::CreateRange(void)
+ {
+   string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+     
+   ObjectCreate(range,OBJ_RECTANGLE,0,Time[sBar],srec[ActiveSession].High,Time[sBar],srec[ActiveSession].Low);
+   
+   ObjectSet(range, OBJPROP_STYLE,STYLE_SOLID);
+   ObjectSet(range, OBJPROP_COLOR,Color(sType,Dark));
+   ObjectSet(range, OBJPROP_BACK,true);     
+ }
+
+//+------------------------------------------------------------------+
+//| UpdateRange - Repaints the session box                           |
+//+------------------------------------------------------------------+
+void CSession::UpdateRange(void)
+  {
+    string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+
+    if (Event(NewHour))
+      if (sIsOpen||Event(SessionClose))
+        ObjectSet(range,OBJPROP_TIME2,Time[sBar]);
+
+    if (sIsOpen)
+    {
+      if (Event(NewHigh))
+        ObjectSet(range,OBJPROP_PRICE1,srec[ActiveSession].High);
+     
+      if (Event(NewLow))
+        ObjectSet(range,OBJPROP_PRICE2,srec[ActiveSession].Low);
+    }
+ }
+
+//+------------------------------------------------------------------+
+//| UpdateSession - Sets active state, bounds and alerts on the tick |
+//+------------------------------------------------------------------+
+void CSession::UpdateSession(void)
+  {
+    if (IsHigher(High[sBar],srec[ActiveSession].High))
+    {
+      srec[ActiveSession].Lead      = OP_BUY;
+
+      SetEvent(NewHigh,Nominal);
+      SetEvent(NewBoundary,Nominal);
+    }
+            
+    if (IsLower(Low[sBar],srec[ActiveSession].Low))
+    {
+      srec[ActiveSession].Lead      = OP_SELL;
+
+      SetEvent(NewLow,Nominal);
+      SetEvent(NewBoundary,Nominal);
+    }
+
+    if (NewAction(srec[ActiveSession].Bias,Action(Close[sBar]-BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
+      SetEvent(NewBias,Nominal);
+
+    if (Event(NewBoundary))
+      if (NewDirection(srec[ActiveSession].Direction,Direction(Pivot(ActiveSession)-BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)))))
+        SetEvent(NewDirection,Nominal);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateBuffers - updates indicator buffer values                  |
+//+------------------------------------------------------------------+
+void CSession::UpdateBuffers(void)
+  {
+    for (sBars=sBars;sBars<Bars;sBars++)
+    {
+      for (PeriodType period=OffSession;period<PeriodTypes;period++)
+      {
+        ArrayResize(sbuf[period].Point,sBars,10);
+        ArrayCopy(sbuf[period].Point,sbuf[period].Point,1,0,WHOLE_ARRAY);
+        
+        sbuf[period].Point[0]             = 0.00;
+      }
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| InitSession - Handle session changeovers; Open->Close;Close->Open|
+//+------------------------------------------------------------------+
+void CSession::InitSession(EventType Event)
+  {
+    //-- Set ActiveSession support/resistance
+    srec[ActiveSession].High              = High[sBar];
+    srec[ActiveSession].Low               = Low[sBar];
+
+    if (sBar+1<sBars)
+    {
+      SetEvent(BoolToEvent(IsHigher(High[sBar+1],srec[ActiveSession].High),NoEvent,NewHigh));
+      SetEvent(BoolToEvent(IsLower(Low[sBar+1],srec[ActiveSession].Low),NoEvent,NewLow));
+    }
+    
+    SetEvent(Event,Notify);
+    
+    CreateRange();
+  }
 
 //+------------------------------------------------------------------+
 //| OpenSession - Initializes active session start values on open    |
@@ -87,24 +204,10 @@ void CSession::OpenSession(void)
   {
     //-- Update OffSession Record and Indicator Buffer      
     srec[OffSession]                      = srec[ActiveSession];
-//    sOffMidBuffer.SetValue(sBar,Pivot(ActiveSession));
+    sbuf[OffSession].Point[sBar]          = Pivot(OffSession);
 
-    //-- Set support/resistance (ActiveSession is OffSession data)
-    srec[ActiveSession].Resistance        = fmax(srec[PriorSession].High,srec[OffSession].High);
-    srec[ActiveSession].Support           = fmin(srec[PriorSession].Low,srec[OffSession].Low);
-    srec[ActiveSession].High              = Open[sBar];
-    srec[ActiveSession].Low               = Open[sBar];
-
-    //<--- Check for offsession reversals
-    if (IsHigher(srec[ActiveSession].High,srec[PriorSession].High,NoUpdate))
-      if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionUp,NoUpdate))
-        srec[ActiveSession].High          = fdiv(srec[PriorSession].High+High[sBar],2,Digits);
-
-    if (IsLower(srec[ActiveSession].Low,srec[PriorSession].Low,NoUpdate))
-      if (NewDirection(srec[ActiveSession].BreakoutDir,DirectionDown,NoUpdate))
-       srec[ActiveSession].Low            = fdiv(srec[PriorSession].Low+Low[sBar],2,Digits);
-
-    SetEvent(SessionOpen,Notify);
+    InitSession(SessionOpen);    
+    CreateRange();
   }
 
 //+------------------------------------------------------------------+
@@ -113,34 +216,58 @@ void CSession::OpenSession(void)
 void CSession::CloseSession(void)
   {        
     //-- Update Prior Record, range history, and Indicator Buffer
-    sSessionRange.Insert(0,srec[ActiveSession].High-srec[ActiveSession].Low);
-
     srec[PriorSession]                    = srec[ActiveSession];
-    sPriorMidBuffer.SetValue(sBar,Pivot(PriorSession));
-
-    //-- Reset Active Record
-    srec[ActiveSession].Resistance        = srec[PriorSession].High;
-    srec[ActiveSession].Support           = srec[PriorSession].Low;
-    srec[ActiveSession].High              = Open[sBar];
-    srec[ActiveSession].Low               = Open[sBar];
-
-    SetEvent(SessionClose,Notify);
+    sbuf[PriorSession].Point[sBar]        = Pivot(PriorSession);
+    
+    InitSession(SessionClose);    
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| CSession Constructor                                             |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Session, FractalType Type)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false)
   {
-    for (sBar=Bars;sBar>0;sBar--)
+    //--- Initialize period operationals
+    sBar                             = Bars-1;
+    sBars                            = Bars;
+    sBarDay                          = NoValue;
+    sBarHour                         = NoValue;
+
+    sHourOpen                        = HourOpen;
+    sHourClose                       = HourClose;
+    sHourOffset                      = HourOffset;
+
+    sIsOpen                          = false;
+//    sShowFlags                       = ShowFlags;
+
+    //--- Initialize session records
+    for (PeriodType period=OffSession;period<PeriodTypes;period++)
+    {
+      srec[period].Direction         = BoolToInt(Close[sBar]<Open[sBar],DirectionDown,DirectionUp);
+      srec[period].High              = High[sBar];
+      srec[period].Low               = Low[sBar];
+
+      ArrayResize(sbuf[period].Point,Bars);
+      ArrayInitialize(sbuf[period].Point,0.00);
+    }
+
+    for (sBar=sBar;sBar>0;sBar--)
       Update();
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| CSession Destructor                                              |
 //+------------------------------------------------------------------+
 CSession::~CSession()
   {
+    //-- Clean Open Chart Objects
+    int fObject             = 0;
+    
+    while (fObject<ObjectsTotal())
+      if (InStr(ObjectName(fObject),"[s2]"))
+        ObjectDelete(ObjectName(fObject));
+      else fObject++;
+
   }
 
 //+------------------------------------------------------------------+
@@ -148,11 +275,12 @@ CSession::~CSession()
 //+------------------------------------------------------------------+
 void CSession::Update(void)
   {
-    //--- Clear events
+    //--- Tick Setup
     ClearEvents();
+    UpdateBuffers();
 
     //--- Test for New Day; Force close
-    if (IsChanged(sDay,TimeDay(ServerTime())))
+    if (IsChanged(sBarDay,TimeDay(ServerTime())))
     {
       SetEvent(NewDay,Notify);
       
@@ -160,43 +288,92 @@ void CSession::Update(void)
         CloseSession();
     }
     
-    if (IsChanged(sHour,TimeHour(ServerTime())))
+    if (IsChanged(sBarHour,TimeHour(ServerTime())))
       SetEvent(NewHour,Notify);
 
     //--- Calc events session open/close
     if (IsChanged(sIsOpen,IsOpen()))
-      if (IsOpen())
+      if (sIsOpen)
         OpenSession();
       else
         CloseSession();
+        
+    UpdateSession();
+    UpdateRange();
+    Update(srec[PriorSession].Low,srec[PriorSession].High,sBar);
   }
 
 //+------------------------------------------------------------------+
-//| ServerTime - Returns the adjusted time based on server offset    |
-//+------------------------------------------------------------------+
-datetime CSession::ServerTime(void)
-  {
-    //-- Time is set to reflect 5:00pm New York as end of trading day
-    
-    return(Time[sBar]+(PERIOD_H1*60*sHourOffset));
-  };
-
-//+------------------------------------------------------------------+
-//| SessionHour - Returns the hour of open session trading           |
-//+------------------------------------------------------------------+
-int CSession::SessionHour(void)
-  {    
-    return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);
-  }
-
-//+------------------------------------------------------------------+
-//| SessionIsOpen - Returns true if session is open for trade        |
+//| IsOpen - Returns true if session is open for trade               |
 //+------------------------------------------------------------------+
 bool CSession::IsOpen(void)
   {
     if (TimeDayOfWeek(ServerTime())<6)
       if (TimeHour(ServerTime())>=sHourOpen && TimeHour(ServerTime())<sHourClose)
         return (true);
-        
+
     return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| BufferStr - Returns formatted Buffer data for supplied Period    |
+//+------------------------------------------------------------------+
+string CSession::BufferStr(PeriodType Period)
+  {  
+    string text            = EnumToString(Period);
+
+    for (int bar=0;bar<Bars;bar++)
+      if (sbuf[Period].Point[bar]>0.00)
+      {
+        Append(text,(string)bar,"|");
+        Append(text,TimeToStr(Time[bar]),"|");
+        Append(text,DoubleToStr(sbuf[Period].Point[bar],Digits),"|");
+      }
+
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| SessionStr - Returns formatted Session data for supplied type    |
+//+------------------------------------------------------------------+
+string CSession::SessionStr(string Title="")
+  {  
+    string text            = Title;
+
+    Append(text,EnumToString(sType),"|");
+    Append(text,BoolToStr(IsOpen(),"Open","Closed"),"|");
+    Append(text,BoolToStr(IsOpen(),BoolToStr(ServerTime()>sHourClose-3,"Late",BoolToStr(ServerTime()>3,"Mid","Early")),"Closed"),"|");
+    Append(text,(string)SessionHour(),"|");
+    Append(text,BufferStr(PriorSession),"|");
+    Append(text,BufferStr(OffSession),"|");
+
+    return(text);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Compares SessionType to detect if a change occurred  |
+//+------------------------------------------------------------------+
+bool IsChanged(SessionType &Compare, SessionType Value)
+  {
+    if (Compare==Value)
+      return (false);
+      
+    Compare = Value;
+    return (true);
+  }
+
+//+------------------------------------------------------------------+
+//| Color - Returns the color for session ranges                     |
+//+------------------------------------------------------------------+
+color Color(SessionType Type, DisplayGamma Gamma)
+  {
+    switch (Type)
+    {
+      case Asia:    return (color)BoolToInt(Gamma==Dark,AsiaColor,clrForestGreen);
+      case Europe:  return (color)BoolToInt(Gamma==Dark,EuropeColor,clrFireBrick);
+      case US:      return (color)BoolToInt(Gamma==Dark,USColor,clrSteelBlue);
+      case Daily:   return (color)BoolToInt(Gamma==Dark,DailyColor,clrDarkGray);
+    }
+    
+    return (clrBlack);
   }

@@ -103,8 +103,6 @@
   //-- Canonical Fibonacci Pivot
   struct FibonacciRec
          {
-           FractalType   Type;                     //-- Type
-           PivotRec      Pivot;                    //-- Fractal Pivot
            FiboLevel     Level;                    //-- Fibo Level Now
            double        Percent;                  //-- Actual Fibonacci Percentage
            double        Forecast;                 //-- Calculated Fibonacci Price
@@ -117,12 +115,11 @@
            FractalState  State;                    //-- State
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
            double        Price;                    //-- Event Price
-           int           Lead;                     //-- Bias based on Last Pivot High/Low hit
-           int           Bias;                     //-- Active Bias derived from Close[] to Pivot.Open  
            EventType     Event;                    //-- Last Event; disposes on next tick
            AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
            bool          Peg;                      //-- Retrace peg
-           FibonacciRec  Extension;                //-- Fibo Extension Pivot
+           FibonacciRec  Extension;                //-- Active Fibo Extension
+           FibonacciRec  Retrace;                  //-- Active Fibo Retrace
            datetime      Updated;                  //-- Last Update;
            double        Point[FractalPoints];     //-- Fractal Points (Prices)
          };
@@ -182,7 +179,7 @@ ENUM_LINE_STYLE Style(FractalPoint Fractal)
 //+------------------------------------------------------------------+
 //| FractalAlert - Returns Alert Level for supplied Fractal Type     |
 //+------------------------------------------------------------------+
-AlertLevel FractalAlert(FractalType Type)
+AlertLevel Alert(FractalType Type)
   {
     static const AlertLevel alertlevel[FractalTypes]    = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,Notify,Notify,Notify,Notify,Notify};
 
@@ -192,7 +189,7 @@ AlertLevel FractalAlert(FractalType Type)
 //+------------------------------------------------------------------+
 //| FractalEvent - Returns the Fractal Event on change in State      |
 //+------------------------------------------------------------------+
-EventType FractalEvent(FractalState State)
+EventType Event(FractalState State)
   {
     static const EventType FractalEvent[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,NewExtension,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
   
@@ -202,7 +199,7 @@ EventType FractalEvent(FractalState State)
 //+------------------------------------------------------------------+
 //| FractalEvent - Returns the Fractal Event on change in Type       |
 //+------------------------------------------------------------------+
-EventType FractalEvent(FractalType Type)
+EventType Event(FractalType Type)
   {
     switch (Type)
     {
@@ -234,14 +231,16 @@ FiboLevel Level(double Percent)
   }
 
 //+------------------------------------------------------------------+
-//| Price - Returns price for supplied fibonacci level               |
+//| Price - Returns price from supplied level, Root/[Base|Expansion] |
 //+------------------------------------------------------------------+
-double Price(FiboLevel Level, double Root, double Reference, int Method)
+double Price(FiboLevel Level, double Root, double Reference, FractalState Method)
   {
-    if (Method == Retrace)     
-      return (NormalizeDouble(Reference-((Reference-Root)*Percent(Level)),Digits));
-
-    return (NormalizeDouble(Root+((Reference-Root)*Percent(Level)),Digits));
+    switch (Method)
+    {
+      case Retrace:   return NormalizeDouble(Reference-((Reference-Root)*Percent(Level)),Digits);
+      case Extension: return NormalizeDouble(Root+((Reference-Root)*Percent(Level)),Digits);
+      default:        return NoValue;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -339,24 +338,38 @@ double Percent(FiboLevel Level, int Format=InPoints)
   }
 
 //+------------------------------------------------------------------+
-//| UpdatePivot - updates Pivot details on the tick                  |
+//| UpdatePivot - updates active Pivot on the stack each tick        |
 //+------------------------------------------------------------------+
-void UpdatePivot(PivotRec &Pivot, int Direction, int Bar=0)
+void UpdatePivot(PivotRec &Pivot[], int Direction, int Bar=0)
   {
-    double price        = Price(Pivot.State,Direction,Bar);
+    double price;
+    int    size      = ArraySize(Pivot);
     
-    Pivot.Close         = price;
-    Pivot.Event         = BoolToEvent(NewBias(Pivot.Bias,Action(price-Pivot.Open)),NewBias);
+    for (int node=0;node<size;node++)
+    {
+      Pivot[node].Event          = NoEvent;
+
+      if (IsEqual(node,0)||IsBetween(Pivot[node].State,Breakout,Reversal))
+      {
+        price                    = Price(Pivot[node].State,Direction,Bar);
     
-    if (IsHigher(price,Pivot.High))
-      Pivot.Event       = NewHigh;
+        Pivot[node].Close       = price;
+        Pivot[node].Event       = BoolToEvent(NewBias(Pivot[node].Bias,Action(price-Pivot[node].Open)),NewBias);
+    
+        if (IsHigher(price,Pivot[node].High))
+          Pivot[node].Event     = NewHigh;
 
-    if (IsLower(price,Pivot.Low))
-      Pivot.Event       = NewLow;
+        if (IsLower(price,Pivot[node].Low))
+          Pivot[node].Event     = NewLow;
 
-    if (Pivot.Event>NoEvent)
-      if (NewAction(Pivot.Lead,BoolToInt(IsEqual(Pivot.Event,NewHigh),OP_BUY,OP_SELL)))
-        Pivot.Event     = NewLead;
+        if (Pivot[node].Event>NoEvent)
+          if (NewAction(Pivot[node].Lead,BoolToInt(IsEqual(Pivot[node].Event,NewHigh),OP_BUY,BoolToInt(IsEqual(Pivot[node].Event,NewLow),OP_SELL,Pivot[node].Lead))))
+            Pivot[node].Event   = NewLead;
+      }
+      
+      if (IsBetween(Pivot[node].State,Breakout,Reversal))
+        break;
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -413,32 +426,41 @@ PivotRec GetPivot(PivotRec &Pivot[], FractalState State, int Start=0, MeasureTyp
 void AddPivot(PivotRec &Pivot[], FractalState State, int Direction, double Price, int Bar=0)
   {
     int      size            = ArraySize(Pivot);
-
-    ArrayResize(Pivot,size+1,32768);
     
-    if (size>0)
+    if (IsEqual(size,0))
     {
-      ArrayCopy(Pivot,Pivot,1,0,size);
-      
-      Pivot[0].Direction     = Direction(Price-Pivot[1].Open);
-    }
-    else Pivot[0].Direction  = NoDirection;
+      ArrayResize(Pivot,size+1,32768);
 
-    Direction                = BoolToInt(IsEqual(State,Retrace),Direction(Direction,InDirection,InContrarian),Direction);
+      Pivot[0].Direction     = NoDirection;
+    }
+    else
+    {
+      if (IsEqual(State,Extension)&&IsEqual(Pivot[0].State,Extension))
+        Pivot[0].Direction   = Direction(Price-Pivot[0].Open);
+      else
+      {
+        ArrayResize(Pivot,size+1,32768);
+        ArrayCopy(Pivot,Pivot,1,0,size);
+      
+        Pivot[0].Direction   = Direction(Price-Pivot[1].Open);
+      }
+    }
+
+    Direction                = BoolToInt(IsBetween(State,Retrace,Correction),Direction(Direction,InDirection,InContrarian),Direction);
 
     Pivot[0].Bias            = Action(Direction);
     Pivot[0].State           = State;
     Pivot[0].Open            = Price;
-    Pivot[0].High            = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Price(State,Direction,Bar),Digits);
-    Pivot[0].Low             = BoolToDouble(IsEqual(Direction,DirectionUp),Price(State,Direction,Bar),Low[Bar],Digits);
+    Pivot[0].High            = BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],fmax(Price(State,Direction,Bar),Price),Digits);
+    Pivot[0].Low             = BoolToDouble(IsEqual(Direction,DirectionUp),fmin(Price(State,Direction,Bar),Price),Low[Bar],Digits);
     Pivot[0].Close           = Close[Bar];
     Pivot[0].Time            = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
   }
 
 //+------------------------------------------------------------------+
-//| NewState - Returns true on change to a Fractal State             |
+//| NewFractal - Returns true on change to a Fractal State             |
 //+------------------------------------------------------------------+
-bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, bool Update=true, bool Force=true)
+bool NewFractal(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, bool Update=true, bool Force=true)
   {
     FractalRec frec          = Fractal;
     double     retrace       = Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]);
@@ -533,25 +555,16 @@ bool NewState(FractalRec &Fractal, PivotRec &Pivot[], int Bar, bool Reversing, b
     {
       AddPivot(Pivot,frec.State,frec.Direction,frec.Price,Bar);
 
-      frec.Event             = FractalEvent(frec.State);
-      frec.Alert             = FractalAlert(frec.Type);
+      frec.Event             = Event(frec.State);
+      frec.Alert             = Alert(frec.Type);
       frec.Updated           = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
       Fractal                = frec;
 
       return true;
     }
 
-    UpdatePivot(Pivot[0],Fractal.Direction,Bar);
+    UpdatePivot(Pivot,Fractal.Direction,Bar);
     
-    if (Bar>0)
-    {
-      Fractal.Lead           = BoolToInt(IsHigher(High[Bar],Pivot[0].High),OP_BUY,Fractal.Lead);
-      Fractal.Lead           = BoolToInt(IsLower(Low[Bar],Pivot[0].Low),OP_SELL,Fractal.Lead);
-    } 
-    else Fractal.Lead        = Pivot[0].Lead;
-    
-    Fractal.Bias             = Pivot[0].Bias;
-
     return false;
   }
 
@@ -609,39 +622,37 @@ bool NewBias(int &Check, int Change, bool Force=false)
 //+------------------------------------------------------------------+
 //| NewFibonacci - Returns refreshed Fibo rec                        |
 //+------------------------------------------------------------------+
-bool NewFibonacci(FractalRec &Fractal, FibonacciRec &Fibo, int Method=Expansion, int Bar=0)
+bool NewFibonacci(FractalRec &Fractal, PivotRec &Pivot[], FractalState Method=Extension, bool Reversing=false, int Bar=0)
   {
-    double  fibo             = BoolToDouble(IsEqual(Method,Expansion),
-                                 Expansion(Fractal.Point[fpBase],Fractal.Point[fpRoot],Fractal.Point[fpExpansion]),
-                                 Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]),Digits);
+    bool    reset      = false;
+    double  fibo       = BoolToDouble(IsEqual(Method,Extension),Expansion(Fractal.Point[fpBase],Fractal.Point[fpRoot],Fractal.Point[fpExpansion]),
+                         BoolToDouble(IsEqual(Method,Retrace),Retrace(Fractal.Point[fpRoot],Fractal.Point[fpExpansion],Fractal.Point[fpRetrace]),NoValue),Digits);
 
-    Fibo.Pivot.Event         = NoEvent;
-
-    if (IsChanged(Fibo.Level,Level(fibo)))
+    switch (Method)
     {
-      Fractal.Event          = NewFibonacci;
-      Fractal.Updated        = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
-
-      Fibo.Type              = Fractal.Type;
-     
-      Fibo.Percent           = fibo;
-      Fibo.Forecast          = Price(Fibo.Level,Fractal.Point[fpRoot],BoolToDouble(IsEqual(Method,Expansion),Fractal.Point[fpBase],Fractal.Point[fpExpansion]),Method);
-  
-      Fibo.Pivot.Event       = NewFibonacci;
-      Fibo.Pivot.Direction   = Fractal.Direction;
-      Fibo.Pivot.State       = Fractal.State;
-      Fibo.Pivot.Lead        = Action(Fractal.Direction);
-      Fibo.Pivot.Bias        = Action(Fractal.Direction);
-      Fibo.Pivot.Open        = BoolToDouble(IsEqual(Bar,0),Close[0],Fibo.Forecast,Digits);
-      Fibo.Pivot.High        = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),High[Bar],fmax(Close[Bar],Fibo.Forecast),Digits);
-      Fibo.Pivot.Low         = BoolToDouble(IsEqual(Fractal.Direction,DirectionUp),fmin(Close[Bar],Fibo.Forecast),Low[Bar],Digits);
-      Fibo.Pivot.Close       = Price(Fractal.State,Fractal.Direction,Bar);
-      Fibo.Pivot.Time        = BoolToDate(IsEqual(Bar,0),TimeCurrent(),Time[Bar]);
-
-      return true;
+      case Extension:  reset  = Level(fibo)<Fractal.Extension.Level;
+                         //if (Fractal.Type==Origin&&Reversing)
+                         //  Flag("New "+EnumToString(Fractal.Type)+":"+EnumToString(Fractal.Extension.Level),
+                         //    BoolToInt(Fractal.Extension.Level==Fibo100,Color(Fractal.Direction),
+                         //    BoolToInt(Fractal.Extension.Level<Fibo100,clrDarkGray,clrWhite)),Bar,Fractal.Extension.Forecast);  
+//                       if (IsChanged(Fractal.Extension.Level,Level(fibo))||Reversing) //-- Term Pivot
+//                       if (IsChanged(Fractal.Extension.Level,Level(fibo))||Reversing)   //-- Trend Pivot
+                       if (IsChanged(Fractal.Extension.Level,Level(fibo))||Reversing)   //-- Origin Pivot
+                       {
+                         Fractal.Event       = NewFibonacci;
+                         Fractal.Updated     = BoolToDate(Bar>0,Time[Bar],TimeCurrent());
+                  
+                         Fractal.Extension.Percent    = fibo;
+                         Fractal.Extension.Forecast   = Price(Fractal.Extension.Level,Fractal.Point[fpRoot],BoolToDouble(IsEqual(Method,Extension),Fractal.Point[fpBase],Fractal.Point[fpExpansion]),Method);
+                         //if (Fractal.Type==Origin)
+                         //  Flag("New "+EnumToString(Fractal.Type)+":"+EnumToString(Fractal.Extension.Level),
+                         //    BoolToInt(Fractal.Extension.Level==Fibo100,Color(Fractal.Direction),
+                         //    BoolToInt(Fractal.Extension.Level<Fibo100,clrDarkGray,clrWhite)),Bar,Fractal.Extension.Forecast);  
+                         AddPivot(Pivot,Extension,Fractal.Direction,Fractal.Extension.Forecast,Bar);
+                  
+                         return true;
+                       }
     }
-
-    UpdatePivot(Fibo.Pivot,Fractal.Direction,Bar);
 
     return false;
   }

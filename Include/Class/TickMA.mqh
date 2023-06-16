@@ -353,7 +353,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
         
         if (IsEqual(poly.Bias,bias))
           FOC.Event         = BoolToEvent(NewState(FOC.State,(FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)),
-                                          FractalEvent((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
+                                          Event((FractalState)BoolToInt(IsEqual(FOC.Direction,DirectionUp),Pullback,Rally)));
       }
       else 
         bias                = NoBias;
@@ -765,7 +765,7 @@ void CTickMA::UpdateRange(void)
 
       range.Size          = range.High-range.Low;
       range.Mean          = fdiv(range.High+range.Low,2);
-      range.Support       = Price(Fibo23,range.Low,range.High,Expansion);
+      range.Support       = Price(Fibo23,range.Low,range.High,Extension);
       range.Resistance    = Price(Fibo23,range.Low,range.High,Retrace);
     }
 
@@ -956,7 +956,7 @@ void CTickMA::UpdateFractal(void)
         fm.Bias           = Bias(direction,fm.State);
 
         if (IsChanged(fm.Type,type))
-          SetEvent(FractalEvent(fm.State),Major);
+          SetEvent(Event(fm.State),Major);
 
         ArrayCopy(fm.Fractal,detail);
         break;

@@ -55,7 +55,7 @@ enum StyleType
        StyleTypes
      };
 
-enum DisplayColor
+enum DisplayGamma
      {
        Bright,
        Dark
