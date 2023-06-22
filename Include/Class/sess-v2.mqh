@@ -52,7 +52,8 @@ private:
          SessionType      sType;
 
          bool             sIsOpen;
-         bool             sFlags;
+         bool             sShowFlags;
+         string           sObjectKey;
 
          int              sHourOpen;
          int              sHourClose;
@@ -97,11 +98,11 @@ public:
   };
 
 //+------------------------------------------------------------------+
-//| CreateRange - Paints the session boxes                           |
+//| CreateRange - Creates active session frames on Session Open      |
 //+------------------------------------------------------------------+
 void CSession::CreateRange(void)
  {
-   string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+   string range       = sObjectKey+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
      
    ObjectCreate(range,OBJ_RECTANGLE,0,Time[sBar],srec[ActiveSession].High,Time[sBar],srec[ActiveSession].Low);
    
@@ -111,11 +112,11 @@ void CSession::CreateRange(void)
  }
 
 //+------------------------------------------------------------------+
-//| UpdateRange - Repaints the session box                           |
+//| UpdateRange - Repaints active session frame                      |
 //+------------------------------------------------------------------+
 void CSession::UpdateRange(void)
   {
-    string range       = "[s2]"+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+    string range       = sObjectKey+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
 
     if (Event(NewHour))
       if (sIsOpen||Event(SessionClose))
@@ -143,7 +144,7 @@ void CSession::UpdateSession(void)
       SetEvent(NewHigh,Nominal);
       SetEvent(NewBoundary,Nominal);
     }
-            
+
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
     {
       srec[ActiveSession].Lead      = OP_SELL;
@@ -238,7 +239,8 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sHourOffset                      = HourOffset;
 
     sIsOpen                          = false;
-//    sShowFlags                       = ShowFlags;
+    sShowFlags                       = ShowFlags;
+    sObjectKey                       = "[session]";
 
     //--- Initialize session records
     for (PeriodType period=OffSession;period<PeriodTypes;period++)
@@ -264,14 +266,13 @@ CSession::~CSession()
     int fObject             = 0;
     
     while (fObject<ObjectsTotal())
-      if (InStr(ObjectName(fObject),"[s2]"))
+      if (InStr(ObjectName(fObject),sObjectKey))
         ObjectDelete(ObjectName(fObject));
       else fObject++;
-
   }
 
 //+------------------------------------------------------------------+
-//| Update: Computes fractal using supplied fractal and price        |
+//| Update - Computes fractal using supplied fractal and price       |
 //+------------------------------------------------------------------+
 void CSession::Update(void)
   {
@@ -300,7 +301,7 @@ void CSession::Update(void)
         
     UpdateSession();
     UpdateRange();
-    Update(srec[PriorSession].Low,srec[PriorSession].High,sBar);
+    UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(ActiveSession),sBar);
   }
 
 //+------------------------------------------------------------------+
@@ -365,7 +366,7 @@ bool IsChanged(SessionType &Compare, SessionType Value)
 //+------------------------------------------------------------------+
 //| Color - Returns the color for session ranges                     |
 //+------------------------------------------------------------------+
-color Color(SessionType Type, DisplayGamma Gamma)
+color Color(SessionType Type, GammaType Gamma)
   {
     switch (Type)
     {

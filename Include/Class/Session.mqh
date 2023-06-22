@@ -875,14 +875,14 @@ bool IsChanged(SessionType &Compare, SessionType Value)
 //+------------------------------------------------------------------+
 //| Color - Returns the color for session ranges                     |
 //+------------------------------------------------------------------+
-color Color(SessionType Type, DisplayColor Display=Dark)
+color Color(SessionType Type, GammaType Gamma=Dark)
   {
     switch (Type)
     {
-      case Asia:    return((color)BoolToInt(Display==Dark,AsiaColor,clrForestGreen));
-      case Europe:  return((color)BoolToInt(Display==Dark,EuropeColor,clrFireBrick));
-      case US:      return((color)BoolToInt(Display==Dark,USColor,clrSteelBlue));
-      case Daily:   return((color)BoolToInt(Display==Dark,DailyColor,clrDarkGray));
+      case Asia:    return((color)BoolToInt(Gamma==Dark,AsiaColor,clrForestGreen));
+      case Europe:  return((color)BoolToInt(Gamma==Dark,EuropeColor,clrFireBrick));
+      case US:      return((color)BoolToInt(Gamma==Dark,USColor,clrSteelBlue));
+      case Daily:   return((color)BoolToInt(Gamma==Dark,DailyColor,clrDarkGray));
     }
     
     return (clrBlack);

@@ -112,10 +112,10 @@ protected:
   struct FibonacciRec
          {
            FractalType   Type;                     //-- Type
-           PivotRec      Pivot;                    //-- Fractal Pivot
            FiboLevel     Level;                    //-- Fibo Level Now
-           double        Percent;                  //-- Actual Fibonacci Percentage
+           double        Open;                     //-- Calculated Fibonacci Price
            double        Forecast;                 //-- Calculated Fibonacci Price
+           double        Percent;                  //-- Actual Fibonacci Percentage
          };
 
   //-- Canonical Fractal Rec
@@ -129,8 +129,8 @@ protected:
            AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
            bool          Peg;                      //-- Retrace peg
            FibonacciRec  Extension;                //-- Fibo Extension Pivot
-           datetime      Updated;                  //-- Last Update;
            double        Point[FractalPoints];     //-- Fractal Points (Prices)
+           datetime      Updated;                  //-- Last Update;
          };
 
   struct BufferRec
@@ -142,6 +142,11 @@ protected:
 private:
 
         int          fbar;
+        int          fdirection;
+        double       fsupport;
+        double       fresistance;
+        double       fpivot;
+
 
         FractalRec   frec[FractalTypes];
         PivotRec     prec[];
@@ -149,11 +154,11 @@ private:
         AlertLevel   Alert(FractalType Type);
         EventType    Event(FractalState State);
         EventType    Event(FractalType Type);
-
-        double       Price(FiboLevel Level, double Root, double Reference, FractalState Method);
+        
         double       Price(FractalState State, int Direction, int Bar);
 
-        void         UpdateTerm(double Support, double Resistance);
+        void         CalcFractal(FractalRec &Fractal, int Direction, double &Points[]);
+        void         UpdateTerm(void);
         void         UpdateTrend(void);
         void         UpdateOrigin(void);
 
@@ -162,13 +167,15 @@ public:
                      CFractal(void);
                     ~CFractal();
                     
-         void        Calc(FractalType Type, int Direction, double Price, int Bar=0);
-         void        Update(double Support, double Resistance, int Bar);
-         double      Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal);  //--- returns expansion fibonacci
-         double      Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns retrace fibonacci
-         double      Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal);   //--- returns recovery fibonacci
-         double      Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot);         //--- returns extended fibo price
-         string      PivotStr(string Title, PivotRec &Pivot);
+        void         UpdateFractal(double Support, double Resistance, double Pivot, int Bar);
+
+        double       Extension(FractalType Type, MeasureType Measure, int Format=InDecimal);    //--- returns expansion fibonacci
+        double       Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal);      //--- returns retrace fibonacci
+        double       Correction(FractalType Type, MeasureType Measure, int Format=InDecimal);   //--- returns recovery fibonacci
+        double       Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal);     //--- returns recovery fibonacci
+        double       Forecast(FractalType Type, FractalState Method, FiboLevel Level=FiboRoot);
+
+        string       PivotStr(string Title, PivotRec &Pivot);
   };
 
 
@@ -179,207 +186,97 @@ AlertLevel CFractal::Alert(FractalType Type)
   {
     static const AlertLevel level[FractalTypes]  = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,
                                                     Notify,Notify,Notify,Notify,Notify};
-
     return level[Type];
   }
 
 //+------------------------------------------------------------------+
-//| FractalEvent - Returns the Fractal Event on change in State      |
+//| Event(State) - Returns the Event on change in Fractal State      |
 //+------------------------------------------------------------------+
 EventType CFractal::Event(FractalState State)
   {
     static const EventType event[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,
                                                     NewExtension,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
-  
     return event[State];
   }
 
 //+------------------------------------------------------------------+
-//| FractalEvent - Returns the Fractal Event on change in Type       |
+//| Event(Type) - Returns the Event on change in Fractal Type        |
 //+------------------------------------------------------------------+
 EventType CFractal::Event(FractalType Type)
   {
     static const EventType event[FractalTypes]   = {NewOrigin,NewTrend,NewTerm,NewRetrace,NewBase,NewReversal,NewExpansion,
                                                     NewDivergence,NewConvergence,NewInversion,NewConversion,NewLead};
-    
     return event[Type];
   }
 
 //+------------------------------------------------------------------+
-//| Price - Returns price from supplied level, Root/[Base|Expansion] |
-//+------------------------------------------------------------------+
-double CFractal::Price(FiboLevel Level, double Root, double Reference, FractalState Method)
-  {
-    const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
-
-    switch (Method)
-    {
-      case Retrace:   return NormalizeDouble(Reference-((Reference-Root)*percent[Level]),Digits);
-      case Extension: return NormalizeDouble(Root+((Reference-Root)*percent[Level]),Digits);
-      default:        return NoValue;
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| Price - Returns historical price of supplied State,Direction,Bar |
-//+------------------------------------------------------------------+
-double CFractal::Price(FractalState State, int Direction, int Bar)
-  {
-    if (IsEqual(Bar,0))
-      return Close[0];
-      
-    //--- Note: Not perfect - long bar historical pricing (retrace, correction, rally/pullback(On Close?) missing;
-    switch (State)
-    {
-      case Rally:                 return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
-      case Pullback:              return BoolToDouble(IsEqual(Direction,DirectionUp),Close[Bar],Low[Bar],Digits);
-      case Retrace:
-      case Correction:            return BoolToDouble(IsEqual(Direction,DirectionUp),Low[Bar],Close[Bar],Digits);
-      case Recovery:
-      case Breakout:
-      case Reversal:
-      case Extension:             return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
-    }
-
-    return Close[Bar];
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateOrigin: Calc Origin fractal                                |
+//| UpdateOrigin - Calc Origin fractal                               |
 //+------------------------------------------------------------------+
 void CFractal::UpdateOrigin(void)
   {
   }
 
 //+------------------------------------------------------------------+
-//| UpdateOrigin: Calc Trend fractal                                 |
+//| UpdateTrend - Calc Trend fractal                                 |
 //+------------------------------------------------------------------+
 void CFractal::UpdateTrend(void)
   {
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTerm: Calc Term fractal                                    |
+//| UpdateTerm - Calc Term Fractal                                   |
 //+------------------------------------------------------------------+
-void CFractal::Calc(FractalType Type, int Direction, double Price, int Bar=0)
+void CFractal::CalcFractal(FractalRec &Fractal, int Direction, double &Points[])
   {
-    FractalState  state              = NoState;
-    
-    frec[Type].Event                 = NoEvent;
-    frec[Type].Point[fpClose]        = Close[Bar];
-
-    //--- Check for Reversals
-    if (NewDirection(frec[Type].Direction,Direction))
-    {
-      frec[Type].Point[fpOrigin]     = frec[Type].Point[fpRoot];
-      frec[Type].Point[fpRoot]       = frec[Type].Point[fpExpansion];
-      frec[Type].Point[fpBase]       = Price;
-      
-      SetEvent(Event(Type),Alert(Type));
-    }
-
-    //--- Check for Term Upper Boundary changes
-    if (IsEqual(Direction,DirectionUp))
-      if (IsHigher(High[Bar],frec[Type].Point[fpExpansion]))
-      {
-        frec[Type].Point[fpRetrace]  = frec[Type].Point[fpExpansion];
-        frec[Type].Point[fpRecovery] = frec[Type].Point[fpExpansion];
-
-        SetEvent(NewExpansion,Alert(Type));
-
-//        UpdateFractalBuffer(DirectionUp,High[Bar]);
-      }
-      else 
-      if (IsLower(BoolToDouble(Bar==0,Close[Bar],Low[Bar]),frec[Type].Point[fpRetrace]))
-        frec[Type].Point[fpRecovery] = frec[Type].Point[fpRetrace];
-      else
-        frec[Type].Point[fpRecovery] = fmax(BoolToDouble(Bar==0,Close[Bar],High[Bar]),frec[Type].Point[fpRecovery]);
-    else
-
-    //--- Check for Term Lower Boundary changes
-      if (IsLower(Low[Bar],frec[Type].Point[fpExpansion]))
-      {
-        frec[Type].Point[fpRetrace]  = frec[Type].Point[fpExpansion];
-        frec[Type].Point[fpRecovery] = frec[Type].Point[fpExpansion];
-
-        SetEvent(NewExpansion,Alert(Type));
-
-//        UpdateFractalBuffer(DirectionDown,Low[Bar]);
-      }
-      else
-      if (IsHigher(BoolToDouble(Bar==0,Close[Bar],High[Bar]),frec[Type].Point[fpRetrace]))
-        frec[Type].Point[fpRecovery] = frec[Type].Point[fpRetrace];
-      else
-        frec[Type].Point[fpRecovery] = fmin(BoolToDouble(Bar==0,Close[Bar],Low[Bar]),frec[Type].Point[fpRecovery]);
-
-    //--- Check for state changes
-    if (IsEqual(frec[Type].Point[fpRecovery],frec[Type].Point[fpExpansion],Digits))
-      if (Event(Event(Type)))
-        state                        = Reversal;
-      else
-        state                        = Breakout;
-    else
-    if (Retrace(Type,Max)>FiboCorrection)
-      if (Recovery(Type,Max)>FiboCorrection)
-        state                        = Recovery;
-      else
-        state                        = Correction;
-    else
-    if (Retrace(Type,Max)>FiboRetrace)
-      state                          = Retrace;
-    else
-    if (Retrace(Type,Max)>FiboDivergent)
-      state                          = (FractalState)BoolToInt(IsEqual(Direction,DirectionUp),Rally,Pullback);
-
-//    if (NewState(frec[Type].State,state))
-//    {
-//      frec[Type].Event             = FractalEvent(state);
-//      frec[Type].Price             = BoolToDouble(Event(NewTerm),frec[Type].Point[fpBase],Close[Bar]);
-//
-//      SetEvent(BoolToEvent(NewAction(frec[Type].Lead,(FractalState)BoolToInt(Event(NewTerm)||Event(NewExpansion,Minor),
-//                              Action(frec[Type].Direction),Action(frec[Type].Direction,InDirection,InContrarian))),NewBias),Minor);
-//      SetEvent(FractalEvent(state),Minor);
-//      SetEvent(NewState,Minor);
-//    }
-//    
-//    NewBias(frec[Type].Bias,Action(Close[Bar]-frec[Type].Price,InDirection));
   }
 
 //+------------------------------------------------------------------+
-//| UpdateTerm: Calc Term Fractal                                    |
+//| UpdateTerm - Calc Term Fractal                                   |
 //+------------------------------------------------------------------+
-void CFractal::UpdateTerm(double Support, double Resistance)
+void CFractal::UpdateTerm(void)
   {
-    FractalState  state              = NoState;
-    
-    if (High[fbar]>Resistance)
-      if (Low[fbar]<Support)
+    frec[Term].Point[fpBase]     = BoolToDouble(frec[Term].Direction==DirectionUp,fresistance,fsupport,Digits);
+    frec[Term].Point[fpRoot]     = BoolToDouble(frec[Term].Direction==DirectionUp,fsupport,fresistance,Digits);
+
+    if (High[fbar]>fresistance)
+      if (Low[fbar]<fsupport)
+      {
+        //-- Handle Outside Reversal Anomalies
         if (Event(NewHigh))
 
-          //-- Handle Outside Reversals
+          //-- Handle Hard Outside Anomaly Downtrend
           if (Event(NewLow))
           {
-            Print(TimeToStr(Time[fbar])+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Support,Digits)+":"+DoubleToStr(Resistance,Digits));
-            if (IsBetween(Close[fbar],Support,Resistance))
+            Print(TimeToStr(Time[fbar])+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(fsupport,Digits)+":"+DoubleToStr(fresistance,Digits));
+            if (IsBetween(Close[fbar],fsupport,fresistance))
               Flag("[fr3]Interior Close",clrGoldenrod,fbar,Close[fbar],Always);
             else
               Flag("[fr3]Exterior Close",clrDodgerBlue,fbar,Close[fbar],Always);
 
-            Flag("[fr3]Outside Support",clrRed,fbar,Support,Always);
-            Flag("[fr3]Outside Resisance",clrYellow,fbar,Resistance,Always);
+            Flag("[fr3]Outside Support",clrRed,fbar,fsupport,Always);
+            Flag("[fr3]Outside Resisance",clrYellow,fbar,fresistance,Always);
+            Arrow("[fr3]Outside Pivot:"+TimeToStr(Time[fbar]),(ArrowType)BoolToInt(fdirection==DirectionUp,ArrowUp,ArrowDown),clrWhite,fbar,fpivot);
           }
 
-          //-- Handle Outside Anomaly Uptrend
+          //-- Handle Hard Outside Anomaly Uptrend
           else
           {
-//            Flag("[fr3]Anomaly Resistance",clrWhite,Bar,High[Bar],Always);
+            //if (NewDirection(frec[Term].Direction,DirectionUp))
+            //{
+            //  Print(TimeToStr(Time[fbar])+":"+(string)fbar+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Resistance,Digits));
+            //  Flag("[fr3]Anomaly Resistance",Color(DirectionUp,IN_CHART_DIR),fbar,Resistance,Always);
+            //}
           }
         else
 
         //-- Handle Outside Anomaly Downtrend
         if (Event(NewLow))
         {
-//          Flag("[fr3]Anomaly Support",clrWhite,Bar,Low[Bar],Always);   
+          //if (NewDirection(frec[Term].Direction,DirectionDown))
+          //{
+          //  Print(TimeToStr(Time[fbar])+":"+(string)fbar+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Support,Digits));
+          //  Flag("[fr3]Anomaly Support",Color(DirectionDown,IN_CHART_DIR),fbar,Support,Always);   
+          //}
         }
 
         //-- Handle Outside Anomaly Rally/Pullback
@@ -387,14 +284,32 @@ void CFractal::UpdateTerm(double Support, double Resistance)
         {
 //          Flag("[fr3]Anomaly Interior",clrGoldenrod,Bar,Close[Bar],Always);
         }
+      }
+
+
       else
 
-      //-- Handle Uptrend Expansions
+      //-- Handle Normal Uptrend Expansions
       {
+        if (Event(NewHigh))
+        {
+          //if (NewDirection(frec[Term].Direction,DirectionUp))
+          //{
+          //  Print(TimeToStr(Time[fbar])+":"+(string)fbar+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Resistance,Digits));
+          //  Flag("[fr3]Anomaly Resistance",Color(DirectionUp,IN_CHART_DIR),fbar,Resistance,Always);
+          //}
+        }
+        else
+        if (Event(NewLow))
+        {
+        }
+        else
+        {
+        }
       }
     else
-    
-    //-- Handle Downtrend Expansions
+
+    //-- Handle Normal Downtrend Expansions
     if (Low[fbar]<Support)
       if (Event(NewHigh))
       {
@@ -402,6 +317,11 @@ void CFractal::UpdateTerm(double Support, double Resistance)
       else
       if (Event(NewLow))
       {
+        //if (NewDirection(frec[Term].Direction,DirectionDown))
+        //{
+        //  Print(TimeToStr(Time[fbar])+":"+(string)fbar+":"+DoubleToStr(Close[fbar],Digits)+":"+DoubleToStr(Support,Digits));
+        //  Flag("[fr3]Anomaly Support",Color(DirectionDown,IN_CHART_DIR),fbar,Support,Always);   
+        //}
       }
       else
       {
@@ -412,6 +332,7 @@ void CFractal::UpdateTerm(double Support, double Resistance)
     {
     }
   }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -439,18 +360,44 @@ CFractal::~CFractal()
   }
 
 //+------------------------------------------------------------------+
-//| Update - Calculates the fractal based on Term Support/Resistance |
+//| UpdateFractal - Updates fractal Term based on supplied values    |
 //+------------------------------------------------------------------+
-void CFractal::Update(double Support, double Resistance, int Bar)
+void CFractal::UpdateFractal(double Support, double Resistance, double Pivot, int Bar)
   {
     fbar                         = Bar;
+    fdirection                   = Direction(Close[Bar]-Pivot);
+
+    fsupport                     = Support;
+    fresistance                  = Resistance;
+    fpivot                       = Pivot;
     
-    frec[Term].Point[fpBase]     = BoolToDouble(frec[Term].Direction==DirectionUp,Resistance,Support,Digits);
-    frec[Term].Point[fpRoot]     = BoolToDouble(frec[Term].Direction==DirectionUp,Support,Resistance,Digits);
-    
-    UpdateTerm(Support,Resistance);
+    UpdateTerm();
     UpdateTrend();
     UpdateOrigin();
+  }
+
+//+------------------------------------------------------------------+
+//| Price - Returns historical price of supplied State,Direction,Bar |
+//+------------------------------------------------------------------+
+double CFractal::Price(FractalState State, int Direction, int Bar)
+  {
+    if (IsEqual(Bar,0))
+      return Close[0];
+      
+    //--- Note: Not perfect - long bar historical pricing (retrace, correction, rally/pullback(On Close?) missing;
+    switch (State)
+    {
+      case Rally:                 return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+      case Pullback:              return BoolToDouble(IsEqual(Direction,DirectionUp),Close[Bar],Low[Bar],Digits);
+      case Retrace:
+      case Correction:            return BoolToDouble(IsEqual(Direction,DirectionUp),Low[Bar],Close[Bar],Digits);
+      case Recovery:
+      case Breakout:
+      case Reversal:
+      case Extension:             return BoolToDouble(IsEqual(Direction,DirectionUp),High[Bar],Close[Bar],Digits);
+    }
+
+    return Close[Bar];
   }
 
 //+------------------------------------------------------------------+
@@ -458,66 +405,85 @@ void CFractal::Update(double Support, double Resistance, int Bar)
 //+------------------------------------------------------------------+
 double CFractal::Retrace(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
-    double retrace      = frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot];
     double format       = BoolToDouble(Format==InDecimal,1,BoolToDouble(Format==InPercent,100));
 
     switch (Measure)
     {
-      case Now: return(fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpClose],retrace,3)*format);
-      case Min: return(fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRecovery],retrace,3)*format);
-      case Max: return(fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRetrace],retrace,3)*format);
+      case Now: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpClose],frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],3)*format;
+      case Min: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRecovery],frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],3)*format;
+      case Max: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRetrace],frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],3)*format;
     }
 
     return(0.00);
   }
 
 //+------------------------------------------------------------------+
-//| Expansion - Calcuates fibo expansion % for supplied Type         |
+//| Extension - Calcuates fibo extension % for supplied Type         |
 //+------------------------------------------------------------------+
-double CFractal::Expansion(FractalType Type, MeasureType Measure, int Format=InDecimal)
+double CFractal::Extension(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
-    //switch (Measure)
-    //{
-    //  case Now: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],Close[sBar],Format));
-    //  case Min: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],frec[Type].Point[fpRetrace],Format));
-    //  case Max: return(Expansion(frec[Type].Point[fpBase],frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion],Format));
-    //}
-
-    return (0.00);
-  }
-
-//+------------------------------------------------------------------+
-//| Recovery - Calcuates fibo recovery% for supplied Type            |
-//+------------------------------------------------------------------+
-double CFractal::Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal)
-  {
-    double recovery     = frec[Type].Point[fpRoot]-frec[Type].Point[fpBase];
     double format       = BoolToDouble(Format==InDecimal,1,BoolToDouble(Format==InPercent,100));
 
     switch (Measure)
     {
-      case Now: return fdiv(frec[Type].Point[fpRoot]-frec[Type].Point[fpClose],recovery,3)*format;
-//      case Min: return(BoolToInt(IsEqual(Format,InDecimal),1,100)-fabs(Retrace(Type,Max,Format)));
-      case Max: return fdiv(frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion],recovery,3)*format;
+      case Now: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpClose]-frec[Type].Point[fpRoot],3)*format;
+      case Min: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpRetrace]-frec[Type].Point[fpRoot],3)*format;
+      case Max: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],3)*format;
     }
 
     return (0.00);
   }
 
 //+------------------------------------------------------------------+
-//| Forecast - Returns Forecast Price for supplied Fibo              |
+//| Correction - Calcuates fibo contrarian %  for supplied Type      |
 //+------------------------------------------------------------------+
-double CFractal::Forecast(FractalType Type, int Method, FiboLevel Fibo=FiboRoot)
+double CFractal::Correction(FractalType Type, MeasureType Measure, int Format=InDecimal)
   {
-    //switch (Method)
-    //{
-    //  case Expansion:   return(NormalizeDouble(frec[Type].Point[fpRoot]+((frec[Type].Point[fpBase]-frec[Type].Point[fpRoot])*Percent(Fibo)),Digits));
-    //  case Retrace:     return(NormalizeDouble(frec[Type].Point[fpExpansion]+((frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion])*Percent(Fibo)),Digits));
-    //  case Recovery:    return(NormalizeDouble(frec[Type].Point[fpRoot]-((frec[Type].Point[fpRoot]-frec[Type].Point[fpRecovery])*Percent(Fibo)),Digits));
-    //  case Correction:  return(NormalizeDouble(((frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion])*FiboCorrection)+frec[Type].Point[fpExpansion],Digits));
-    //}
+    double format       = BoolToDouble(Format==InDecimal,1,BoolToDouble(Format==InPercent,100));
+
+    switch (Measure)
+    {
+      case Now: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpClose]-frec[Type].Point[fpRoot],3)*format;
+      case Min: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpRetrace]-frec[Type].Point[fpRoot],3)*format;
+      case Max: return fdiv(frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot],frec[Type].Point[fpRecovery]-frec[Type].Point[fpRoot],3)*format;
+    }
 
     return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Recovery - Calcuates fibo recovery % for supplied Type           |
+//+------------------------------------------------------------------+
+double CFractal::Recovery(FractalType Type, MeasureType Measure, int Format=InDecimal)
+  {
+    double format       = BoolToDouble(Format==InDecimal,1,BoolToDouble(Format==InPercent,100));
+
+    switch (Measure)
+    {
+      case Now: return fdiv(frec[Type].Point[fpRoot]-frec[Type].Point[fpClose],frec[Type].Point[fpRoot]-frec[Type].Point[fpBase],3)*format;
+      case Max: return fdiv(frec[Type].Point[fpRoot]-frec[Type].Point[fpExpansion],frec[Type].Point[fpRoot]-frec[Type].Point[fpBase],3)*format;
+    }
+
+    return (0.00);
+  }
+
+//+------------------------------------------------------------------+
+//| Forecast - Returns price for supplied Type/State/Level           |
+//+------------------------------------------------------------------+
+double CFractal::Forecast(FractalType Type, FractalState Method, FiboLevel Level=FiboRoot)
+  {
+    const double percent[FiboLevels] = {0.00,0.236,0.382,0.500,0.618,1.0,1.618,2.618,4.236,8.236};
+
+    switch (Method)
+    {
+      case Rally:       return Forecast(Type,Correction,Fibo23);
+      case Pullback:    return Forecast(Type,Retrace,Fibo23);
+      case Retrace:     return NormalizeDouble(frec[Type].Point[fpExpansion]-((frec[Type].Point[Base]-frec[Type].Point[fpRoot])*percent[Level]),Digits);
+      case Correction:  return NormalizeDouble(frec[Type].Point[fpRoot]+((frec[Type].Point[fpExpansion]-frec[Type].Point[fpRoot])*percent[Level]),Digits);
+      case Recovery:    return Forecast(Type,Retrace,Fibo23);
+      case Extension:   return NormalizeDouble(frec[Type].Point[fpRoot]+((frec[Type].Point[fpBase]-frec[Type].Point[fpRoot])*percent[Level]),Digits);
+      default:          return NoValue;
+    }
   }
 
 //+------------------------------------------------------------------+
