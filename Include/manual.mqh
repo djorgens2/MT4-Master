@@ -162,7 +162,7 @@ bool AppCommand(string &args[], int Elements=0)
   {    
     if (ArraySize(commands)>0)
     {      
-      StringSplit(commands[0],"|",args);
+      SplitStr(commands[0],"|",args);
       ArrayResize(args,Elements);
 
       for (int idx=1;idx<ArraySize(commands);idx++)
@@ -235,12 +235,11 @@ void GetManualRequest(string Command="")
           
         if (StringLen(fRecord)>0&&!bComment&&!lComment)
         {
-          if (StringToUpper(fRecord))
-            StringSplit(fRecord," ",params);
+          SplitStr(fRecord," ",params);
                     
           fRecord = "";
           for (int i=0;i<ArraySize(params);i++)
-            fRecord += params[i]+"|";
+            Append(fRecord,params[i],"|");
           Print(fRecord);
 
           if (params[0]=="VERIFY")
@@ -305,7 +304,8 @@ void GetManualRequest(string Command="")
           if (InStr(params[0],"HED"))
           {
             if (IsBetween(Action(LotCount(NoAction,Net)),OP_BUY,OP_SELL))
-              OpenOrder(Action(LotCount(NoAction,Net),InDirection,InContrarian),"Hedge",fabs(LotCount(NoAction,Net)));
+              OpenOrder(Action(LotCount(NoAction,Net),InDirection,InContrarian),"\"Hedge ["+
+                 DoubleToStr(fabs(LotCount(NoAction,Net)),ordLotPrecision)+"] "+DirText(Direction(LotCount(NoAction,Net)))+"\"",fabs(LotCount(NoAction,Net)));
           }
           else          
           
@@ -357,7 +357,7 @@ void GetManualRequest(string Command="")
             if (ArraySize(params)>2)
               comment = params[2];
 
-            OpenOrder(ActionCode(params[0]), comment, lots);
+            OpenOrder(ActionCode(params[0]),comment,lots);
           }
           else
           

@@ -72,7 +72,7 @@ struct    SignalRec
             SignalClass      Class;
             ResponseType     Response;
             EventType        Event;
-            AlertLevel       Alert;
+            AlertType        Alert;
             FractalType      Type;       //-- Fractal Lead
             FractalState     State;
             int              Direction;
@@ -97,8 +97,8 @@ input string           appHeader          = "";          // +--- Application Con
 input BrokerModel      inpBrokerModel     = Discount;    // Broker Model
 input double           inpZoneStep        = 2.5;         // Zone Step (pips)
 input double           inpMaxZoneMargin   = 5.0;         // Max Zone Margin
-input AlertLevel       inpAlertTick       = Nominal;     // Tick Alert Level
-input AlertLevel       inpAlertSession    = Nominal;     // Segment Alert Level
+input AlertType        inpAlertTick       = Nominal;     // Tick Alert Level
+input AlertType        inpAlertSession    = Nominal;     // Segment Alert Level
 
 
 //--- Regression parameters
@@ -318,7 +318,7 @@ void UpdateSignal(CTickMA &Signal)
     else
     if (Signal[NewFractal])
     {
-      signal.Alert             = Signal.EventLevel(NewFractal);
+      signal.Alert             = Signal.Alert(NewFractal);
       signal.State             = Signal.Fractal().State;
       signal.Direction         = Signal.Fractal().Direction;
       signal.Bias              = Signal.Fractal().Bias;
@@ -327,7 +327,7 @@ void UpdateSignal(CTickMA &Signal)
       {
         case Nominal:  //-- Leader Change triggering event
                        signal.Class      = Segment;
-                       signal.Alert      = Signal.HighAlert();
+                       signal.Alert      = Signal.MaxAlert();
                        signal.Response   = Trigger;
                        signal.Event      = NewDirection;
                        signal.State      = (FractalState)BoolToInt(Signal[NewRally],Rally,Pullback);
@@ -358,7 +358,7 @@ void UpdateSignal(CTickMA &Signal)
     }
     else
     {
-      signal.Alert      = Signal.HighAlert();
+      signal.Alert      = Signal.MaxAlert();
       signal.Direction  = Signal.Segment().Direction[Trend];
       signal.Bias       = Action(Signal.Segment().Direction[Term]);
       signal.State      = (FractalState)BoolToInt(Signal[NewHigh],Rally,BoolToInt(Signal[NewLow],Pullback));
@@ -382,7 +382,7 @@ void UpdateSignal(CTickMA &Signal)
       { 
         signal.Class    = SMA;
         signal.Response = CrossCheck;
-        signal.Event    = BoolToEvent(Signal[NewHigh],NewRally,BoolToEvent(Signal[NewLow],NewPullback,NewFlatline));
+        signal.Event    = (EventType)BoolToInt(Signal[NewHigh],NewRally,BoolToInt(Signal[NewLow],NewPullback,NewFlatline));
         signal.Text     = "SMA Check [Minor]: "+BoolToStr(Signal[NewHigh],"High",BoolToStr(Signal[NewLow],"Low","Flatline"));
 
         Arrow("SMA:"+(string)Signal.Count(Ticks),ArrowDash,BoolToInt(Signal[NewHigh],clrYellow,clrRed));

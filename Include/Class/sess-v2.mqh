@@ -10,6 +10,11 @@
 
 #include <Class/frac-v2.mqh>
 
+const color          AsiaColor       = C'0,32,0';    // Asia session box color
+const color          EuropeColor     = C'48,0,0';    // Europe session box color
+const color          USColor         = C'0,0,56';    // US session box color
+const color          DailyColor      = C'64,64,0';   // US session box color
+
 class CSession : public CFractal
   {
 
@@ -43,6 +48,11 @@ protected:
            double         Low;
          };
 
+         struct BufferRec
+         {
+           double        Point[];
+         };
+
 private:
 
          //--- Panel Indicators
@@ -53,7 +63,7 @@ private:
 
          bool             sIsOpen;
          bool             sShowFlags;
-         string           sObjectKey;
+         string           sObjectStr;
 
          int              sHourOpen;
          int              sHourClose;
@@ -82,16 +92,19 @@ public:
                          ~CSession();
 
          void             Update(void);
+         void             Update(double &PriorBuffer[], double &OffBuffer[]);
 
          datetime         ServerTime(void)  {return Time[sBar]+(PERIOD_H1*60*sHourOffset);};
          int              SessionHour(void) {return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);};
       
          bool             IsOpen(void);
+         bool             IsChanged(SessionType &Compare, SessionType Change);
+         color            Color(SessionType Type, GammaType Gamma);
 
-         double           Pivot(const PeriodType Period) {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
-
-         BufferRec        Buffer(PeriodType Period) const {return sbuf[Period];};
-         SessionRec       operator[](const PeriodType Period) const {return srec[Period];};
+         double           Pivot(const PeriodType Period)       {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
+         BufferRec        Buffer(PeriodType Period)            {return sbuf[Period];};
+         SessionRec       operator[](const PeriodType Period)  {return srec[Period];};
+         FractalRec       operator[](const FractalType Type)   {return Fractal(Type);};
 
          string           BufferStr(PeriodType Period);
          string           SessionStr(string Title="");
@@ -102,7 +115,7 @@ public:
 //+------------------------------------------------------------------+
 void CSession::CreateRange(void)
  {
-   string range       = sObjectKey+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+   string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
      
    ObjectCreate(range,OBJ_RECTANGLE,0,Time[sBar],srec[ActiveSession].High,Time[sBar],srec[ActiveSession].Low);
    
@@ -116,7 +129,7 @@ void CSession::CreateRange(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateRange(void)
   {
-    string range       = sObjectKey+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+    string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
 
     if (Event(NewHour))
       if (sIsOpen||Event(SessionClose))
@@ -137,28 +150,40 @@ void CSession::UpdateRange(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {
+    SessionRec session     = srec[ActiveSession];
+
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
-      srec[ActiveSession].Lead      = OP_BUY;
-
-      SetEvent(NewHigh,Nominal);
-      SetEvent(NewBoundary,Nominal);
+      SetEvent(NewHigh,Nominal,srec[ActiveSession].High);
+      SetEvent(NewBoundary,Nominal,session.High);
     }
 
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
     {
-      srec[ActiveSession].Lead      = OP_SELL;
-
-      SetEvent(NewLow,Nominal);
-      SetEvent(NewBoundary,Nominal);
+      SetEvent(NewLow,Nominal,srec[ActiveSession].Low);
+      SetEvent(NewBoundary,Nominal,session.Low);
     }
 
     if (NewAction(srec[ActiveSession].Bias,Action(Close[sBar]-BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
       SetEvent(NewBias,Nominal);
 
     if (Event(NewBoundary))
+    {
       if (NewDirection(srec[ActiveSession].Direction,Direction(Pivot(ActiveSession)-BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)))))
         SetEvent(NewDirection,Nominal);
+      
+      if (Event(NewHigh)&&Event(NewLow))
+      {
+        SetEvent(AdverseEvent,BoolToAlert(High[sBar]>srec[PriorSession].High&&Low[sBar]<srec[PriorSession].Low,Major,Minor),
+          BoolToDouble(IsEqual(srec[ActiveSession].Lead,OP_BUY),srec[ActiveSession].High,srec[ActiveSession].Low,Digits));
+
+        if (Event(AdverseEvent,Major))
+          Print(TimeToStr(Time[sBar])+":"+sObjectStr+":"+EnumToString(Alert(AdverseEvent))+":Outside Reversal Anomaly; Please Verify");
+      }
+      else
+        if (IsChanged(srec[ActiveSession].Lead,BoolToInt(Event(NewHigh),OP_BUY,OP_SELL)))
+          SetEvent(NewLead,Minor,BoolToDouble(Event(NewHigh),session.High,session.Low,Digits));
+    }
   }
 
 //+------------------------------------------------------------------+
@@ -183,16 +208,13 @@ void CSession::UpdateBuffers(void)
 //+------------------------------------------------------------------+
 void CSession::InitSession(EventType Event)
   {
-    //-- Set ActiveSession support/resistance
-    srec[ActiveSession].High              = High[sBar];
-    srec[ActiveSession].Low               = Low[sBar];
+    //-- Catch session changeover Boundary Events
+    UpdateSession();
 
-    if (sBar+1<sBars)
-    {
-      SetEvent(BoolToEvent(IsHigher(High[sBar+1],srec[ActiveSession].High),NoEvent,NewHigh));
-      SetEvent(BoolToEvent(IsLower(Low[sBar+1],srec[ActiveSession].Low),NoEvent,NewLow));
-    }
-    
+    //-- Set ActiveSession support/resistance
+    srec[ActiveSession].High              = Open[sBar];
+    srec[ActiveSession].Low               = Open[sBar];
+
     SetEvent(Event,Notify);
     
     CreateRange();
@@ -219,8 +241,8 @@ void CSession::CloseSession(void)
     //-- Update Prior Record, range history, and Indicator Buffer
     srec[PriorSession]                    = srec[ActiveSession];
     sbuf[PriorSession].Point[sBar]        = Pivot(PriorSession);
-    
-    InitSession(SessionClose);    
+
+    InitSession(SessionClose);
   }
 
 //+------------------------------------------------------------------+
@@ -240,7 +262,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
 
     sIsOpen                          = false;
     sShowFlags                       = ShowFlags;
-    sObjectKey                       = "[session]";
+    sObjectStr                       = "[session]";
 
     //--- Initialize session records
     for (PeriodType period=OffSession;period<PeriodTypes;period++)
@@ -262,13 +284,7 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
 //+------------------------------------------------------------------+
 CSession::~CSession()
   {
-    //-- Clean Open Chart Objects
-    int fObject             = 0;
-    
-    while (fObject<ObjectsTotal())
-      if (InStr(ObjectName(fObject),sObjectKey))
-        ObjectDelete(ObjectName(fObject));
-      else fObject++;
+    RemoveChartObjects(sObjectStr);
   }
 
 //+------------------------------------------------------------------+
@@ -301,7 +317,18 @@ void CSession::Update(void)
         
     UpdateSession();
     UpdateRange();
-    UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(ActiveSession),sBar);
+    UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
+  }
+
+//+------------------------------------------------------------------+
+//| Update - Computes fractal using supplied fractal and price       |
+//+------------------------------------------------------------------+
+void CSession::Update(double &PriorBuffer[], double &OffBuffer[])
+  {
+    Update();
+
+    ArrayCopy(PriorBuffer,sbuf[PriorSession].Point,0,0,WHOLE_ARRAY);
+    ArrayCopy(OffBuffer,sbuf[OffSession].Point,0,0,WHOLE_ARRAY);
   }
 
 //+------------------------------------------------------------------+
@@ -314,6 +341,34 @@ bool CSession::IsOpen(void)
         return (true);
 
     return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - Compares SessionType to detect if a change occurred  |
+//+------------------------------------------------------------------+
+bool CSession::IsChanged(SessionType &Compare, SessionType Change)
+  {
+    if (Compare==Change)
+      return false;
+      
+    Compare = Change;
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Color - Returns the color for session ranges                     |
+//+------------------------------------------------------------------+
+color CSession::Color(SessionType Type, GammaType Gamma)
+  {
+    switch (Type)
+    {
+      case Asia:    return (color)BoolToInt(Gamma==Dark,AsiaColor,clrForestGreen);
+      case Europe:  return (color)BoolToInt(Gamma==Dark,EuropeColor,clrFireBrick);
+      case US:      return (color)BoolToInt(Gamma==Dark,USColor,clrSteelBlue);
+      case Daily:   return (color)BoolToInt(Gamma==Dark,DailyColor,clrDarkGray);
+    }
+    
+    return (clrBlack);
   }
 
 //+------------------------------------------------------------------+
@@ -349,32 +404,4 @@ string CSession::SessionStr(string Title="")
     Append(text,BufferStr(OffSession),"|");
 
     return(text);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - Compares SessionType to detect if a change occurred  |
-//+------------------------------------------------------------------+
-bool IsChanged(SessionType &Compare, SessionType Value)
-  {
-    if (Compare==Value)
-      return (false);
-      
-    Compare = Value;
-    return (true);
-  }
-
-//+------------------------------------------------------------------+
-//| Color - Returns the color for session ranges                     |
-//+------------------------------------------------------------------+
-color Color(SessionType Type, GammaType Gamma)
-  {
-    switch (Type)
-    {
-      case Asia:    return (color)BoolToInt(Gamma==Dark,AsiaColor,clrForestGreen);
-      case Europe:  return (color)BoolToInt(Gamma==Dark,EuropeColor,clrFireBrick);
-      case US:      return (color)BoolToInt(Gamma==Dark,USColor,clrSteelBlue);
-      case Daily:   return (color)BoolToInt(Gamma==Dark,DailyColor,clrDarkGray);
-    }
-    
-    return (clrBlack);
   }

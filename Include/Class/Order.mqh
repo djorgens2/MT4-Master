@@ -8,7 +8,7 @@
 #property version   "1.00"
 #property strict
 
-#include <std_utility.mqh>
+#include <stdutil.mqh>
 
 #define ByZone    0
 #define ByTicket  1
@@ -314,6 +314,8 @@ public:
           bool         Closed(int Type=NoAction)             {return(Status(Closed,Type));};
           bool         Submitted(OrderRequest &Request);
           
+          bool         IsChanged(QueueStatus &Compare, QueueStatus Value);
+          bool         IsEqual(QueueStatus &Compare, QueueStatus Value) {return Compare==Value;};
 
           //-- Order Property Methods
           OrderRequest BlankRequest(string Requestor);
@@ -460,15 +462,15 @@ void COrder::UpdatePanel(void)
     if (ChartWindowFind(0,indSN)>NoValue)
     {
       //-- Account Information frame
-      UpdateLabel("lbvAI-Bal",LPad(DoubleToStr(Account.Balance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
-      UpdateLabel("lbvAI-Eq",LPad(NegLPad(Account.Equity,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
-      UpdateLabel("lbvAI-EqBal",LPad(DoubleToStr(Account.EquityBalance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+      UpdateLabel("lbvAI-Bal",lpad(DoubleToStr(Account.Balance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+      UpdateLabel("lbvAI-Eq",lpad(lpad(Account.Equity,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
+      UpdateLabel("lbvAI-EqBal",lpad(DoubleToStr(Account.EquityBalance,0)," ",11),Color(Summary[Net].Equity),16,"Consolas");
 
       UpdateLabel("lbvAI-Eq%",center(DoubleToStr(Account.EquityClosed*100,1)+"%",7),Color(Summary[Net].Equity),16);
       UpdateLabel("lbvAI-EqOpen%",center(DoubleToStr(Account.EquityOpen*100,1)+"%",6),Color(Summary[Net].Equity),12);
       UpdateLabel("lbvAI-EqVar%",center(DoubleToStr(Account.EquityVariance*100,1)+"%",6),Color(Summary[Net].Equity),12);
-      UpdateLabel("lbvAI-Spread",LPad(DoubleToStr(pip(Account.Spread),1)," ",5),Color(Summary[Net].Equity),14);
-      UpdateLabel("lbvAI-Margin",LPad(DoubleToStr(Account.Margin*100,1)+"%"," ",6),Color(Summary[Net].Equity),14);
+      UpdateLabel("lbvAI-Spread",lpad(DoubleToStr(pip(Account.Spread),1)," ",5),Color(Summary[Net].Equity),14);
+      UpdateLabel("lbvAI-Margin",lpad(DoubleToStr(Account.Margin*100,1)+"%"," ",6),Color(Summary[Net].Equity),14);
 
       UpdateDirection("lbvAI-OrderBias",Direction(Summary[Net].Lots),Color(Summary[Net].Lots),30);            
 
@@ -480,18 +482,18 @@ void COrder::UpdatePanel(void)
         if (action<=OP_SELL)
         {
           UpdateLabel("lbvAI-"+proper(ActionText(action))+"#",IntegerToString(Master[action].Summary[Net].Count,2),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",LPad(DoubleToStr(Master[action].Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",LPad(DoubleToStr(Master[action].Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",LPad(DoubleToStr(Master[action].Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",LPad(DoubleToStr(Master[action].Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-"+proper(ActionText(action))+"L",lpad(DoubleToStr(Master[action].Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-"+proper(ActionText(action))+"V",lpad(DoubleToStr(Master[action].Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-"+proper(ActionText(action))+"M",lpad(DoubleToStr(Master[action].Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-"+proper(ActionText(action))+"E",lpad(DoubleToStr(Master[action].Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
         }
         else
         {
           UpdateLabel("lbvAI-Net#",IntegerToString(Summary[Net].Count,2),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-NetL",LPad(DoubleToStr(Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-NetV",LPad(DoubleToStr(Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-NetM",LPad(DoubleToStr(Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
-          UpdateLabel("lbvAI-NetE",LPad(DoubleToStr(Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-NetL",lpad(DoubleToStr(Summary[Net].Lots,2)," ",6),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-NetV",lpad(DoubleToStr(Summary[Net].Value,0)," ",10),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-NetM",lpad(DoubleToStr(Summary[Net].Margin,1)," ",5),clrDarkGray,10,"Consolas");
+          UpdateLabel("lbvAI-NetE",lpad(DoubleToStr(Summary[Net].Equity,1)," ",5),clrDarkGray,10,"Consolas");
         }
 
       //-- Order Config by Action frames
@@ -541,7 +543,7 @@ void COrder::UpdatePanel(void)
             UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"L",center(DoubleToString(Master[action].Zone[node].Lots,Account.LotPrecision),7),nodecolor,9,"Consolas");
             UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"V",dollar(Master[action].Zone[node].Value,14),nodecolor,9,"Consolas");
             UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"M",DoubleToString(Master[action].Zone[node].Margin,1),nodecolor,9,"Consolas");
-            UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"E",NegLPad(Master[action].Zone[node].Equity,1),nodecolor,9,"Consolas");
+            UpdateLabel("lbvOZ-"+ActionText(action)+(string)row+"E",lpad(Master[action].Zone[node].Equity,1),nodecolor,9,"Consolas");
           }
           else
           {
@@ -633,7 +635,7 @@ void COrder::UpdatePanel(void)
           if (IsEqual(Queue[request].Pend.Type,NoAction))
             UpdateLabel("lbvRQ-"+(string)request+"-Step"," 0.00",clrDarkGray);
           else
-            UpdateLabel("lbvRQ-"+(string)request+"-Step",LPad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
+            UpdateLabel("lbvRQ-"+(string)request+"-Step",lpad(DoubleToStr(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),
                       BoolToDouble(IsBetween(Queue[request].Pend.Type,OP_BUY,OP_SELLSTOP),Master[Operation(Queue[request].Pend.Type)].Step,0.00),
                       Queue[request].Pend.Step,1),1)," ",4),
                       BoolToInt(IsEqual(Queue[request].Pend.Step,0.00),clrYellow,clrDarkGray));
@@ -1674,7 +1676,7 @@ double COrder::Price(SummaryType Type, int RequestType, double Requested, double
                      
       calculated        = BoolToDouble(IsBetween(calculated,Basis+Account.Spread,Basis-Account.Spread),0.00,calculated,Digits);
 
-      return (Coalesce(requested,stored,calculated));
+      return (coalesce(requested,stored,calculated));
     }
     
     return (0.00);
@@ -2276,10 +2278,11 @@ string COrder::SnapshotStr(void)
 
     return(text);
   }
+
 //+------------------------------------------------------------------+
 //| IsChanged - Compares events to determine if a change occurred    |
 //+------------------------------------------------------------------+
-bool IsChanged(QueueStatus &Compare, QueueStatus Value)
+bool COrder::IsChanged(QueueStatus &Compare, QueueStatus Value)
   {
     if (IsEqual(Compare,Value))
       return (false);

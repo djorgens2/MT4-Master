@@ -7,7 +7,6 @@
 #property link      "http://www.mql5.com"
 #property strict
 
-#include <Class/Event.mqh>
 #import "user32.dll"
    int MessageBoxW(int Ignore, string Caption, string Title, int Icon);
 #import
@@ -55,7 +54,7 @@ enum StyleType
        StyleTypes
      };
 
-enum DisplayGamma
+enum GammaType
      {
        Bright,
        Dark
@@ -81,17 +80,6 @@ int Pause(string Message, string Title, int Style=64)
     return (0);
   }
     
-//+------------------------------------------------------------------+
-//| ArrayInitializeStr - initializes string arrays                   |
-//+------------------------------------------------------------------+
-void ArrayInitializeStr(string &Array[], int Count)
-  {
-    ArrayResize(Array,Count);
-    
-    for (int index=0; index<Count; index++)
-      Array[index] = "";
-  }
-
 //+------------------------------------------------------------------+
 //| InStr - Returns true if pattern is found in source string        |
 //+------------------------------------------------------------------+
@@ -399,17 +387,18 @@ string lower(string Value)
 //+------------------------------------------------------------------+
 //| DirText - returns the text of a DirectionCode                    |
 //+------------------------------------------------------------------+
-string DirText(int Value, bool Contrarian=false)
+string DirText(int Direction, bool Contrarian=false)
 {
   if (Contrarian)
-    Value *= NoValue;
+    Direction *= NoValue;
     
-  switch (Value)
+  switch (Direction)
   {
     case DirectionUp:    return("Long");
     case NoDirection:    return("Flat");
     case DirectionDown:  return("Short");
-    case NewDirection:   return("Pending");
+//    case NewDirection:   return("Pending");
+    case -2:   return("Pending");
   }
 
   return("BAD DIRECTION CODE");

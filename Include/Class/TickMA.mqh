@@ -313,7 +313,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
     double minFOC           = fabs(FOC.Min);
     double nowFOC           = fabs(FOC.Now);
     
-    AlertLevel alertlevel   = (AlertLevel)BoolToInt(IsEqual(Type,ptClose),Major,Notify);
+    AlertType alert         = (AlertType)BoolToInt(IsEqual(Type,ptClose),Major,Notify);
     
     FOC.Event               = NoEvent;
 
@@ -361,7 +361,7 @@ void CTickMA::CalcFOC(PriceType Type, FOCRec &FOC)
       if (IsChanged(FOC.Bias,bias))
         FOC.Event           = BoolToEvent(IsEqual(FOC.Event,NoEvent),NewBias,FOC.Event);
 
-      SetEvent(FOC.Event,alertlevel);
+      SetEvent(FOC.Event,alert);
     }
   }
 
@@ -1249,7 +1249,7 @@ string CTickMA::EventStr(EventType Type)
   {
     string text      = "|"+EnumToString(Type);
 
-    Append(text,EnumToString(EventLevel(Type)),"|");
+    Append(text,EnumToString(Alert(Type)),"|");
     
     if (Event(Type))
     {

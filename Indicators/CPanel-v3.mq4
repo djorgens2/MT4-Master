@@ -13,9 +13,9 @@
 
 #define debug false
 
+#include <Class\Order.mqh>
 #include <Class\Session.mqh>
 #include <Class\TickMA.mqh>
-#include <std_utility.mqh>
 
 //--- plot plHigh
 #property indicator_label1  "plHigh"
@@ -124,6 +124,7 @@ double         plSMALow[1];
 
 //--- Class defs
 CTickMA       *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
+COrder        *ord               = new COrder(Discount,Hold,Hold);
 
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
@@ -155,18 +156,18 @@ void RefreshScreen(void)
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
     UpdateDirection("tmaLinearDir"+(string)indWinId,t.Linear().Direction,Color(t.Linear().Direction),16);
-    UpdateLabel("tmaLinearStateOpen"+(string)indWinId,NegLPad(t.Linear().Open.Now,3)+" "+NegLPad(t.Linear().Open.Max,3)+" "+
-                  NegLPad(t.Linear().Open.Min,3),Color(t.Linear().Open.Direction),12);
+    UpdateLabel("tmaLinearStateOpen"+(string)indWinId,lpad(t.Linear().Open.Now,3)+" "+lpad(t.Linear().Open.Max,3)+" "+
+                  lpad(t.Linear().Open.Min,3),Color(t.Linear().Open.Direction),12);
     UpdateDirection("tmaLinearBiasOpen"+(string)indWinId,Direction(t.Linear().Open.Bias,InAction),Color(Direction(t.Linear().Open.Bias,InAction)),18);
-    UpdateLabel("tmaLinearStateClose"+(string)indWinId,NegLPad(t.Linear().Close.Now,3)+" "+NegLPad(t.Linear().Close.Max,3)+" "+
-                  NegLPad(t.Linear().Close.Min,3),Color(t.Linear().Close.Direction),12);
+    UpdateLabel("tmaLinearStateClose"+(string)indWinId,lpad(t.Linear().Close.Now,3)+" "+lpad(t.Linear().Close.Max,3)+" "+
+                  lpad(t.Linear().Close.Min,3),Color(t.Linear().Close.Direction),12);
     UpdateDirection("tmaLinearBiasClose"+(string)indWinId,Direction(t.Linear().Close.Bias,InAction),Color(Direction(t.Linear().Close.Bias,InAction)),18);
 
     //-- SMA Box
     UpdateDirection("tmaSMABias"+(string)indWinId,Direction(t.SMA().Bias,InAction)/*Lead*/,Color(Direction(t.SMA().Bias,InAction)),32);
     UpdateDirection("tmaSMADir"+(string)indWinId,t.SMA().Direction/*Lead*/,Color(t.SMA().Direction),16);
     UpdateLabel("tmaSMAState"+(string)indWinId,center(BoolToStr(IsEqual(t.SMA().Event,NoEvent),
-                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText[t.SMA().Event]),16),
+                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),t.Text(t.SMA().Event)),16),
                   Color(Direction(t.SMA().Close[0]-t.SMA().Open[0])),12);
     UpdateLabel("tmaSMAMomentumHi"+(string)indWinId,DoubleToStr(pip(t.Momentum().High.Now),1),
                   Color(Direction(t.Momentum().High.Bias,InAction),IN_CHART_DIR),12);
@@ -360,6 +361,7 @@ int OnCalculate(const int rates_total,
   {
     UpdateTickMA();
     UpdateSegment();
+    ord.Update();
 
     RefreshScreen();
 
@@ -380,7 +382,7 @@ int OnInit()
     {
       DrawBox("bxhAI-Session"+EnumToString(type),(75*type)+60,5,70,20,C'60,60,60',BORDER_RAISED,SCREEN_UL,indWinId);
       DrawBox("bxbAI-OpenInd"+EnumToString(type),(75*type)+64,9,7,12,C'60,60,60',BORDER_RAISED,SCREEN_UL,indWinId);
-      NewLabel("lbhAI-Session"+EnumToString(type),LPad(EnumToString(type)," ",4),85+(74*type),7,clrWhite,SCREEN_UL,indWinId);
+      NewLabel("lbhAI-Session"+EnumToString(type),lpad(EnumToString(type)," ",4),85+(74*type),7,clrWhite,SCREEN_UL,indWinId);
     }
         
     NewLabel("lbhAI-Bal","----- Balance/Equity -----",155,30,clrGold,SCREEN_UL,indWinId);
@@ -747,4 +749,5 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete t;
+    delete ord;
   }

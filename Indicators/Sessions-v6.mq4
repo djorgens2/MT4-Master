@@ -15,8 +15,6 @@
 #property indicator_buffers   3
 #property indicator_plots     3
 
-#include <stdutil.mqh>
-#include <std_utility.mqh>
 #include <Class/Session.mqh>
 
 //--- plot Off & Prior Session points

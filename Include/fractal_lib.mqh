@@ -116,7 +116,7 @@
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
            double        Price;                    //-- Event Price
            EventType     Event;                    //-- Last Event; disposes on next tick
-           AlertLevel    Alert;                    //-- Last Alert; disposes on next tick
+           AlertType     Alert;                    //-- Last Alert; disposes on next tick
            bool          Peg;                      //-- Retrace peg
            FibonacciRec  Extension;                //-- Active Fibo Extension
            FibonacciRec  Retrace;                  //-- Active Fibo Retrace
@@ -179,11 +179,11 @@ ENUM_LINE_STYLE Style(FractalPoint Fractal)
 //+------------------------------------------------------------------+
 //| FractalAlert - Returns Alert Level for supplied Fractal Type     |
 //+------------------------------------------------------------------+
-AlertLevel Alert(FractalType Type)
+AlertType Alert(FractalType Type)
   {
-    static const AlertLevel alertlevel[FractalTypes]    = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,Notify,Notify,Notify,Notify,Notify};
+    static const AlertType alert[FractalTypes]    = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,Notify,Notify,Notify,Notify,Notify};
 
-    return alertlevel[Type];
+    return alert[Type];
   }
 
 //+------------------------------------------------------------------+
@@ -353,18 +353,20 @@ void UpdatePivot(PivotRec &Pivot[], int Direction, int Bar=0)
       {
         price                    = Price(Pivot[node].State,Direction,Bar);
     
-        Pivot[node].Close       = price;
-        Pivot[node].Event       = BoolToEvent(NewBias(Pivot[node].Bias,Action(price-Pivot[node].Open)),NewBias);
+        Pivot[node].Close        = price;
+
+        if (NewBias(Pivot[node].Bias,Action(price-Pivot[node].Open)))
+          Pivot[node].Event      = NewBias;
     
         if (IsHigher(price,Pivot[node].High))
-          Pivot[node].Event     = NewHigh;
+          Pivot[node].Event      = NewHigh;
 
         if (IsLower(price,Pivot[node].Low))
-          Pivot[node].Event     = NewLow;
+          Pivot[node].Event      = NewLow;
 
         if (Pivot[node].Event>NoEvent)
           if (NewAction(Pivot[node].Lead,BoolToInt(IsEqual(Pivot[node].Event,NewHigh),OP_BUY,BoolToInt(IsEqual(Pivot[node].Event,NewLow),OP_SELL,Pivot[node].Lead))))
-            Pivot[node].Event   = NewLead;
+            Pivot[node].Event    = NewLead;
       }
       
       if (IsBetween(Pivot[node].State,Breakout,Reversal))
