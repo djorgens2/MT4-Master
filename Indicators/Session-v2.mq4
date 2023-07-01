@@ -61,6 +61,7 @@ CSession            *s                  = new CSession(inpType,inpHourOpen,inpHo
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
+string        sObjectStr  = "[s2]";
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaint screen elements                          |
@@ -81,26 +82,26 @@ void RefreshScreen(void)
 
     if (ShowSession<PeriodTypes)
     {
-      UpdateLine("lnS_ActiveMid:"+EnumToString(inpType),s.Pivot(ShowSession),STYLE_SOLID,clrGoldenrod);
-      UpdateLine("lnS_Low:"+EnumToString(inpType),s[ShowSession].Low,STYLE_DOT,clrMaroon);
-      UpdateLine("lnS_High:"+EnumToString(inpType),s[ShowSession].High,STYLE_DOT,clrForestGreen);
+      UpdateLine(sObjectStr+"lnS_ActiveMid:"+EnumToString(inpType),s.Pivot(ShowSession),STYLE_SOLID,clrGoldenrod);
+      UpdateLine(sObjectStr+"lnS_Low:"+EnumToString(inpType),s[ShowSession].Low,STYLE_DOT,clrMaroon);
+      UpdateLine(sObjectStr+"lnS_High:"+EnumToString(inpType),s[ShowSession].High,STYLE_DOT,clrForestGreen);
       //UpdateLine("lnS_Support:"+EnumToString(inpType),s[ShowSession].Support,STYLE_SOLID,clrMaroon);
       //UpdateLine("lnS_Resistance:"+EnumToString(inpType),s[ShowSession].Resistance,STYLE_SOLID,clrForestGreen);
     }
     else
     if (ShowFractal<FractalTypes)
     {
-      UpdateLine("lnS_Origin:"+EnumToString(inpType),s[ShowFractal].Fractal[fpOrigin],STYLE_DOT,clrWhite);
-      UpdateLine("lnS_Base:"+EnumToString(inpType),s[ShowFractal].Fractal[fpBase],STYLE_SOLID,clrYellow);
-      UpdateLine("lnS_Root:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRoot],STYLE_SOLID,
+      UpdateLine(sObjectStr+"lnS_Origin:"+EnumToString(inpType),s[ShowFractal].Fractal[fpOrigin],STYLE_DOT,clrWhite);
+      UpdateLine(sObjectStr+"lnS_Base:"+EnumToString(inpType),s[ShowFractal].Fractal[fpBase],STYLE_SOLID,clrYellow);
+      UpdateLine(sObjectStr+"lnS_Root:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRoot],STYLE_SOLID,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateLine("lnS_Expansion:"+EnumToString(inpType),s[ShowFractal].Fractal[fpExpansion],STYLE_SOLID,
+      UpdateLine(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),s[ShowFractal].Fractal[fpExpansion],STYLE_SOLID,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateLine("lnS_Retrace:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRetrace],STYLE_DOT,clrGoldenrod);      
-      UpdateLine("lnS_Recovery:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRecovery],STYLE_DOT,clrSteelBlue);
+      UpdateLine(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRetrace],STYLE_DOT,clrGoldenrod);      
+      UpdateLine(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRecovery],STYLE_DOT,clrSteelBlue);
 
       for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-        UpdateLine("lnS_"+EnumToString(fl)+":"+EnumToString(inpType),s.Forecast(ShowFractal,Extension,fl),STYLE_DASH,clrYellow);
+        UpdateLine(sObjectStr+"lnS_"+EnumToString(fl)+":"+EnumToString(inpType),s.Forecast(ShowFractal,Extension,fl),STYLE_SOLID,clrDarkGray);
 
 //      Append(alert,BoolToStr(s[ShowFractal].Event>NoEvent||s[Origin].Event>NoEvent,s.ActiveEventStr()+"\n\n"));
     }
@@ -123,9 +124,10 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
+//    Print(DoubleToStr(extension(s[Origin].Fractal[fpBase],s[Origin].Fractal[fpRoot],s[Origin].Fractal[fpExpansion],InPercent),1)+"%");
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
-    
+
     RefreshScreen();
 
     return(rates_total);
@@ -156,11 +158,11 @@ int OnInit()
         if (inpShowOption==ShowOffSession)    ShowSession = OffSession;
         if (inpShowOption==ShowPriorSession)  ShowSession = PriorSession;
 
-        NewLine("lnS_ActiveMid:"+EnumToString(inpType));
-        NewLine("lnS_High:"+EnumToString(inpType));
-        NewLine("lnS_Low:"+EnumToString(inpType));    
-        NewLine("lnS_Support:"+EnumToString(inpType));
-        NewLine("lnS_Resistance:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_ActiveMid:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_High:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Low:"+EnumToString(inpType));    
+        NewLine(sObjectStr+"lnS_Support:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Resistance:"+EnumToString(inpType));
       }
       else
       {    
@@ -168,16 +170,16 @@ int OnInit()
         if (inpShowOption==ShowTrend)         ShowFractal = Trend;
         if (inpShowOption==ShowTerm)          ShowFractal = Term;
 
-        NewLine("lnS_Origin:"+EnumToString(inpType));
-        NewLine("lnS_Base:"+EnumToString(inpType));
-        NewLine("lnS_Root:"+EnumToString(inpType));    
-        NewLine("lnS_Expansion:"+EnumToString(inpType));
-        NewLine("lnS_Retrace:"+EnumToString(inpType));
-        NewLine("lnS_Recovery:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Origin:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Base:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Root:"+EnumToString(inpType));    
+        NewLine(sObjectStr+"lnS_Expansion:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Retrace:"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_Recovery:"+EnumToString(inpType));
       }
 
       for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-        NewLine("lnS_"+EnumToString(fl)+":"+EnumToString(inpType));
+        NewLine(sObjectStr+"lnS_"+EnumToString(fl)+":"+EnumToString(inpType));
     }
 
     return(INIT_SUCCEEDED);
