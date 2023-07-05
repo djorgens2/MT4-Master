@@ -227,9 +227,48 @@ bool CEvent::IsChanged(EventType &Compare, EventType Change)
   }
 
 //+------------------------------------------------------------------+
-//| Text - String of active events formatted for Log                 |
+//| ActiveEventStr - String of active events formatted for display   |
 //+------------------------------------------------------------------+
-string CEvent::Text(EventType Event)
+string CEvent::ActiveEventStr(bool WithHeader=true)
+  {
+    string text   = "\n------------------------------";
+    
+    if (WithHeader)
+      text        = Symbol()+" Events"+text;
+    
+    if (this.ActiveEvent())
+    {
+      for (EventType event=NoEvent;event<EventTypes;event++)
+        if (eEvent[event])
+          Append(text,EnumToString(eAlert[event])+":"+EnumToString(event),"\n");
+    }
+    else Append(text, "No Active Events", "\n");
+    
+    return text;
+  }
+
+//+------------------------------------------------------------------+
+//| EventStr - String of active events formatted for Log             |
+//+------------------------------------------------------------------+
+string CEvent::EventStr(void)
+  {
+    string text   = "";
+    
+    if (this.ActiveEvent())
+    {
+      for (EventType event=NoEvent;event<EventTypes;event++)
+        if (eEvent[event])
+          Append(text, EnumToString(eAlert[event])+":"+EnumToString(event),"|");
+    }
+    else Append(text,"No Active Events");
+    
+    return text;
+  }
+  
+//+------------------------------------------------------------------+
+//| EventText - String of active events formatted for Log            |
+//+------------------------------------------------------------------+
+string EventText(EventType Event)
   {
     const string text[EventTypes] =
                  {
@@ -277,43 +316,4 @@ string CEvent::Text(EventType Event)
                  };
 
     return text[Event];
-  }
-
-//+------------------------------------------------------------------+
-//| ActiveEventStr - String of active events formatted for display   |
-//+------------------------------------------------------------------+
-string CEvent::ActiveEventStr(bool WithHeader=true)
-  {
-    string text   = "\n------------------------------";
-    
-    if (WithHeader)
-      text        = Symbol()+" Events"+text;
-    
-    if (this.ActiveEvent())
-    {
-      for (EventType event=NoEvent;event<EventTypes;event++)
-        if (eEvent[event])
-          Append(text,EnumToString(eAlert[event])+":"+EnumToString(event),"\n");
-    }
-    else Append(text, "No Active Events", "\n");
-    
-    return text;
-  }
-
-//+------------------------------------------------------------------+
-//| EventStr - String of active events formatted for Log             |
-//+------------------------------------------------------------------+
-string CEvent::EventStr(void)
-  {
-    string text   = "";
-    
-    if (this.ActiveEvent())
-    {
-      for (EventType event=NoEvent;event<EventTypes;event++)
-        if (eEvent[event])
-          Append(text, EnumToString(eAlert[event])+":"+EnumToString(event),"|");
-    }
-    else Append(text,"No Active Events");
-    
-    return text;
-  }
+  }  

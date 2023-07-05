@@ -151,9 +151,9 @@ string rpad(string Value, string Pad, int Length)
 //+------------------------------------------------------------------+
 //| lpad - returns a numeric string padded for negative sign         |
 //+------------------------------------------------------------------+
-string lpad(double Value, int Precision)
+string lpad(double Value, int Precision, int Length)
   {
-    return BoolToStr(Value<0.00," ")+DoubleToString(Value,Precision);
+    return lpad(BoolToStr(Value<0.00,""," ")+DoubleToString(Value,Precision)," ",Length);
   }
 
 //+------------------------------------------------------------------+

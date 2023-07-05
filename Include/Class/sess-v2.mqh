@@ -103,6 +103,7 @@ public:
 
          double           Pivot(const PeriodType Period)       {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
          BufferRec        Buffer(PeriodType Period)            {return sbuf[Period];};
+
          SessionRec       operator[](const PeriodType Period)  {return srec[Period];};
          FractalRec       operator[](const FractalType Type)   {return Fractal(Type);};
 

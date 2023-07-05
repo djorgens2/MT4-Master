@@ -304,8 +304,8 @@ void GetManualRequest(string Command="")
           if (InStr(params[0],"HED"))
           {
             if (IsBetween(Action(LotCount(NoAction,Net)),OP_BUY,OP_SELL))
-              OpenOrder(Action(LotCount(NoAction,Net),InDirection,InContrarian),"\"Hedge ["+
-                 DoubleToStr(fabs(LotCount(NoAction,Net)),ordLotPrecision)+"] "+DirText(Direction(LotCount(NoAction,Net)))+"\"",fabs(LotCount(NoAction,Net)));
+              OpenOrder(Action(LotCount(NoAction,Net),InDirection,InContrarian),"Hedge ["+
+                 DoubleToStr(fabs(LotCount(NoAction,Net)),ordLotPrecision)+"] "+DirText(Direction(LotCount(NoAction,Net))),fabs(LotCount(NoAction,Net)));
           }
           else          
           
