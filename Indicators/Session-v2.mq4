@@ -63,6 +63,27 @@ PeriodType    ShowSession = PeriodTypes;
 FractalType   ShowFractal = FractalTypes;
 string        sObjectStr  = "[s2]";
 
+
+//+------------------------------------------------------------------+
+//| Bar - Finds Bar in the Fractal Buffer matching Count             |
+//+------------------------------------------------------------------+
+int Bar(double Price)
+  {
+    int count   = 0;
+
+    for (int index=0;index<Bars-1;index++)
+    {
+      if (IsEqual(indFractalBuffer[index],Price))
+        return index;
+
+      if (indFractalBuffer[index]>0)
+        if (++count>5)
+          return index;
+    }
+    
+    return NoValue;
+  }
+
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaint screen elements                          |
 //+------------------------------------------------------------------+
@@ -117,26 +138,34 @@ void RefreshScreen(void)
     else
     if (ShowFractal<FractalTypes)
     {
-      UpdateLine(sObjectStr+"lnS_Origin:"+EnumToString(inpType),s[ShowFractal].Fractal[fpOrigin],STYLE_DOT,clrWhite);
-      UpdateLine(sObjectStr+"lnS_Base:"+EnumToString(inpType),s[ShowFractal].Fractal[fpBase],STYLE_SOLID,clrYellow);
-      UpdateLine(sObjectStr+"lnS_Root:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRoot],STYLE_SOLID,
+      int bar      = Bar(s[ShowFractal].Fractal[fpRoot]);
+
+      UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpOrigin],-8);
+      UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpBase],-8);
+      UpdateRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRoot],-8,0,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateLine(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),s[ShowFractal].Fractal[fpExpansion],STYLE_SOLID,
+      UpdateRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpExpansion],-8,0,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateLine(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRetrace],STYLE_DOT,clrGoldenrod);      
-      UpdateLine(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),s[ShowFractal].Fractal[fpRecovery],STYLE_DOT,clrSteelBlue);
+      UpdateRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRetrace],-8,0);
+      UpdateRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRecovery],-8,0);
 
-      for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-        UpdateLine(sObjectStr+"lnS_"+EnumToString(fl)+":"+EnumToString(inpType),s.Forecast(ShowFractal,Extension,fl),STYLE_DOT,clrDarkGray);
+      for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
+      {
+        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,s.Forecast(ShowFractal,Extension,fibo),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",s.Forecast(ShowFractal,Extension,fibo),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+      }
 
-      Append(text,"------- Fractal ["+EnumToString(inpType)+" "+EnumToString(ShowFractal)+"] --------------------","\n\n");
-      Append(text," (o) Origin:     "+DoubleToStr(s[ShowFractal].Fractal[fpOrigin],Digits),"\n");
-      Append(text," Close:  "+DoubleToStr(s[ShowFractal].Fractal[fpClose],Digits));
-      Append(text," (bre) Fractal: "+DoubleToStr(s[ShowFractal].Fractal[fpBase],Digits),"\n");
-      Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRoot],Digits));
-      Append(text,DoubleToStr(s[ShowFractal].Fractal[fpExpansion],Digits));
-      Append(text," (rt)(rc):         "+DoubleToStr(s[ShowFractal].Fractal[fpRetrace],Digits),"\n");
-      Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRecovery],Digits));      
+      for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
+        UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Fractal[point],-6);
+
+      //Append(text,"------- Fractal ["+EnumToString(inpType)+" "+EnumToString(ShowFractal)+"] --------------------","\n\n");
+      //Append(text," (o) Origin:     "+DoubleToStr(s[ShowFractal].Fractal[fpOrigin],Digits),"\n");
+      //Append(text," Close:  "+DoubleToStr(s[ShowFractal].Fractal[fpClose],Digits));
+      //Append(text," (bre) Fractal: "+DoubleToStr(s[ShowFractal].Fractal[fpBase],Digits),"\n");
+      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRoot],Digits));
+      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpExpansion],Digits));
+      //Append(text," (rt)(rc):         "+DoubleToStr(s[ShowFractal].Fractal[fpRetrace],Digits),"\n");
+      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRecovery],Digits));      
     }
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
@@ -150,9 +179,6 @@ void RefreshScreen(void)
       Append(text,FibonacciStr("   Ret: ",s[type].Retrace),"\n");
     }
 
-    //Append(text,s.FractalStr(Origin),"\n\n");
-    //Append(text,s.FractalStr(Trend),"\n");
-    //Append(text,s.FractalStr(Term),"\n");
     Append(text,s.ActiveEventStr(),"\n\n");
 
     Comment(text);
@@ -220,16 +246,22 @@ int OnInit()
         if (inpShowOption==ShowTrend)         ShowFractal = Trend;
         if (inpShowOption==ShowTerm)          ShowFractal = Term;
 
-        NewLine(sObjectStr+"lnS_Origin:"+EnumToString(inpType));
-        NewLine(sObjectStr+"lnS_Base:"+EnumToString(inpType));
-        NewLine(sObjectStr+"lnS_Root:"+EnumToString(inpType));    
-        NewLine(sObjectStr+"lnS_Expansion:"+EnumToString(inpType));
-        NewLine(sObjectStr+"lnS_Retrace:"+EnumToString(inpType));
-        NewLine(sObjectStr+"lnS_Recovery:"+EnumToString(inpType));
-      }
+        NewRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),STYLE_DOT,clrWhite,Never);
+        NewRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),STYLE_SOLID,clrYellow,Never);
+        NewRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),STYLE_SOLID,clrDarkGray,Never);
+        NewRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),STYLE_SOLID,clrDarkGray,Never);
+        NewRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),STYLE_DOT,clrGoldenrod,Never);
+        NewRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),STYLE_DOT,clrSteelBlue,Never);
 
-      for (FiboLevel fl=Fibo161;fl<FiboLevels;fl++)
-        NewLine(sObjectStr+"lnS_"+EnumToString(fl)+":"+EnumToString(inpType));
+        for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
+          NewText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),fp[point]);
+
+        for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
+        {
+          NewRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),STYLE_DOT,clrDarkGray,Never);
+          NewText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),DoubleToStr(fibonacci[fibo]*100,1)+"%");
+        }
+      }
     }
 
     return(INIT_SUCCEEDED);

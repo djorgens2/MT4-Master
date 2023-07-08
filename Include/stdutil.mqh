@@ -40,6 +40,7 @@
 #define InTrueFalse          11      //--- Stated as True or False
 #define InYesNo              12      //--- Stated as Yes or No
 #define Always             true
+#define Never             false
 
 //--- Option type defs
 #define InContrarian       true      //--- Return as contrarian direction/action
@@ -151,9 +152,11 @@ string rpad(string Value, string Pad, int Length)
 //+------------------------------------------------------------------+
 //| lpad - returns a numeric string padded for negative sign         |
 //+------------------------------------------------------------------+
-string lpad(double Value, int Precision, int Length)
+string lpad(double Value, int Precision, int Length=NoValue)
   {
-    return lpad(BoolToStr(Value<0.00,""," ")+DoubleToString(Value,Precision)," ",Length);
+    string text = BoolToStr(Value<0.00,""," ")+DoubleToString(Value,Precision);
+    
+    return lpad(text," ",fmax(StringLen(text),Length));
   }
 
 //+------------------------------------------------------------------+
@@ -904,6 +907,30 @@ void NewLabel(string LabelName, string Text, int PosX, int PosY, int Color=White
   }
 
 //+------------------------------------------------------------------+
+//| UpdateText                                                       |
+//+------------------------------------------------------------------+
+void UpdateText(string Name, string Text, double Price, int Bar=NoValue, int Color=NoValue, int Size=NoValue, string Font="")
+  {
+    Text     = BoolToStr(Text=="",ObjectGetString(0,Name,OBJPROP_TEXT),Text);
+    Color    = BoolToInt(Color==NoValue,(int)ObjectGetInteger(0,Name,OBJPROP_COLOR),Color);
+    Size     = BoolToInt(Size==NoValue,(int)ObjectGetInteger(0,Name,OBJPROP_FONTSIZE),Size);
+    Font     = BoolToStr(Font=="",ObjectGetString(0,Name,OBJPROP_FONT),Font);
+
+    ObjectSet(Name,OBJPROP_PRICE1,Price);
+    ObjectSet(Name,OBJPROP_TIME1,BoolToDate(Bar<0,Time[0]+(Period()*fabs(Bar)*60),Time[fmin(Bars-1,fmax(Bar,0))]));
+    ObjectSetText(Name,Text,Size,Font,Color);
+  }
+  
+//+------------------------------------------------------------------+
+//| NewText                                                         |
+//+------------------------------------------------------------------+
+void NewText(string Name, string Text, int Color=White, int Size=8, string Font="Tahoma")
+  {
+    ObjectCreate(Name,OBJ_TEXT,0,0,0);
+    ObjectSetText(Name,Text,Size,Font,Color);
+  }
+
+//+------------------------------------------------------------------+
 //| UpdatePriceTag                                                   |
 //+------------------------------------------------------------------+
 void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int Down=8)
@@ -956,13 +983,16 @@ void NewLine(string LineName, double Price=0.00, int Style=STYLE_SOLID, int Colo
 //+------------------------------------------------------------------+
 //| UpdateRay                                                        |
 //+------------------------------------------------------------------+
-void UpdateRay(string RayName, double PriceStart, int BarStart, double PriceEnd=0.00, int BarEnd=0)
+void UpdateRay(string RayName, int BarStart, double PriceStart, int BarEnd=0, double PriceEnd=0.00, int Color=NoValue)
   {
     ObjectSet(RayName,OBJPROP_PRICE1,PriceStart);
     ObjectSet(RayName,OBJPROP_PRICE2,BoolToDouble(IsEqual(PriceEnd,0.00),PriceStart,PriceEnd,Digits));
     
     ObjectSet(RayName,OBJPROP_TIME1,Time[BarStart]);
-    ObjectSet(RayName,OBJPROP_TIME2,Time[BarEnd]);
+    ObjectSet(RayName,OBJPROP_TIME2,BoolToDate(BarEnd<0,Time[0]+(Period()*fabs(BarEnd)*60),Time[fmin(Bars-1,fmax(BarEnd,0))]));
+    
+    if (Color>NoValue)
+      ObjectSet(RayName,OBJPROP_COLOR,Color);
   }
   
 //+------------------------------------------------------------------+

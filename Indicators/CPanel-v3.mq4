@@ -167,7 +167,7 @@ void RefreshScreen(void)
     UpdateDirection("tmaSMABias"+(string)indWinId,Direction(t.SMA().Bias,InAction)/*Lead*/,Color(Direction(t.SMA().Bias,InAction)),32);
     UpdateDirection("tmaSMADir"+(string)indWinId,t.SMA().Direction/*Lead*/,Color(t.SMA().Direction),16);
     UpdateLabel("tmaSMAState"+(string)indWinId,center(BoolToStr(IsEqual(t.SMA().Event,NoEvent),
-                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),t.Text(t.SMA().Event)),16),
+                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText(t.SMA().Event)),16),
                   Color(Direction(t.SMA().Close[0]-t.SMA().Open[0])),12);
     UpdateLabel("tmaSMAMomentumHi"+(string)indWinId,DoubleToStr(pip(t.Momentum().High.Now),1),
                   Color(Direction(t.Momentum().High.Bias,InAction),IN_CHART_DIR),12);
@@ -197,10 +197,10 @@ void RefreshScreen(void)
       UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t[Resistance],clrLawnGreen);
       UpdatePriceLabel("tmaPL(ex):"+(string)indWinId,t[Active],clrGoldenrod);
 
-      UpdateRay("tmaPlanSup:"+(string)indWinId,t.Range().Support,inpPeriods-1);
-      UpdateRay("tmaPlanRes:"+(string)indWinId,t.Range().Resistance,inpPeriods-1);
-      UpdateRay("tmaRangeMid:"+(string)indWinId,t.Range().Mean,inpPeriods-1);
-      UpdateRay("tmaClose:"+(string)indWinId,Close[0],inpPeriods-1);
+      UpdateRay("tmaPlanSup:"+(string)indWinId,inpPeriods-1,t.Range().Support);
+      UpdateRay("tmaPlanRes:"+(string)indWinId,inpPeriods-1,t.Range().Resistance);
+      UpdateRay("tmaRangeMid:"+(string)indWinId,inpPeriods-1,t.Range().Mean);
+      UpdateRay("tmaClose:"+(string)indWinId,inpPeriods-1,Close[0]);
 
       if (t[NewHigh]||t[NewLow])
         UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));

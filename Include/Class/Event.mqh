@@ -111,7 +111,6 @@ public:
       bool           Event(EventType Event, AlertType Alert)     {return eAlert[Event]==Alert&&Alert>NoAlert;}
       bool           ActiveEvent(void)                           {return !eEvent[NoEvent];}
 
-      string         Text(EventType Event);
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       
