@@ -317,7 +317,7 @@ void CSession::Update(void)
         
     UpdateSession();
     UpdateRange();
-    UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
+    Update(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
   }
 
 //+------------------------------------------------------------------+

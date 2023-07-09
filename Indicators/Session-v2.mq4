@@ -264,6 +264,11 @@ int OnInit()
       }
     }
 
+    double buffer[];
+    s.Fractal(buffer);
+    for (int bar=0;bar<Bars-1;bar++)
+      if (buffer[bar]>0.00)
+        Print(s.BufferStr(bar));
     return(INIT_SUCCEEDED);
   }
 
