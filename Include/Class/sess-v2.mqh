@@ -8,7 +8,7 @@
 #property version   "2.00"
 #property strict
 
-#include <Class/frac-v2.mqh>
+#include <Class/Fractal.mqh>
 
 const color          AsiaColor       = C'0,32,0';    // Asia session box color
 const color          EuropeColor     = C'48,0,0';    // Europe session box color

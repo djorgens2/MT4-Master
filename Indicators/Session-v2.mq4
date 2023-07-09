@@ -12,7 +12,7 @@
 #property indicator_buffers   3
 #property indicator_plots     3
 
-#include <Class/sess-v2.mqh>
+#include <Class/Session.mqh>
 
 //--- plot Off & Prior Session points
 #property indicator_label1  "indPriorMid"

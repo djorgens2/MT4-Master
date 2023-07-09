@@ -259,7 +259,7 @@ void CFractal::UpdateFibonacci(FibonacciRec &Fibonacci, FractalState Method, dou
       Fibonacci.Open        = Fractal[fpClose];
       Fibonacci.High        = Fibonacci.Pivot;
       Fibonacci.Low         = Fibonacci.Pivot;
-      //Flag(fObjectStr+"Reset["+EnumToString(Method)+"]"+EnumToString(Fibonacci.Level),BoolToInt(event==NewFibonacci,clrCyan,clrMagenta),fBar,Fibonacci.Pivot,Always);
+      Flag(fObjectStr+"Reset["+EnumToString(Method)+"]"+EnumToString(Fibonacci.Level),BoolToInt(Fibonacci.Event==NewFibonacci,clrCyan,clrMagenta),fBar,Fibonacci.Pivot,Always);
       //Print("|"+TimeToStr(Time[fBar])+"|"+EnumToString(Method)+"|"+FractalStr(Term));
     }
     else
