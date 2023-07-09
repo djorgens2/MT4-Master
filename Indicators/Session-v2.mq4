@@ -55,7 +55,7 @@ input int            inpHourOpen        = NoValue;         // Session Opening Ho
 input int            inpHourClose       = NoValue;         // Session Closing Hour
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input YesNoType      inpShowRange       = No;              // Show Session Ranges
-input ShowOptions    inpShowOption      = ShowNone;        // Show Boundary Options
+input ShowOptions    inpShowOption      = ShowNone;        // Show Fibonacci/Session Pivots
 
 CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,false);
 
@@ -151,8 +151,8 @@ void RefreshScreen(void)
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,s.Forecast(ShowFractal,Extension,fibo),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
-        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",s.Forecast(ShowFractal,Extension,fibo),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,forecast(s[ShowFractal].Fractal[fpBase],s[ShowFractal].Fractal[fpRoot],fibo),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",forecast(s[ShowFractal].Fractal[fpBase],s[ShowFractal].Fractal[fpRoot],fibo),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)

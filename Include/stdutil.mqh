@@ -716,7 +716,6 @@ bool IsHigher(double Compare, double &Check, bool Update=true, int Precision=0)
 //+------------------------------------------------------------------+
 bool IsHigher(datetime Compare, datetime &Check, bool Update=true)
   {
-      
     if (Compare>Check)
     {    
       if (Update)
