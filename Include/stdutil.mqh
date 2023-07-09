@@ -664,14 +664,11 @@ bool IsEqual(double Value1, double Value2, int Precision=0)
   }
 
 //+------------------------------------------------------------------+
-//| IsEqual - returns true if the values are equal                   |
+//| trim - Returns string removed of leading/trailing blanks         |
 //+------------------------------------------------------------------+
-bool IsEqual(string Value1, string Value2, bool Trim)
+string trim(string Text)
   {
-    if (Trim)
-      return (StringTrimLeft(StringTrimRight(Value1))==StringTrimLeft(StringTrimRight(Value2)));
-     
-    return (Value1==Value2);
+    return StringTrimLeft(StringTrimRight(Text));
   }
 
 //+------------------------------------------------------------------+

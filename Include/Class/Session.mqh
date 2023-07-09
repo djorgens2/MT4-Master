@@ -98,7 +98,6 @@ public:
          int              SessionHour(void) {return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);};
       
          bool             IsOpen(void);
-         bool             IsChanged(SessionType &Compare, SessionType Change);
          color            Color(SessionType Type, GammaType Gamma);
 
          double           Pivot(const PeriodType Period)       {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
@@ -342,18 +341,6 @@ bool CSession::IsOpen(void)
         return (true);
 
     return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - Compares SessionType to detect if a change occurred  |
-//+------------------------------------------------------------------+
-bool CSession::IsChanged(SessionType &Compare, SessionType Change)
-  {
-    if (Compare==Change)
-      return false;
-      
-    Compare = Change;
-    return true;
   }
 
 //+------------------------------------------------------------------+

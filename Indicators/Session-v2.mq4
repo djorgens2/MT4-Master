@@ -151,8 +151,8 @@ void RefreshScreen(void)
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,forecast(s[ShowFractal].Fractal[fpBase],s[ShowFractal].Fractal[fpRoot],fibo),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
-        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",forecast(s[ShowFractal].Fractal[fpBase],s[ShowFractal].Fractal[fpRoot],fibo),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,s.Price(fibo,ShowFractal,Extension),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",s.Price(fibo,ShowFractal,Extension),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)

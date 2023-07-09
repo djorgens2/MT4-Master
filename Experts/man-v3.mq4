@@ -62,7 +62,7 @@ struct    ManagerRec
           {
             StrategyType     Strategy;     //-- Role Responsibility/Strategy
             double           DCA;           //-- Role DCA
-            FiboLevel        DCALevel;      //-- DCA Fibo Level
+//            FiboLevel        DCALevel;      //-- DCA Fibo Level
             OrderSummary     Entry;         //-- Role Entry Zone Summary
             bool             Hold;          //-- Hold Role Profit
           };
@@ -597,10 +597,10 @@ int OnInit()
     //-- Initialize Session
     s[Daily].Update();
     
-    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-//      if (s[Daily].Fibonacci(type).Level>Fibo61)
-        if (IsHigher(s[Daily].Pivot(type).Time,time))
-          master.Session.Type = type;
+//    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+////      if (s[Daily].Fibonacci(type).Level>Fibo61)
+//        if (IsHigher(s[Daily].Pivot(type).Time,time))
+//          master.Session.Type = type;
 
     master.Lead          = (RoleType)BoolToInt(IsEqual(s[Daily][Origin].State,Correction),Action(s[Daily][Origin].Direction,InDirection,InContrarian),Action(s[Daily][Origin].Direction));
     master.State         = NoState;

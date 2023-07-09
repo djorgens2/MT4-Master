@@ -910,7 +910,7 @@ void COrder::UpdateMaster(void)
     //-- Merge Untracked/Update Tracked
     for (int position=0;position<OrdersTotal();position++)
       if (OrderSelect(position,SELECT_BY_POS,MODE_TRADES))
-        if (IsEqual(Symbol(),OrderSymbol(),false))
+        if (Symbol()==OrderSymbol())
           MergeOrder(OrderType(),OrderTicket());
 
     for (int action=OP_BUY;action<=OP_SELL;action++)

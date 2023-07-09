@@ -216,11 +216,11 @@ void RefreshScreen(void)
       for (FractalType type=Origin;type<FractalTypes;type++)
       {
         if (t.Fractal().High[type].Bar>NoValue)
-          ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)t.Fractal().High[type].Bar,FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrHi:"+(string)indWinId+"-"+(string)t.Fractal().High[type].Bar,tag[type],9,"Stencil",clrRed);
             //BoolToInt(IsEqual(t.Fractal().High.Bar[type],t.Find(t.Fractal().Resistance[3],t.SMA().High)),clrGoldenrod,clrRed));
 
         if (t.Fractal().Low[type].Bar>NoValue)
-          ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)t.Fractal().Low[type].Bar,FractalTag[type],9,"Stencil",clrRed);
+          ObjectSetText("tmaFrLo:"+(string)indWinId+"-"+(string)t.Fractal().Low[type].Bar,tag[type],9,"Stencil",clrRed);
             //BoolToInt(IsEqual(t.Fractal().Low.Bar[type],t.Find(t.Fractal().Support[3],t.SMA().Low)),clrGoldenrod,clrRed));
       }
     }
@@ -427,7 +427,7 @@ int OnInit()
     }
 
     for (FractalType type=Origin;type<FractalTypes;type++)
-      NewRay("tma["+FractalTag[type]+"]:"+(string)indWinId,STYLE_SOLID,clrDarkGray,false,indWinId);
+      NewRay("tma["+tag[type]+"]:"+(string)indWinId,STYLE_SOLID,clrDarkGray,false,indWinId);
 
     if (inpSegBounds)
     {

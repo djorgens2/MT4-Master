@@ -8,16 +8,24 @@
 #property version   "1.00"
 #property strict
 
-#include <Class\Event.mqh>
-#include <fractal_lib.mqh>
+#include <Class\Fractal.mqh>
+//#include <fractal_lib.mqh>
 
 #define Fast           2
 #define Slow           3
 
-class CTickMA : public CEvent
+class CTickMA : public CFractal
   {
 
 private:
+  enum             PivotType
+                   {
+                     Mean,
+                     Support,
+                     Resistance,
+                     Active,
+                     PivotTypes
+                   };
 
     enum   PriceType
            {
