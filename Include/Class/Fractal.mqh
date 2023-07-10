@@ -142,20 +142,20 @@ private:
 
          FractalRec      frec[FractalTypes];
 
-         void            ManageBuffer(void);
-         void            UpdateBuffer(void);
-
          bool            NewState(FractalState &State, FibonacciType Level, FibonacciType Prior);
+         bool            NewState(FractalState &State, FibonacciType Level, FibonacciType Prior, bool Reversing);
+         bool            NewState(FractalState &State, FractalState Change, bool Force=false, bool Update=true);
 
-         FibonacciType   Level(double Percent);
-
-         void            InitFractal(void);
-         void            VerifyFractal(void);
+         void            UpdateFibonacci(FibonacciRec &Extension, FibonacciRec &Retrace, double &Fractal[], bool Reset);
          void            UpdateTerm(void);
          void            UpdateTrend(void);
          void            UpdateOrigin(void);
-         void            UpdateFibonacci(FibonacciRec &Extension, FibonacciRec &Retrace, double &Fractal[], bool Reset);
+         void            UpdateFractal(void);
 
+         void            InitFractal(void);
+
+         void            UpdateBuffer(void);
+         void            ManageBuffer(void);
 
 public:
                          CFractal(void);
@@ -163,15 +163,13 @@ public:
                     
         void             Update(double Support, double Resistance, double Pivot, int Bar);
 
-        void             Fractal(double &Buffer[]) {ArrayCopy(Buffer,fbuf);}
+        EventType        Event(FractalType Type);
+        EventType        Event(FractalState State);
+        AlertType        Alert(FractalType Type);
+        FibonacciType    Level(double Percent);
+
         FractalRec       Fractal(FractalType Type) {return frec[Type];};
-
-         EventType       Event(FractalState State);
-         EventType       Event(FractalType Type);
-         AlertType       Alert(FractalType Type);
-
-         bool            NewState(FractalState &State, FractalState Change, bool Force=false, bool Update=true);
-         bool            IsHigher(FibonacciType Check, FibonacciType &Change, bool Update=true);
+        void             Fractal(double &Buffer[]) {ArrayCopy(Buffer,fbuf);};
 
         double           Price(FibonacciType Level, FractalType Type, FractalState Method);
         double           Price(FibonacciType Level, double Root, double Reference, FractalState Method);
@@ -212,6 +210,16 @@ bool CFractal::NewState(FractalState &State, FractalState Change, bool Force=fal
       else return(false);
 
     return(IsChanged(State,Change,Update));
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Returns true on detected change of Fibonacci State    |
+//+------------------------------------------------------------------+
+bool CFractal::NewState(FractalState &State, FibonacciType Level, FibonacciType Prior, bool Reversing)
+  {
+//    FractalState state;
+
+    return false;
   }
 
 //+------------------------------------------------------------------+
@@ -272,88 +280,6 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
 //
 //    if (NewAction(Fibonacci.Bias,Action(Fractal[fpClose]-Fibonacci.Pivot)))
 //      SetEvent(NewBias,Nominal);
-  }
-
-//+------------------------------------------------------------------+
-//| NewState - Returns true on detected change of Fibonacci State    |
-//+------------------------------------------------------------------+
-bool NewState(FractalState &State, FibonacciType Level, FibonacciType Prior, bool Reversing)
-  {
-//    FractalState state;
-
-    return false;
-  }
-
-//+------------------------------------------------------------------+
-//| IsHigher - Returns true on higher FibonacciType                  |
-//+------------------------------------------------------------------+
-bool CFractal::IsHigher(FibonacciType Check, FibonacciType &Change, bool Update=true)
-  {
-    if (Check>Change)
-      return (IsChanged(Change,Check,Update));
-
-    return (false);
-  }
-
-//+------------------------------------------------------------------+
-//| Level - Returns the FiboLevel based on extended fibonacci        |
-//+------------------------------------------------------------------+
-FibonacciType CFractal::Level(double Percent)
-  {
-    for (FibonacciType level=Fibo823;level>FiboRoot;level--)
-      if (fabs(Percent)>fibonacci[level])
-        return (level);
-
-    return (FiboRoot);
-  }
-
-//+------------------------------------------------------------------+
-//| Event(State) - Returns the Event on change in Fractal State      |
-//+------------------------------------------------------------------+
-EventType CFractal::Event(FractalState State)
-  {
-    static const EventType event[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,
-                                                    NewExtension,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
-    return event[State];
-  }
-
-//+------------------------------------------------------------------+
-//| Event(Type) - Returns the Event on change in Fractal Type        |
-//+------------------------------------------------------------------+
-EventType CFractal::Event(FractalType Type)
-  {
-    static const EventType event[FractalTypes]   = {NewOrigin,NewTrend,NewTerm,NewRetrace,NewBase,NewReversal,NewExpansion,
-                                                    NewDivergence,NewConvergence,NewInversion,NewConversion,NewLead};
-    return event[Type];
-  }
-
-//+------------------------------------------------------------------+
-//| Alert - Returns Alert Level for supplied Fractal Type            |
-//+------------------------------------------------------------------+
-AlertType CFractal::Alert(FractalType Type)
-  {
-    static const AlertType alert[FractalTypes]  = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,
-                                                    Notify,Notify,Notify,Notify,Notify};
-    return alert[Type];
-  }
-
-//+------------------------------------------------------------------+
-//| UpdateBuffer - Apply changes to the Fractal Buffer               |
-//+------------------------------------------------------------------+
-void CFractal::UpdateBuffer(void)
-  {
-    if (IsEqual(frec[Term].Direction,fbufDirection))
-    {
-      fbuf[fbufBar]       = 0.00;
-      fbufBar             = fBar;
-      fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
-    }
-    else  
-    if (IsChanged(fbufBar,fBar))
-    {
-      fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
-      fbufDirection       = frec[Term].Direction;
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -552,54 +478,64 @@ void CFractal::UpdateOrigin(void)
 //    }
   }
 
+
 //+------------------------------------------------------------------+
-//| VerifyFractal - Check/Apply Corrections to Fractal before Update |
+//| UpdateFractal - Check/Apply Corrections to Fractal before Update |
 //+------------------------------------------------------------------+
-void CFractal::VerifyFractal(void)
+void CFractal::UpdateFractal(void)
   {
     fLow      = BoolToDouble(fBar==0,Close[fBar],Low[fBar]);
     fHigh     = BoolToDouble(fBar==0,Close[fBar],High[fBar]);
     fClose    = BoolToDouble(frec[Term].Direction==DirectionUp,fHigh,fLow);
 
-    //-- Handle Anomalies; set effective Fractal prices
-    if (High[fBar]>fResistance)
+    if (IsEqual(frec[Term].Direction,NewDirection))
+      InitFractal();
+    else
     {
-      if (Low[fBar]<fSupport)
+      //-- Handle Anomalies; set effective Fractal prices
+      if (High[fBar]>fResistance)
       {
-        //-- Handle Outside Reversal Anomalies (Historical only)
-        if (Event(NewHigh)&&Event(NewLow))
+        if (Low[fBar]<fSupport)
         {
-          fClose   = BoolToDouble(IsEqual(fDirection,DirectionUp),Low[fBar],High[fBar]);
+          //-- Handle Outside Reversal Anomalies (Historical only)
+          if (Event(NewHigh)&&Event(NewLow))
+          {
+            fClose   = BoolToDouble(IsEqual(fDirection,DirectionUp),Low[fBar],High[fBar]);
 
-          UpdateTerm();
-          UpdateTrend();
-          UpdateOrigin();
+            UpdateTerm();
+            UpdateTrend();
+            UpdateOrigin();
 
-          fClose   = BoolToDouble(IsEqual(fDirection,DirectionUp),High[fBar],Low[fBar]);
+            fClose   = BoolToDouble(IsEqual(fDirection,DirectionUp),High[fBar],Low[fBar]);
+          }
+          else
+        
+          //-- Handle Hard Outside Anomaly Uptrend
+          if (Event(NewHigh))
+              fClose = High[fBar];
+          else
+
+          //-- Handle Hard Outside Anomaly Downtrend
+          if (Event(NewLow))
+            fClose = Low[fBar];
         }
         else
-        
-        //-- Handle Hard Outside Anomaly Uptrend
-        if (Event(NewHigh))
-            fClose = High[fBar];
-        else
 
-        //-- Handle Hard Outside Anomaly Downtrend
-        if (Event(NewLow))
-          fClose = Low[fBar];
+        //-- Handle Normal Uptrend Expansions
+        if (Event(NewHigh))
+          fClose   = fHigh;
       }
       else
 
-      //-- Handle Normal Uptrend Expansions
-      if (Event(NewHigh))
-        fClose   = fHigh;
+      //-- Handle Normal Downtrend Expansions
+      if (Low[fBar]<fSupport)
+        if (Event(NewLow))
+          fClose   = fLow;
+        
+      UpdateTerm();
+      UpdateTrend();
+      UpdateOrigin();
     }
-    else
-
-    //-- Handle Normal Downtrend Expansions
-    if (Low[fBar]<fSupport)
-      if (Event(NewLow))
-        fClose   = fLow;
   }
 
 //+------------------------------------------------------------------+
@@ -653,6 +589,25 @@ void CFractal::InitFractal(void)
       
       fbufBar         = fBar;
       fbufDirection   = frec[Term].Direction;
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateBuffer - Apply changes to the Fractal Buffer               |
+//+------------------------------------------------------------------+
+void CFractal::UpdateBuffer(void)
+  {
+    if (IsEqual(frec[Term].Direction,fbufDirection))
+    {
+      fbuf[fbufBar]       = 0.00;
+      fbufBar             = fBar;
+      fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
+    }
+    else  
+    if (IsChanged(fbufBar,fBar))
+    {
+      fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
+      fbufDirection       = frec[Term].Direction;
     }
   }
 
@@ -718,30 +673,49 @@ void CFractal::Update(double Support, double Resistance, double Pivot, int Bar)
     fPivot                       = Pivot;
 
     ManageBuffer();
-    
-    if (IsEqual(frec[Term].Direction,NewDirection))
-      InitFractal();
-    else
-    {
-      VerifyFractal();
-
-      UpdateTerm();
-      UpdateTrend();
-      UpdateOrigin();
-    }
+    UpdateFractal();    
   }
 
 //+------------------------------------------------------------------+
-//| Price - Returns price from supplied level, Root/[Base|Expansion] |
+//| Event(Type) - Returns the Event on change in Fractal Type        |
 //+------------------------------------------------------------------+
-double CFractal::Price(FibonacciType Level, double Root, double Reference, FractalState Method)
+EventType CFractal::Event(FractalType Type)
   {
-    switch (Method)
-    {
-      case Retrace:   return NormalizeDouble(Reference-((Reference-Root)*fibonacci[Level]),Digits);
-      case Extension: return NormalizeDouble(Root+((Reference-Root)*fibonacci[Level]),Digits);
-      default:        return NoValue;
-    }
+    static const EventType event[FractalTypes]   = {NewOrigin,NewTrend,NewTerm,NewRetrace,NewBase,NewReversal,NewExpansion,
+                                                    NewDivergence,NewConvergence,NewInversion,NewConversion,NewLead};
+    return event[Type];
+  }
+
+//+------------------------------------------------------------------+
+//| Event(State) - Returns the Event on change in Fractal State      |
+//+------------------------------------------------------------------+
+EventType CFractal::Event(FractalState State)
+  {
+    static const EventType event[FractalStates]  = {NoEvent,NewRally,NewPullback,NewRetrace,NewCorrection,NewRecovery,NewBreakout,NewReversal,
+                                                    NewExtension,NewFlatline,NewConsolidation,NewParabolic,NewChannel};
+    return event[State];
+  }
+
+//+------------------------------------------------------------------+
+//| Alert - Returns Alert Level for supplied Fractal Type            |
+//+------------------------------------------------------------------+
+AlertType CFractal::Alert(FractalType Type)
+  {
+    static const AlertType alert[FractalTypes]  = {Critical,Major,Minor,Nominal,Warning,Nominal,Warning,
+                                                    Notify,Notify,Notify,Notify,Notify};
+    return alert[Type];
+  }
+
+//+------------------------------------------------------------------+
+//| Level - Returns the FiboLevel based on extended fibonacci        |
+//+------------------------------------------------------------------+
+FibonacciType CFractal::Level(double Percent)
+  {
+    for (FibonacciType level=Fibo823;level>FiboRoot;level--)
+      if (fabs(Percent)>fibonacci[level])
+        return (level);
+
+    return (FiboRoot);
   }
 
 //+------------------------------------------------------------------+
@@ -762,21 +736,30 @@ double CFractal::Price(FibonacciType Level, FractalType Type, FractalState Metho
   }
 
 //+------------------------------------------------------------------+
+//| Price - Returns price from supplied level, Root/[Base|Expansion] |
+//+------------------------------------------------------------------+
+double CFractal::Price(FibonacciType Level, double Root, double Reference, FractalState Method)
+  {
+    switch (Method)
+    {
+      case Retrace:   return NormalizeDouble(Reference-((Reference-Root)*fibonacci[Level]),Digits);
+      case Extension: return NormalizeDouble(Root+((Reference-Root)*fibonacci[Level]),Digits);
+      default:        return NoValue;
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| BufferStr - Returns formatted Buffer data for supplied Period    |
 //+------------------------------------------------------------------+
 string CFractal::BufferStr(int Node)
   {  
     string text            = "Fractal";
 
-    //for (int bar=0;bar<Bars;bar++)
-    //  if (fbuf[bar]>0.00)
-      {
-        Append(text,(string)Node,"|");
-        Append(text,TimeToStr(Time[Node]),"|");
-        Append(text,DoubleToStr(fbuf[Node],Digits),"|");
-      }
+    Append(text,(string)Node,"|");
+    Append(text,TimeToStr(Time[Node]),"|");
+    Append(text,DoubleToStr(fbuf[Node],Digits),"|");
 
-    return(text);
+    return text;
   }
 
 //+------------------------------------------------------------------+
@@ -789,7 +772,7 @@ string CFractal::PointStr(double &Fractal[])
     for (int point=0;point<FractalPoints;point++)
       Append(text,DoubleToStr(Fractal[point],Digits),"|");
 
-    return (text);
+    return text;
   }
 
 //+------------------------------------------------------------------+
@@ -811,7 +794,7 @@ string CFractal::FibonacciStr(FractalState Type, FibonacciRec &Fibonacci)
     for (MeasureType measure=0;measure<MeasureTypes;measure++)
       Append(text,DoubleToStr(Fibonacci.Percent[measure]*100,1),"|");
     
-    return (text);
+    return text;
   }
 
 //+------------------------------------------------------------------+
@@ -830,7 +813,7 @@ string CFractal::FractalStr(FractalType Type)
     Append(text,FibonacciStr(Extension,frec[Type].Extension),"|");
     Append(text,FibonacciStr(Retrace,frec[Type].Retrace),"|");
 
-    return (text);
+    return text;
   }
   
 
@@ -878,10 +861,20 @@ bool IsChanged(FibonacciType &Check, FibonacciType Compare, bool Update=true)
     return true;
   }
 
+//+------------------------------------------------------------------+
+//| IsHigher - Returns true on higher FibonacciType                  |
+//+------------------------------------------------------------------+
+bool IsHigher(FibonacciType Check, FibonacciType &Change, bool Update=true)
+  {
+    if (Check>Change)
+      return (IsChanged(Change,Check,Update));
+
+    return (false);
+  }
+
 bool IsEqual(FractalType Source, FractalType Compare)     {return Source==Compare;};
 bool IsEqual(FractalState Source, FractalState Compare)   {return Source==Compare;};
 bool IsEqual(FibonacciType Source, FibonacciType Compare) {return Source==Compare;};
-
  
 int Bias(int Direction, FractalState State)
   {
