@@ -96,11 +96,6 @@ string FibonacciStr(string Type, FibonacciRec &Fibonacci)
     Append(text,EnumToString(Fibonacci.Level));
     Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
 
-    Append(text,"      Open/High/Low: ","\n");
-    Append(text,DoubleToStr(Fibonacci.Open,Digits));
-    Append(text,DoubleToStr(Fibonacci.High,Digits));
-    Append(text,DoubleToStr(Fibonacci.Low,Digits));
-
     Append(text,"      Now/Min/Max:   ","\n");
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
@@ -134,7 +129,7 @@ void RefreshScreen(void)
         UpdateLine(sObjectStr+"lnS_Support:"+EnumToString(inpType),s[PriorSession].Low,STYLE_SOLID,clrMaroon);
         UpdateLine(sObjectStr+"lnS_Resistance:"+EnumToString(inpType),s[PriorSession].High,STYLE_SOLID,clrForestGreen);
       }
-    }
+    } 
     else
     if (ShowFractal<FractalTypes)
     {

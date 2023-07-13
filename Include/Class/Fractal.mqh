@@ -100,9 +100,6 @@ protected:
            int           Bias;                     //-- Action of Close-Open
            FibonacciType Level;                    //-- Current Fibonacci Level
            double        Pivot;                    //-- Fibonacci Pivot from Last Event
-           double        Open;                     //-- Fibonacci Event Price
-           double        High;                     //-- Fibonacci High Price
-           double        Low;                      //-- Fibonacci Low Price
            double        Percent[MeasureTypes];    //-- Actual Fibonacci Percents by Measure
          };
 
@@ -137,10 +134,12 @@ private:
          double          fHigh;
          double          fLow;
          double          fClose;
-        
+         
          string          fObjectStr;
 
+         FractalType     fType;
          FractalRec      frec[FractalTypes];
+         double          fpoint[FractalPoints];
 
          bool            NewState(FractalState &State, FibonacciType Level, FibonacciType Prior);
          bool            NewState(FractalState &State, FibonacciType Level, FibonacciType Prior, bool Reversing);
@@ -167,6 +166,7 @@ public:
         EventType        Event(FractalState State);
         AlertType        Alert(FractalType Type);
         FibonacciType    Level(double Percent);
+//        FractalState     State(int Direction, double Fibonacci);
 
         FractalRec       Fractal(FractalType Type) {return frec[Type];};
         void             Fractal(double &Buffer[]) {ArrayCopy(Buffer,fbuf);};
@@ -227,6 +227,15 @@ bool CFractal::NewState(FractalState &State, FibonacciType Level, FibonacciType 
 //+------------------------------------------------------------------+
 void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,double &Fractal[],bool Reset)
   {
+    //-- Maintain high/low while managing history
+    //double retrace   = BoolToDouble(Reset,Fractal[fpRetrace],
+    //                     BoolToDouble(IsEqual(Direction(Fractal[fpExpansion]-Fractal[fpRoot]),DirectionUp),
+    //                       fmin(Fractal[fpRetrace],Low[fBar]),
+    //                       fmax(Fractal[fpRetrace],High[fBar]),Digits));
+    //double expansion = BoolToDouble(Reset,Fractal[fpExpansion],
+    //                     BoolToDouble(IsEqual(Direction(Fractal[fpExpansion]-Fractal[fpRoot]),DirectionUp),
+    //                       High[fBar+1],Low[fBar]+1));
+
     Extension.Event   = NoEvent;
     Retrace.Event     = NoEvent;
 
@@ -234,11 +243,14 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
     Retrace.Percent[Now]      = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpClose],InDecimal);
     Retrace.Percent[Min]      = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRecovery],InDecimal);
     Retrace.Percent[Max]      = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRetrace],InDecimal);
-    Retrace.Level             = (FibonacciType)BoolToInt(Reset,Level(Retrace.Percent[Max]),Retrace.Level);
+    Retrace.Level             = (FibonacciType)BoolToInt(Reset,FiboRoot,Retrace.Level);
+//    Retrace.Level             = (FibonacciType)BoolToInt(Reset,FiboRoot,Level(fret(Fractal[fpRoot],Fractal[fpExpansion],retrace,InDecimal)));
+//    Retrace.Level             = (FibonacciType)BoolToInt(Reset,FiboRoot,Level(fret(Fractal[fpRoot],expansion,retrace,InDecimal))); //<--- for later?
+//    Retrace.State             = State(Direction(Fractal[fpRoot]-Fractal[fpExpansion]),Retrace.Percent[Max]);
 
-    if (Reset||IsHigher(Level(Retrace.Percent[Max]),Retrace.Level))
+    if (IsHigher(Level(Retrace.Percent[Max]),Retrace.Level))
     {
-      Retrace.Event           = NewState;
+      Retrace.Event           = NewFibonacci;
       Retrace.Pivot           = fprice(Fractal[fpRoot],Fractal[fpExpansion],Retrace.Level);
     }
 
@@ -246,40 +258,45 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
     Extension.Percent[Now]   = fext(Fractal[fpBase],Fractal[fpRoot],Fractal[fpClose],InDecimal);
     Extension.Percent[Min]   = fext(Fractal[fpBase],Fractal[fpRoot],Fractal[fpRetrace],InDecimal);
     Extension.Percent[Max]   = fext(Fractal[fpBase],Fractal[fpRoot],Fractal[fpExpansion],InDecimal);
-    Extension.Level          = (FibonacciType)BoolToInt(Reset,Level(Extension.Percent[Max]),Extension.Level);
+    Extension.Level          = (FibonacciType)BoolToInt(Reset,FiboRoot,Extension.Level);
+//    Extension.State          = State(Direction(Fractal[fpExpansion]-Fractal[fpRoot]),Extension.Percent[Max]);
 
-    if (Reset||IsHigher(Level(Extension.Percent[Max]),Extension.Level))
+    if (IsHigher(Level(Extension.Percent[Max]),Extension.Level))
     {
-      Extension.Event        = NewState;
+      Extension.Event        = NewFibonacci;
       Extension.Pivot        = fprice(Fractal[fpBase],Fractal[fpRoot],Extension.Level);
     }
 
-    //if (Reset)
-    //{
-    //  Fibonacci.Open        = Fractal[fpClose];
-    //  Fibonacci.High        = Fibonacci.Pivot;
-    //  Fibonacci.Low         = Fibonacci.Pivot;
-    //  Flag(fObjectStr+"Reset["+EnumToString(Method)+"]"+EnumToString(Fibonacci.Level),BoolToInt(Fibonacci.Event==NewFibonacci,clrCyan,clrMagenta),fBar,Fibonacci.Pivot,Always);
-    //  //Print("|"+TimeToStr(Time[fBar])+"|"+EnumToString(Method)+"|"+FractalStr(Term));
-    //}
-    //else
-    //if (Retrace.Event==NewState)
-    //  if (Extension.Event==NewState)
-    //    Flag(fObjectStr+"Reset[Both]"+EnumToString(Extension.Level),clrWhite,fBar,Extension.Pivot,Always);
-    //  else
-    //    Flag(fObjectStr+"Reset[Retrace]"+EnumToString(Retrace.Level),clrLawnGreen,fBar,Retrace.Pivot,Always);
-    //else
-    //  if (Extension.Event==NewState)
-    //    Flag(fObjectStr+"Reset[Extension]"+EnumToString(Extension.Level),clrRed,fBar,Extension.Pivot,Always);
+    if (Extension.Percent[Max]>fibonacci[Fibo100])
+      //if (IsBetween(fpo
+      //else
+      if (!IsBetween(Fractal[fpExpansion],fpoint[fpRoot],fpoint[fpExpansion]))
+        if (Retrace.Level>FiboRoot)
+        {
+          Extension.Pivot  = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
+          Extension.Event  = NewBreakout;
 
-//    if (IsHigher(Fractal[fpClose],Fibonacci.High))
-//      Fibonacci.Lead   = OP_BUY;
-//    
-//    if (IsLower(Fractal[fpClose],Fibonacci.Low))
-//      Fibonacci.Lead   = OP_SELL;
-//
-//    if (NewAction(Fibonacci.Bias,Action(Fractal[fpClose]-Fibonacci.Pivot)))
-//      SetEvent(NewBias,Nominal);
+          Retrace.Level    = FiboRoot;
+          Retrace.Pivot    = fpoint[fpExpansion];
+
+          //if (fType==Trend)
+          //  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Breakout"+TimeToStr(TimeCurrent()),Color(fType,frec[fType].Direction),fBar,Extension.Pivot,Always);
+        }
+
+    if (!IsEqual(fpoint[fpRoot],Fractal[fpRoot]))
+      if (Extension.Percent[Max]>fibonacci[Fibo100])
+        {
+          Extension.Pivot  = Fractal[fpBase];
+//          Extension.Pivot  = BoolToDouble(IsEqual(Direction(Fractal[fpExpansion]-Fractal[fpRoot]),DirectionUp),fResistance,fSupport,Digits);
+          Extension.Event  = NewReversal;
+
+          Retrace.Level    = FiboRoot;
+          Retrace.Pivot    = Fractal[fpExpansion];
+
+          //if (fType==Trend)
+          //  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Reversal"+TimeToStr(TimeCurrent()),Color(fType,NewDirection),fBar,Extension.Pivot,Always);
+        }
+
   }
 
 //+------------------------------------------------------------------+
@@ -287,7 +304,10 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
 //+------------------------------------------------------------------+
 void CFractal::UpdateTerm(void)
   {
-    FractalRec    term                  = frec[Term];
+    //-- Hold copy for State comparisons
+    fType    = Term;
+    ArrayCopy(fpoint,frec[Term].Fractal);
+
     FractalState  state                 = NoState;
 
     int           direction             = Direction(BoolToInt(fClose<fSupport,DirectionDown,
@@ -300,8 +320,9 @@ void CFractal::UpdateTerm(void)
       if (NewDirection(frec[Term].Direction,direction))
       {
         frec[Term].Fractal[fpOrigin]    = frec[Term].Fractal[fpRoot];
-        frec[Term].Fractal[fpBase]      = BoolToDouble(IsBetween(fClose,frec[Term].Fractal[fpRoot],frec[Term].Fractal[fpExpansion]),
-                                          BoolToDouble(fClose<fSupport,fSupport,BoolToDouble(fClose>fResistance,fResistance)),frec[Term].Fractal[fpRoot]);
+        //frec[Term].Fractal[fpBase]      = BoolToDouble(IsBetween(fClose,frec[Term].Fractal[fpRoot],frec[Term].Fractal[fpExpansion]),
+        //                                  BoolToDouble(fClose<fSupport,fSupport,BoolToDouble(fClose>fResistance,fResistance)),frec[Term].Fractal[fpRoot]);
+        frec[Term].Fractal[fpBase]      = BoolToDouble(IsEqual(direction,DirectionUp),fResistance,fSupport,Digits);  //<-- Better than ^^ but doesn't handle Triplet+ Period Reversals (see Quintuple issue"
         frec[Term].Fractal[fpRoot]      = frec[Term].Fractal[fpExpansion];
 
         SetEvent(NewTerm,Minor,frec[Term].Fractal[fpBase]);
@@ -343,6 +364,12 @@ void CFractal::UpdateTerm(void)
 
     UpdateFibonacci(frec[Term].Extension,frec[Term].Retrace,frec[Term].Fractal,Event(NewTerm));
 
+//if (IsEqual(frec[Term].Extension.Event,NewBreakout))
+//  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Breakout"+TimeToStr(TimeCurrent()),Color(fType,frec[fType].Direction),fBar,frec[Term].Extension.Pivot,Always);
+//
+if (IsEqual(frec[Term].Extension.Event,NewReversal))
+  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Reversal"+TimeToStr(TimeCurrent()),Color(fType,NewDirection),fBar,frec[Term].Extension.Pivot,Always);
+
     //--- Check for term state changes
     if (Event(NewTerm))
       state                             = Reversal;
@@ -364,8 +391,8 @@ void CFractal::UpdateTerm(void)
     {
       frec[Term].Event                  = Event(state);
 
-      SetEvent(frec[Term].Event,Minor,BoolToDouble(state==Breakout,term.Fractal[fpExpansion],
-                                      BoolToDouble(state==Reversal,term.Fractal[fpRoot],
+      SetEvent(frec[Term].Event,Minor,BoolToDouble(state==Breakout,fpoint[fpExpansion],
+                                      BoolToDouble(state==Reversal,fpoint[fpRoot],
                                       Price(Fibo23,Term,Retrace))));
       SetEvent(NewState,Minor,fClose);
     }
@@ -376,7 +403,10 @@ void CFractal::UpdateTerm(void)
 //+------------------------------------------------------------------+
 void CFractal::UpdateTrend(void)
   {
-    FractalRec   trend                  = frec[Trend];
+    //-- Hold copy for State comparisons
+    fType    = Trend;
+    ArrayCopy(fpoint,frec[Trend].Fractal);
+
     FractalState state                  = NoState;
     
     //--- Set Common Fractal Points
@@ -413,18 +443,23 @@ void CFractal::UpdateTrend(void)
         SetEvent(NewExpansion,Major);
     }
 
-    //UpdateFibonacci(frec[Trend].Extension,Extension,frec[Trend].Fractal,Event(NewTerm));
-    //UpdateFibonacci(frec[Trend].Retrace,Retrace,frec[Trend].Fractal,Event(NewTerm));
+    UpdateFibonacci(frec[Trend].Extension,frec[Trend].Retrace,frec[Trend].Fractal,Event(NewTerm));
+
+//if (IsEqual(frec[fType].Extension.Event,NewBreakout))
+//  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Breakout"+TimeToStr(TimeCurrent()),Color(fType,frec[fType].Direction),fBar,frec[fType].Extension.Pivot,Always);
+//
+if (IsEqual(frec[fType].Extension.Event,NewReversal))
+  Flag(fObjectStr+"NewFibonacci-["+EnumToString(fType)+"]:Reversal"+TimeToStr(TimeCurrent()),Color(fType,NewDirection),fBar,frec[fType].Extension.Pivot,Always);
 
     if (NewState(frec[Trend].State,state,IsEqual(state,Reversal)))
     {
       frec[Trend].Event                 = Event(state);
 
       SetEvent(NewState,Major);
-      SetEvent(frec[Trend].Event,Major,BoolToDouble(state==Breakout,trend.Fractal[fpExpansion],
-                                       BoolToDouble(state==Reversal,trend.Fractal[fpRoot],
+      SetEvent(frec[Trend].Event,Major,BoolToDouble(state==Breakout,fpoint[fpExpansion],
+                                       BoolToDouble(state==Reversal,fpoint[fpRoot],
                                        Price(Fibo23,Trend,Retrace)))); //<-- needs work, need to trap the last fibo crossed
-      SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major,trend.Fractal[fpRoot]);
+      SetEvent(BoolToEvent(Event(NewReversal,Major),NewTrend),Major,fpoint[fpRoot]);
     }
   }
 
@@ -433,15 +468,18 @@ void CFractal::UpdateTrend(void)
 //+------------------------------------------------------------------+
 void CFractal::UpdateOrigin(void)
   {
-    FractalRec origin                   = frec[Origin];
+    //-- Hold copy for State comparisons
+    fType    = Origin;
+    ArrayCopy(fpoint,frec[Origin].Fractal);
+
     frec[Origin].Event                  = NoEvent;
     frec[Origin].Fractal[fpClose]       = frec[Term].Fractal[fpClose];
 
     if (Event(NewTrend))
     {
       frec[Origin]                      = frec[Trend];
-      frec[Origin].Fractal[fpOrigin]    = origin.Fractal[fpExpansion];
-      frec[Origin].Fractal[fpRoot]      = origin.Fractal[fpExpansion];
+      frec[Origin].Fractal[fpOrigin]    = fpoint[fpExpansion];
+      frec[Origin].Fractal[fpRoot]      = fpoint[fpExpansion];
 
       SetEvent(BoolToEvent(Event(NewReversal,Major),NewOrigin),Critical);
     }
@@ -463,8 +501,7 @@ void CFractal::UpdateOrigin(void)
                                           fmax(frec[Origin].Fractal[fpRecovery],frec[Trend].Fractal[fpRecovery]),
                                           fmin(frec[Origin].Fractal[fpRecovery],frec[Trend].Fractal[fpRecovery]),Digits);
       
-    //UpdateFibonacci(frec[Origin].Extension,Extension,frec[Origin].Fractal,Event(NewOrigin));
-    //UpdateFibonacci(frec[Origin].Retrace,Retrace,frec[Origin].Fractal,Event(NewOrigin));
+    UpdateFibonacci(frec[Origin].Extension,frec[Origin].Retrace,frec[Origin].Fractal,Event(NewOrigin));
 
 //    if (NewFractal(frec[Origin],prec,sBar,Event(NewOrigin),Always,Always))
 //    {
@@ -712,7 +749,7 @@ AlertType CFractal::Alert(FractalType Type)
 FibonacciType CFractal::Level(double Percent)
   {
     for (FibonacciType level=Fibo823;level>FiboRoot;level--)
-      if (fabs(Percent)>fibonacci[level])
+      if (Percent>fibonacci[level])
         return (level);
 
     return (FiboRoot);
@@ -787,9 +824,6 @@ string CFractal::FibonacciStr(FractalState Type, FibonacciRec &Fibonacci)
     Append(text,ActionText(Fibonacci.Bias),"|");
     Append(text,EnumToString(Fibonacci.Level),"|");
     Append(text,DoubleToStr(Fibonacci.Pivot,Digits),"|");
-    Append(text,DoubleToStr(Fibonacci.Open,Digits),"|");
-    Append(text,DoubleToStr(Fibonacci.High,Digits),"|");
-    Append(text,DoubleToStr(Fibonacci.Low,Digits),"|");
     
     for (MeasureType measure=0;measure<MeasureTypes;measure++)
       Append(text,DoubleToStr(Fibonacci.Percent[measure]*100,1),"|");
@@ -895,3 +929,35 @@ int Bias(int Direction, FractalState State)
     return NoBias;
   }
 
+color Color(FractalType Type, int Direction=DirectionUp)
+  {
+    switch (Direction)
+    {
+      case NoDirection:    switch(Type)
+                           {
+                             case Origin: return C'64,128,250';
+                             case Trend:  return C'64,128,200';
+                             case Term:   return C'64,128,150';
+                           }
+      case DirectionUp:    switch(Type)
+                           {
+                             case Origin: return C'00,250,00';
+                             case Trend:  return C'00,200,00';
+                             case Term:   return C'00,150,00';
+                           }
+      case DirectionDown:  switch(Type)
+                           {
+                             case Origin: return C'250,00,00';
+                             case Trend:  return C'200,00,00';
+                             case Term:   return C'150,00,00';
+                           }
+      case NewDirection:   switch(Type)
+                           {
+                             case Origin: return C'250,250,00';
+                             case Trend:  return C'200,200,00';
+                             case Term:   return C'150,150,00';
+                           }
+    }
+    
+    return clrDarkGray;
+  }
