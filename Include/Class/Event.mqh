@@ -102,20 +102,21 @@ public:
       bool           IsChanged(EventType &Compare, EventType Value);
       bool           IsEqual(EventType Event1, EventType Event2) {return Event1==Event2;};
 
-      AlertType      MaxAlert(void)                              {return eMaxAlert;}
-      AlertType      Alert(EventType Event)                      {return eAlert[Event];}
+      AlertType      MaxAlert(void)                              {return eMaxAlert;};
+      AlertType      Alert(EventType Event)                      {return eAlert[Event];};
       EventLog       Log(EventType Event);
+      EventLog       LastEvent(void)                             {return eLog[0];};
 
       //---  General use events
-      bool           Event(EventType Event)                      {return eEvent[Event];}
-      bool           Event(EventType Event, AlertType Alert)     {return eAlert[Event]==Alert&&Alert>NoAlert;}
-      bool           ActiveEvent(void)                           {return !eEvent[NoEvent];}
+      bool           Event(EventType Event)                      {return eEvent[Event];};
+      bool           Event(EventType Event, AlertType Alert)     {return eAlert[Event]==Alert&&Alert>NoAlert;};
+      bool           ActiveEvent(void)                           {return !eEvent[NoEvent];};
 
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       
-      bool           operator[](const EventType Event)           {return eEvent[Event];}
-      bool           operator[](const AlertType Alert)           {return Alert==eMaxAlert;}
+      bool           operator[](const EventType Event)           {return eEvent[Event];};
+      bool           operator[](const AlertType Alert)           {return Alert==eMaxAlert;};
   };
 
 //+------------------------------------------------------------------+
@@ -129,6 +130,7 @@ void CEvent::SetEvent(EventType Event, AlertType Alert=Notify, double Price=NoVa
     eEvent[NoEvent]         = false;
     eEvent[Event]           = true;
     eAlert[Event]           = fmax(Alert,eAlert[Event]);
+
     eMaxAlert               = fmax(Alert,eMaxAlert);
     
     ArrayResize(eLog,ArraySize(eLog)+1,32);
@@ -182,7 +184,7 @@ void CEvent::ClearEvents(void)
   {
     ArrayInitialize(eEvent,false);    
     ArrayInitialize(eAlert,NoAlert);
-    ArrayResize(eLog,0);
+    ArrayResize(eLog,0,12);
     
     eEvent[NoEvent]         = true;
     eMaxAlert               = NoAlert;

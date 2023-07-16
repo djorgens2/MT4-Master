@@ -633,20 +633,14 @@ bool IsChanged(uchar &Check, uchar Compare, bool Update=true)
 //+------------------------------------------------------------------+
 bool IsBetween(double Check, double Range1, double Range2, int Precision=0)
   {
-    double min;
-    double max;
-
     if (Precision == 0)
       Precision  = Digits;
-
-    min = fmin(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
-    max = fmax(NormalizeDouble(Range1,Precision),NormalizeDouble(Range2,Precision));
           
-    if (NormalizeDouble(Check,Precision) >= NormalizeDouble(min,Precision))
-      if (NormalizeDouble(Check,Precision) <= NormalizeDouble(max,Precision))
-        return (true);
+    if (NormalizeDouble(Check,Precision) >= NormalizeDouble(fmin(Range1,Range2),Precision))
+      if (NormalizeDouble(Check,Precision) <= NormalizeDouble(fmax(Range1,Range2),Precision))
+        return true;
      
-    return (false);
+    return false;
   }
 
 //+------------------------------------------------------------------+
