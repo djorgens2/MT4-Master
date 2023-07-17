@@ -63,6 +63,7 @@ private:
 
          bool             sIsOpen;
          bool             sShowFlags;
+         bool             sShowRanges;
          string           sObjectStr;
 
          int              sHourOpen;
@@ -88,7 +89,7 @@ private:
          
 public:
 
-                          CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false);
+                          CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRange, bool ShowFlags=false);
                          ~CSession();
 
          void             Update(void);
@@ -115,13 +116,16 @@ public:
 //+------------------------------------------------------------------+
 void CSession::CreateRange(void)
  {
-   string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
-     
-   ObjectCreate(range,OBJ_RECTANGLE,0,Time[sBar],srec[ActiveSession].High,Time[sBar],srec[ActiveSession].Low);
-   
-   ObjectSet(range, OBJPROP_STYLE,STYLE_SOLID);
-   ObjectSet(range, OBJPROP_COLOR,Color(sType,Dark));
-   ObjectSet(range, OBJPROP_BACK,true);     
+   if (sShowRanges)
+   {
+     string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
+
+     ObjectCreate(range,OBJ_RECTANGLE,0,Time[sBar],srec[ActiveSession].High,Time[sBar],srec[ActiveSession].Low);
+
+     ObjectSet(range, OBJPROP_STYLE,STYLE_SOLID);
+     ObjectSet(range, OBJPROP_COLOR,Color(sType,Dark));
+     ObjectSet(range, OBJPROP_BACK,true);
+   }
  }
 
 //+------------------------------------------------------------------+
@@ -129,21 +133,24 @@ void CSession::CreateRange(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateRange(void)
   {
-    string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
-
-    if (Event(NewHour))
-      if (sIsOpen||Event(SessionClose))
-        ObjectSet(range,OBJPROP_TIME2,Time[sBar]);
-
-    if (sIsOpen)
+    if (sShowRanges)
     {
-      if (Event(NewHigh))
-        ObjectSet(range,OBJPROP_PRICE1,srec[ActiveSession].High);
+      string range       = sObjectStr+EnumToString(sType)+":"+TimeToStr(Time[sBar],TIME_DATE);
 
-      if (Event(NewLow))
-        ObjectSet(range,OBJPROP_PRICE2,srec[ActiveSession].Low);
+      if (Event(NewHour))
+        if (sIsOpen||Event(SessionClose))
+          ObjectSet(range,OBJPROP_TIME2,Time[sBar]);
+
+      if (sIsOpen)
+      {
+        if (Event(NewHigh))
+          ObjectSet(range,OBJPROP_PRICE1,srec[ActiveSession].High);
+
+        if (Event(NewLow))
+          ObjectSet(range,OBJPROP_PRICE2,srec[ActiveSession].Low);
+      }
     }
- }
+  }
 
 //+------------------------------------------------------------------+
 //| UpdateSession - Sets active state, bounds and alerts on the tick |
@@ -217,7 +224,7 @@ void CSession::InitSession(EventType Event)
 
     SetEvent(Event,Notify);
     
-    CreateRange();
+    //CreateRange();
   }
 
 //+------------------------------------------------------------------+
@@ -248,7 +255,7 @@ void CSession::CloseSession(void)
 //+------------------------------------------------------------------+
 //| CSession Constructor                                             |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowFlags=false)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, bool ShowFlags=false) : CFractal (ShowFlags)
   {
     //--- Initialize period operationals
     sBar                             = Bars-1;
@@ -256,11 +263,13 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sBarDay                          = NoValue;
     sBarHour                         = NoValue;
 
+    sType                            = Type;
     sHourOpen                        = HourOpen;
     sHourClose                       = HourClose;
     sHourOffset                      = HourOffset;
 
     sIsOpen                          = false;
+    sShowRanges                      = ShowRanges;
     sShowFlags                       = ShowFlags;
     sObjectStr                       = "[session]";
 
@@ -323,7 +332,7 @@ void CSession::Update(void)
         
     UpdateSession();
     UpdateRange();
-    Update(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
+    UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
   }
 
 //+------------------------------------------------------------------+

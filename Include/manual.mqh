@@ -78,11 +78,11 @@ int ActionCode(string Action, string Operation="")
     
     switch (operation)
     {
-      case OP_BUY:   if (trim(Operation)=="LIMIT"))       return (OP_BUYLIMIT);
+      case OP_BUY:   if (trim(Operation)=="LIMIT")        return (OP_BUYLIMIT);
                      if (InStr("MITSTOP",Operation))      return (OP_BUYSTOP);
                      return (operation);
 
-      case OP_SELL:  if (trim(Operation)=="LIMIT"))       return (OP_SELLLIMIT);
+      case OP_SELL:  if (trim(Operation)=="LIMIT")        return (OP_SELLLIMIT);
                      if (InStr("MITSTOP",Operation))      return (OP_SELLSTOP);
                      return (operation);                  
     }

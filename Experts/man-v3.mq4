@@ -110,7 +110,6 @@ input double           inpAgg             = 2.5;         // Tick Aggregation
 
 //--- Session Inputs
 input string           sessHeader        = "";           // +--- Session Config -------+
-input SessionType      inpShowFractal    = Daily;        // Display Session Fractal
 input int              inpAsiaOpen       = 1;            // Asia Session Opening Hour
 input int              inpAsiaClose      = 10;           // Asia Session Closing Hour
 input int              inpEuropeOpen     = 8;            // Europe Session Opening Hour
@@ -155,12 +154,6 @@ void RefreshScreen(void)
     Append(text,"Fractal "+EnumToString(master.Session.Type),"\n");
     Append(text,EnumToString(master.Session.State));
     Append(text,EnumToString(master.Lead));
-
-    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-      Append(text,s[Daily].PivotStr(EnumToString(type),s[Daily].Pivot(type)),"\n");
-
-    if (inpShowFractal==Daily)
-      Append(text,s[inpShowFractal].FractalStr(5),"\n\n");
 
     Append(text,"Daily "+s[Daily].ActiveEventStr(),"\n\n");
     Append(text,"Tick "+t.ActiveEventStr(),"\n\n");
@@ -228,7 +221,6 @@ void UpdateMaster(void)
     for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
     {
       master.Manager[role].DCA          = order.DCA(role);
-      master.Manager[role].DCALevel     = Level(Retrace(s[Daily][Origin].Point[fpRoot],s[Daily][Origin].Point[fpExpansion],master.Manager[role].DCA));
       master.Manager[role].Entry        = order.Entry(role);
     }
   }
@@ -413,9 +405,9 @@ void UpdateSignal(CSession &Signal)
 
     signal.Response          = Review;
 
-    if (Signal[NewFibonacci])
+    if (Signal[NewExtension])
       for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-        if (IsEqual(Signal.Pivot(type).Event,NewFibonacci))
+        if (IsEqual(Signal[type].Pivot.Event,NewExtension))
         {
           signal.Type        = type;
           signal.State       = Extension;

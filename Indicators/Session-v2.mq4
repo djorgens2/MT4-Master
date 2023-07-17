@@ -55,9 +55,10 @@ input int            inpHourOpen        = NoValue;         // Session Opening Ho
 input int            inpHourClose       = NoValue;         // Session Closing Hour
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input YesNoType      inpShowRange       = No;              // Show Session Ranges
+input YesNoType      inpShowFlags       = No;              // Show Event Flags
 input ShowOptions    inpShowOption      = ShowNone;        // Show Fibonacci/Session Pivots
 
-CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,false);
+CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowRange==Yes,inpShowFlags==Yes);
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
@@ -91,12 +92,10 @@ string FibonacciStr(string Type, FibonacciRec &Fibonacci)
   {
     string text    = Type;
 
-    Append(text,DirText(Direction(Fibonacci.Bias,InAction)));
-    Append(text,"["+ActionText(Fibonacci.Lead)+"]");
     Append(text,EnumToString(Fibonacci.Level));
     Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
 
-    Append(text,"      Now/Min/Max:   ","\n");
+//    Append(text,"      Now/Min/Max:   ","\n");
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Max]*100,1)+"%");
@@ -116,7 +115,7 @@ void RefreshScreen(void)
     Append(text,(string)s.SessionHour()," [");
     Append(text,DirText(s[ActiveSession].Direction),"]");
     Append(text,ActionText(s[ActiveSession].Lead));
-    Append(text,BoolToStr(s[ActiveSession].Lead==s[ActiveSession].Bias,"","Hedge ["+DirText(s[ActiveSession].Bias,InAction)+"]"));
+    Append(text,BoolToStr(s[ActiveSession].Lead==s[ActiveSession].Bias,"","Hedge ["+DirText(Direction(s[ActiveSession].Bias,InAction))+"]"));
 
     if (ShowSession<PeriodTypes)
     {
@@ -168,12 +167,15 @@ void RefreshScreen(void)
       Append(text,"------- Fibonacci ["+EnumToString(type)+"] ------------------------","\n\n");
       Append(text," "+DirText(s[type].Direction),"\n");
       Append(text,EnumToString(s[type].State));
-      Append(text,"["+ActionText(s[type].Bias)+"]");
+      Append(text,"["+ActionText(s[type].Pivot.Lead)+"]");
+      Append(text,BoolToStr(IsEqual(s[type].Pivot.Bias,s[type].Pivot.Lead),"","Hedge"));
       Append(text,BoolToStr(IsEqual(s[type].Event,NoEvent),""," **"+EventText(s[type].Event)));
       Append(text,FibonacciStr("   Ext: ",s[type].Extension),"\n");
       Append(text,FibonacciStr("   Ret: ",s[type].Retrace),"\n");
     }
 
+//if (s.Event(NewBreakout,Major))
+//  Flag(sObjectStr+"Breakout",Color(Trend),0,s[Trend].Pivot.Price,Always);
     Append(text,s.ActiveEventStr(),"\n\n");
 
     Comment(text);

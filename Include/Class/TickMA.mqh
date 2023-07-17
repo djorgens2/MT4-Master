@@ -173,6 +173,7 @@ private:
 
     void             NewTick();
     void             NewSegment(void);
+    bool             NewState(FractalState &State, FractalState Change, bool Force=false, bool Update=true);
 
     void             UpdateTick(void);
     void             UpdateSegment(void);
@@ -619,6 +620,38 @@ void CTickMA::NewSegment(void)
     }
 
     SetEvent(NewSegment,Nominal);
+  }
+
+//+------------------------------------------------------------------+
+//| NewState - Returns true on change to a Fractal State             |
+//+------------------------------------------------------------------+
+bool CTickMA::NewState(FractalState &State, FractalState Change, bool Force=false, bool Update=true)
+  {
+    if (Change==NoState)
+      return(false);
+
+    if (Change==Breakout)
+      if (State==Reversal)
+        return(false);
+
+    //-- Outside Reversal Manager - force only on Direction Change
+    if (Force&&Change==Reversal&&State==Reversal)
+      return(true);
+
+    if (State==Correction)
+      if (Change==Reversal||Change==Breakout||Change==Recovery)
+        return(IsChanged(State,Change,Update));
+      else return(false);
+
+    if (Change==Recovery)
+      return (false);
+
+    if (State==Retrace)
+      if (Force||Change==Reversal||Change==Breakout||Change==Correction)
+        return(IsChanged(State,Change,Update));
+      else return(false);
+
+    return(IsChanged(State,Change,Update));
   }
 
 //+------------------------------------------------------------------+
