@@ -150,7 +150,7 @@ private:
          double          fpoint[FractalPoints];
 
          void            Flag(FractalType Type);
-         bool            NewState(FractalRec &Fractal);
+         bool            NewState(FractalRec &Fractal, bool PrintLog=false);
 
          void            InitPivot(PivotRec &Pivot, EventLog &Log);
          void            InitFractal(void);
@@ -185,7 +185,8 @@ public:
 
         string           BufferStr(int Node);
         string           PointStr(double &Fractal[]);
-        string           FibonacciStr(FractalState State, FibonacciRec &Fibonacci);
+        string           FibonacciStr(FibonacciRec &Fibonacci);
+        string           PivotStr(PivotRec &Pivot);
         string           FractalStr(FractalType Type);
   };
 
@@ -194,6 +195,7 @@ public:
 //+------------------------------------------------------------------+
 void CFractal::Flag(FractalType Type)
   {
+    if (Type!=Trend) return;
     string name    = fObjectStr+EnumToString(Type)+":"+EnumToString(frec[Type].Event);
     
     if (IsEqual(frec[Type].State,Extension))
@@ -214,14 +216,15 @@ void CFractal::Flag(FractalType Type)
 //+------------------------------------------------------------------+
 //| NewState - Returns true on detected change of Fibonacci State    |
 //+------------------------------------------------------------------+
-bool CFractal::NewState(FractalRec &Fractal)
+bool CFractal::NewState(FractalRec &Fractal, bool PrintLog=false)
   {
     if (IsBetween(Fractal.Extension.Event,NewRally,NewExtension))
     {
       Fractal.State        = State(Fractal.Extension.Event);
       Fractal.Event        = Fractal.Extension.Event;
       Fractal.Pivot.Price  = Fractal.Extension.Pivot;
-
+      
+      if (PrintLog) Print("|"+TimeToStr(Time[fBar])+"|Extension|"+FractalStr(Trend));
       return true;
     }
 
@@ -231,6 +234,7 @@ bool CFractal::NewState(FractalRec &Fractal)
       Fractal.Event        = Fractal.Retrace.Event;
       Fractal.Pivot.Price  = Fractal.Retrace.Pivot;
 
+      if (PrintLog) Print("|"+TimeToStr(Time[fBar])+"|Retrace|"+FractalStr(Trend));
       return true;
     }
 
@@ -323,10 +327,7 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
       {
         Extension.Pivot        = Fractal[fpBase];
         Extension.Event        = BoolToEvent(fext(fpoint[fpBase],fpoint[fpRoot],fpoint[fpExpansion],InDecimal)>fibonacci[Fibo100],NewReversal,NewBreakout);
-
-        Retrace.Level          = FiboRoot;
-        Retrace.Pivot          = Fractal[fpExpansion];
-      }      
+      }
       
       //-- Reset Retrace
       ArrayInitialize(Retrace.Percent,0.00);
@@ -343,58 +344,96 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
 
       if (IsHigher(Level(Extension.Percent[Max]),Extension.Level))
       {
-        Extension.Event        = BoolToEvent(Extension.Level>Fibo100,NewExtension,NewFibonacci);
+        Extension.Event        = BoolToEvent(Extension.Level>Fibo100,NewExtension,
+                                 BoolToEvent(Extension.Level<Fibo100,NewFibonacci,NewBreakout));
         Extension.Pivot        = fprice(Fractal[fpBase],Fractal[fpRoot],Extension.Level);
       }
 
-      if (IsEqual(Extension.Percent[Min],Extension.Percent[Max],3))
+      //-- Handle Geometric Breakouts/Extensions
+      if (Extension.Percent[Max]>fibonacci[Fibo100])
       {
-        //-- Handle Linear Breakouts
-        if (Extension.Percent[Max]>fibonacci[Fibo100])
+        //-- Handle New Extension
+        if (IsEqual(Extension.Percent[Min],Extension.Percent[Max],3))
         {
-          if (IsEqual(Extension.Event,NewFibonacci)||Retrace.Level>FiboRoot)
+          if (IsEqual(Extension.Event,NewBreakout)||Retrace.Level>FiboRoot)
           {
             Extension.Pivot    = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
             Extension.Event    = NewBreakout;
+
+            Retrace.Level      = FiboRoot;
+            Retrace.Pivot      = fClose;
+          }
+        }
+        else
+        {
+          //-- Handle Retraces
+          FibonacciType min        = Level(Retrace.Percent[Min]);
+
+          Retrace.Percent[Now]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpClose],InDecimal);
+          Retrace.Percent[Min]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRecovery],InDecimal);
+          Retrace.Percent[Max]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRetrace],InDecimal);
+
+          if (IsHigher(Level(Retrace.Percent[Max]),Retrace.Level))
+          {
+            if (IsEqual(Retrace.Level,FiboCorrection))
+              Retrace.Event        = NewCorrection;
+            else
+            if (IsBetween(Retrace.Level,Fibo50,Fibo61))
+              Retrace.Event        = NewRetrace;
+            else
+            if (IsBetween(Retrace.Level,Fibo23,Fibo38))
+              Retrace.Event        = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewPullback,NewRally);
+
+            Retrace.Pivot          = fprice(Fractal[fpRoot],Fractal[fpExpansion],Retrace.Level);
           }
 
-          Retrace.Level        = FiboRoot;
-          Retrace.Pivot        = fClose;
+          if (Retrace.Percent[Max]>fibonacci[FiboCorrection])
+            if (IsLower(Level(Retrace.Percent[Min]),min))
+              if (Retrace.Percent[Min]<fibonacci[Fibo23])
+              {
+                Retrace.Event      = NewRecovery;
+                Retrace.Pivot      = fprice(Fractal[fpRoot],Fractal[fpExpansion],Fibo23);
+              }
         }
-
-        //-- NewFibonacci Conflict Resolution (Event Merge)
+      }
+      else
+      {
+        //-- Handle Linear Expansions
         if (IsEqual(Extension.Event,NewFibonacci))
+        {
           if (IsEqual(Extension.Level,FiboCorrection))
-            Extension.Event    = NewCorrection;
+            Extension.Event      = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),frec[Origin].Direction),NewRetrace,NewCorrection);
           else
           if (IsBetween(Extension.Level,Fibo50,Fibo61))
-            Extension.Event    = NewRetrace;
+            Extension.Event      = NewRetrace;
           else
-            Extension.Event    = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewRally,NewPullback);
+            Extension.Event      = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewRally,NewPullback);
+
+          Extension.Pivot        = fprice(Fractal[fpBase],Fractal[fpRoot],Extension.Level);
+        }
+
+        //-- Handle Retraces
+        Retrace.Percent[Now]     = fret(Fractal[fpRoot],Fractal[fpBase],Fractal[fpClose],InDecimal);
+        Retrace.Percent[Min]     = fret(Fractal[fpRoot],Fractal[fpBase],Fractal[fpExpansion],InDecimal);
+        Retrace.Percent[Max]     = fret(Fractal[fpRoot],Fractal[fpBase],Fractal[fpRetrace],InDecimal);
+
+        if (IsEqual(Retrace.Percent[Now],Retrace.Percent[Max],3))
+          if (IsHigher(Level(Retrace.Percent[Max]),Retrace.Level))
+            switch (Retrace.Level-Level(Retrace.Percent[Min]))
+            {
+              case 1:    break;
+              case 2:
+              case 3:    Retrace.Event      = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewPullback,NewRally);
+                         Retrace.Pivot      = fprice(Fractal[fpRoot],Fractal[fpBase],Retrace.Level);
+                         break;
+              case 4:    Retrace.Event      = Retrace.Event  = NewRetrace;
+                         Retrace.Pivot      = fprice(Fractal[fpRoot],Fractal[fpBase],Retrace.Level);
+                         break;
+              case 5:    Retrace.Event      = Retrace.Event  = NewRecovery;
+                         Retrace.Pivot      = fprice(Fractal[fpRoot],Fractal[fpBase],Retrace.Level);
+                         break;
+            }
       }
-
-      //-- Update Retrace
-      Retrace.Percent[Now]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpClose],InDecimal);
-      Retrace.Percent[Min]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRecovery],InDecimal);
-      Retrace.Percent[Max]     = fret(Fractal[fpRoot],Fractal[fpExpansion],Fractal[fpRetrace],InDecimal);
-
-      if (IsHigher(Level(Retrace.Percent[Max]),Retrace.Level))
-      {
-        Retrace.Event          = NewFibonacci;
-        Retrace.Pivot          = fprice(Fractal[fpRoot],Fractal[fpExpansion],Retrace.Level);
-      }
-
-      //-- NewFibonacci Conflict Resolution (Event Merge)
-      if (IsEqual(Retrace.Percent[Min],Retrace.Percent[Max],3))
-        if (IsEqual(Retrace.Event,NewFibonacci))
-          if (IsEqual(Retrace.Level,FiboCorrection))
-            Retrace.Event      = BoolToEvent(Extension.Percent[Now]>fibonacci[FiboCorrection],NewRecovery,NewCorrection);
-          else
-          if (IsBetween(Retrace.Level,Fibo50,Fibo61))
-            Retrace.Event      = NewRetrace;
-          else
-          if (IsBetween(Retrace.Level,Fibo23,Fibo38))
-            Retrace.Event      = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewPullback,NewRally);
     }
 
     SetEvent(Extension.Event,Nominal,Extension.Pivot);
@@ -527,7 +566,7 @@ void CFractal::UpdateTrend(void)
     UpdateFibonacci(frec[Trend].Extension,frec[Trend].Retrace,frec[Trend].Fractal,Event(NewTerm)||Event(NewTrend));
     UpdatePivot(frec[Trend].Pivot);
 
-    if (NewState(frec[Trend]))
+    if (NewState(frec[Trend],true))
     {
       SetEvent(NewState,Major,fClose);
       SetEvent(frec[Trend].Event,Major,frec[Trend].Pivot.Price);
@@ -645,6 +684,9 @@ void CFractal::UpdateFractal(void)
       UpdateTrend();
       UpdateOrigin();
     }
+
+    //if (Event(NewState))
+    //  Print("|"+TimeToStr(Time[fBar])+"|"+FractalStr(Trend));    
   }
 
 //+------------------------------------------------------------------+
@@ -854,17 +896,35 @@ string CFractal::PointStr(double &Fractal[])
 //+------------------------------------------------------------------+
 //| FibonacciStr - Returns formatted text for supplied Fibonacci     |
 //+------------------------------------------------------------------+
-string CFractal::FibonacciStr(FractalState State, FibonacciRec &Fibonacci)
+string CFractal::FibonacciStr(FibonacciRec &Fibonacci)
   {
     string text    = "";
 
-    Append(text,EnumToString(State));
+    Append(text,EnumToString(Fibonacci.Event));
     Append(text,EnumToString(Fibonacci.Level),"|");
     Append(text,DoubleToStr(Fibonacci.Pivot,Digits),"|");
     
     for (MeasureType measure=0;measure<MeasureTypes;measure++)
       Append(text,DoubleToStr(Fibonacci.Percent[measure]*100,1),"|");
     
+    return text;
+  }
+
+//+------------------------------------------------------------------+
+//| PivotStr - Returns formatted text for supplied Pivot             |
+//+------------------------------------------------------------------+
+string CFractal::PivotStr(PivotRec &Pivot)
+  {
+    string text    = "";
+
+    Append(text,EnumToString(Pivot.Event));
+    Append(text,ActionText(Pivot.Lead),"|");
+    Append(text,ActionText(Pivot.Bias),"|");
+    Append(text,DoubleToStr(Pivot.Price,Digits),"|");
+    Append(text,DoubleToStr(Pivot.Open,Digits),"|");
+    Append(text,DoubleToStr(Pivot.High,Digits),"|");
+    Append(text,DoubleToStr(Pivot.Low,Digits),"|");
+
     return text;
   }
 
@@ -879,9 +939,10 @@ string CFractal::FractalStr(FractalType Type)
     Append(text,DirText(frec[Type].Direction),"|");
     Append(text,EnumToString(frec[Type].State),"|");
     Append(text,EnumToString(frec[Type].Event),"|");
+    Append(text,PivotStr(frec[Type].Pivot),"|");
+    Append(text,FibonacciStr(frec[Type].Extension),"|");
+    Append(text,FibonacciStr(frec[Type].Retrace),"|");
     Append(text,PointStr(frec[Type].Fractal),"|");
-    Append(text,FibonacciStr(Extension,frec[Type].Extension),"|");
-    Append(text,FibonacciStr(Retrace,frec[Type].Retrace),"|");
 
     return text;
   }
@@ -940,6 +1001,17 @@ bool IsHigher(FibonacciType Check, FibonacciType &Change, bool Update=true)
       return (IsChanged(Change,Check,Update));
 
     return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsLower - Returns true on lower FibonacciType                    |
+//+------------------------------------------------------------------+
+bool IsLower(FibonacciType Check, FibonacciType &Change, bool Update=true)
+  {
+    if (Check<Change)
+      return (IsChanged(Change,Check,Update));
+
+    return false;
   }
 
 bool IsEqual(FractalType Source, FractalType Compare)     {return Source==Compare;};
