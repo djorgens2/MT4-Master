@@ -174,13 +174,9 @@ void RefreshScreen(void)
       Append(text,FibonacciStr("   Ret: ",s[type].Retrace),"\n");
     }
 
-//if (s.Event(NewBreakout,Major))
-//  Flag(sObjectStr+"Breakout",Color(Trend),0,s[Trend].Pivot.Price,Always);
     Append(text,s.ActiveEventStr(),"\n\n");
 
     Comment(text);
-    //if (s[NewDirection])
-    //  Arrow("[sv2]Direction"+TimeToStr(TimeCurrent()),(ArrowType)BoolToInt(s[ActiveSession].Direction==DirectionUp,ArrowUp,ArrowDown),Color(s[ActiveSession].Direction,IN_CHART_DIR));
   }
 
 //+------------------------------------------------------------------+

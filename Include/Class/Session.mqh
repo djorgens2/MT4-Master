@@ -333,6 +333,7 @@ void CSession::Update(void)
     UpdateSession();
     UpdateRange();
     UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
+//    Flag(Trend,Event(NewState));
   }
 
 //+------------------------------------------------------------------+
