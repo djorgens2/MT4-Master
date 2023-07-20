@@ -62,7 +62,6 @@ private:
          SessionType      sType;
 
          bool             sIsOpen;
-         bool             sShowFlags;
          bool             sShowRanges;
          string           sObjectStr;
 
@@ -89,7 +88,7 @@ private:
          
 public:
 
-                          CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRange, bool ShowFlags=false);
+                          CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRange, FractalType ShowFlags);
                          ~CSession();
 
          void             Update(void);
@@ -255,7 +254,7 @@ void CSession::CloseSession(void)
 //+------------------------------------------------------------------+
 //| CSession Constructor                                             |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, bool ShowFlags=false) : CFractal (ShowFlags)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, FractalType ShowFlags=FractalTypes) : CFractal (ShowFlags)
   {
     //--- Initialize period operationals
     sBar                             = Bars-1;
@@ -270,7 +269,6 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
 
     sIsOpen                          = false;
     sShowRanges                      = ShowRanges;
-    sShowFlags                       = ShowFlags;
     sObjectStr                       = "[session]";
 
     //--- Initialize session records

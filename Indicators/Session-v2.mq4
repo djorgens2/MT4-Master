@@ -55,10 +55,10 @@ input int            inpHourOpen        = NoValue;         // Session Opening Ho
 input int            inpHourClose       = NoValue;         // Session Closing Hour
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input YesNoType      inpShowRange       = No;              // Show Session Ranges
-input YesNoType      inpShowFlags       = No;              // Show Event Flags
+input FractalType    inpShowFlags       = FractalTypes;    // Show Event Flags
 input ShowOptions    inpShowOption      = ShowNone;        // Show Fibonacci/Session Pivots
 
-CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowRange==Yes,inpShowFlags==Yes);
+CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowRange==Yes,inpShowFlags);
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
