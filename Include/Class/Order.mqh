@@ -1542,7 +1542,7 @@ void COrder::ProcessLosses(int Action)
 COrder::COrder(BrokerModel Model, OrderMethod Long, OrderMethod Short)
   {
     //--- Set Panel Indicator Short Name
-    indSN                            = "CPanel-v3";
+    indSN                            = "CPanel-v2";
 
     //-- Initialize Account
     Account.MarginModel    = Model;
