@@ -1011,7 +1011,7 @@ void CTickMA::UpdateFractal(void)
 //+------------------------------------------------------------------+
 //| TickMA Class Constructor                                         |
 //+------------------------------------------------------------------+
-CTickMA::CTickMA(int Periods, int Degree, double Aggregate)
+CTickMA::CTickMA(int Periods, int Degree, double Aggregate) : CFractal (FractalTypes)
   {
     tmaPeriods                 = Periods;
     tmaDegree                  = Degree;
