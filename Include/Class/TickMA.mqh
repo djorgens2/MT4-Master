@@ -8,24 +8,16 @@
 #property version   "1.00"
 #property strict
 
-#include <Class\Fractal.mqh>
-//#include <fractal_lib.mqh>
+//#include <Class\Fractal.mqh>
+#include <fractal_lib.mqh>
 
 #define Fast           2
 #define Slow           3
 
-class CTickMA : public CFractal
+class CTickMA : public CEvent
   {
 
 private:
-  enum             PivotType
-                   {
-                     Mean,
-                     Support,
-                     Resistance,
-                     Active,
-                     PivotTypes
-                   };
 
     enum   PriceType
            {
@@ -161,6 +153,13 @@ private:
              FOCRec         Close;
            };
 
+    struct SegmentPivot
+           {
+             double         Support;
+             double         Resistance;
+             double         Active;
+             double         Mean;
+           };
 
     void             InitFractal(FractalDetail &Detail[]);
 
@@ -192,6 +191,11 @@ private:
     int              tmaDirection[FractalTypes];
     int              tmaBar;
     
+    //-- Key Segment Pivots
+    double           segResistance;    //-- Resistance
+    double           segSupport;       //-- Support
+    double           segActive;        //-- Active segment pivot
+
     //-- Aggregation Structures
     TickRec          tr[];             //-- Tick Record
     SegmentRec       sr[];             //-- Segment Record
@@ -201,7 +205,7 @@ private:
     LinearRec        line;             //-- Linear Regr Record
     FractalMaster    fm;               //-- Fractal Master
     MomentumRec      mr;               //-- Momentum Record
-    double           seg[PivotTypes];  //-- Segment Key Pivots
+    SegmentPivot     seg;              //-- Segment Pivots
 
 public:
                      CTickMA(int Periods, int Degree, double Aggregate);
@@ -217,6 +221,7 @@ public:
     PolyRec          Poly(void)            {return(poly);};
     LinearRec        Linear(void)          {return(line);};
     FractalMaster    Fractal(void)         {return(fm);};
+    SegmentPivot     Pivot(void)           {return(seg);};
 
     MomentumRec      Momentum(void)        {return(mr);};    
     MomentumDetail   Momentum(PriceType Type);
@@ -225,7 +230,6 @@ public:
     int              Direction(double &Price[], int Speed=Fast) {return(Direction(Price[0]-Price[Speed-1]));};
 
     FractalDetail    operator[](const FractalType Type)  const {return(fm.Fractal[Type]);};
-    double           operator[](const PivotType Pivot)   const {return(seg[Pivot]);};
 
     //-- Format strings
     string           TickStr(int Count=0);
@@ -713,14 +717,14 @@ void CTickMA::UpdateSegment(void)
         if (IsHigher(sr[0].High,sr[1].High,NoUpdate,Digits))
           if (NewDirection(tmaDirection[Term],DirectionUp))
           {
-            seg[Support]     = seg[Active];
-            seg[Active]      = sr[0].High;
+            seg.Support      = seg.Active;
+            seg.Active       = sr[0].High;
 
             SetEvent(NewRally,Nominal);
           }
 
       if (IsEqual(tmaDirection[Term],DirectionUp))
-        seg[Active]          = fmax(seg[Active],sr[0].High);
+        seg.Active           = fmax(seg.Active,sr[0].High);
 
       SetEvent(NewHigh,Nominal);
       SetEvent(NewBoundary,Nominal);
@@ -732,14 +736,14 @@ void CTickMA::UpdateSegment(void)
         if (IsLower(sr[0].Low,sr[1].Low,NoUpdate,Digits))
           if (NewDirection(tmaDirection[Term],DirectionDown))
           {
-            seg[Resistance]  = seg[Active];
-            seg[Active]      = sr[0].Low;
+            seg.Resistance   = seg.Active;
+            seg.Active       = sr[0].Low;
 
             SetEvent(NewPullback,Nominal);
           }
 
       if (IsEqual(tmaDirection[Term],DirectionDown))
-        seg[Active]          = fmin(seg[Active],sr[0].Low);
+        seg.Active           = fmin(seg.Active,sr[0].Low);
 
       SetEvent(NewLow,Nominal);
       SetEvent(NewBoundary,Nominal);
@@ -751,7 +755,7 @@ void CTickMA::UpdateSegment(void)
       SetEvent(NewFractal,Nominal);
     }
 
-    if (!IsBetween(seg[Active],seg[Support],seg[Resistance],Digits))
+    if (!IsBetween(seg.Active,seg.Support,seg.Resistance,Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
       {
         SetEvent(NewTrend,Nominal);
@@ -1011,7 +1015,7 @@ void CTickMA::UpdateFractal(void)
 //+------------------------------------------------------------------+
 //| TickMA Class Constructor                                         |
 //+------------------------------------------------------------------+
-CTickMA::CTickMA(int Periods, int Degree, double Aggregate) : CFractal (FractalTypes)
+CTickMA::CTickMA(int Periods, int Degree, double Aggregate) //: CFractal (FractalTypes)
   {
     tmaPeriods                 = Periods;
     tmaDegree                  = Degree;
@@ -1044,9 +1048,9 @@ CTickMA::CTickMA(int Periods, int Degree, double Aggregate) : CFractal (FractalT
     ArrayResize(sma.Close,tmaPeriods);
 
     //-- Preload History (Initialize)
-    seg[Support]              = Low[tmaBar];
-    seg[Resistance]           = High[tmaBar];
-    seg[Active]               = Close[tmaBar];
+    seg.Support               = Low[tmaBar];
+    seg.Resistance            = High[tmaBar];
+    seg.Active                = Close[tmaBar];
 
     for (tmaBar=Bars-1;tmaBar>0;tmaBar--)
       Update();
