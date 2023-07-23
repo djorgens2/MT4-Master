@@ -254,7 +254,7 @@ void CSession::CloseSession(void)
 //+------------------------------------------------------------------+
 //| CSession Constructor                                             |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, FractalType ShowFlags=FractalTypes) : CFractal (ShowFlags)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, FractalType ShowFlags=FractalTypes) : CFractal (Period(),ShowFlags)
   {
     //--- Initialize period operationals
     sBar                             = Bars-1;

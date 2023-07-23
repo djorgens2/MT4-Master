@@ -58,10 +58,10 @@
 #property indicator_width6  1
 
 //--- plot plOpenLine
-#property indicator_label7 "plTrendLine"
-#property indicator_type7  DRAW_SECTION
-#property indicator_style7 STYLE_SOLID
-#property indicator_width7 1
+#property indicator_label7  "plTrendLine"
+#property indicator_type7   DRAW_SECTION
+#property indicator_style7  STYLE_SOLID
+#property indicator_width7  1
 
 enum ShowType
      {
@@ -72,7 +72,7 @@ enum ShowType
      };
 
 //--- input parameters
-input int          inpPeriods        =  80;         // Retention
+input int          inpPeriods        = 80;          // Retention
 input double       inpAgg            = 2.5;         // Tick Aggregation
 input YesNoType    inpShowComment    = No;          // Display Comments
 input YesNoType    inpRangeBounds    = No;          // Show Range Boundaries
@@ -83,7 +83,6 @@ input ShowType     inpShowEvents     = stNone;      // Show Events
 string         indObjectStr       = "[tv2]";
 string         indSN              = "TickMA-v2: "+(string)inpPeriods+":"+(string)inpAgg;
 int            indWinId           = NoValue;
-int            indSegHist         = NoValue;
 
 //--- Indicator buffers
 double         plHighBuffer[];
@@ -221,8 +220,7 @@ void UpdateTickMA(void)
 //    if (t[NewBoundary])
 //      UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
 //
-    SetIndexStyle(8,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
-    SetIndexStyle(9,DRAW_LINE,STYLE_DASH,1,Color(t.Range().Direction,IN_CHART_DIR));
+    SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open);
     ResetBuffer(plSMACloseBuffer,t.SMA().Close);
@@ -326,7 +324,7 @@ int OnInit()
 //    SetIndexLabel (3,"");
 //    SetIndexLabel (4,""); 
 //    SetIndexLabel (5,"");
-    SetIndexLabel (6,""); 
+//    SetIndexLabel (6,""); 
 
     //-- Fibonacci Display Option
     if (IsBetween(inpShowFibo,Origin,Term))

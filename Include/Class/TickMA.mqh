@@ -117,7 +117,6 @@ private:
     SMARec           sma;              //-- SMA Master Record
     LinearRec        line;             //-- Linear Regr Record
     SegmentPivot     seg;              //-- Segment Pivots
-    TickRec          tick;             //-- OHLC of incoming tick
 
 public:
                      CTickMA(int Periods, double Aggregate, FractalType Show);
@@ -225,10 +224,10 @@ void CTickMA::NewTick()
       ArrayCopy(tr,tr,1,0,ArraySize(tr)-1);
 
     tr[0].Count               = 0;
-    tr[0].Open                = BoolToDouble(IsEqual(tmaBar,0),Close[0],Open[tmaBar]);
-    tr[0].High                = BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar]);
-    tr[0].Low                 = BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]);
-    tr[0].Close               = Close[tmaBar];
+    tr[0].Open                = iOpen(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].High                = iHigh(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].Low                 = iLow(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].Close               = iClose(Symbol(),PERIOD_M1,tmaBar);
     
     if (ArraySize(tr)>1)
       SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow),Notify);
@@ -261,9 +260,9 @@ void CTickMA::NewSegment(void)
       sr[0].Low               = fmin(sr[0].Low,tr[1].Low);
     }
     else
-    {
-      sr[0].High              = fmax(sr[0].High,BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar],Digits));
-      sr[0].Low               = fmin(sr[0].Low,BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar],Digits));
+    {    
+      sr[0].High              = fmax(sr[0].High,BoolToDouble(IsEqual(tmaBar,0),Close[0],iHigh(Symbol(),PERIOD_M1,tmaBar),Digits));
+      sr[0].Low               = fmin(sr[0].Low,BoolToDouble(IsEqual(tmaBar,0),Close[0],iLow(Symbol(),PERIOD_M1,tmaBar),Digits));
     }
 
     SetEvent(NewSegment,Nominal);
@@ -274,18 +273,18 @@ void CTickMA::NewSegment(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateTick(void)
   {
-    if (fabs(tr[0].Open-Close[tmaBar])>=tmaTickAgg)
+    if (fabs(tr[0].Open-iClose(Symbol(),PERIOD_M1,tmaBar))>=tmaTickAgg)
       NewTick();
 
-    if (IsHigher(BoolToDouble(IsEqual(tmaBar,0),Close[0],High[tmaBar]),tr[0].High))
+    if (IsHigher(BoolToDouble(IsEqual(tmaBar,0),Close[0],iHigh(Symbol(),PERIOD_M1,tmaBar)),tr[0].High))
       SetEvent(NewHigh,Notify);
 
-    if (IsLower(BoolToDouble(IsEqual(tmaBar,0),Close[0],Low[tmaBar]),tr[0].Low))
+    if (IsLower(BoolToDouble(IsEqual(tmaBar,0),Close[0],iLow(Symbol(),PERIOD_M1,tmaBar)),tr[0].Low))
       SetEvent(NewLow,Notify);
 
     SetEvent(BoolToEvent(Event(NewHigh)||Event(NewLow),NewBoundary),Notify);
 
-    tr[0].Close           = Close[tmaBar];
+    tr[0].Close           = iClose(Symbol(),PERIOD_M1,tmaBar);
     tr[0].Count++;
   }
 
@@ -369,8 +368,8 @@ void CTickMA::UpdateSegment(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateRange(void)
   {
-    double rangehigh      = BoolToDouble(IsEqual(tmaBar,0),Close[tmaBar],High[tmaBar],Digits);
-    double rangelow       = BoolToDouble(IsEqual(tmaBar,0),Close[tmaBar],Low[tmaBar],Digits);
+    double rangehigh      = BoolToDouble(IsEqual(tmaBar,0),Close[0],iHigh(Symbol(),PERIOD_M1,tmaBar),Digits);
+    double rangelow       = BoolToDouble(IsEqual(tmaBar,0),Close[0],iLow(Symbol(),PERIOD_M1,tmaBar),Digits);
     int    direction      = NoDirection;
 
     range.Event           = NoEvent;
@@ -527,11 +526,10 @@ void CTickMA::UpdateLinear(void)
 //+------------------------------------------------------------------+
 //| TickMA Class Constructor                                         |
 //+------------------------------------------------------------------+
-CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Show)
+CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PERIOD_M1,Show)
   {
     tmaPeriods                 = Periods;
     tmaTickAgg                 = point(Aggregate);
-    tmaBar                     = Bars-1;
 
     ArrayInitialize(tmaDirection,NewDirection);
     ArrayResize(line.Price,tmaPeriods);
@@ -540,9 +538,9 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Sh
     NewSegment();
     
     //-- Initialize Range
-    range.Direction           = Direction(Close[tmaBar]-Close[tmaBar]);
-    range.High                = High[tmaBar];
-    range.Low                 = Low[tmaBar];
+    range.Direction           = Direction(iClose(Symbol(),PERIOD_M1,tmaBar)-iOpen(Symbol(),PERIOD_M1,tmaBar));
+    range.High                = iHigh(Symbol(),PERIOD_M1,tmaBar);
+    range.Low                 = iLow(Symbol(),PERIOD_M1,tmaBar);
     range.Mean                = fdiv(range.High+range.Low,2,Digits);
     
     //-- Preload SMA Price arrays
@@ -552,11 +550,11 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Sh
     ArrayResize(sma.Close,tmaPeriods);
 
     //-- Preload History (Initialize)
-    seg.Support               = Low[tmaBar];
-    seg.Resistance            = High[tmaBar];
-    seg.Active                = Close[tmaBar];
+    seg.Support               = range.Low;
+    seg.Resistance            = range.High;
+    seg.Active                = iClose(Symbol(),PERIOD_M1,tmaBar);
 
-    for (tmaBar=Bars-1;tmaBar>0;tmaBar--)
+    for (tmaBar=(Periods*10000);tmaBar>0;tmaBar--)
       Update();
   }
 
