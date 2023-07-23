@@ -138,7 +138,6 @@ private:
 
          double          fSupport;
          double          fResistance;
-         double          fPivot;
          double          fHigh;
          double          fLow;
          double          fClose;
@@ -663,7 +662,6 @@ void CFractal::UpdateFractal(double Support, double Resistance, double Pivot, in
 
     fSupport                     = Support;
     fResistance                  = Resistance;
-    fPivot                       = Pivot;
 
     ManageBuffer();
     UpdateFractal();
