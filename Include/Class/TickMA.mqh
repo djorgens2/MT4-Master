@@ -539,8 +539,8 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PE
     
     //-- Initialize Range
     range.Direction           = Direction(iClose(Symbol(),PERIOD_M1,tmaBar)-iOpen(Symbol(),PERIOD_M1,tmaBar));
-    range.High                = iHigh(Symbol(),PERIOD_M1,tmaBar);
-    range.Low                 = iLow(Symbol(),PERIOD_M1,tmaBar);
+    range.High                = iHighest(Symbol(),PERIOD_M1,MODE_HIGH,1440);
+    range.Low                 = iLowest(Symbol(),PERIOD_M1,MODE_LOW,1440);
     range.Mean                = fdiv(range.High+range.Low,2,Digits);
     
     //-- Preload SMA Price arrays
@@ -554,7 +554,8 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PE
     seg.Resistance            = range.High;
     seg.Active                = iClose(Symbol(),PERIOD_M1,tmaBar);
 
-    for (tmaBar=(Periods*10000);tmaBar>0;tmaBar--)
+    Print("Start Time: "+TimeToStr(iTime(Symbol(),PERIOD_M1,1440*3)));
+    for (tmaBar=(1440*3);tmaBar>0;tmaBar--)
       Update();
   }
 

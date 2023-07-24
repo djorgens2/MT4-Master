@@ -62,7 +62,7 @@ CSession            *s                  = new CSession(inpType,inpHourOpen,inpHo
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
-string        sObjectStr  = "[s2]";
+string        sObjectStr  = "[s1]";
 
 
 //+------------------------------------------------------------------+
