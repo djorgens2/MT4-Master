@@ -193,7 +193,6 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-//    Print(DoubleToStr(extension(s[Origin].Fractal[fpBase],s[Origin].Fractal[fpRoot],s[Origin].Fractal[fpExpansion],InPercent),1)+"%");
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
 

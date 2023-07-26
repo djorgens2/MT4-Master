@@ -136,7 +136,7 @@ void RefreshScreen(void)
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Fractal[point],-6);
+        UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Fractal[point],-7);
     }
 
 
@@ -253,6 +253,7 @@ void UpdateSegment(bool Refresh)
     {
       highbuffer     = t.Segment(0).Low;
       lowbuffer      = t.Segment(0).High;
+
       ArrayInitialize(plHighBuffer,0.00);
       ArrayInitialize(plLowBuffer,0.00);
 
@@ -266,7 +267,9 @@ void UpdateSegment(bool Refresh)
       }
     }
 
+    UpdateNode("tmaHL:"+(string)indWinId+"-",0,t.Segment(0).High,t.Segment(0).Low);
     UpdateNode("tmaOC:"+(string)indWinId+"-",0,t.Segment(0).Open,t.Segment(0).Close);
+    
     plHighBuffer[0]        = highbuffer+point(2);
     plLowBuffer[0]         = lowbuffer;
   }

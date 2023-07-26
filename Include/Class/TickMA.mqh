@@ -528,8 +528,10 @@ void CTickMA::UpdateLinear(void)
 //+------------------------------------------------------------------+
 CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PERIOD_M1,Show)
   {
+    //-- Configure Fractal (max 100 days)
     tmaPeriods                 = Periods;
     tmaTickAgg                 = point(Aggregate);
+    tmaBar                     = fmin(iBarShift(Symbol(),PERIOD_M1,Time[Bars-1]),144000);
 
     ArrayInitialize(tmaDirection,NewDirection);
     ArrayResize(line.Price,tmaPeriods);
@@ -538,9 +540,9 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PE
     NewSegment();
     
     //-- Initialize Range
-    range.Direction           = Direction(iClose(Symbol(),PERIOD_M1,tmaBar)-iOpen(Symbol(),PERIOD_M1,tmaBar));
-    range.High                = iHighest(Symbol(),PERIOD_M1,MODE_HIGH,1440);
-    range.Low                 = iLowest(Symbol(),PERIOD_M1,MODE_LOW,1440);
+    range.Direction           = NewDirection;
+    range.High                = iHigh(Symbol(),PERIOD_M1,tmaBar);
+    range.Low                 = iLow(Symbol(),PERIOD_M1,tmaBar);
     range.Mean                = fdiv(range.High+range.Low,2,Digits);
     
     //-- Preload SMA Price arrays
@@ -554,8 +556,7 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PE
     seg.Resistance            = range.High;
     seg.Active                = iClose(Symbol(),PERIOD_M1,tmaBar);
 
-    Print("Start Time: "+TimeToStr(iTime(Symbol(),PERIOD_M1,1440*3)));
-    for (tmaBar=(1440*3);tmaBar>0;tmaBar--)
+    for (tmaBar=tmaBar;tmaBar>0;tmaBar--)
       Update();
   }
 
@@ -579,15 +580,12 @@ void CTickMA::Update(void)
     UpdateFractal(range.Low,range.High,range.Mean,tmaBar);
     UpdateRange();
 
+//for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+//  Print(DoubleToStr(range.Low,Digits)+"|"+DoubleToStr(range.High,Digits)+"|"+FractalStr(type));
     if (Count(Segments)>Slow)
     {
       UpdateSMA();
-
-      if (Count(Segments)>tmaPeriods)
-      {
-        UpdateLinear();      
-        UpdateFractal(range.Low,range.High,range.Mean,tmaBar);
-      }
+      UpdateLinear();      
     }
   }
 

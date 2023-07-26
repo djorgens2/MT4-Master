@@ -285,11 +285,11 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     for (sBar=sBar;sBar>0;sBar--)
       Update();
 
-    //double fbuffer[];
-    //Fractal(fbuffer);
-    //for (int node=Bars-1;node>0;node--)
-    //  if (fbuffer[node]>0.00)
-    //    Print(BufferStr(node));
+    double fbuffer[];
+    Fractal(fbuffer);
+    for (int node=Bars-1;node>0;node--)
+      if (fbuffer[node]>0.00)
+        Print(BufferStr(node));
   }
 
 //+------------------------------------------------------------------+

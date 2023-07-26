@@ -114,6 +114,7 @@ public:
 
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
+      string         EventStr(EventType Begin, EventType End);
       
       bool           operator[](const EventType Event)           {return eEvent[Event];};
       bool           operator[](const AlertType Alert)           {return Alert==eMaxAlert;};
@@ -265,7 +266,25 @@ string CEvent::EventStr(void)
     
     return text;
   }
-  
+
+//+------------------------------------------------------------------+
+//| EventStr - String of active events formatted for Log             |
+//+------------------------------------------------------------------+
+string CEvent::EventStr(EventType Begin, EventType End)
+  {
+    string text   = "";
+
+    Append(text,EnumToString(MaxAlert()),"|");
+    Append(text,EnumToString(Begin),"|");
+    
+    for (EventType event=Begin;event<End;event++)
+      Append(text,EnumToString(eAlert[event]),"|");
+
+    Append(text,EnumToString(End),"|");
+    
+    return text;
+  }
+
 //+------------------------------------------------------------------+
 //| EventText - String of active events formatted for Log            |
 //+------------------------------------------------------------------+
