@@ -217,6 +217,11 @@ void UpdateTickMA(void)
   {
     t.Update();
 
+    if (t.Count(Ticks)==813||t.Count(Ticks)==827)
+      Flag("[tmav2]-Tick",clrRed,0,Close[0],Always);
+
+    if (t[NewTick])
+      Print("|"+TimeToStr(TimeCurrent())+"|"+t.SegmentStr(0)+"|"+t.TickStr(1));
 //    if (t[NewBoundary])
 //      UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
 //

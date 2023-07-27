@@ -224,9 +224,9 @@ void CTickMA::NewTick()
       ArrayCopy(tr,tr,1,0,ArraySize(tr)-1);
 
     tr[0].Count               = 0;
-    tr[0].Open                = iOpen(Symbol(),PERIOD_M1,tmaBar);
-    tr[0].High                = iHigh(Symbol(),PERIOD_M1,tmaBar);
-    tr[0].Low                 = iLow(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].Open                = iClose(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].High                = iClose(Symbol(),PERIOD_M1,tmaBar);
+    tr[0].Low                 = iClose(Symbol(),PERIOD_M1,tmaBar);
     tr[0].Close               = iClose(Symbol(),PERIOD_M1,tmaBar);
     
     if (ArraySize(tr)>1)
