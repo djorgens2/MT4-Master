@@ -284,7 +284,7 @@ void CFractal::InitFractal(void)
       fClose                     = fHigh;
 
       rec.Direction              = DirectionUp;
-      rec.Fractal[fpOrigin]      = fSupport;
+      rec.Fractal[fpOrigin]      = fResistance;
       rec.Fractal[fpBase]        = fResistance;
       rec.Fractal[fpRoot]        = fSupport;
     }
@@ -294,7 +294,7 @@ void CFractal::InitFractal(void)
       fClose                     = fLow;
 
       rec.Direction              = DirectionDown;
-      rec.Fractal[fpOrigin]      = fResistance;
+      rec.Fractal[fpOrigin]      = fSupport;
       rec.Fractal[fpBase]        = fSupport;
       rec.Fractal[fpRoot]        = fResistance;
     }
@@ -472,7 +472,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
     //-- Handle *Special* Breakouts
     if (IsEqual(frec[Type].Direction,direction))
       if (Type==Trend)
-        if (IsChanged(frec[Type].Fractal[fpBase],frec[Term].Fractal[fpOrigin]))
+        if (IsChanged(frec[Trend].Fractal[fpBase],frec[Term].Fractal[fpOrigin]))
         {
           fpoint[fpExpansion]              = frec[Term].Fractal[fpOrigin];
 
@@ -485,7 +485,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
           SetEvent(AdverseEvent,Minor,fClose);
         }
 
-    //--- Check for Term Upper Boundary changes
+    //--- Check for Upper Boundary changes
     if (IsEqual(frec[Type].Direction,DirectionUp))
       if (IsHigher(fHigh,frec[Type].Fractal[fpExpansion]))
       {
@@ -501,7 +501,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
         frec[Type].Fractal[fpRecovery]  = fmax(fHigh,frec[Type].Fractal[fpRecovery]);
     else
 
-    //--- Check for Type Lower Boundary changes
+    //--- Check for Lower Boundary changes
       if (IsLower(fClose,frec[Type].Fractal[fpExpansion]))
       {
         frec[Type].Fractal[fpRetrace]   = frec[Type].Fractal[fpExpansion];
@@ -533,9 +533,9 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
 //+------------------------------------------------------------------+
 void CFractal::ManageFractal(void)
   {
-    fLow      = iLow(Symbol(),fPeriod,fBar);
-    fHigh     = iHigh(Symbol(),fPeriod,fBar);
-    fClose    = BoolToDouble(frec[Term].Direction==DirectionUp,fHigh,fLow);
+    fLow      = BoolToDouble(IsEqual(fBar,0),iClose(Symbol(),fPeriod,0),iLow(Symbol(),fPeriod,fBar));
+    fHigh     = BoolToDouble(IsEqual(fBar,0),iClose(Symbol(),fPeriod,0),iHigh(Symbol(),fPeriod,fBar));
+    fClose    = BoolToDouble(IsEqual(frec[Term].Direction,DirectionUp),fHigh,fLow);
 
     //-- Handle Anomalies; set effective Fractal prices
     if (fHigh>fResistance)
