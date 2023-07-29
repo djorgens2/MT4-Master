@@ -135,7 +135,6 @@ public:
     int              Count(CountType Type) {return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr)));};
     int              Direction(double &Price[], int Speed=Fast) {return(Direction(Price[0]-Price[Speed-1]));};
 
-    FractalRec       operator[](const FractalType Type)   {return Fractal(Type);};
 
     //-- Format strings
     string           TickStr(int Count=0);
@@ -336,31 +335,24 @@ void CTickMA::UpdateSegment(void)
     }
 
     if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))
-    {
-      SetEvent(NewTerm,Nominal);
-      SetEvent(NewFractal,Nominal);
-    }
+      SetEvent(NewLead,Nominal);
 
     if (!IsBetween(seg.Active,seg.Support,seg.Resistance,Digits))
       if (IsChanged(tmaDirection[Trend],tmaDirection[Term]))
-      {
-        SetEvent(NewTrend,Nominal);
-        SetEvent(NewFractal,Warning);
-      }
+        SetEvent(NewLead,Warning);
 
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
     
     SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
 
-    sr[0].Event            = BoolToEvent(Event(NewTrend,Nominal),      NewTrend,
-                             BoolToEvent(Event(NewTerm,Nominal),       NewTerm,
+    sr[0].Event            = BoolToEvent(Event(NewLead),               NewLead,
                              BoolToEvent(Event(NewSegment,Nominal),    NewSegment,
                              BoolToEvent(Event(NewPullback,Nominal),   NewPullback,
                              BoolToEvent(Event(NewRally,Nominal),      NewRally,
                              BoolToEvent(Event(NewLow,Nominal),        NewLow,
                              BoolToEvent(Event(NewHigh,Nominal),       NewHigh,
-                             BoolToEvent(Event(NewBias,Nominal),       NewBias,NoEvent))))))));
+                             BoolToEvent(Event(NewBias,Nominal),       NewBias,NoEvent)))))));
   }
 
 //+------------------------------------------------------------------+
@@ -368,17 +360,20 @@ void CTickMA::UpdateSegment(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateRange(void)
   {
-    double rangehigh      = BoolToDouble(IsEqual(tmaBar,0),Close[0],iHigh(Symbol(),PERIOD_M1,tmaBar),Digits);
-    double rangelow       = BoolToDouble(IsEqual(tmaBar,0),Close[0],iLow(Symbol(),PERIOD_M1,tmaBar),Digits);
-    int    direction      = NoDirection;
-
-    range.Event           = NoEvent;
+    double rangehigh      = BoolToDouble(IsEqual(tmaBar,0),iClose(Symbol(),PERIOD_M1,tmaBar),iHigh(Symbol(),PERIOD_M1,tmaBar),Digits);
+    double rangelow       = BoolToDouble(IsEqual(tmaBar,0),iClose(Symbol(),PERIOD_M1,tmaBar),iLow(Symbol(),PERIOD_M1,tmaBar),Digits);
 
     if (IsHigher(rangehigh,range.High))
-      range.Event         = NewHigh;
+    {
+      SetEvent(NewHigh,Minor);
+      SetEvent(NewBoundary,Minor);
+    }
 
     if (IsLower(rangelow,range.Low))
-      range.Event         = NewLow;
+    {
+      SetEvent(NewLow,Minor);
+      SetEvent(NewBoundary,Minor);
+    }
 
     if (Event(NewTick))
     {
@@ -400,7 +395,14 @@ void CTickMA::UpdateRange(void)
       range.Resistance    = Price(Fibo23,range.Low,range.High,Retrace);
     }
 
-    SetEvent(range.Event,Notify);
+    if (Event(NewBoundary,Minor))
+      if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
+        SetEvent(NewDirection,Minor);
+        
+    range.Event           = BoolToEvent(Event(NewDirection,Minor),    NewDirection,
+                            BoolToEvent(Event(NewHigh,Minor),         NewHigh,
+                            BoolToEvent(Event(NewLow,Minor),          NewLow,
+                            BoolToEvent(Event(NewContraction,Minor),  NewContraction))));
   }
 
 //+------------------------------------------------------------------+
@@ -432,8 +434,9 @@ void CTickMA::UpdateSMA(void)
     if (IsEqual(dirHigh,dirLow))
     {
       if (NewDirection(sma.Direction,dirHigh))
-        event        = NewDirection;
+        SetEvent(NewDirection,Nominal);
 
+      event          = NewChannel;
       state          = Channel;
     }
     else
@@ -580,8 +583,6 @@ void CTickMA::Update(void)
     UpdateFractal(range.Low,range.High,range.Mean,tmaBar);
     UpdateRange();
 
-//for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-//  Print(DoubleToStr(range.Low,Digits)+"|"+DoubleToStr(range.High,Digits)+"|"+FractalStr(type));
     if (Count(Segments)>Slow)
     {
       UpdateSMA();

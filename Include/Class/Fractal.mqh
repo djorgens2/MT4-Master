@@ -184,6 +184,8 @@ public:
         double           Price(FibonacciType Level, FractalType Type, FractalState Method);
         double           Price(FibonacciType Level, double Root, double Reference, FractalState Method);
 
+        FractalRec       operator[](const FractalType Type)   {return Fractal(Type);};
+
         string           BufferStr(int Node);
         string           PointStr(double &Fractal[]);
         string           FibonacciStr(FibonacciRec &Fibonacci);
@@ -316,7 +318,6 @@ void CFractal::InitFractal(void)
 
       rec.Event                  = Event(type);
       frec[type]                 = rec;
-//Print(FractalStr(type));
     }
 
     //-- Initialize Fractal Buffer
@@ -529,10 +530,11 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
   }
 
 //+------------------------------------------------------------------+
-//| ManageFractal - Check/Apply Corrections to Fractal before Update |
+//| ManageFractal - Apply Historical Fractal Corrections then Update |
 //+------------------------------------------------------------------+
 void CFractal::ManageFractal(void)
   {
+    //-- f[Low|High|Close] calculated for historical use; history ends at fBar==0
     fLow      = BoolToDouble(IsEqual(fBar,0),iClose(Symbol(),fPeriod,0),iLow(Symbol(),fPeriod,fBar));
     fHigh     = BoolToDouble(IsEqual(fBar,0),iClose(Symbol(),fPeriod,0),iHigh(Symbol(),fPeriod,fBar));
     fClose    = BoolToDouble(IsEqual(frec[Term].Direction,DirectionUp),fHigh,fLow);

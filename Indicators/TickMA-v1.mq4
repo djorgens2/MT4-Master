@@ -130,11 +130,9 @@ void UpdateTickMA(void)
     t.Update();
     t.Fractal(plFractalBuffer);
 
-//    Print(t.FractalStr(Trend));
-//
-//    if (printevent)
-//      if (t.ActiveEvent())
-//        Print("|"+TimeToString(TimeCurrent())+"|"+t.EventStr(NoEvent,EventTypes));
+    if (printevent)
+      if (t.ActiveEvent())
+        Print("|"+TimeToString(TimeCurrent())+"|"+t.EventStr(NoEvent,EventTypes));
   }
 
 //+------------------------------------------------------------------+

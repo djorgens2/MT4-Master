@@ -42,8 +42,8 @@ protected:
                   NewTick,       //-- Tick level event; aggregate or trade
                   NewSegment,    //-- Segment level event; aggregate of Ticks
                   NewPivot,
-                  NewFractal,    //-- Fractal Direction change
                   NewContraction,
+                  NewFractal,    //-- Fractal Direction change
                   NewFibonacci,  //-- Fibonacci Level change only
                   NewOrigin,
                   NewTrend,
@@ -131,7 +131,6 @@ void CEvent::SetEvent(EventType Event, AlertType Alert=Notify, double Price=NoVa
     eEvent[NoEvent]         = false;
     eEvent[Event]           = true;
     eAlert[Event]           = fmax(Alert,eAlert[Event]);
-
     eMaxAlert               = fmax(Alert,eMaxAlert);
     
     ArrayResize(eLog,ArraySize(eLog)+1,32);
@@ -304,8 +303,8 @@ string EventText(EventType Event)
                    "New Tick",
                    "New Segment",
                    "New Pivot",
-                   "New Fractal",
                    "New Contraction",
+                   "New Fractal",
                    "New Fibonacci",
                    "New Origin",
                    "New Trend",

@@ -217,14 +217,9 @@ void UpdateTickMA(void)
   {
     t.Update();
 
-    if (t.Count(Ticks)==813||t.Count(Ticks)==827)
-      Flag("[tmav2]-Tick",clrRed,0,Close[0],Always);
-
-    if (t[NewTick])
-      Print("|"+TimeToStr(TimeCurrent())+"|"+t.SegmentStr(0)+"|"+t.TickStr(1));
 //    if (t[NewBoundary])
 //      UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
-//
+
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open);
@@ -274,7 +269,7 @@ void UpdateSegment(bool Refresh)
 
     UpdateNode("tmaHL:"+(string)indWinId+"-",0,t.Segment(0).High,t.Segment(0).Low);
     UpdateNode("tmaOC:"+(string)indWinId+"-",0,t.Segment(0).Open,t.Segment(0).Close);
-    
+
     plHighBuffer[0]        = highbuffer+point(2);
     plLowBuffer[0]         = lowbuffer;
   }
@@ -437,7 +432,12 @@ int OnInit()
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
 
     NewPriceLabel("tmaNewBoundary");
-
+//double xClose[];
+//ArraySetAsSeries(xClose,true);
+//ResetLastError();
+//int copied=CopyClose(NULL,PERIOD_M1,Time[0],14400,xClose);
+//Print((string)copied);
+//Print(TimeToStr(Time[0])+":"+TimeToStr(iTime(Symbol(),PERIOD_M1,0))+":"+DoubleToStr(xClose[0],Digits));
     return(INIT_SUCCEEDED);
   }
 
