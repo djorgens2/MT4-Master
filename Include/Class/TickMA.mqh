@@ -529,7 +529,7 @@ void CTickMA::UpdateLinear(void)
 //+------------------------------------------------------------------+
 //| TickMA Class Constructor                                         |
 //+------------------------------------------------------------------+
-CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (PERIOD_M1,Show)
+CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Show)
   {
     //-- Configure Fractal (max 100 days)
     tmaPeriods                 = Periods;

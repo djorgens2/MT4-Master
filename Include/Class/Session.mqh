@@ -50,7 +50,7 @@ protected:
 
          struct BufferRec
          {
-           double        Point[];
+           double        Price[];
          };
 
 private:
@@ -73,7 +73,7 @@ private:
          int              sBars;
          int              sBarDay;
          int              sBarHour;
-
+         
          void             CreateRange(void);
          void             UpdateRange(void);
          void             UpdateBuffers(void);
@@ -200,10 +200,10 @@ void CSession::UpdateBuffers(void)
     {
       for (PeriodType period=OffSession;period<PeriodTypes;period++)
       {
-        ArrayResize(sbuf[period].Point,sBars,10);
-        ArrayCopy(sbuf[period].Point,sbuf[period].Point,1,0,WHOLE_ARRAY);
+        ArrayResize(sbuf[period].Price,sBars,10);
+        ArrayCopy(sbuf[period].Price,sbuf[period].Price,1,0,WHOLE_ARRAY);
         
-        sbuf[period].Point[0]             = 0.00;
+        sbuf[period].Price[0]             = 0.00;
       }
     }
   }
@@ -221,8 +221,6 @@ void CSession::InitSession(EventType Event)
     srec[ActiveSession].Low               = Open[sBar];
 
     SetEvent(Event,Notify);
-    
-    //CreateRange();
   }
 
 //+------------------------------------------------------------------+
@@ -232,7 +230,7 @@ void CSession::OpenSession(void)
   {
     //-- Update OffSession Record and Indicator Buffer      
     srec[OffSession]                      = srec[ActiveSession];
-    sbuf[OffSession].Point[sBar]          = Pivot(OffSession);
+    sbuf[OffSession].Price[sBar]          = Pivot(OffSession);
 
     InitSession(SessionOpen);    
     CreateRange();
@@ -245,7 +243,7 @@ void CSession::CloseSession(void)
   {        
     //-- Update Prior Record, range history, and Indicator Buffer
     srec[PriorSession]                    = srec[ActiveSession];
-    sbuf[PriorSession].Point[sBar]        = Pivot(PriorSession);
+    sbuf[PriorSession].Price[sBar]        = Pivot(PriorSession);
 
     InitSession(SessionClose);
   }
@@ -253,12 +251,15 @@ void CSession::CloseSession(void)
 //+------------------------------------------------------------------+
 //| CSession Constructor                                             |
 //+------------------------------------------------------------------+
-CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, FractalType ShowFlags=FractalTypes) : CFractal (Period(),ShowFlags)
+CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset, bool ShowRanges=false, FractalType ShowFlags=FractalTypes) : CFractal (ShowFlags)
   {
+    double high[];
+    double low[];
+
     //--- Initialize period operationals
-    sBar                             = Bars-1;
+    sBar                             = InitHistory(Period(),Bars-1)-1;
     sBars                            = Bars;
-    sBarDay                          = NoValue;
+    sBarDay                          = TimeDay(ServerTime());
     sBarHour                         = NoValue;
 
     sType                            = Type;
@@ -266,24 +267,29 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
     sHourClose                       = HourClose;
     sHourOffset                      = HourOffset;
 
-    sIsOpen                          = false;
+    sIsOpen                          = IsOpen();
     sShowRanges                      = ShowRanges;
     sObjectStr                       = "[session]";
+
+    CopyHigh(NULL,PERIOD_D1,Time[sBar]+1,1,high);
+    CopyLow(NULL,PERIOD_D1,Time[sBar]+1,1,low);
 
     //--- Initialize session records
     for (PeriodType period=OffSession;period<PeriodTypes;period++)
     {
-      srec[period].Direction         = BoolToInt(Close[sBar]<Open[sBar],DirectionDown,DirectionUp);
-      srec[period].High              = High[sBar];
-      srec[period].Low               = Low[sBar];
+      srec[period].Direction         = NewDirection;
+      srec[period].High              = high[0];
+      srec[period].Low               = low[0];
 
-      ArrayResize(sbuf[period].Point,Bars);
-      ArrayInitialize(sbuf[period].Point,0.00);
+      ArrayResize(sbuf[period].Price,Bars);
+      ArrayInitialize(sbuf[period].Price,0.00);
     }
+
+    if (sIsOpen)
+      CreateRange();
 
     for (sBar=sBar;sBar>0;sBar--)
       Update();
-
     //double fbuffer[];
     //Fractal(fbuffer);
     //for (int node=Bars-1;node>0;node--)
@@ -339,8 +345,8 @@ void CSession::Update(double &PriorBuffer[], double &OffBuffer[])
   {
     Update();
 
-    ArrayCopy(PriorBuffer,sbuf[PriorSession].Point,0,0,WHOLE_ARRAY);
-    ArrayCopy(OffBuffer,sbuf[OffSession].Point,0,0,WHOLE_ARRAY);
+    ArrayCopy(PriorBuffer,sbuf[PriorSession].Price,0,0,WHOLE_ARRAY);
+    ArrayCopy(OffBuffer,sbuf[OffSession].Price,0,0,WHOLE_ARRAY);
   }
 
 //+------------------------------------------------------------------+
@@ -379,11 +385,11 @@ string CSession::BufferStr(PeriodType Period)
     string text            = EnumToString(Period);
 
     for (int bar=0;bar<Bars;bar++)
-      if (sbuf[Period].Point[bar]>0.00)
+      if (sbuf[Period].Price[bar]>0.00)
       {
         Append(text,(string)bar,"|");
         Append(text,TimeToStr(Time[bar]),"|");
-        Append(text,DoubleToStr(sbuf[Period].Point[bar],Digits),"|");
+        Append(text,DoubleToStr(sbuf[Period].Price[bar],Digits),"|");
       }
 
     return(text);
