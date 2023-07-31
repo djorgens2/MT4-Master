@@ -16,7 +16,6 @@ const string fp[7]   = {"(o)","(b)","(r)","(e)","(rt)","(rc)","(cl)"};
 #define   fext(b,r,e,f) fdiv(e-r,b-r)*format(f)
 #define   fret(r,e,rt,f) fdiv(rt-e,r-e)*format(f)
 #define   fprice(b,r,p) ((b-r)*fibonacci[p])+r
-#define   shift(p,b) iBarShift(Symbol(),Period(),iTime(Symbol(),p,b))
 
 #include <Class\Event.mqh>
 
@@ -207,6 +206,7 @@ public:
         string           FibonacciStr(FibonacciRec &Fibonacci);
         string           PivotStr(PivotRec &Pivot);
         string           FractalStr(FractalType Type);
+        void             PrintHistory(void);
   };
 
 //+------------------------------------------------------------------+
@@ -218,22 +218,23 @@ void CFractal::Flag(FractalType Type, bool FlagEvent=false)
     {
       string name    = fObjectStr+EnumToString(Type)+":"+EnumToString(frec[Type].Event);
     
+      if (fPrice.Bar<Bars-1)
       if (IsEqual(frec[Type].State,Extension))
-        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Extension.Level,InPercent),1)+"%]",Color(Type,NewDirection),shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Extension.Level,InPercent),1)+"%]",Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
       else
       if (IsEqual(frec[Type].State,Reversal))
-        Flag(name,Color(frec[Type].Direction),shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name,Color(frec[Type].Direction),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
       else
       if (IsEqual(frec[Type].State,Breakout))
-        Flag(name,Color(Type,NewDirection),shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name,Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
       else
       if (IsEqual(frec[Type].State,Recovery))
-        Flag(name,clrSteelBlue,shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name,clrSteelBlue,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
       else
       if (IsEqual(frec[Type].State,Correction))
-        Flag(name,clrWhite,shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name,clrWhite,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
       else
-        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Retrace.Level,InPercent),1)+"%]",clrDarkGray,shift(fPeriod,fBar),frec[Type].Pivot.Price,FlagEvent);
+        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Retrace.Level,InPercent),1)+"%]",clrDarkGray,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
     }
   }
 
@@ -248,7 +249,7 @@ bool CFractal::NewState(FractalRec &Fractal, bool PrintLog=false)
       Fractal.Event        = Fractal.Extension.Event;
       Fractal.Pivot.Price  = Fractal.Extension.Pivot;
       
-      if (PrintLog) Print("|"+TimeToStr(Time[shift(fPeriod,fBar)])+"|Extension|"+FractalStr(Trend));
+      if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Extension|"+FractalStr(Trend));
       return true;
     }
 
@@ -258,7 +259,7 @@ bool CFractal::NewState(FractalRec &Fractal, bool PrintLog=false)
       Fractal.Event        = Fractal.Retrace.Event;
       Fractal.Pivot.Price  = Fractal.Retrace.Pivot;
 
-      if (PrintLog) Print("|"+TimeToStr(Time[shift(fPeriod,fBar)])+"|Retrace|"+FractalStr(Trend));
+      if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Retrace|"+FractalStr(Trend));
       return true;
     }
 
@@ -300,7 +301,7 @@ void CFractal::InitFractal(void)
       rec.Fractal[fpBase]        = fResistance;
       rec.Fractal[fpRoot]        = fSupport;
       
-      root = BoolToInt(IsEqual(Low[iLowest(NULL,Period(),MODE_LOW,WHOLE_ARRAY,fBar)],fSupport),iLowest(NULL,Period(),MODE_LOW,WHOLE_ARRAY,fBar),Bars-2);
+      root = BoolToInt(IsEqual(Low[iLowest(NULL,Period(),MODE_LOW,WHOLE_ARRAY,fPrice.Bar)],fSupport),iLowest(NULL,Period(),MODE_LOW,WHOLE_ARRAY,fPrice.Bar),Bars-2);
     }
     else
     if (fPrice.Low<fSupport)
@@ -312,7 +313,7 @@ void CFractal::InitFractal(void)
       rec.Fractal[fpBase]        = fSupport;
       rec.Fractal[fpRoot]        = fResistance;
       
-      root = BoolToInt(IsEqual(High[iHighest(NULL,Period(),MODE_HIGH,WHOLE_ARRAY,fBar)],fResistance),iHighest(NULL,Period(),MODE_HIGH,WHOLE_ARRAY,fBar),Bars-2);
+      root = BoolToInt(IsEqual(High[iHighest(NULL,Period(),MODE_HIGH,WHOLE_ARRAY,fPrice.Bar)],fResistance),iHighest(NULL,Period(),MODE_HIGH,WHOLE_ARRAY,fPrice.Bar),Bars-2);
     }
     else return;
 
@@ -335,7 +336,7 @@ void CFractal::InitFractal(void)
     }
 
     //-- Initialize Fractal Buffer
-    fbufBar                      = shift(fPeriod,fBar);
+    fbufBar                      = fPrice.Bar;
     fbufDirection                = frec[Term].Direction;
 
     fbuf[root]                   = frec[Term].Fractal[fpRoot];
@@ -511,10 +512,10 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
         SetEvent(NewExpansion,Alert(Type),frec[Type].Fractal[fpExpansion]);
       }
       else 
-      if (IsLower(fPrice.Low,frec[Type].Fractal[fpRetrace]))
+      if (IsLower(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.Low),frec[Type].Fractal[fpRetrace]))
         frec[Type].Fractal[fpRecovery]      = frec[Type].Fractal[fpRetrace];
       else
-        frec[Type].Fractal[fpRecovery]      = fmax(fPrice.High,frec[Type].Fractal[fpRecovery]);
+        frec[Type].Fractal[fpRecovery]      = fmax(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.High),frec[Type].Fractal[fpRecovery]);
     else
 
     //--- Check for Lower Boundary changes
@@ -526,10 +527,10 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
         SetEvent(NewExpansion,Alert(Type),frec[Type].Fractal[fpExpansion]);
       }
       else
-      if (IsHigher(fPrice.High,frec[Type].Fractal[fpRetrace]))
+      if (IsHigher(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.High),frec[Type].Fractal[fpRetrace]))
         frec[Type].Fractal[fpRecovery]      = frec[Type].Fractal[fpRetrace];
       else
-        frec[Type].Fractal[fpRecovery]      = fmin(fPrice.Low,frec[Type].Fractal[fpRecovery]);
+        frec[Type].Fractal[fpRecovery]      = fmin(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.Low),frec[Type].Fractal[fpRecovery]);
 
     UpdateFibonacci(frec[Type].Extension,frec[Type].Retrace,frec[Type].Fractal,!IsEqual(fpoint[fpRoot],frec[Type].Fractal[fpRoot]));
     UpdatePivot(frec[Type].Pivot);
@@ -581,14 +582,14 @@ void CFractal::ManageFractal(void)
 
       //-- Handle Normal Uptrend Expansions
       if (Event(NewHigh))
-        fPrice.Close   = fPrice.High;
+        fPrice.Close   = BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.High);
     }
     else
 
     //-- Handle Normal Downtrend Expansions
     if (fPrice.Low<fSupport)
       if (Event(NewLow))
-        fPrice.Close   = fPrice.Low;
+        fPrice.Close   = BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.Low);
 
     UpdateFractal(Term,fSupport,fResistance);
     UpdateFractal(Trend,fmin(frec[Term].Fractal[fpOrigin],frec[Term].Fractal[fpRoot]),fmax(frec[Term].Fractal[fpOrigin],frec[Term].Fractal[fpRoot]));
@@ -605,11 +606,11 @@ void CFractal::UpdateBuffer(void)
       if (IsEqual(frec[Term].Direction,fbufDirection))
       {
         fbuf[fbufBar]       = 0.00;
-        fbufBar             = shift(fPeriod,fBar);
+        fbufBar             = fPrice.Bar;
         fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
       }
       else  
-      if (IsChanged(fbufBar,shift(fPeriod,fBar)))
+      if (IsChanged(fbufBar,fPrice.Bar))
       {
         fbuf[fbufBar]       = frec[Term].Fractal[fpExpansion];
         fbufDirection       = frec[Term].Direction;
@@ -631,7 +632,7 @@ void CFractal::ManageBuffer(void)
     }
 
     //-- Push Buffer post Zero Bar after Outside Reversal Anomaly
-    if (shift(fPeriod,fBar)<fbufBar)
+    if (fPrice.Bar<fbufBar)
       if (IsChanged(fbufDirection,frec[Term].Direction,NoUpdate))
         UpdateBuffer();
   }
@@ -648,6 +649,12 @@ CFractal::CFractal(FractalType ShowFlags)
     
     fObjectStr                       = "[fractal]";
     fShowFlags                       = ShowFlags;
+
+    ArraySetAsSeries(fOpen,true);
+    ArraySetAsSeries(fHigh,true);
+    ArraySetAsSeries(fLow,true);
+    ArraySetAsSeries(fClose,true);
+    ArraySetAsSeries(fTime,true);
 
     ArrayResize(fbuf,Bars);
     ArrayInitialize(fbuf,0.00);
@@ -687,23 +694,16 @@ void CFractal::UpdateFractal(double Support, double Resistance, double Pivot, in
 //+------------------------------------------------------------------+
 int CFractal::InitHistory(int TimeFrame, int MaxBars=144000)
   {
-    fPeriod                          = TimeFrame;
+    int bars                = CopyTime(NULL,TimeFrame,Time[0],MaxBars,fTime);
+
+    fPeriod                 = TimeFrame;
   
-    ArraySetAsSeries(fOpen,true);
-    ArraySetAsSeries(fHigh,true);
-    ArraySetAsSeries(fLow,true);
-    ArraySetAsSeries(fClose,true);
-    ArraySetAsSeries(fTime,true);
-
-    int max = CopyTime(NULL,TimeFrame,Time[0],MaxBars,fTime);
-
-    CopyOpen(NULL,TimeFrame,fTime[0],MaxBars,fOpen);
-    CopyHigh(NULL,TimeFrame,fTime[0],MaxBars,fHigh);
-    CopyLow(NULL,TimeFrame,fTime[0],MaxBars,fLow);
-    CopyClose(NULL,TimeFrame,fTime[0],MaxBars,fClose);
+    CopyOpen(NULL,TimeFrame,fTime[0],bars,fOpen);
+    CopyHigh(NULL,TimeFrame,fTime[0],bars,fHigh);
+    CopyLow(NULL,TimeFrame,fTime[0],bars,fLow);
+    CopyClose(NULL,TimeFrame,fTime[0],bars,fClose);
     
-//    for (int bar=0;bar<ArraySize(
-    return max;
+    return bars;
   }
 
 //+------------------------------------------------------------------+
@@ -778,16 +778,16 @@ BarRec CFractal::Price(int Bar)
     if (IsEqual(Bar,0))
     {
       rec.Bar       = 0;
-      rec.Open      = Open[Bar];
-      rec.High      = High[Bar];
-      rec.Low       = Low[Bar];
-      rec.Close     = Close[Bar];
-      rec.Time      = Time[Bar];
+      rec.Open      = Open[0];
+      rec.High      = High[0];
+      rec.Low       = Low[0];
+      rec.Close     = Close[0];
+      rec.Time      = Time[0];
 
       return rec;
     }
 
-    rec.Bar         = iBarShift(NULL,fPeriod,fTime[Bar]);
+    rec.Bar         = iBarShift(NULL,Period(),fTime[Bar]);
     rec.Open        = fOpen[Bar];
     rec.High        = fHigh[Bar];
     rec.Low         = fLow[Bar];
@@ -906,6 +906,21 @@ string CFractal::FractalStr(FractalType Type)
     Append(text,PointStr(frec[Type].Fractal),"|");
 
     return text;
+  }
+
+//+------------------------------------------------------------------+
+//| PrintHistory - Dumps formatted history to the logfile            |
+//+------------------------------------------------------------------+
+void CFractal::PrintHistory(void)
+  {
+    for (int bar=ArraySize(fOpen);bar>0;bar--)
+      Print((string)bar+"|"+
+             TimeToStr(fTime[bar])+"|"+
+             DoubleToStr(fOpen[bar],Digits)+"|"+
+             DoubleToStr(fHigh[bar],Digits)+"|"+
+             DoubleToStr(fLow[bar],Digits)+"|"+
+             DoubleToStr(fClose[bar],Digits)
+           );
   }
 
 ////+------------------------------------------------------------------+
