@@ -350,12 +350,12 @@ void CTickMA::UpdateSegment(void)
     SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
 
     sr[0].Event            = BoolToEvent(Event(NewLead),               NewLead,
-                             BoolToEvent(Event(NewSegment,Nominal),    NewSegment,
-                             BoolToEvent(Event(NewPullback,Nominal),   NewPullback,
                              BoolToEvent(Event(NewRally,Nominal),      NewRally,
+                             BoolToEvent(Event(NewPullback,Nominal),   NewPullback,
+                             BoolToEvent(Event(NewSegment,Nominal),    NewSegment,
                              BoolToEvent(Event(NewLow,Nominal),        NewLow,
                              BoolToEvent(Event(NewHigh,Nominal),       NewHigh,
-                             BoolToEvent(Event(NewBias,Nominal),       NewBias,NoEvent)))))));
+                             BoolToEvent(Event(NewBias,Nominal),       NewBias)))))));
   }
 
 //+------------------------------------------------------------------+
@@ -485,31 +485,31 @@ void CTickMA::UpdateLinear(void)
     CalcLinear(line.Price);
 
     //--- compute FOC metrics
-    if (Event(NewTick)||Event(NewExpansion,Critical))
+    if (Event(NewTick)||Event(NewDirection,Minor))
     {
       line.Head             = line.Price[0];
       line.Tail             = line.Price[tmaPeriods-1];
       line.FOC[Now]         = (atan(fdiv(pip(line.Head-line.Tail),tmaPeriods))*180)/M_PI;
       
       //-- Adverse Linear-Price Divergence
-      if (Event(NewExpansion))
+      if (Event(NewDirection,Minor))
         if (!IsEqual(Direction(line.FOC[Now]),range.Direction))
           SetEvent(AdverseEvent,Critical);
 
       //-- Linear Directional Slope Change (Lead-Prior Node)
-      if (NewDirection(line.Direction,Direction(line.Head-line.Price[1])))
+      if (NewDirection(line.Direction,Direction(line.FOC[Now])))
       {
         maxFOC              = NoValue;
         line.Event          = NewDirection;
       }
 
-      if (IsHigher(fabs(line.FOC[Now]),maxFOC,NoUpdate,3)||Event(NewExpansion,Critical))
+      if (IsHigher(fabs(line.FOC[Now]),maxFOC,NoUpdate,3)||Event(NewBoundary,Minor))
       {
         bias                = Action(line.Direction);
 
         line.FOC[Min]       = line.FOC[Now];
         line.FOC[Max]       = line.FOC[Now];
-        line.Event          = NewExpansion;
+        line.Event          = BoolToEvent(Event(NewBoundary,Minor),NewExpansion,NewConvergence);
       }
       else
       if (IsLower(fabs(line.FOC[Now]),minFOC,NoUpdate,3))
@@ -517,15 +517,15 @@ void CTickMA::UpdateLinear(void)
         bias                = Action(line.Direction,InDirection,InContrarian);
 
         line.FOC[Min]       = line.FOC[Now];        
-        line.Event          = BoolToEvent(IsEqual(bias,OP_BUY),NewRally,NewPullback);
+        line.Event          = NewDivergence;
       }
       else 
         bias                = NoBias;
 
       if (IsChanged(line.Bias,bias))
-        SetEvent(NewBias,Nominal);
+        SetEvent(NewBias,Nominal,tmaPrice.Close);
 
-      SetEvent(line.Event,Nominal);
+      SetEvent(line.Event,Minor,tmaPrice.Close);
     }
   }
 

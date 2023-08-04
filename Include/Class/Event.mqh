@@ -41,10 +41,10 @@ protected:
                   NewBias,
                   NewTick,       //-- Tick level event; aggregate or trade
                   NewSegment,    //-- Segment level event; aggregate of Ticks
-                  NewPivot,
                   NewContraction,
                   NewFractal,    //-- Fractal Direction change
                   NewFibonacci,  //-- Fibonacci Level change only
+                  NewPivot,
                   NewOrigin,
                   NewTrend,
                   NewTerm,
@@ -302,10 +302,10 @@ string EventText(EventType Event)
                    "New Bias",
                    "New Tick",
                    "New Segment",
-                   "New Pivot",
                    "New Contraction",
                    "New Fractal",
                    "New Fibonacci",
+                   "New Pivot",
                    "New Origin",
                    "New Trend",
                    "New Term",

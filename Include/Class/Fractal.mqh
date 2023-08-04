@@ -169,7 +169,7 @@ private:
          void            InitFractal(void);
 
          void            UpdateFibonacci(FibonacciRec &Extension, FibonacciRec &Retrace, double &Fractal[], bool Reset);
-         void            UpdatePivot(PivotRec &Pivot);
+         void            UpdatePivot(FractalType, PivotRec &Pivot);
          void            UpdateFractal(FractalType Type, double Support, double Resistance);
          void            ManageFractal(void);
 
@@ -206,6 +206,8 @@ public:
         string           FibonacciStr(FibonacciRec &Fibonacci);
         string           PivotStr(PivotRec &Pivot);
         string           FractalStr(FractalType Type);
+        string           DisplayStr(FractalState State, FibonacciRec &Fractal);
+        string           DisplayStr(void);
         void             PrintHistory(void);
   };
 
@@ -214,28 +216,26 @@ public:
 //+------------------------------------------------------------------+
 void CFractal::Flag(FractalType Type, bool FlagEvent=false)
   {
+    string name    = fObjectStr+EnumToString(Type)+":"+EnumToString(frec[Type].Event);
+
     if (FlagEvent)
-    {
-      string name    = fObjectStr+EnumToString(Type)+":"+EnumToString(frec[Type].Event);
-    
       if (fPrice.Bar<Bars-1)
-      if (IsEqual(frec[Type].State,Extension))
-        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Extension.Level,InPercent),1)+"%]",Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-      else
-      if (IsEqual(frec[Type].State,Reversal))
-        Flag(name,Color(frec[Type].Direction),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-      else
-      if (IsEqual(frec[Type].State,Breakout))
-        Flag(name,Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-      else
-      if (IsEqual(frec[Type].State,Recovery))
-        Flag(name,clrSteelBlue,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-      else
-      if (IsEqual(frec[Type].State,Correction))
-        Flag(name,clrWhite,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-      else
-        Flag(name+" ["+DoubleToStr(Percent(frec[Type].Retrace.Level,InPercent),1)+"%]",clrDarkGray,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
-    }
+        if (IsEqual(frec[Type].State,Extension))
+          Flag(name+" ["+DoubleToStr(Percent(frec[Type].Extension.Level,InPercent),1)+"%]",Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
+        else
+        if (IsEqual(frec[Type].State,Reversal))
+          Flag(name,Color(frec[Type].Direction),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
+        else
+        if (IsEqual(frec[Type].State,Breakout))
+          Flag(name,Color(Type,NewDirection),fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
+        else
+        if (IsEqual(frec[Type].State,Recovery))
+          Flag(name,clrSteelBlue,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
+        else
+        if (IsEqual(frec[Type].State,Correction))
+          Flag(name,clrWhite,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
+        else
+          Flag(name+" ["+DoubleToStr(Percent(frec[Type].Retrace.Level,InPercent),1)+"%]",clrDarkGray,fPrice.Bar,frec[Type].Pivot.Price,FlagEvent);
   }
 
 //+------------------------------------------------------------------+
@@ -430,7 +430,7 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
 //+------------------------------------------------------------------+
 //| UpdatePivot - Updates Pivot on the Tick                          |
 //+------------------------------------------------------------------+
-void CFractal::UpdatePivot(PivotRec &Pivot)
+void CFractal::UpdatePivot(FractalType Type, PivotRec &Pivot)
   {
     Pivot.Event      = NoEvent;
 
@@ -445,7 +445,7 @@ void CFractal::UpdatePivot(PivotRec &Pivot)
       if (NewAction(Pivot.Lead,OP_SELL))
         Pivot.Event  = NewLead;
 
-    SetEvent(Pivot.Event,Nominal,fPrice.Close);
+    SetEvent(Pivot.Event,Alert(Type),fPrice.Close);
   }
 
 //+------------------------------------------------------------------+
@@ -483,6 +483,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
         }
 
       SetEvent(Event(Type),Alert(Type),frec[Type].Fractal[fpBase]);
+      SetEvent(NewFractal,Alert(Type),frec[Type].Fractal[fpBase]);
     }
     else
     
@@ -533,11 +534,18 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
         frec[Type].Fractal[fpRecovery]      = fmin(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.Low),frec[Type].Fractal[fpRecovery]);
 
     UpdateFibonacci(frec[Type].Extension,frec[Type].Retrace,frec[Type].Fractal,!IsEqual(fpoint[fpRoot],frec[Type].Fractal[fpRoot]));
-    UpdatePivot(frec[Type].Pivot);
+    UpdatePivot(Type,frec[Type].Pivot);
+    
+    if (Event(NewLead,Alert(Type)))
+    {
+      SetEvent(NewPivot,Alert(Type),fPrice.Close);
+      SetEvent(BoolToEvent(IsEqual(frec[Type].Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)),NewConvergence,NewDivergence),Alert(Type),fPrice.Close);
+    }
 
     if (NewState(frec[Type]))
     {
       SetEvent(NewState,Alert(Type),fPrice.Close);
+      SetEvent(NewFibonacci,Alert(Type),frec[Type].Pivot.Price);
       SetEvent(frec[Type].Event,Alert(Type),frec[Type].Pivot.Price);
 
       InitPivot(frec[Type].Pivot,LastEvent());
@@ -942,6 +950,45 @@ void CFractal::PrintHistory(void)
 //  }  
 
 //-- General purpose functions
+
+//+------------------------------------------------------------------+
+//| DisplayStr - returns Fractal/Fibo data formatted for Comment     |
+//+------------------------------------------------------------------+
+string CFractal::DisplayStr(FractalState State, FibonacciRec &Fibonacci)
+  {
+    string text   = "   ";
+
+    Append(text,StringSubstr(EnumToString(State),0,3)+" [");
+    Append(text,StringSubstr(EnumToString(Fibonacci.Level),4)+"]:");
+    Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
+
+    Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
+    Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
+    Append(text,DoubleToStr(Fibonacci.Percent[Max]*100,1)+"%");
+
+    return text;
+  }
+//+------------------------------------------------------------------+
+//| DisplayStr - returns Fractal/Fibo data formatted for Comment     |
+//+------------------------------------------------------------------+
+string CFractal::DisplayStr(void)
+  {
+    string text    = "";
+
+    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+    {
+      Append(text,"------- Fractal ["+EnumToString(type)+"] ------------------------","\n\n");
+      Append(text," "+DirText(frec[type].Direction),"\n");
+      Append(text,EnumToString(frec[type].State));
+      Append(text,"["+ActionText(frec[type].Pivot.Lead)+"]");
+      Append(text,BoolToStr(IsEqual(frec[type].Pivot.Bias,frec[type].Pivot.Lead),"","Hedge"));
+      Append(text,BoolToStr(IsEqual(frec[type].Event,NoEvent),""," **"+EventText(frec[type].Event)));
+      Append(text,DisplayStr(Extension,frec[type].Extension),"\n");
+      Append(text,DisplayStr(Retrace,frec[type].Retrace),"\n");
+    }
+    
+    return text;
+  }
 
 //+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
