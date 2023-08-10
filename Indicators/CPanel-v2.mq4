@@ -7,7 +7,7 @@
 #property link      ""
 #property version   "2.00"
 #property strict
-//#property indicator_chart_window
+
 #property indicator_separate_window
 #property indicator_buffers 7
 #property indicator_plots   7
@@ -114,9 +114,9 @@ void CallPause(string Message, bool Pause)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed);
-    UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Pivot().Resistance,clrLawnGreen);
-    UpdatePriceLabel("tmaPL(ex):"+(string)indWinId,t.Pivot().Active,clrGoldenrod);
+    UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed,-1);
+    UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Pivot().Resistance,clrLawnGreen,-1);
+    UpdatePriceLabel("tmaPL(ex):"+(string)indWinId,t.Pivot().Active,clrGoldenrod,-1);
 
 
     //-- Fractal
@@ -127,12 +127,14 @@ void RefreshScreen(void)
     //UpdateDirection("tmaFractalTrendBias"+(string)indWinId,Direction(t[Trend].Bias,InAction),Color(Direction(t[Trend].Bias,InAction)),18);
     //UpdateDirection("tmaFractalTermBias"+(string)indWinId,Direction(t[Term].Bias,InAction),Color(Direction(t[Term].Bias,InAction)),18);
 
+
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
     UpdateDirection("tmaLinearDir"+(string)indWinId,t.Linear().Direction,Color(t.Linear().Direction),16);
     UpdateLabel("tmaLinearStateOpen"+(string)indWinId,lpad(t.Linear().FOC[Now],3)+" "+lpad(t.Linear().FOC[Max],3)+" "+
                   lpad(t.Linear().FOC[Min],3),Color(t.Linear().Direction),12);
     UpdateDirection("tmaLinearBiasOpen"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),18);
+
 
     //-- SMA Box
     UpdateDirection("tmaSMABias"+(string)indWinId,Direction(t.SMA().Bias,InAction)/*Lead*/,Color(Direction(t.SMA().Bias,InAction)),32);
@@ -158,6 +160,7 @@ void RefreshScreen(void)
                   Color(t.Segment().Direction[Term]),12);
     UpdateDirection("tmaSegmentBias"+(string)indWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),18);
 
+
     //-- Range Bounds
     UpdateRay("tmaPlanSup:"+(string)indWinId,inpPeriods-1,t.Range().Support);
     UpdateRay("tmaPlanRes:"+(string)indWinId,inpPeriods-1,t.Range().Resistance);
@@ -171,8 +174,9 @@ void RefreshScreen(void)
 
     string text   = "";
 
-    if (t.ActiveEvent())
-      text        = t.ActiveEventStr();
+    if (inpShowComment==Yes)
+      if (t.ActiveEvent())
+        text      = t.ActiveEventStr();
 
     if (inpShowComment)
       Comment(text);
@@ -298,13 +302,13 @@ int OnInit()
     SetIndexEmptyValue(5,0.00);
     SetIndexEmptyValue(6,0.00);
 
-    SetIndexLabel (0,""); 
-    SetIndexLabel (1,""); 
-//    SetIndexLabel (2,"");
-//    SetIndexLabel (3,"");
-//    SetIndexLabel (4,""); 
-//    SetIndexLabel (5,"");
-//    SetIndexLabel (6,""); 
+    SetIndexLabel (0,"");
+    SetIndexLabel (1,"");
+    SetIndexLabel (2,"");
+    SetIndexLabel (3,"");
+    SetIndexLabel (4,"");
+    SetIndexLabel (5,"");
+    SetIndexLabel (6,"");
 
 
     //-- Account Information Box
@@ -316,7 +320,7 @@ int OnInit()
       DrawBox("bxbAI-OpenInd"+EnumToString(type),(75*type)+64,9,7,12,C'60,60,60',BORDER_RAISED,SCREEN_UL,indWinId);
       NewLabel("lbhAI-Session"+EnumToString(type),lpad(EnumToString(type)," ",4),85+(74*type),7,clrWhite,SCREEN_UL,indWinId);
     }
-        
+
     NewLabel("lbhAI-Bal","----- Balance/Equity -----",155,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbvAI-Bal","",140,42,clrDarkGray,SCREEN_UL,indWinId);
     NewLabel("lbvAI-Eq","",140,60,clrDarkGray,SCREEN_UL,indWinId);
@@ -356,7 +360,7 @@ int OnInit()
     NewLabel("lbhAI-"+"E","Eq%",320,116,clrWhite,SCREEN_UL,indWinId);
 
     string key;
-    
+
     for (int row=0;row<=2;row++)
     {
       key = BoolToStr(row==2,"Net",proper(ActionText(row)));
@@ -369,7 +373,6 @@ int OnInit()
       NewLabel("lbvAI-"+key+"E","",310,128+(12*row),clrDarkGray,SCREEN_UL,indWinId);
 
       UpdateLabel("lbhAI-"+key+"Action",key,clrDarkGray,10);
-
       UpdateLabel("lbvAI-"+key+"#","99",clrDarkGray,10,"Consolas");
       UpdateLabel("lbvAI-"+key+"L","000.00",clrDarkGray,10,"Consolas");
       UpdateLabel("lbvAI-"+key+"V","-000000000",clrDarkGray,10,"Consolas");
@@ -386,7 +389,7 @@ int OnInit()
     //-- Order Config
     DrawBox("bxfOC-Long",5,174,352,144,C'0,42,0',BORDER_FLAT,SCREEN_UL,indWinId);
     DrawBox("bxfOC-Short",5,320,352,144,C'42,0,0',BORDER_FLAT,SCREEN_UL,indWinId);
-    
+
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
       NewLabel("lbhOC-"+ActionText(action)+"-Trading","Trading",10,(146*(action+1))+30,clrWhite,SCREEN_UL,indWinId);
@@ -399,12 +402,12 @@ int OnInit()
       NewLabel("lbhOC-"+ActionText(action)+"-RKBalance","Max",198,(146*(action+1))+70,clrGold,SCREEN_UL,indWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-RKMaxMargin","Margin",240,(146*(action+1))+70,clrGold,SCREEN_UL,indWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-RKPrice","S/L",296,(146*(action+1))+70,clrGold,SCREEN_UL,indWinId);
-      
+
       NewLabel("lbhOC-"+ActionText(action)+"-EQBase","P/L",24,(146*(action+1))+100,clrGold,SCREEN_UL,indWinId);
       UpdateLabel("lbhOC-"+ActionText(action)+"-EQBase","P/L",clrWhite,10);
       NewLabel("lbhOC-"+ActionText(action)+"-DCA","DCA",194,(146*(action+1))+100,clrGold,SCREEN_UL,indWinId);
       UpdateLabel("lbhOC-"+ActionText(action)+"-DCA","DCA",clrWhite,10);
-      
+
       NewLabel("lbhOC-"+ActionText(action)+"-Lots","------- Lot Sizing --------",36,(146*(action+1))+118,clrGold,SCREEN_UL,indWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-LotSize","Size",28,(146*(action+1))+144,clrGold,SCREEN_UL,indWinId);
       NewLabel("lbhOC-"+ActionText(action)+"-LotMin","Min",78,(146*(action+1))+144,clrGold,SCREEN_UL,indWinId);
@@ -491,7 +494,7 @@ int OnInit()
         UpdateLabel("lbvOZ-"+ActionText(col)+(string)row+"V",dollar(-9999999999,14,false),clrDarkGray,9,"Consolas");
         UpdateLabel("lbvOZ-"+ActionText(col)+(string)row+"M","00.0",clrDarkGray,9,"Consolas");
         UpdateLabel("lbvOZ-"+ActionText(col)+(string)row+"E","999.9",clrDarkGray,9,"Consolas");
-        
+
         UpdateLabel("lbvOQ-"+ActionText(col)+(string)row+"-Ticket",IntegerToString(99999999,10,'-'),clrDarkGray,9,"Consolas");
         UpdateLabel("lbvOQ-"+ActionText(col)+(string)row+"-State","Hold",clrDarkGray,9,"Consolas");
         UpdateLabel("lbvOQ-"+ActionText(col)+(string)row+"-Price","9.99999",clrDarkGray,9,"Consolas");
@@ -503,7 +506,7 @@ int OnInit()
         UpdateLabel("lbvOQ-"+ActionText(col)+(string)row+"-Net",dollar(-9999999,11,false),clrDarkGray,9,"Consolas");
       }
 
-    //-- Request Queue    
+    //-- Request Queue
     DrawBox("bxfRQ-Request",360,28,960,144,C'0,12,24',BORDER_FLAT,SCREEN_UL,indWinId);
 
     //-- Request Queue Headers
@@ -561,13 +564,12 @@ int OnInit()
     NewPriceLabel("tmaPL(sp):"+(string)indWinId,0.00,false,indWinId);
     NewPriceLabel("tmaPL(rs):"+(string)indWinId,0.00,false,indWinId);
     NewPriceLabel("tmaPL(ex):"+(string)indWinId,0.00,false,indWinId);
-      
+
     //--- Indicator Rays
     NewRay("tmaRangeMid:"+(string)indWinId,STYLE_DOT,clrDarkGray,false,indWinId);
     NewRay("tmaPlanSup:"+(string)indWinId,STYLE_DOT,clrRed,false,indWinId);
     NewRay("tmaPlanRes:"+(string)indWinId,STYLE_DOT,clrLawnGreen,false,indWinId);
     NewRay("tmaClose:"+(string)indWinId,STYLE_SOLID,clrDarkGray,false,indWinId);
-
 
     //-- App Data Frames
     DrawBox("bxhFractalDir"+(string)indWinId,300,5,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);

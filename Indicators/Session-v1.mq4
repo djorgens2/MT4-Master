@@ -193,8 +193,24 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
+    string textstr = "Exception";
+
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
+
+    if (s.Event(NewFractal)) textstr="Fractal";
+    else
+    if (s.Event(NewFibonacci)) textstr="Fibonacci";
+    else
+    if (s.Event(NewLead)) textstr="Lead";
+    else
+    if (s.Event(NewBoundary)) textstr = BoolToStr(s.Event(NewDirection),"Lead","Boundary");
+    else
+    if (s.Event(NewBias)) textstr="Bias";
+    else
+    if (s.Event(SessionClose)||s.Event(SessionOpen)||s.Event(NewDay)||s.Event(NewHour)) textstr="Session";
+
+    if (s.ActiveEvent()) Print("|"+textstr+"|"+s.EventStr(NoEvent,EventTypes));
 
     RefreshScreen();
 

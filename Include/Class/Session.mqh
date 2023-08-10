@@ -98,6 +98,7 @@ public:
          int              SessionHour(void) {return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);};
       
          bool             IsOpen(void);
+         bool             IsOpen(int HourOpen, int HourClose);
          color            Color(SessionType Type, GammaType Gamma);
 
          double           Pivot(const PeriodType Period)       {return fdiv(srec[Period].High+srec[Period].Low,2,Digits);};
@@ -155,22 +156,22 @@ void CSession::UpdateRange(void)
 //+------------------------------------------------------------------+
 void CSession::UpdateSession(void)
   {
+    int direction          = Direction(Close[sBar]-BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)));
+
     SessionRec session     = srec[ActiveSession];
+    AlertType  alert       = (AlertType)BoolToInt(IsEqual(srec[ActiveSession].Direction,direction),Nominal,Notify);
 
     if (IsHigher(High[sBar],srec[ActiveSession].High))
     {
-      SetEvent(NewHigh,Nominal,srec[ActiveSession].High);
-      SetEvent(NewBoundary,Nominal,session.High);
+      SetEvent(NewHigh,alert,srec[ActiveSession].High);
+      SetEvent(NewBoundary,alert,session.High);
     }
 
     if (IsLower(Low[sBar],srec[ActiveSession].Low))
     {
-      SetEvent(NewLow,Nominal,srec[ActiveSession].Low);
-      SetEvent(NewBoundary,Nominal,session.Low);
+      SetEvent(NewLow,alert,srec[ActiveSession].Low);
+      SetEvent(NewBoundary,alert,session.Low);
     }
-
-    if (NewAction(srec[ActiveSession].Bias,Action(Close[sBar]-BoolToDouble(IsOpen(),Pivot(OffSession),Pivot(PriorSession)))))
-      SetEvent(NewBias,Nominal);
 
     if (Event(NewBoundary))
     {
@@ -187,7 +188,13 @@ void CSession::UpdateSession(void)
       }
       else
         if (IsChanged(srec[ActiveSession].Lead,BoolToInt(Event(NewHigh),OP_BUY,OP_SELL)))
-          SetEvent(NewLead,Minor,BoolToDouble(Event(NewHigh),session.High,session.Low,Digits));
+          SetEvent(NewLead,Nominal,BoolToDouble(Event(NewHigh),session.High,session.Low,Digits));
+    }
+
+    if (NewAction(srec[ActiveSession].Bias,Action(direction)))
+    {
+      SetEvent(NewBias,alert,BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)));
+      SetEvent(BoolToEvent(IsEqual(alert,Notify),NewDivergence,NewConvergence),alert,BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)));
     }
   }
 
@@ -356,6 +363,18 @@ bool CSession::IsOpen(void)
   {
     if (TimeDayOfWeek(ServerTime())<6)
       if (TimeHour(ServerTime())>=sHourOpen && TimeHour(ServerTime())<sHourClose)
+        return (true);
+
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsOpen - Returns true if a session is open during supplied hours |
+//+------------------------------------------------------------------+
+bool CSession::IsOpen(int HourOpen, int HourClose)
+  {
+    if (TimeDayOfWeek(ServerTime())<6)
+      if (TimeHour(ServerTime())>=HourOpen && TimeHour(ServerTime())<HourClose)
         return (true);
 
     return (false);

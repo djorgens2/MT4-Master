@@ -104,7 +104,7 @@ protected:
   //-- Pivot Record
   struct PivotRec
          {
-           EventType     Event;                    //-- Event last updating the Pivot
+           EventType     Event;                    //-- Pivot Event
            int           Lead;                     //-- Action of last Boundary Hit
            int           Bias;                     //-- Bias 
            double        Price;                    //-- Last Event Pivot (Fibonacci)
@@ -129,7 +129,7 @@ protected:
            FractalState  State;                    //-- State
            int           Direction;                //-- Direction based on Last Breakout/Reversal (Trend)
            EventType     Event;                    //-- Last Event; disposes on next tick
-           PivotRec      Pivot;
+           PivotRec      Pivot;                    //-- Last Fibonacci Event Pivot
            FibonacciRec  Extension;                //-- Fibo Extension Rec
            FibonacciRec  Retrace;                  //-- Fibo Retrace Rec
            double        Fractal[FractalPoints];   //-- Fractal Points (Prices)
@@ -163,7 +163,7 @@ private:
          FractalRec      frec[FractalTypes];
          double          fpoint[FractalPoints];
 
-         bool            NewState(FractalRec &Fractal, bool PrintLog=false);
+         bool            NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=false);
 
          void            InitPivot(PivotRec &Pivot, EventLog &Log);
          void            InitFractal(void);
@@ -241,11 +241,13 @@ void CFractal::Flag(FractalType Type, bool FlagEvent=false)
 //+------------------------------------------------------------------+
 //| NewState - Returns true on detected change of Fibonacci State    |
 //+------------------------------------------------------------------+
-bool CFractal::NewState(FractalRec &Fractal, bool PrintLog=false)
+bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=false)
   {
     if (IsBetween(Fractal.Extension.Event,NewRally,NewExtension))
     {
-      Fractal.State        = State(Fractal.Extension.Event);
+      if (IsChanged(Fractal.State,State(Fractal.Extension.Event)))
+        SetEvent(NewState,Alert(Type),fPrice.Close);
+
       Fractal.Event        = Fractal.Extension.Event;
       Fractal.Pivot.Price  = Fractal.Extension.Pivot;
       
@@ -255,7 +257,9 @@ bool CFractal::NewState(FractalRec &Fractal, bool PrintLog=false)
 
     if (IsBetween(Fractal.Retrace.Event,NewRally,NewExtension))
     {
-      Fractal.State        = State(Fractal.Retrace.Event);
+      if (IsChanged(Fractal.State,State(Fractal.Retrace.Event)))
+        SetEvent(NewState,Alert(Type),fPrice.Close);
+
       Fractal.Event        = Fractal.Retrace.Event;
       Fractal.Pivot.Price  = Fractal.Retrace.Pivot;
 
@@ -379,8 +383,8 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
       if (IsEqual(Extension.Percent[Min],Extension.Percent[Max],3))
         if (Retrace.Level>FiboRoot)
         {
-          Extension.Pivot    = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
-          Extension.Event    = NewBreakout;
+          Extension.Pivot      = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
+          Extension.Event      = NewBreakout;
         }
     }
     
@@ -542,9 +546,8 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
       SetEvent(BoolToEvent(IsEqual(frec[Type].Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)),NewConvergence,NewDivergence),Alert(Type),fPrice.Close);
     }
 
-    if (NewState(frec[Type]))
+    if (NewState(Type,frec[Type]))
     {
-      SetEvent(NewState,Alert(Type),fPrice.Close);
       SetEvent(NewFibonacci,Alert(Type),frec[Type].Pivot.Price);
       SetEvent(frec[Type].Event,Alert(Type),frec[Type].Pivot.Price);
 

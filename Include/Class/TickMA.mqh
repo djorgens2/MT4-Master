@@ -401,7 +401,7 @@ void CTickMA::UpdateRange(void)
     if (Event(NewBoundary,Minor))
       if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
         SetEvent(NewDirection,Minor);
-        
+
     range.Event           = BoolToEvent(Event(NewDirection,Minor),    NewDirection,
                             BoolToEvent(Event(NewHigh,Minor),         NewHigh,
                             BoolToEvent(Event(NewLow,Minor),          NewLow,
@@ -464,7 +464,6 @@ void CTickMA::UpdateSMA(void)
     {
       sma.Event      = event;
 
-      SetEvent(NewState,Minor);
       SetEvent(sma.Event,Minor);
     }
   }
@@ -474,12 +473,14 @@ void CTickMA::UpdateSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
-    int    bias             = line.Bias;
+    int        bias         = line.Bias;
+    int        direction    = NoDirection;
+    AlertType  alert        = NoAlert;
 
     double maxFOC           = fabs(line.FOC[Max]);
     double minFOC           = fabs(line.FOC[Min]);
     double nowFOC           = fabs(line.FOC[Now]);
-    
+
     line.Event              = NoEvent;
 
     CalcLinear(line.Price);
@@ -490,7 +491,7 @@ void CTickMA::UpdateLinear(void)
       line.Head             = line.Price[0];
       line.Tail             = line.Price[tmaPeriods-1];
       line.FOC[Now]         = (atan(fdiv(pip(line.Head-line.Tail),tmaPeriods))*180)/M_PI;
-      
+
       //-- Adverse Linear-Price Divergence
       if (Event(NewDirection,Minor))
         if (!IsEqual(Direction(line.FOC[Now]),range.Direction))
@@ -522,10 +523,13 @@ void CTickMA::UpdateLinear(void)
       else 
         bias                = NoBias;
 
-      if (IsChanged(line.Bias,bias))
-        SetEvent(NewBias,Nominal,tmaPrice.Close);
+      direction             = BoolToInt(IsEqual(bias,NoBias),BoolToInt(line.FOC[Now]>fdiv(line.FOC[Max]+line.FOC[Min],2),DirectionUp,DirectionDown),Action(bias));
+      alert                 = (AlertType)BoolToInt(IsEqual(range.Direction,direction),Nominal,Notify);
 
-      SetEvent(line.Event,Minor,tmaPrice.Close);
+      if (IsChanged(line.Bias,bias))
+        SetEvent(NewBias,alert,tmaPrice.Close);
+
+      SetEvent(line.Event,alert,tmaPrice.Close);
     }
   }
 
