@@ -63,11 +63,24 @@
 #property indicator_style7  STYLE_SOLID
 #property indicator_width7  1
 
+enum ShowType
+     {
+       stNone   = NoValue,   // None
+       stOrigin = Origin,    // Origin
+       stTrend  = Trend,     // Trend
+       stTerm   = Term       // Term
+     };
+
+
+//--- Operational Vars
+FractalType    show;
+
 
 //--- input parameters
 input int          inpPeriods        =  80;         // Retention
 input double       inpAgg            = 2.5;         // Tick Aggregation
 input YesNoType    inpShowComment    =  No;         // Show Comments
+input ShowType     inpShowEvents     = stNone;      // Show Events
 input int          inpPanelVersion   =   2;         // Control Panel Version
 
 
@@ -93,7 +106,7 @@ double         plSMALow[1];
 
 
 //--- Class defs
-CTickMA       *t                 = new CTickMA(inpPeriods,inpAgg,Never);
+CTickMA       *t                 = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowEvents);
 
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
@@ -172,14 +185,9 @@ void RefreshScreen(void)
     UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
 
-    string text   = "";
-
     if (inpShowComment==Yes)
       if (t.ActiveEvent())
-        text      = t.ActiveEventStr();
-
-    if (inpShowComment)
-      Comment(text);
+        Comment(t.DisplayStr());
   }
 
 //+------------------------------------------------------------------+

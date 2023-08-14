@@ -934,23 +934,6 @@ void CFractal::PrintHistory(void)
            );
   }
 
-////+------------------------------------------------------------------+
-////| DisplayStr - Returns formatted text for Diplay/Comment           |
-////+------------------------------------------------------------------+
-//string  CFractal:DisplayStr(string Type, FibonacciRec &Fibonacci)
-//  {
-//    string text    = Type;
-//
-//    Append(text,EnumToString(Fibonacci.Level));
-//    Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
-//
-////    Append(text,"      Now/Min/Max:   ","\n");
-//    Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
-//    Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
-//    Append(text,DoubleToStr(Fibonacci.Percent[Max]*100,1)+"%");
-//
-//    return text;
-//  }  
 
 //-- General purpose functions
 
@@ -962,7 +945,7 @@ string CFractal::DisplayStr(FractalState State, FibonacciRec &Fibonacci)
     string text   = "   ";
 
     Append(text,StringSubstr(EnumToString(State),0,3)+" [");
-    Append(text,StringSubstr(EnumToString(Fibonacci.Level),4)+"]:");
+    Append(text,StringSubstr(EnumToString(Fibonacci.Level),4)+" ]:");
     Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
 
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
@@ -971,6 +954,8 @@ string CFractal::DisplayStr(FractalState State, FibonacciRec &Fibonacci)
 
     return text;
   }
+
+
 //+------------------------------------------------------------------+
 //| DisplayStr - returns Fractal/Fibo data formatted for Comment     |
 //+------------------------------------------------------------------+

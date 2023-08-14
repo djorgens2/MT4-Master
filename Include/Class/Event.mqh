@@ -104,8 +104,10 @@ public:
 
       AlertType      MaxAlert(void)                              {return eMaxAlert;};
       AlertType      Alert(EventType Event)                      {return eAlert[Event];};
-      EventLog       Log(EventType Event);
       EventLog       LastEvent(void)                             {return eLog[0];};
+
+      EventLog       Log(EventType Event);
+      bool           Log(EventType Event, AlertType Alert=NoAlert);
 
       //---  General use events
       bool           Event(EventType Event)                      {return eEvent[Event];};
@@ -175,6 +177,20 @@ EventLog CEvent::Log(EventType Event)
           return eLog[node];
         
     return eventlog;
+  }
+
+//+------------------------------------------------------------------+
+//| Log - Returns true if Event logged for the supplied alert        |
+//+------------------------------------------------------------------+
+bool CEvent::Log(EventType Event, AlertType Alert=NoAlert)
+  {
+    if (eEvent[Event])
+      for (int node=0;node<ArraySize(eLog);node++)
+        if (IsEqual(eLog[node].Event,Event))
+          if (IsEqual(eLog[node].Alert,Alert))
+            return true;
+        
+    return false;
   }
 
 //+------------------------------------------------------------------+

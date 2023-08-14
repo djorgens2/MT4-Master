@@ -73,7 +73,6 @@ private:
     struct LinearRec
            {
              int            Direction;
-             FractalState   State;
              EventType      Event;
              int            Bias;
              double         Head;
@@ -531,6 +530,14 @@ void CTickMA::UpdateLinear(void)
 
       SetEvent(line.Event,alert,tmaPrice.Close);
     }
+
+//-- Set Range State?
+//                  BoolToStr(IsBetween(t.Pivot().Active,t.Pivot().Support,t.Pivot().Resistance),
+//                  BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Trend]),
+//                      "Conforming: "+proper(ActionText(Action(t.Segment().Direction[Term]))),
+//                      "Contrarian: "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
+//                      "Breakout: "+proper(ActionText(Action(t.Segment().Direction[Term])))),
+    
   }
 
 //+------------------------------------------------------------------+

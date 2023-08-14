@@ -111,6 +111,12 @@ FractalType    show;
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
+    static FractalType pivot  = Term;
+
+    if (t[NewPivot])
+      pivot                   = (FractalType)BoolToInt(t.Event(NewPivot,Critical),Origin,
+                                             BoolToInt(t.Event(NewPivot,Major),Trend,Term));
+
     if (inpRangeBounds==Yes)
     {
       UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed);
@@ -139,14 +145,13 @@ void RefreshScreen(void)
         UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Fractal[point],-7);
     }
 
-
     //-- Fractal
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
     UpdateDirection("tmaFractalTermDir"+(string)indWinId,t[Term].Direction,Color(t[Term].Direction),32);
     UpdateLabel("tmaFractalTrendState"+(string)indWinId,center(EnumToString(t[Trend].State),12),Color(t[Trend].Direction),16);
-//    UpdateLabel("tmaFractalTermState"+(string)indWinId,center(EnumToString(t[Term])+" "+EnumToString(t[t.Fractal().Type].State),24),Color(Direction(t[t.Fractal().Type].Bias,InAction)),12);
-    //UpdateDirection("tmaFractalTrendBias"+(string)indWinId,Direction(t[Trend].Bias,InAction),Color(Direction(t[Trend].Bias,InAction)),18);
-    //UpdateDirection("tmaFractalTermBias"+(string)indWinId,Direction(t[Term].Bias,InAction),Color(Direction(t[Term].Bias,InAction)),18);
+    UpdateLabel("tmaFractalPivot"+(string)indWinId,center(EnumToString(pivot)+" "+EnumToString(t[pivot].State),24),Color(Direction(t[pivot].Pivot.Lead,InAction)),12);
+    UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[pivot].Pivot.Lead,InAction),Color(Direction(t[pivot].Pivot.Lead,InAction)),18);
+    UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[pivot].Pivot.Bias,InAction),Color(Direction(t[pivot].Pivot.Bias,InAction)),18);
 
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
@@ -191,13 +196,13 @@ void RefreshScreen(void)
     //-- General
     UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
+    
+    string text   = "\n";
 
-    string text   = "";
+    Append(text,t.DisplayStr());
+    Append(text,t.ActiveEventStr(),"\n\n");
 
-    if (t.ActiveEvent())
-      text        = t.ActiveEventStr();
-
-    if (inpShowComment)
+    if (inpShowComment==Yes)
       Comment(text);
   }
 
@@ -394,10 +399,10 @@ int OnInit()
     NewLabel("tmaHFractal"+(string)indWinId,"Fractal",250,51,clrGold,SCREEN_UR,indWinId);
     NewLabel("tmaFractalTrendDir"+(string)indWinId,"",244,8,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalTermDir"+(string)indWinId,"",250,12,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTrendState"+(string)indWinId,"",60,10,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTrendBias"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTermState"+(string)indWinId,"",34,38,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTermBias"+(string)indWinId,"",15,35,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalTrendState"+(string)indWinId,"",80,10,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivot"+(string)indWinId,"",66,36,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotLead"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotBias"+(string)indWinId,"",15,35,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Linear Data
     NewLabel("tmaHLinear"+(string)indWinId,"Linear",252,116,clrGold,SCREEN_UR,indWinId);
@@ -413,9 +418,7 @@ int OnInit()
     NewLabel("tmaSMABias"+(string)indWinId,"",250,142,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaSMADir"+(string)indWinId,"",244,138,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaSMAState"+(string)indWinId,"",76,154,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMAMomentumHi"+(string)indWinId,"-9.999",40,142,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaSMABiasHi"+(string)indWinId,"",15,138,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMAMomentumLo"+(string)indWinId,"-9.999",40,166,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaSMABiasLo"+(string)indWinId,"",15,165,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Segment Data

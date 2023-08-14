@@ -193,24 +193,27 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    string textstr = "Exception";
+    string strategy = "Exception";
 
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
 
-    if (s.Event(NewFractal)) textstr="Fractal";
+    if (s.Event(NewFractal)) strategy="Fractal";
     else
-    if (s.Event(NewFibonacci)) textstr="Fibonacci";
+    if (s.Event(NewFibonacci)) strategy="Fibonacci";
     else
-    if (s.Event(NewLead)) textstr="Lead";
+    if (s.Event(NewLead)) strategy="Lead";
     else
-    if (s.Event(NewBoundary)) textstr = BoolToStr(s.Event(NewDirection),"Lead","Boundary");
+    if (s.Event(NewBoundary)) strategy = BoolToStr(s.Event(NewDirection),"Lead","Boundary");
     else
-    if (s.Event(NewBias)) textstr="Bias";
+    if (s.Event(NewBias)) strategy="Bias";
     else
-    if (s.Event(SessionClose)||s.Event(SessionOpen)||s.Event(NewDay)||s.Event(NewHour)) textstr="Session";
+    if (s.Event(SessionClose)||s.Event(SessionOpen)||s.Event(NewDay)||s.Event(NewHour)) strategy="Session";
 
-    if (s.ActiveEvent()) Print("|"+textstr+"|"+s.EventStr(NoEvent,EventTypes));
+//    if (s.ActiveEvent()) Print("|"+strategy+"|"+s.EventStr(NoEvent,EventTypes));
+
+//    if (strategy=="Lead") 
+    if (s.IsOpen()&&s.Log(NewLead,Nominal)) Flag("[sv1]Lead",Color(Direction(s[ActiveSession].Lead,InAction)));
 
     RefreshScreen();
 

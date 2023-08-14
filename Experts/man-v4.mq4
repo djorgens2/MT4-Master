@@ -8,6 +8,7 @@
 #property version   "4.00"
 #property strict
 
+#define debug true
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
 #include <Class/Order.mqh>
@@ -363,14 +364,18 @@ void UpdateSignal(CTickMA &Signal)
     else
     if (Signal.Event(NewPivot))                 textstr = "Pivot";
     else
-    if (Signal.Event(NewLead))                  textstr = "Lead";
+    if (Signal.Event(NewLead))
+      if (t.Log(NewLead,Warning))
+        textstr = "Warning";
+      else
+      if (t.Log(NewLead,Nominal))
+        textstr = "Lead-";
+      else Flag("Lead+",clrMagenta);
     else
     if (Signal.Event(NewBoundary))
       if (Signal.Event(NewDirection))           textstr = "Direction";
       else
       if (IsEqual(Signal.MaxAlert(),Notify))    textstr = "Tick";
-      else
-      if (IsEqual(Signal.MaxAlert(),Warning))   textstr = "Warning";
       else
       if (IsEqual(Signal.MaxAlert(),Nominal))   textstr = "Segment";
       else
@@ -385,6 +390,9 @@ void UpdateSignal(CTickMA &Signal)
       if (Signal.Event(NewFlatline)||Signal.Event(NewConsolidation)||Signal.Event(NewParabolic)||Signal.Event(NewChannel)) textstr="SMA";
       else
       if (Signal.Event(NewBias))                textstr = "Bias";
+//      
+//    if (textstr=="Lead")
+//      Pause("
   }
 
 //+------------------------------------------------------------------+
@@ -401,6 +409,8 @@ void UpdateSignal(CSession &Signal)
     if (Signal.Event(NewFractal))   textstr="Fractal";
     else
     if (Signal.Event(NewFibonacci)) textstr="Fibonacci";
+    else
+    if (Signal.Event(NewPivot))     textstr="Pivot";
     else
     if (Signal.Event(NewLead))      textstr="Lead";
     else
@@ -486,11 +496,11 @@ void UpdateMaster(void)
     {
       case Session: UpdateManager(s);
                     RefreshFractal(s[show].Direction,s[show].Fractal);
-                    if (s.ActiveEvent()) Print("|"+textstr+"|"+s.EventStr(NoEvent,EventTypes));
+                    if (debug) if (s.ActiveEvent()) Print("|"+textstr+"|"+s.EventStr(NoEvent,EventTypes));
                     break;
       case TickMA:  UpdateManager(t);
                     RefreshFractal(t[show].Direction,t[show].Fractal);
-                    if (t.ActiveEvent()) Print("|"+textstr+"|"+t.EventStr(NoEvent,EventTypes));
+                    if (debug) if (t.ActiveEvent()) Print("|"+textstr+"|"+t.EventStr(NoEvent,EventTypes));
     }
   }
 

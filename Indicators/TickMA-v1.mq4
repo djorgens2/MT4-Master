@@ -76,7 +76,7 @@ string FibonacciStr(string Type, FibonacciRec &Fibonacci)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string text   = "";
+    string text   = "\n";
 
     if (inpShowFibo>stNone)
     {
@@ -103,19 +103,7 @@ void RefreshScreen(void)
     UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
 
-
-    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
-    {
-      Append(text,"------- Fibonacci ["+EnumToString(type)+"] ------------------------","\n\n");
-      Append(text," "+DirText(t[type].Direction),"\n");
-      Append(text,EnumToString(t[type].State));
-      Append(text,"["+ActionText(t[type].Pivot.Lead)+"]");
-      Append(text,BoolToStr(IsEqual(t[type].Pivot.Bias,t[type].Pivot.Lead),"","Hedge"));
-      Append(text,BoolToStr(IsEqual(t[type].Event,NoEvent),""," **"+EventText(t[type].Event)));
-      Append(text,FibonacciStr("   Ext: ",t[type].Extension),"\n");
-      Append(text,FibonacciStr("   Ret: ",t[type].Retrace),"\n");
-    }
-
+    Append(text,t.DisplayStr());
     Append(text,t.ActiveEventStr(),"\n\n");
 
     if (inpShowComment==Yes)
