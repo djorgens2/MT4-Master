@@ -72,8 +72,10 @@ private:
 
     struct LinearRec
            {
-             int            Direction;
+             FractalType    Type;
              EventType      Event;
+             int            Direction;
+             int            Lead;
              int            Bias;
              double         Head;
              double         Tail;
@@ -531,13 +533,12 @@ void CTickMA::UpdateLinear(void)
       SetEvent(line.Event,alert,tmaPrice.Close);
     }
 
-//-- Set Range State?
-//                  BoolToStr(IsBetween(t.Pivot().Active,t.Pivot().Support,t.Pivot().Resistance),
-//                  BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Trend]),
-//                      "Conforming: "+proper(ActionText(Action(t.Segment().Direction[Term]))),
-//                      "Contrarian: "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
-//                      "Breakout: "+proper(ActionText(Action(t.Segment().Direction[Term])))),
-    
+    //-- Set Range Fractal Type (shape)
+    line.Type              = (FractalType)BoolToInt(IsBetween(Pivot().Active,Pivot().Support,Pivot().Resistance),
+                                          BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Convergent,Divergent),
+                                          BoolToInt(Fractal(Term).Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
+
+    NewAction(line.Lead,Action(BoolToInt(Fractal(Term).Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
   }
 
 //+------------------------------------------------------------------+

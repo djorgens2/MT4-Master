@@ -52,8 +52,6 @@ protected:
                   NewExpansion,
                   NewDivergence,
                   NewConvergence,
-                  NewInversion,
-                  NewConversion,
                   NewLead,
                   NewRally,
                   NewPullback,
@@ -67,6 +65,8 @@ protected:
                   NewConsolidation,
                   NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
                   NewChannel,
+                  CrossCheck,
+                  Exception,
                   SessionOpen,
                   SessionClose,
                   NewDay,
@@ -95,9 +95,6 @@ public:
       void           SetEvent(EventType Event, AlertType Alert=Notify, double Price=NoValue);
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
-
-      EventType      BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoEvent);
-      AlertType      BoolToAlert(bool IsTrue, AlertType TrueValue, AlertType FalseValue=NoAlert);
 
       bool           IsChanged(EventType &Compare, EventType Value);
       bool           IsEqual(EventType Event1, EventType Event2) {return Event1==Event2;};
@@ -207,28 +204,6 @@ void CEvent::ClearEvents(void)
   }
 
 //+------------------------------------------------------------------+
-//| BoolToEvent - Returns event based on supplied condition          |
-//+------------------------------------------------------------------+
-EventType CEvent::BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoEvent)
-  {
-    if (IsTrue)
-      return TrueValue;
-
-    return FalseValue;
-  }
-
-//+------------------------------------------------------------------+
-//| BoolToAlert - Returns supplied AlertLevel based on Condition     |
-//+------------------------------------------------------------------+
-AlertType CEvent::BoolToAlert(bool IsTrue, AlertType TrueValue, AlertType FalseValue=NoAlert)
-  {
-    if (IsTrue)
-      return TrueValue;
-
-    return FalseValue;
-  }
-
-//+------------------------------------------------------------------+
 //| IsChanged - Compares events to determine if a change occurred    |
 //+------------------------------------------------------------------+
 bool CEvent::IsChanged(EventType &Compare, EventType Change)
@@ -329,8 +304,6 @@ string EventText(EventType Event)
                    "New Expansion",
                    "New Divergence",
                    "New Convergence",
-                   "New Inversion",
-                   "New Conversion",
                    "New Lead",
                    "New Rally",
                    "New Pullback",
@@ -344,6 +317,8 @@ string EventText(EventType Event)
                    "New Consolidation",
                    "New Parabolic",
                    "New Channel",
+                   "Cross Check",
+                   "Exception",
                    "Session Open",
                    "Session Close",
                    "New Day",
@@ -351,4 +326,27 @@ string EventText(EventType Event)
                  };
 
     return text[Event];
-  }  
+  }
+
+//+------------------------------------------------------------------+
+//| BoolToEvent - Returns event based on supplied condition          |
+//+------------------------------------------------------------------+
+EventType BoolToEvent(bool IsTrue, EventType TrueValue, EventType FalseValue=NoEvent)
+  {
+    if (IsTrue)
+      return TrueValue;
+
+    return FalseValue;
+  }
+
+//+------------------------------------------------------------------+
+//| BoolToAlert - Returns supplied AlertLevel based on Condition     |
+//+------------------------------------------------------------------+
+AlertType BoolToAlert(bool IsTrue, AlertType TrueValue, AlertType FalseValue=NoAlert)
+  {
+    if (IsTrue)
+      return TrueValue;
+
+    return FalseValue;
+  }
+

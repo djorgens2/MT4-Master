@@ -541,10 +541,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
     UpdatePivot(Type,frec[Type].Pivot);
     
     if (Event(NewLead,Alert(Type)))
-    {
-      SetEvent(NewPivot,Alert(Type),fPrice.Close);
       SetEvent(BoolToEvent(IsEqual(frec[Type].Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)),NewConvergence,NewDivergence),Alert(Type),fPrice.Close);
-    }
 
     if (NewState(Type,frec[Type]))
     {
@@ -723,7 +720,7 @@ int CFractal::InitHistory(int TimeFrame, int MaxBars=144000)
 EventType CFractal::Event(FractalType Type)
   {
     static const EventType event[FractalTypes]   = {NewOrigin,NewTrend,NewTerm,NewRetrace,NewBase,NewReversal,NewExpansion,
-                                                    NewDivergence,NewConvergence,NewInversion,NewConversion,NewLead};
+                                                    NewDivergence,NewConvergence,NoEvent,NoEvent,NewLead};
     return event[Type];
   }
 
