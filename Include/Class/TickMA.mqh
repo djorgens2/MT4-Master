@@ -188,30 +188,34 @@ void CTickMA::CalcSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::CalcLinear(double &Buffer[])
   {
+    int periods           = fmin(Count(Segments)-1,tmaPeriods);
+
     //--- Linear regression line
-    double m[5]           = {0.00,0.00,0.00,0.00,0.00};   //--- slope
-    double b              = 0.00;                         //--- y-intercept
+    double m[5]           = {0.00,0.00,0.00,0.00,0.00};    //--- slope
+    double b              = 0.00;                          //--- y-intercept
 
     double sumx           = 0.00;
     double sumy           = 0.00;
-    
-    for (int idx=0;idx<tmaPeriods;idx++)
+
+    for (int idx=0;idx<periods;idx++)
     {
       sumx += idx+1;
       sumy += fdiv(sma.High[idx]+sma.Low[idx],2);
       
-      m[1] += (idx+1)*fdiv(sma.High[idx]+sma.Low[idx],2);            // Exy
-      m[3] += pow(idx+1,2);                   // E(x^2)
+      m[1] += (idx+1)*fdiv(sma.High[idx]+sma.Low[idx],2);  // Exy
+      m[3] += pow(idx+1,2);                                // E(x^2)
     }
     
-    m[2]    = fdiv(sumx*sumy,tmaPeriods);     // (Ex*Ey)/n
-    m[4]    = fdiv(pow(sumx,2),tmaPeriods);   // [(Ex)^2]/n
+    m[2]    = fdiv(sumx*sumy,periods);                  // (Ex*Ey)/n
+    m[4]    = fdiv(pow(sumx,2),periods);                // [(Ex)^2]/n
     
     m[0]    = (m[1]-m[2])/(m[3]-m[4]);
-    b       = (sumy-m[0]*sumx)/tmaPeriods;
+    b       = (sumy-m[0]*sumx)/periods;
 
-    for (int idx=0;idx<tmaPeriods;idx++)
-      Buffer[idx]    = (m[0]*(idx+1))+b;      //--- y=mx+b
+    ArrayResize(Buffer,periods);
+
+    for (int idx=0;idx<periods;idx++)
+      Buffer[idx]    = (m[0]*(idx+1))+b;                   //--- y=mx+b
   }
 
 //+------------------------------------------------------------------+
@@ -474,6 +478,7 @@ void CTickMA::UpdateSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
+    int        periods      = fmin(Count(Segments)-1,tmaPeriods);
     int        bias         = line.Bias;
     int        direction    = NoDirection;
     AlertType  alert        = NoAlert;
@@ -490,8 +495,8 @@ void CTickMA::UpdateLinear(void)
     if (Event(NewTick)||Event(NewDirection,Minor))
     {
       line.Head             = line.Price[0];
-      line.Tail             = line.Price[tmaPeriods-1];
-      line.FOC[Now]         = (atan(fdiv(pip(line.Head-line.Tail),tmaPeriods))*180)/M_PI;
+      line.Tail             = line.Price[periods-1];
+      line.FOC[Now]         = (atan(fdiv(pip(line.Head-line.Tail),periods))*180)/M_PI;
 
       //-- Adverse Linear-Price Divergence
       if (Event(NewDirection,Minor))
@@ -556,7 +561,6 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Sh
     tmaPrice                   = Price(tmaBar);
 
     ArrayInitialize(tmaDirection,NewDirection);
-    ArrayResize(line.Price,tmaPeriods);
 
     NewTick();
     NewSegment();

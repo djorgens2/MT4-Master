@@ -260,13 +260,14 @@ void UpdateSegment(bool Refresh)
       ArrayInitialize(plLowBuffer,0.00);
 
       for (int node=0;node<inpPeriods;node++)
-      {
-        UpdateNode("tmaHL:"+(string)indWinId+"-",node,t.Segment(node).High,t.Segment(node).Low);
-        UpdateNode("tmaOC:"+(string)indWinId+"-",node,t.Segment(node).Open,t.Segment(node).Close);
+        if (node<t.Count(Segments))
+        {
+          UpdateNode("tmaHL:"+(string)indWinId+"-",node,t.Segment(node).High,t.Segment(node).Low);
+          UpdateNode("tmaOC:"+(string)indWinId+"-",node,t.Segment(node).Open,t.Segment(node).Close);
 
-        highbuffer   = fmax(highbuffer,t.Segment(node).High);
-        lowbuffer    = fmin(lowbuffer,t.Segment(node).Low);
-      }
+          highbuffer   = fmax(highbuffer,t.Segment(node).High);
+          lowbuffer    = fmin(lowbuffer,t.Segment(node).Low);
+        }
     }
 
     UpdateNode("tmaHL:"+(string)indWinId+"-",0,t.Segment(0).High,t.Segment(0).Low);
@@ -429,12 +430,7 @@ int OnInit()
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
 
     NewPriceLabel("tmaNewBoundary");
-//double xClose[];
-//ArraySetAsSeries(xClose,true);
-//ResetLastError();
-//int copied=CopyClose(NULL,PERIOD_M1,Time[0],14400,xClose);
-//Print((string)copied);
-//Print(TimeToStr(Time[0])+":"+TimeToStr(iTime(Symbol(),PERIOD_M1,0))+":"+DoubleToStr(xClose[0],Digits));
+
     return(INIT_SUCCEEDED);
   }
 

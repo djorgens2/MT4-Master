@@ -257,7 +257,7 @@ void UpdateSegment(bool Refresh)
       ArrayInitialize(plHighBuffer,0.00);
       ArrayInitialize(plLowBuffer,0.00);
 
-      for (int node=0;node<inpPeriods;node++)
+      for (int node=0;node<fmin(t.Count(Segments)-1,inpPeriods);node++)
       {
         UpdateNode("tmaHL:"+(string)indWinId+"-",node,t.Segment(node).High,t.Segment(node).Low);
         UpdateNode("tmaOC:"+(string)indWinId+"-",node,t.Segment(node).Open,t.Segment(node).Close);

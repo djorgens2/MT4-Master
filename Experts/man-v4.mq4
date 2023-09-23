@@ -41,6 +41,7 @@
   input ShowType         inpShowEvents       = stNone;      // Show Event Flags for Fractal
   input YesNoType        inpShowComments     = No;          // Show Comments
   input int              inpIndSNVersion     = 2;           // Control Panel Version
+  input YesNoType        inpPauseOn          = No;          // Pause on Event?
 
 
   //---- Extern Variables
@@ -210,13 +211,33 @@ void RefreshScreen(void)
   {
     string text     = "";
 
-    if (inpShowComments==Yes)
-    {
-      Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),t.DisplayStr(),s.DisplayStr()));
-      Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),t.ActiveEventStr(),"Session "+s.ActiveEventStr()),"\n\n");
-      Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),"Session "+s.ActiveEventStr(),"TickMA "+t.ActiveEventStr()),"\n\n");
+    Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),t.DisplayStr(),s.DisplayStr()));
+    Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),"Tick "+t.ActiveEventStr(),"Session "+s.ActiveEventStr()),"\n\n");
+    Append(text,BoolToStr(IsEqual(inpFractalModel,TickMA),"Session "+s.ActiveEventStr(),"TickMA "+t.ActiveEventStr()),"\n\n");
 
+    if (inpShowComments==Yes)
       Comment(text);
+
+    string alert    = "";
+
+    if (signal.Fired)
+    {
+      if (t[NewFibonacci]) alert = "Tick";
+      else
+      if (s[NewFibonacci]) alert = "Session";
+      else
+                           alert = EnumToString(signal.Source);
+
+      Append(alert,"Trigger ["+EnumToString(signal.Event)+"]");
+      Append(alert,"Fractal ["+EnumToString(signal.Type)+"]:"+EnumToString(signal.State),"\n");
+      Append(alert,"Lead Bias ["+EnumToString(signal.Lead)+"]:"+ActionText(signal.Bias),"\n");
+      Append(alert,text,"\n\n");
+
+      if (inpPauseOn==Yes) Pause(alert,"Trigger Check");
+      Arrow("arr"+ActionText(signal.Lead)+":"+BoolToStr(signal.Model[TickMA],"Tick","Session"),
+           (ArrowType)BoolToInt(signal.Direction==DirectionUp,
+            ArrowUp,BoolToInt(signal.Direction==DirectionDown,ArrowDown,ArrowHold)),
+            Color(signal.Direction,IN_CHART_DIR));
     }
   }
 
@@ -520,25 +541,6 @@ void ManageFund(RoleType Role)
       request.Action         = Role;
       request.Requestor      = "Auto Open ("+request.Requestor+")";
       
-      if (signal.Fired)
-      {
-        if (t[NewFibonacci]) request.Memo = "Tick";
-        else
-        if (s[NewFibonacci]) request.Memo = "Session";
-        else
-                             request.Memo = EnumToString(signal.Source);
-
-        Append(request.Memo,"Trigger ["+EnumToString(signal.Event)+"]");
-        Append(request.Memo,"Fractal ["+EnumToString(signal.Type)+"]:"+EnumToString(signal.State),"\n");
-        Append(request.Memo,"Lead Bias ["+EnumToString(signal.Lead)+"]:"+ActionText(signal.Bias),"\n");
-
-//        Pause(request.Memo,"Trigger Check");
-        Arrow("arr"+ActionText(signal.Lead)+":"+BoolToStr(signal.Model[TickMA],"Tick","Session"),
-             (ArrowType)BoolToInt(signal.Direction==DirectionUp,
-              ArrowUp,BoolToInt(signal.Direction==DirectionDown,ArrowDown,ArrowHold)),
-              Color(signal.Direction,IN_CHART_DIR));
-      }
-
       switch (Role)
       {
         case Buyer:          if (t[NewTick])
