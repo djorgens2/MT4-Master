@@ -107,10 +107,15 @@ double         plSMALow[1];
 
 //--- Class defs
 CTickMA       *t                 = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowEvents);
-CSession      *s                 = new CSession(Daily,0,23,0);
 
+
+//-- Operational vars
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
+double hi                        = NoValue;
+double lo                        = NoValue;
+double crest[];
+double trough[];
 
 //+------------------------------------------------------------------+
 //| CallPause                                                        |
@@ -156,16 +161,6 @@ void RefreshScreen(void)
 
     for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
       UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[pivot].Fractal[point],-7);
-
-
-    //-- Session Box
-    UpdateDirection("tmaSessionTrendDir"+(string)indWinId,s[Trend].Direction,Color(s[Trend].Direction),16);
-    UpdateDirection("tmaSessionTermDir"+(string)indWinId,s[Term].Direction,Color(s[Term].Direction),32);
-    UpdateLabel("tmaSessionState"+(string)indWinId,center(EnumToString(s[Trend].State),18),Color(s[Trend].Direction),16);
-    UpdateLabel("tmaSessionFractalState"+(string)indWinId,center(proper(ActionText(s[ActiveSession].Lead))+" "+
-                  BoolToStr(IsEqual(s[ActiveSession].Lead,s[ActiveSession].Bias),"Hold","Hedge"),30),Color(Direction(s[ActiveSession].Lead,InAction)),12);
-    UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(s[ActiveSession].Lead,InAction),Color(Direction(s[ActiveSession].Lead,InAction)),18);
-    UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(s[ActiveSession].Bias,InAction),Color(Direction(s[ActiveSession].Bias,InAction)),18);
 
 
     //-- Fractal Box
@@ -242,8 +237,48 @@ void ResetBuffer(double &Buffer[], double &Source[])
 //+------------------------------------------------------------------+
 void UpdateIndicator(void)
   {
-    s.Update();
+    double sma;
+
     t.Update();
+
+    if (t[NewBoundary])
+    {
+      if (t[NewHigh])
+        if (IsChanged(hi,t.SMA().High[0]))
+        {
+          ArrayResize(crest,fmin(t.Count(Segments),inpPeriods),inpPeriods);
+          ArrayInitialize(crest,0.00);
+
+          sma  = t.Range().Low;
+
+          for (int node=2;node<ArraySize(crest)-1;node++)
+            if (t.SMA().High[node]>t.SMA().High[node-1])
+              if (t.SMA().High[node]>t.SMA().High[node+1])
+                if (IsHigher(t.SMA().High[node],sma))
+                  crest[node]      = sma;
+        }
+        
+      if (t[NewLow])
+        if (IsChanged(lo,t.SMA().Low[0]))
+        {
+          ArrayResize(trough,fmin(t.Count(Segments),inpPeriods),inpPeriods);
+          ArrayInitialize(trough,0.00);
+
+          sma   = t.Range().High;
+          
+          for (int node=2;node<ArraySize(trough)-1;node++)
+            if (t.SMA().Low[node]<t.SMA().Low[node-1])
+              if (t.SMA().Low[node]<t.SMA().Low[node+1])
+                if (IsLower(t.SMA().Low[node],sma))
+                  trough[node]     = sma;
+        }
+
+      for (int node=0;node<fmin(t.Count(Segments),inpPeriods);node++)
+      {
+        if (ArraySize(crest)>node)  UpdatePriceLabel("crest-"+(string)node+":"+(string)indWinId,crest[node],clrYellow,node);
+        if (ArraySize(trough)>node) UpdatePriceLabel("trough-"+(string)node+":"+(string)indWinId,trough[node],clrRed,node);
+      }
+    }
 
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
@@ -686,6 +721,12 @@ int OnInit()
     NewLabel("tmaSegmentState"+(string)indWinId,"",40,298,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaSegmentBias"+(string)indWinId,"",15,295,clrDarkGray,SCREEN_UR,indWinId);
 
+    for (int node=0;node<inpPeriods;node++)
+    {
+      NewPriceLabel("crest-"+(string)node+":"+(string)indWinId,0.00,true,indWinId);
+      NewPriceLabel("trough-"+(string)node+":"+(string)indWinId,0.00,true,indWinId);
+    }
+
     //-- Clock & Price
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,indWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
@@ -699,5 +740,4 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete t;
-    delete s;
   }

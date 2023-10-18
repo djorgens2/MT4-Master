@@ -101,9 +101,15 @@ double         plSMALow[1];
 CTickMA       *t                 = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowEvents);
 
 //--- Operational Vars
+FractalType    show;
+
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
-FractalType    show;
+
+double hi                        = NoValue;
+double lo                        = NoValue;
+double crest[];
+double trough[];
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
@@ -217,10 +223,48 @@ void ResetBuffer(double &Buffer[], double &Source[])
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
+    double sma;
+
     t.Update();
 
-//    if (t[NewBoundary])
-//      UpdatePriceLabel("tmaNewBoundary",Close[0],Color(BoolToInt(t[NewHigh],DirectionUp,DirectionDown),IN_DARK_DIR));
+    if (t[NewBoundary])
+    {
+      if (t[NewHigh])
+        if (IsChanged(hi,t.SMA().High[0]))
+        {
+          ArrayResize(crest,fmin(t.Count(Segments),inpPeriods),inpPeriods);
+          ArrayInitialize(crest,0.00);
+
+          sma  = t.Range().Low;
+
+          for (int node=2;node<ArraySize(crest)-1;node++)
+            if (t.SMA().High[node]>t.SMA().High[node-1])
+              if (t.SMA().High[node]>t.SMA().High[node+1])
+                if (IsHigher(t.SMA().High[node],sma))
+                  crest[node]      = sma;
+        }
+        
+      if (t[NewLow])
+        if (IsChanged(lo,t.SMA().Low[0]))
+        {
+          ArrayResize(trough,fmin(t.Count(Segments),inpPeriods),inpPeriods);
+          ArrayInitialize(trough,0.00);
+
+          sma   = t.Range().High;
+          
+          for (int node=2;node<ArraySize(trough)-1;node++)
+            if (t.SMA().Low[node]<t.SMA().Low[node-1])
+              if (t.SMA().Low[node]<t.SMA().Low[node+1])
+                if (IsLower(t.SMA().Low[node],sma))
+                  trough[node]     = sma;
+        }
+
+      for (int node=0;node<fmin(t.Count(Segments),inpPeriods);node++)
+      {
+        if (ArraySize(crest)>node)  UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
+        if (ArraySize(trough)>node) UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
+      }
+    }
 
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
@@ -431,6 +475,12 @@ int OnInit()
 
     NewPriceLabel("tmaNewBoundary");
 
+    for (int node=0;node<inpPeriods;node++)
+    {
+      NewPriceLabel("crest-"+(string)node,0.00,true,indWinId);
+      NewPriceLabel("trough-"+(string)node,0.00,true,indWinId);
+    }
+      
     return(INIT_SUCCEEDED);
   }
 

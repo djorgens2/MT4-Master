@@ -127,16 +127,16 @@ public:
     void             Update(void);
 
     //-- Data Collections
-    TickRec          Tick(int Node=0)      {return(tr[Node]);};
-    SegmentRec       Segment(int Node=0)   {return(sr[Node]);};
+    TickRec          Tick(int Node=0)      {return(tr[fmin(Node,Count(Ticks)-1)]);};
+    SegmentRec       Segment(int Node=0)   {return(sr[fmin(Node,Count(Segments)-1)]);};
     RangeRec         Range(void)           {return(range);};
     SMARec           SMA(void)             {return(sma);};
     LinearRec        Linear(void)          {return(line);};
     SegmentPivot     Pivot(void)           {return(seg);};
 
+    double           FOC(MeasureType Measure) {return line.FOC[Measure];};
     int              Count(CountType Type) {return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr)));};
     int              Direction(double &Price[], int Speed=Fast) {return(Direction(Price[0]-Price[Speed-1]));};
-
 
     //-- Format strings
     string           TickStr(int Count=0);
@@ -541,9 +541,9 @@ void CTickMA::UpdateLinear(void)
     //-- Set Range Fractal Type (shape)
     line.Type              = (FractalType)BoolToInt(IsBetween(Pivot().Active,Pivot().Support,Pivot().Resistance),
                                           BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Convergent,Divergent),
-                                          BoolToInt(Fractal(Term).Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
+                                          BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
 
-    NewAction(line.Lead,Action(BoolToInt(Fractal(Term).Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
+    NewAction(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
   }
 
 //+------------------------------------------------------------------+

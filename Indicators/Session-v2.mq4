@@ -151,15 +151,6 @@ void RefreshScreen(void)
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
         UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Fractal[point],-6);
-
-      //Append(text,"------- Fractal ["+EnumToString(inpType)+" "+EnumToString(ShowFractal)+"] --------------------","\n\n");
-      //Append(text," (o) Origin:     "+DoubleToStr(s[ShowFractal].Fractal[fpOrigin],Digits),"\n");
-      //Append(text," Close:  "+DoubleToStr(s[ShowFractal].Fractal[fpClose],Digits));
-      //Append(text," (bre) Fractal: "+DoubleToStr(s[ShowFractal].Fractal[fpBase],Digits),"\n");
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRoot],Digits));
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpExpansion],Digits));
-      //Append(text," (rt)(rc):         "+DoubleToStr(s[ShowFractal].Fractal[fpRetrace],Digits),"\n");
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRecovery],Digits));      
     }
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)

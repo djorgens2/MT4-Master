@@ -31,10 +31,9 @@
 #define InDecimal             4      //--- Return in decimal, raw calculation
 #define InDollar              5      //--- Stated in dollars
 #define InEquity              6      //--- Stated as a percent of equity
-#define InMargin              7      //--- Stated as a value of margin
-#define InDirection           8      //--- Stated as a Direction
-#define InAction              9      //--- Stated as an Action
-#define InState              10      //--- State definition
+#define InDirection           7      //--- Stated as a Direction
+#define InAction              8      //--- Stated as an Action
+#define InState               9      //--- State definition
 
 //--- logical defines
 #define InTrueFalse          11      //--- Stated as True or False
@@ -472,7 +471,8 @@ color Color(double Value, int Method=IN_DIRECTION, bool Contrarian=false)
   
   switch (Method)
   {
-    case IN_PROXIMITY:     if (Close[0]>Value+point(6))   return(clrLawnGreen);
+    case IN_PROXIMITY:     if (IsEqual(Value,0.00))       return(clrDarkGray);
+                           if (Close[0]>Value+point(6))   return(clrLawnGreen);
                            if (Close[0]>Value+point(3))   return(clrYellowGreen);
                            if (Close[0]>Value+point(0.2)) return(clrMediumSeaGreen);
                            if (Close[0]>Value-point(0.2)) return(clrYellow);

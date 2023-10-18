@@ -289,6 +289,9 @@ void GetManualRequest(string Command="")
             
             if (IsBetween(ActionCode(params[2],params[1]),OP_BUYLIMIT,OP_SELLSTOP))
             {
+              FormatPrice(params[3],qrec.Type);
+              FormatPrice(params[5],qrec.Type);
+
               qrec.Type          = ActionCode(params[2],params[1]);
               qrec.Price         = StrToDouble(params[3]);
               qrec.Step          = StrToDouble(params[4]);

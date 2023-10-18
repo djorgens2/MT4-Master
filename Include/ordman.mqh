@@ -17,12 +17,12 @@ string    comfile;
 //+------------------------------------------------------------------+
 //| ActionCode - returns order action id (buy/sell)                  |
 //+------------------------------------------------------------------+
-int ActionCode(string Action, double Price=0.00)
+int ActionCode(string Action, double Price=0.00, bool Contrarian=false)
   {
     int action                             = NoAction;
     
-    if (InStr("BUYLONG",Action))   action   = OP_BUY;
-    if (InStr("SELLSHORT",Action)) action   = OP_SELL;
+    if (InStr("BUYLONG",Action))   action   = BoolToInt(Contrarian,OP_SELL,OP_BUY);
+    if (InStr("SELLSHORT",Action)) action   = BoolToInt(Contrarian,OP_BUY,OP_SELL);
     
     if (Price>0)
       switch (action)
@@ -74,7 +74,7 @@ TicketGroup GroupCode(string Group)
 //+------------------------------------------------------------------+
 void FormatTrade(string &Trade[])
   {
-    string defaults[4] = {"","","",""};
+    string defaults[5] = {"","","","",""};
 
     for (int arg=0;arg<ArraySize(Trade);arg++)
       if (arg<ArraySize(defaults))
@@ -115,7 +115,7 @@ void FormatOrder(string &Order[])
 //+------------------------------------------------------------------+
 void FormatConfig(string &Config[])
   {
-    string defaults[6] = {"","","0.00","0.00","0.00","0.00"};
+    string defaults[7] = {"","","","","","",""};
 
     for (int arg=0;arg<ArraySize(Config);arg++)
       if (arg<ArraySize(defaults))
@@ -132,10 +132,12 @@ double FormatPrice(int Action, string Price, bool Pips=false)
     double pips     = 0.00;
     double price    = StringToDouble(Price);
 
+//    Order.SetStopLoss(ActionCode(params[1]),FormatPrice(ActionCode(params[1],0,InContrarian),params[2]),InStr(params[3],"HIDDENHIDE"),InStr(params[2],"P"));
+
     if (StringSubstr(Price,StringLen(Price)-1,1)=="P")
     {
       pips          = point(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)));
-      
+
       switch (Action)
       {
         case OP_SELLLIMIT:
@@ -145,7 +147,7 @@ double FormatPrice(int Action, string Price, bool Pips=false)
         case OP_BUYLIMIT:
         case OP_BUY:        price = Ask-pips;
                             break;
-                       
+
         case OP_BUYSTOP:    price = Ask+pips;
                             break;
 
@@ -273,8 +275,32 @@ void ProcessComFile(COrder &Order)
             }
             
             if (Order.Submitted(request))
+              Print(Order.OrderDetailStr(Order.Ticket(request.Ticket)));
+            else
               Print(Order.RequestStr(request));
           }
+          else
+
+          //-- System/Action Halt
+          if (InStr("DISABLEHALT",params[0]))
+            switch (pCount)
+            {
+              case 1:  Order.Disable("Manual System Halt");
+                       break;
+              default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+                         Order.Disable(ActionCode(params[1]),"Manual "+proper(params[1])+" Halt");
+            }
+          else
+
+          //-- System/Action Resume
+          if (InStr("ENABLERESUME",params[0]))
+            switch (pCount)
+            {
+              case 1:  Order.Enable("Manual System Enabled");
+                       break;
+              default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+                         Order.Enable(ActionCode(params[1]),"Manual "+proper(params[1])+" Enabled");
+            }
           else
 
           //-- Order Cancelations
@@ -309,18 +335,18 @@ void ProcessComFile(COrder &Order)
           else
 
           //-- Default Configuration
-          if (InStr("STOPLOSSTAKEPROFITTPEQFUNDRISKZONE",params[0]))
+          if (InStr("STOPLOSSLTAKEPROFITPTARGETEQFUNDRISKZONE",params[0]))
           {
             FormatConfig(params);
-            
+
             //-- Risk Management
-            if (InStr("STOPLOSS",params[0]))
-              Order.SetStopLoss(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr(params[3],"HIDDENHIDE"),InStr(params[2],"P"));
+            if (InStr("STOPLOSSL",params[0]))
+              Order.SetStopLoss(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr("HIDDENHIDE",params[3]),InStr(params[2],"P"));
             else
 
             //-- Target Management
-            if (InStr("TAKEPROFITTP",params[0]))
-              Order.SetTakeProfit(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr(params[3],"HIDDENHIDE"),InStr(params[2],"P"));
+            if (InStr("TAKEPROFITPTARGET",params[0]))
+              Order.SetTakeProfit(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr("HIDDENHIDE",params[3]),InStr(params[2],"P"));
             else
             
             //-- Fund Management
@@ -339,15 +365,10 @@ void ProcessComFile(COrder &Order)
           }
           else
 
-          //-- Order Management
-          if (InStr("FULLSPLITRETAINHOLDDCARECAPTUREHEDGEEQREQHKILLCLOSE",params[0]))
+          //-- Order State Management
+          if (MethodCode(params[0])>NoValue)
           {
-            //-- Trade Behavior Management
-            //if (MethodCode(params[2])>NoValue)
-            //  Order.SetMethod(ActionCode(params[1]),MethodCode(params[2]));
-            //else
-            FormatTrade(params);
-            Pause("Method: "+ActionText(ActionCode(params[1]))+" "+EnumToString(MethodCode(params[0]))+" "+proper(params[2])+" ["+params[3]+"]","Method Catch");
+            FormatTrade(params);            
             Order.SetMethod(ActionCode(params[1]),MethodCode(params[0]),GroupCode(params[2]),(int)params[3]);
           }
         }
