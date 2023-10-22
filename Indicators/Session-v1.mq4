@@ -66,26 +66,6 @@ string        sObjectStr  = "[s1]";
 
 
 //+------------------------------------------------------------------+
-//| Bar - Finds Bar in the Fractal Buffer matching Count             |
-//+------------------------------------------------------------------+
-int Bar(double Price)
-  {
-    int count   = 0;
-
-    for (int index=0;index<Bars-1;index++)
-    {
-      if (IsEqual(indFractalBuffer[index],Price))
-        return index;
-
-      if (indFractalBuffer[index]>0)
-        if (++count>5)
-          return index;
-    }
-    
-    return NoValue;
-  }
-
-//+------------------------------------------------------------------+
 //| FibonacciStr - Repaint screen elements                           |
 //+------------------------------------------------------------------+
 string FibonacciStr(string Type, FibonacciRec &Fibonacci)
@@ -113,7 +93,7 @@ void RefreshScreen(void)
     Append(text,EnumToString(inpType));
     Append(text,BoolToStr(s.IsOpen(),BoolToStr(TimeHour(s.ServerTime())>inpHourClose-3,"Late",BoolToStr(TimeHour(s.ServerTime())>3,"Mid","Early"))+" Session","Session Closed"));
     Append(text,(string)s.SessionHour()," [");
-    Append(text,DirText(s[ActiveSession].Direction),"]");
+    Append(text,DirText(s[ActiveSession].Direction),"] ");
     Append(text,ActionText(s[ActiveSession].Lead));
     Append(text,BoolToStr(s[ActiveSession].Lead==s[ActiveSession].Bias,"","Hedge ["+DirText(Direction(s[ActiveSession].Bias,InAction))+"]"));
 
@@ -132,7 +112,7 @@ void RefreshScreen(void)
     else
     if (ShowFractal<FractalTypes)
     {
-      int bar      = Bar(s[ShowFractal].Fractal[fpRoot]);
+      int bar      = 80;
 
       UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpOrigin],-8);
       UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpBase],-8);
@@ -151,15 +131,6 @@ void RefreshScreen(void)
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
         UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Fractal[point],-6);
-
-      //Append(text,"------- Fractal ["+EnumToString(inpType)+" "+EnumToString(ShowFractal)+"] --------------------","\n\n");
-      //Append(text," (o) Origin:     "+DoubleToStr(s[ShowFractal].Fractal[fpOrigin],Digits),"\n");
-      //Append(text," Close:  "+DoubleToStr(s[ShowFractal].Fractal[fpClose],Digits));
-      //Append(text," (bre) Fractal: "+DoubleToStr(s[ShowFractal].Fractal[fpBase],Digits),"\n");
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRoot],Digits));
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpExpansion],Digits));
-      //Append(text," (rt)(rc):         "+DoubleToStr(s[ShowFractal].Fractal[fpRetrace],Digits),"\n");
-      //Append(text,DoubleToStr(s[ShowFractal].Fractal[fpRecovery],Digits));      
     }
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
@@ -193,28 +164,12 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    string strategy = "Exception";
-
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
 
-    if (s.Event(NewFractal)) strategy="Fractal";
-    else
-    if (s.Event(NewFibonacci)) strategy="Fibonacci";
-    else
-    if (s.Event(NewLead)) strategy="Lead";
-    else
-    if (s.Event(NewBoundary)) strategy = BoolToStr(s.Event(NewDirection),"Lead","Boundary");
-    else
-    if (s.Event(NewBias)) strategy="Bias";
-    else
-    if (s.Event(SessionClose)||s.Event(SessionOpen)||s.Event(NewDay)||s.Event(NewHour)) strategy="Session";
-
-//    if (s.ActiveEvent()) Print("|"+strategy+"|"+s.EventStr(NoEvent,EventTypes));
-
-//    if (strategy=="Lead") 
-    if (s.IsOpen()&&s.Log(NewLead,Nominal)) Flag("[sv1]Lead",Color(Direction(s[ActiveSession].Lead,InAction)));
-
+    UpdateDirection(sObjectStr+"lbS_Direction:Bias",Direction(s[ActiveSession].Lead,InAction),
+                      BoolToInt(s[ActiveSession].Bias==s[ActiveSession].Lead,
+                      Color(Direction(s[ActiveSession].Bias,InAction)),clrDarkGray),24);
     RefreshScreen();
 
     return(rates_total);
@@ -236,6 +191,8 @@ int OnInit()
     SetIndexBuffer(2,indFractalBuffer);
     SetIndexEmptyValue(2, 0.00);
     SetIndexStyle(2,DRAW_SECTION);
+
+    NewLabel(sObjectStr+"lbS_Direction:Bias","",5,5,clrNONE,SCREEN_LL);
 
     if (inpShowOption>ShowNone)
     {

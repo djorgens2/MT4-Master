@@ -119,8 +119,8 @@ void RefreshScreen(void)
     static FractalType pivot  = Term;
 
     if (t[NewFibonacci])
-      pivot                   = (FractalType)BoolToInt(t.Event(NewPivot,Critical),Origin,
-                                             BoolToInt(t.Event(NewPivot,Major),Trend,Term));
+      pivot                   = (FractalType)BoolToInt(t.Event(NewFibonacci,Critical),Origin,
+                                             BoolToInt(t.Event(NewFibonacci,Major),Trend,Term));
 
     UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed,-1);
     UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Pivot().Resistance,clrLawnGreen,-1);
@@ -151,7 +151,9 @@ void RefreshScreen(void)
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
     UpdateDirection("tmaFractalTermDir"+(string)indWinId,t[Term].Direction,Color(t[Term].Direction),32);
     UpdateLabel("tmaFractalTrendState"+(string)indWinId,center(EnumToString(t[Trend].State),12),Color(t[Trend].Direction),16);
-    UpdateLabel("tmaFractalPivot"+(string)indWinId,center(EnumToString(pivot)+" "+EnumToString(t[pivot].State),24),Color(Direction(t[pivot].Pivot.Lead,InAction)),12);
+    UpdateLabel("tmaFractalPivot"+(string)indWinId,center(EnumToString(pivot)+" "+EnumToString(t[pivot].State),24),Color(t[pivot].Direction),12);
+    UpdateLabel("tmaFractalPivotRet"+(string)indWinId,"[ "+StringSubstr(EnumToString(t[pivot].Retrace.Level),4,4)+" ]",Color(Direction(t[pivot].Pivot.Lead,InAction)));
+    UpdateLabel("tmaFractalPivotExt"+(string)indWinId,"[ "+StringSubstr(EnumToString(t[pivot].Extension.Level),4)+" ]",Color(Direction(t[pivot].Pivot.Bias,InAction)));
     UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[pivot].Pivot.Lead,InAction),Color(Direction(t[pivot].Pivot.Lead,InAction)),18);
     UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[pivot].Pivot.Bias,InAction),Color(Direction(t[pivot].Pivot.Bias,InAction)),18);
 
@@ -229,6 +231,14 @@ void UpdateTickMA(void)
 
     if (t[NewBoundary])
     {
+      if (t[NewSegment])
+      {
+        ArrayCopy(crest,crest,1);
+        ArrayCopy(trough,trough,1);
+        crest[0]     = 0.00;
+        trough[0]    = 0.00;
+      }
+
       if (t[NewHigh])
         if (IsChanged(hi,t.SMA().High[0]))
         {
@@ -440,6 +450,8 @@ int OnInit()
     NewLabel("tmaFractalTermDir"+(string)indWinId,"",250,12,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalTrendState"+(string)indWinId,"",80,10,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivot"+(string)indWinId,"",66,36,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotRet"+(string)indWinId,"[ 999 ]",32,15,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotExt"+(string)indWinId,"[ 999 ]",32,40,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivotLead"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivotBias"+(string)indWinId,"",15,35,clrDarkGray,SCREEN_UR,indWinId);
 
@@ -447,9 +459,9 @@ int OnInit()
     NewLabel("tmaHLinear"+(string)indWinId,"Linear",252,116,clrGold,SCREEN_UR,indWinId);
     NewLabel("tmaLinearDir"+(string)indWinId,"",244,72,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaLinearBias"+(string)indWinId,"",250,76,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearState"+(string)indWinId,"",50,78,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearState"+(string)indWinId,"",54,78,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaLinearLeadDir"+(string)indWinId,"",15,75,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearFOC"+(string)indWinId,"",40,104,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearFOC"+(string)indWinId,"",36,104,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaLinearBiasDir"+(string)indWinId,"",15,100,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- SMA Data

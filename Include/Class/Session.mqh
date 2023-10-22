@@ -96,6 +96,8 @@ public:
 
          datetime         ServerTime(void)  {return Time[sBar]+(PERIOD_H1*60*sHourOffset);};
          int              SessionHour(void) {return BoolToInt(IsOpen(),TimeHour(ServerTime())-sHourOpen+1,NoValue);};
+         int              HourOpen(void)    {return sHourOpen;};
+         int              HourClose(void)   {return sHourClose;};
       
          bool             IsOpen(void);
          bool             IsOpen(int HourOpen, int HourClose);
@@ -392,7 +394,7 @@ color CSession::Color(SessionType Type, GammaType Gamma)
       case US:      return (color)BoolToInt(Gamma==Dark,USColor,clrSteelBlue);
       case Daily:   return (color)BoolToInt(Gamma==Dark,DailyColor,clrDarkGray);
     }
-    
+
     return (clrBlack);
   }
 

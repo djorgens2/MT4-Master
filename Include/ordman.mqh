@@ -229,6 +229,27 @@ void ProcessComFile(COrder &Order)
         //--- Verify Mode
         if (go)
         {
+          //-- Print utilities
+          if (params[0]=="PRINT")
+            switch (pCount)
+            {
+              case 2:     if (InStr("REQUEST",params[1]))
+                            Print(Order.QueueStr());
+
+                          if (InStr("SUMMARY",params[1]))
+                            Print(Order.SummaryStr());
+
+                          if (InStr("ORDER",params[1]))
+                            Print(Order.OrderStr());
+                          break;
+              case 3:     if (InStr("ORDER",params[1]))
+                            Print(Order.OrderStr(ActionCode(params[2])));
+
+                          if (InStr("MASTER",params[1]))
+                            Print(Order.MasterStr(ActionCode(params[2])));
+            }
+          else
+
           //-- Order Requests
           if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
           {
@@ -374,6 +395,8 @@ void ProcessComFile(COrder &Order)
         }
       }
     }
+
+    UpdateLabel("lbvAC-File",comfile,clrDarkGray);
 
     FileClose(fHandle);
 

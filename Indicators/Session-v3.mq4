@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
-//|                                                   Session-v2.mq4 |
+//|                                                   Session-v3.mq4 |
 //|                                                 Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
 #property copyright "Dennis Jorgenson"
 #property link      ""
-#property version   "2.00"
+#property version   "3.00"
 #property strict
 #property indicator_chart_window
 
@@ -51,18 +51,22 @@ enum ShowOptions
 
 //--- Indicator Inputs
 input SessionType    inpType            = SessionTypes;    // Indicator session
-input int            inpHourOpen        = NoValue;         // Session Opening Hour
-input int            inpHourClose       = NoValue;         // Session Closing Hour
+input int            inpAsiaOpen        = 1;               // Asia Session Opening Hour
+input int            inpAsiaClose       = 10;              // Asia Session Closing Hour
+input int            inpEuropeOpen      = 8;               // Europe Session Opening Hour
+input int            inpEuropeClose     = 18;              // Europe Session Closing Hour
+input int            inpUSOpen          = 14;              // US Session Opening Hour
+input int            inpUSClose         = 23;              // US Session Closing Hour
 input int            inpHourOffset      = 0;               // Time offset EOD NY 5:00pm
 input YesNoType      inpShowRange       = No;              // Show Session Ranges
 input FractalType    inpShowFlags       = FractalTypes;    // Show Event Flags
 input ShowOptions    inpShowOption      = ShowNone;        // Show Fibonacci/Session Pivots
 
-CSession            *s                  = new CSession(inpType,inpHourOpen,inpHourClose,inpHourOffset,inpShowRange==Yes,inpShowFlags);
+CSession            *s[SessionTypes];
 
 PeriodType    ShowSession = PeriodTypes; 
 FractalType   ShowFractal = FractalTypes;
-string        sObjectStr  = "[s2]";
+string        sObjectStr  = "[s3]";
 
 //+------------------------------------------------------------------+
 //| FibonacciStr - Repaint screen elements                           |
@@ -89,23 +93,24 @@ void RefreshScreen(void)
   {
     string text    = "";
     
-    Append(text,EnumToString(inpType));
-    Append(text,BoolToStr(s.IsOpen(),BoolToStr(TimeHour(s.ServerTime())>inpHourClose-3,"Late",BoolToStr(TimeHour(s.ServerTime())>3,"Mid","Early"))+" Session","Session Closed"));
-    Append(text,(string)s.SessionHour()," [");
-    Append(text,DirText(s[ActiveSession].Direction),"]");
-    Append(text,ActionText(s[ActiveSession].Lead));
-    Append(text,BoolToStr(s[ActiveSession].Lead==s[ActiveSession].Bias,"","Hedge ["+DirText(Direction(s[ActiveSession].Bias,InAction))+"]"));
+    //-- Update Control Panel (Session)
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (ObjectGet(sObjectStr+"bxh-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s[type].Event(NewTerm)||s[type].Event(NewHour))
+      {
+        UpdateBox(sObjectStr+"bxh-Session"+EnumToString(type),Color(s[type][Term].Direction,IN_DARK_DIR));
+        UpdateBox(sObjectStr+"bxb-OpenInd"+EnumToString(type),BoolToInt(s[type].IsOpen(),clrYellow,clrBoxOff));
+      }
 
     if (ShowSession<PeriodTypes)
     {
-      UpdateLine(sObjectStr+"lnS_ActiveMid:"+EnumToString(inpType),s.Pivot(ShowSession),STYLE_SOLID,clrGoldenrod);
-      UpdateLine(sObjectStr+"lnS_Low:"+EnumToString(inpType),s[ShowSession].Low,STYLE_DOT,clrMaroon);
-      UpdateLine(sObjectStr+"lnS_High:"+EnumToString(inpType),s[ShowSession].High,STYLE_DOT,clrForestGreen);
+      UpdateLine(sObjectStr+"lnS_ActiveMid:"+EnumToString(inpType),s[inpType].Pivot(ShowSession),STYLE_SOLID,clrGoldenrod);
+      UpdateLine(sObjectStr+"lnS_Low:"+EnumToString(inpType),s[inpType][ShowSession].Low,STYLE_DOT,clrMaroon);
+      UpdateLine(sObjectStr+"lnS_High:"+EnumToString(inpType),s[inpType][ShowSession].High,STYLE_DOT,clrForestGreen);
       
       if (IsEqual(ShowSession,ActiveSession))
       {
-        UpdateLine(sObjectStr+"lnS_Support:"+EnumToString(inpType),s[PriorSession].Low,STYLE_SOLID,clrMaroon);
-        UpdateLine(sObjectStr+"lnS_Resistance:"+EnumToString(inpType),s[PriorSession].High,STYLE_SOLID,clrForestGreen);
+        UpdateLine(sObjectStr+"lnS_Support:"+EnumToString(inpType),s[inpType][PriorSession].Low,STYLE_SOLID,clrMaroon);
+        UpdateLine(sObjectStr+"lnS_Resistance:"+EnumToString(inpType),s[inpType][PriorSession].High,STYLE_SOLID,clrForestGreen);
       }
     } 
     else
@@ -113,40 +118,52 @@ void RefreshScreen(void)
     {
       int bar      = 80;
 
-      UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpOrigin],-8);
-      UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpBase],-8);
-      UpdateRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRoot],-8,0,
-                             BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpExpansion],-8,0,
-                             BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRetrace],-8,0);
-      UpdateRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRecovery],-8,0);
+      UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpOrigin],-8);
+      UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpBase],-8);
+      UpdateRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpRoot],-8,0,
+                             BoolToInt(IsEqual(s[inpType][ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
+      UpdateRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpExpansion],-8,0,
+                             BoolToInt(IsEqual(s[inpType][ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+      UpdateRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpRetrace],-8,0);
+      UpdateRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),bar,s[inpType][ShowFractal].Fractal[fpRecovery],-8,0);
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,s.Price(fibo,ShowFractal,Extension),-8,0,Color(s[ShowFractal].Direction,IN_DARK_DIR));
-        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",s.Price(fibo,ShowFractal,Extension),-5,Color(s[ShowFractal].Direction,IN_DARK_DIR));
+        UpdateRay(sObjectStr+"lnS_"+EnumToString(fibo)+":"+EnumToString(inpType),bar,s[inpType].Price(fibo,ShowFractal,Extension),-8,0,Color(s[inpType][ShowFractal].Direction,IN_DARK_DIR));
+        UpdateText(sObjectStr+"lnT_"+EnumToString(fibo)+":"+EnumToString(inpType),"",s[inpType].Price(fibo,ShowFractal,Extension),-5,Color(s[inpType][ShowFractal].Direction,IN_DARK_DIR));
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Fractal[point],-6);
+        UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[inpType][ShowFractal].Fractal[point],-6);
     }
 
-    for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+    if (inpType<SessionTypes)
     {
-      Append(text,"------- Fibonacci ["+EnumToString(type)+"] ------------------------","\n\n");
-      Append(text," "+DirText(s[type].Direction),"\n");
-      Append(text,EnumToString(s[type].State));
-      Append(text,"["+ActionText(s[type].Pivot.Lead)+"]");
-      Append(text,BoolToStr(IsEqual(s[type].Pivot.Bias,s[type].Pivot.Lead),"","Hedge"));
-      Append(text,BoolToStr(IsEqual(s[type].Event,NoEvent),""," **"+EventText(s[type].Event)));
-      Append(text,FibonacciStr("   Ext: ",s[type].Extension),"\n");
-      Append(text,FibonacciStr("   Ret: ",s[type].Retrace),"\n");
+      Append(text,EnumToString(inpType));
+      Append(text,BoolToStr(s[inpType].IsOpen(),BoolToStr(TimeHour(s[inpType].ServerTime())>s[inpType].HourClose()-3,"Late",
+                                                BoolToStr(TimeHour(s[inpType].ServerTime())>3,"Mid","Early"))+" Session","Session Closed"));
+      Append(text,(string)s[inpType].SessionHour()," [");
+      Append(text,DirText(s[inpType][ActiveSession].Direction),"]");
+      Append(text,ActionText(s[inpType][ActiveSession].Lead));
+      Append(text,BoolToStr(s[inpType][ActiveSession].Lead==s[inpType][ActiveSession].Bias,"","Hedge ["+
+                                                DirText(Direction(s[inpType][ActiveSession].Bias,InAction))+"]"));
+
+      for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
+      {
+        Append(text,"------- Fibonacci ["+EnumToString(type)+"] ------------------------","\n\n");
+        Append(text," "+DirText(s[inpType][type].Direction),"\n");
+        Append(text,EnumToString(s[inpType][type].State));
+        Append(text,"["+ActionText(s[inpType][type].Pivot.Lead)+"]");
+        Append(text,BoolToStr(IsEqual(s[inpType][type].Pivot.Bias,s[inpType][type].Pivot.Lead),"","Hedge"));
+        Append(text,BoolToStr(IsEqual(s[inpType][type].Event,NoEvent),""," **"+EventText(s[inpType][type].Event)));
+        Append(text,FibonacciStr("   Ext: ",s[inpType][type].Extension),"\n");
+        Append(text,FibonacciStr("   Ret: ",s[inpType][type].Retrace),"\n");
+      }
+
+      Append(text,s[inpType].ActiveEventStr(),"\n\n");
+
+      Comment(text);
     }
-
-    Append(text,s.ActiveEventStr(),"\n\n");
-
-    Comment(text);
   }
 
 //+------------------------------------------------------------------+
@@ -163,8 +180,13 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    s.Update(indPriorBuffer,indOffBuffer);
-    s.Fractal(indFractalBuffer);
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      if (IsEqual(type,inpType))
+      {
+        s[type].Update(indPriorBuffer,indOffBuffer);
+        s[type].Fractal(indFractalBuffer);
+      }
+      else s[type].Update();
 
     RefreshScreen();
 
@@ -187,6 +209,18 @@ int OnInit()
     SetIndexBuffer(2,indFractalBuffer);
     SetIndexEmptyValue(2, 0.00);
     SetIndexStyle(2,DRAW_SECTION);
+    
+    s[Daily]   = new CSession(Daily,0,23,inpHourOffset,false,(FractalType)BoolToInt(inpType==Daily,inpShowFlags,FractalTypes));
+    s[Asia]    = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpHourOffset,inpShowRange==Yes,(FractalType)BoolToInt(inpType==Asia,inpShowFlags,FractalTypes));
+    s[Europe]  = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpHourOffset,inpShowRange==Yes,(FractalType)BoolToInt(inpType==Europe,inpShowFlags,FractalTypes));
+    s[US]      = new CSession(US,inpUSOpen,inpUSClose,inpHourOffset,inpShowRange==Yes,(FractalType)BoolToInt(inpType==US,inpShowFlags,FractalTypes));
+
+    for (SessionType type=Daily;type<SessionTypes;type++)
+    {
+      DrawBox(sObjectStr+"bxh-Session"+EnumToString(type),120*(SessionTypes-type),5,110,20,C'60,60,60',BORDER_RAISED,SCREEN_UR);
+      DrawBox(sObjectStr+"bxb-OpenInd"+EnumToString(type),120*(SessionTypes-type)-4,9,7,12,C'60,60,60',BORDER_RAISED,SCREEN_UR);
+      NewLabel(sObjectStr+"lbh-Session"+EnumToString(type),lpad(EnumToString(type)," ",4),(120*(SessionTypes-type))-70,7,clrWhite,SCREEN_UR);
+    }
 
     if (inpShowOption>ShowNone)
     {
@@ -234,5 +268,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-    delete s;
+    for (SessionType type=Daily;type<SessionTypes;type++)
+      delete s[type];
   }
