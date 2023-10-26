@@ -106,10 +106,8 @@ FractalType    show;
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
 
-double hi                        = NoValue;
-double lo                        = NoValue;
-double crest[];
-double trough[];
+double         crest[];
+double         trough[];
 
 //+------------------------------------------------------------------+
 //| RefreshScreen - Repaints Indicator labels                        |
@@ -225,56 +223,28 @@ void ResetBuffer(double &Buffer[], double &Source[])
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    double sma;
+    double smahi     = t.Range().Low;
+    double smalo     = t.Range().High;
 
     t.Update();
 
-    if (t[NewBoundary])
+    ArrayInitialize(crest,0.00);
+    ArrayInitialize(trough,0.00);
+
+    for (int node=2;node<fmin(t.Count(Segments),inpPeriods)-1;node++)
     {
-      if (t[NewSegment])
-      {
-        ArrayCopy(crest,crest,1);
-        ArrayCopy(trough,trough,1);
+      if (t.SMA().High[node]>t.SMA().High[node-1])
+        if (t.SMA().High[node]>t.SMA().High[node+1])
+          if (IsHigher(t.SMA().High[node],smahi))
+            crest[node]      = smahi;
 
-        crest[0]     = 0.00;
-        trough[0]    = 0.00;
-      }
+      if (t.SMA().Low[node]<t.SMA().Low[node-1])
+        if (t.SMA().Low[node]<t.SMA().Low[node+1])
+          if (IsLower(t.SMA().Low[node],smalo))
+            trough[node]     = smalo;
 
-      if (t[NewHigh])
-        if (IsChanged(hi,t.SMA().High[0]))
-        {
-          ArrayResize(crest,fmin(t.Count(Segments),inpPeriods),inpPeriods);
-          ArrayInitialize(crest,0.00);
-
-          sma  = t.Range().Low;
-
-          for (int node=2;node<ArraySize(crest)-1;node++)
-            if (t.SMA().High[node]>t.SMA().High[node-1])
-              if (t.SMA().High[node]>t.SMA().High[node+1])
-                if (IsHigher(t.SMA().High[node],sma))
-                  crest[node]      = sma;
-        }
-        
-      if (t[NewLow])
-        if (IsChanged(lo,t.SMA().Low[0]))
-        {
-          ArrayResize(trough,fmin(t.Count(Segments),inpPeriods),inpPeriods);
-          ArrayInitialize(trough,0.00);
-
-          sma   = t.Range().High;
-          
-          for (int node=2;node<ArraySize(trough)-1;node++)
-            if (t.SMA().Low[node]<t.SMA().Low[node-1])
-              if (t.SMA().Low[node]<t.SMA().Low[node+1])
-                if (IsLower(t.SMA().Low[node],sma))
-                  trough[node]     = sma;
-        }
-
-      for (int node=0;node<fmin(t.Count(Segments),inpPeriods);node++)
-      {
-        //if (ArraySize(crest)>node)  UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
-        //if (ArraySize(trough)>node) UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
-      }
+      UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
+      UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
     }
 
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
@@ -485,6 +455,9 @@ int OnInit()
     //-- Clock & Price
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,indWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
+
+    ArrayResize(crest,inpPeriods);
+    ArrayResize(trough,inpPeriods);
 
     for (int node=0;node<inpPeriods;node++)
     {

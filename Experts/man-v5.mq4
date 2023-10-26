@@ -378,73 +378,41 @@ void UpdateSignal(FractalModel Model, CFractal &Signal)
 //| UpdateSignal - Updates Signal Price Arrays                       |
 //+------------------------------------------------------------------+
 void UpdateSignal(void)
-  {
-    double sma;
-    
+  {    
+    double crest               = t.Range().Low;
+    double trough              = t.Range().High;
+    int    crests              = signal.Crest.Count;
+    int    troughs             = signal.Trough.Count;
+
     signal.Crest.Trigger       = false;
     signal.Trough.Trigger      = false;
+    signal.Crest.Count         = 0;
+    signal.Trough.Count        = 0;
 
-    if (t[NewSegment])
+    ArrayInitialize(signal.Crest.Pivot,0.00);
+    ArrayInitialize(signal.Trough.Pivot,0.00);
+
+    for (int node=2;node<inpPeriods-1;node++)
     {
-      ArrayCopy(signal.Crest.Pivot,signal.Crest.Pivot,1);
-      ArrayCopy(signal.Trough.Pivot,signal.Trough.Pivot,1);
+      if (t.SMA().High[node]>t.SMA().High[node-1])
+        if (t.SMA().High[node]>t.SMA().High[node+1])
+          if (IsHigher(t.SMA().High[node],crest))
+          {
+            signal.Crest.Count++;
+            signal.Crest.Pivot[node]     = crest;
+          }
 
-      signal.Crest.Pivot[0]    = 0.00;
-      signal.Trough.Pivot[0]   = 0.00;
+      if (t.SMA().Low[node]<t.SMA().Low[node-1])
+        if (t.SMA().Low[node]<t.SMA().Low[node+1])
+          if (IsLower(t.SMA().Low[node],trough))
+          {
+            signal.Trough.Count++;
+            signal.Trough.Pivot[node]    = trough;
+          }
     }
 
-    if (t[NewBoundary])
-    {
-      if (t[NewHigh])
-        if (IsChanged(signal.Crest.High,t.SMA().High[0]))
-        {
-          ArrayInitialize(signal.Crest.Pivot,0.00);
-
-          sma                  = t.Range().Low;
-
-          for (int node=2;node<inpPeriods-1;node++)
-            if (t.SMA().High[node]>t.SMA().High[node-1])
-              if (t.SMA().High[node]>t.SMA().High[node+1])
-                if (IsHigher(t.SMA().High[node],sma))
-                {
-                  signal.Crest.Trigger         = true;
-                  signal.Crest.Pivot[node]     = sma;
-                }
-        }
-        
-      if (t[NewLow])
-        if (IsChanged(signal.Trough.Low,t.SMA().Low[0]))
-        {
-          ArrayInitialize(signal.Trough.Pivot,0.00);
-
-          sma                  = t.Range().High;
-          
-          for (int node=2;node<inpPeriods-1;node++)
-            if (t.SMA().Low[node]<t.SMA().Low[node-1])
-              if (t.SMA().Low[node]<t.SMA().Low[node+1])
-                if (IsLower(t.SMA().Low[node],sma))
-                {
-                  signal.Trough.Trigger        = true;
-                  signal.Trough.Pivot[node]    = sma;
-                }
-        }
-
-      signal.Crest.Count       = 0;
-      signal.Trough.Count      = 0;
-
-      for (int node=2;node<inpPeriods-1;node++)
-      {
-        signal.Crest.Count    += BoolToInt(signal.Crest.Pivot[node]>0,1);
-        signal.Trough.Count   += BoolToInt(signal.Trough.Pivot[node]>0,1);
-        
-        UpdatePriceLabel("crest-"+(string)node,signal.Crest.Pivot[node],clrYellow,node);
-        UpdatePriceLabel("trough-"+(string)node,signal.Trough.Pivot[node],clrRed,node);
-      }
-      
-      if (signal.Trough.Trigger)
-        if (signal.Trough.Count==2)
-          Pause("Trough Count +2","Trough Check");
-    }
+    signal.Crest.Trigger       = IsChanged(crests,signal.Crest.Count);
+    signal.Trough.Trigger      = IsChanged(troughs,signal.Trough.Count);
   }
 
 
