@@ -379,40 +379,60 @@ void UpdateSignal(FractalModel Model, CFractal &Signal)
 //+------------------------------------------------------------------+
 void UpdateSignal(void)
   {    
-    double crest               = t.Range().Low;
-    double trough              = t.Range().High;
-    int    crests              = signal.Crest.Count;
-    int    troughs             = signal.Trough.Count;
+    double crest             = t.SMA().High[0];
+    double trough            = t.SMA().Low[0];
+    int    cflat             = 0;
+    int    tflat             = 0;
+    int    ccount            = signal.Crest.Count;
+    int    tcount            = signal.Trough.Count;
 
-    signal.Crest.Trigger       = false;
-    signal.Trough.Trigger      = false;
-    signal.Crest.Count         = 0;
-    signal.Trough.Count        = 0;
+    signal.Crest.Trigger     = false;
+    signal.Trough.Trigger    = false;
+    signal.Crest.Count       = 0;
+    signal.Trough.Count      = 0;
 
     ArrayInitialize(signal.Crest.Pivot,0.00);
     ArrayInitialize(signal.Trough.Pivot,0.00);
 
     for (int node=2;node<inpPeriods-1;node++)
     {
-      if (t.SMA().High[node]>t.SMA().High[node-1])
-        if (t.SMA().High[node]>t.SMA().High[node+1])
-          if (IsHigher(t.SMA().High[node],crest))
+      if (IsHigher(t.SMA().High[node],crest))
+        if (t.SMA().High[node]>t.SMA().High[node-1])
+        {
+          if (t.SMA().High[node]>t.SMA().High[node+1])
           {
             signal.Crest.Count++;
             signal.Crest.Pivot[node]     = crest;
           }
 
-      if (t.SMA().Low[node]<t.SMA().Low[node-1])
-        if (t.SMA().Low[node]<t.SMA().Low[node+1])
-          if (IsLower(t.SMA().Low[node],trough))
+          cflat              = BoolToInt(IsEqual(t.SMA().High[node],t.SMA().High[node+1]),node);
+        }
+        
+      if (cflat>0)
+        if (t.SMA().High[node]<t.SMA().High[cflat])
+          if (IsChanged(signal.Crest.Pivot[cflat],crest))
+            signal.Crest.Count++;
+
+      if (IsLower(t.SMA().Low[node],trough))
+        if (t.SMA().Low[node]<t.SMA().Low[node-1])
+        {
+          if (t.SMA().Low[node]<t.SMA().Low[node+1])
           {
             signal.Trough.Count++;
             signal.Trough.Pivot[node]    = trough;
           }
+
+          tflat              = BoolToInt(IsEqual(t.SMA().Low[node],t.SMA().Low[node+1]),node);
+        }
+
+      if (tflat>0)
+        if (t.SMA().Low[node]>t.SMA().Low[tflat])
+          if (IsChanged(signal.Trough.Pivot[tflat],trough))
+            signal.Trough.Count++;
     }
 
-    signal.Crest.Trigger       = IsChanged(crests,signal.Crest.Count);
-    signal.Trough.Trigger      = IsChanged(troughs,signal.Trough.Count);
+    signal.Crest.Trigger     = IsChanged(ccount,signal.Crest.Count);
+    signal.Trough.Trigger    = IsChanged(tcount,signal.Trough.Count);
   }
 
 
@@ -503,7 +523,7 @@ void SetLeadStrategy(RoleType Role, bool Trigger)
 
 //+------------------------------------------------------------------+
 //| SetRiskStrategy - Set Strategy for supplied Role                 |
-//+------------------------------------------------------------------+
+//+--------------------------------------------------------- ---------+
 void SetRiskStrategy(RoleType Role, bool Trigger)
   {
 //Opener,          //-- New Position (Opener)

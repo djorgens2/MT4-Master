@@ -106,8 +106,6 @@ FractalType    show;
 double         highbuffer        = NoValue;
 double         lowbuffer         = NoValue;
 
-double hi                        = NoValue;
-double lo                        = NoValue;
 double crest[];
 double trough[];
 
@@ -225,8 +223,10 @@ void ResetBuffer(double &Buffer[], double &Source[])
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    double smahi     = t.Range().Low;
-    double smalo     = t.Range().High;
+    double smahi     = t.SMA().High[0];
+    double smalo     = t.SMA().Low[0];
+    int    cflat     = 0;
+    int    tflat     = 0;
 
     t.Update();
 
@@ -235,20 +235,41 @@ void UpdateTickMA(void)
 
     for (int node=2;node<fmin(t.Count(Segments),inpPeriods)-1;node++)
     {
-      if (t.SMA().High[node]>t.SMA().High[node-1])
-        if (t.SMA().High[node]>t.SMA().High[node+1])
-          if (IsHigher(t.SMA().High[node],smahi))
+      if (IsHigher(t.SMA().High[node],smahi))
+        if (t.SMA().High[node]>t.SMA().High[node-1])
+        {
+          if (t.SMA().High[node]>t.SMA().High[node+1])
             crest[node]      = smahi;
 
-      if (t.SMA().Low[node]<t.SMA().Low[node-1])
-        if (t.SMA().Low[node]<t.SMA().Low[node+1])
-          if (IsLower(t.SMA().Low[node],smalo))
+          cflat              = BoolToInt(IsEqual(t.SMA().High[node],t.SMA().High[node+1]),node);
+        }
+        
+      if (cflat>0)
+        if (t.SMA().High[node]<t.SMA().High[cflat])
+        {
+          crest[cflat]       = smahi;
+          UpdatePriceLabel("crest-"+(string)cflat,crest[cflat],clrGoldenrod,cflat);
+        }
+
+      if (IsLower(t.SMA().Low[node],smalo))
+        if (t.SMA().Low[node]<t.SMA().Low[node-1])
+        {
+          if (t.SMA().Low[node]<t.SMA().Low[node+1])
             trough[node]     = smalo;
+
+          tflat              = BoolToInt(IsEqual(t.SMA().Low[node],t.SMA().Low[node+1]),node);
+        }
+
+      if (tflat>0)
+        if (t.SMA().Low[node]>t.SMA().Low[tflat])
+        {
+          trough[tflat]      = smalo;
+          UpdatePriceLabel("trough-"+(string)tflat,trough[tflat],clrGoldenrod,tflat);
+        }
 
       UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
       UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
     }
-
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open);
@@ -422,7 +443,7 @@ int OnInit()
     NewLabel("tmaFractalTrendDir"+(string)indWinId,"",244,8,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalTermDir"+(string)indWinId,"",250,12,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalTrendState"+(string)indWinId,"",80,10,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivot"+(string)indWinId,"",66,36,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivot"+(string)indWinId,"",58,36,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivotRet"+(string)indWinId,"[ 999 ]",32,15,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivotExt"+(string)indWinId,"[ 999 ]",32,40,clrDarkGray,SCREEN_UR,indWinId);
     NewLabel("tmaFractalPivotLead"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
@@ -458,7 +479,8 @@ int OnInit()
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,indWinId);
     NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
 
-    NewPriceLabel("tmaNewBoundary");
+    ArrayResize(crest,inpPeriods);
+    ArrayResize(trough,inpPeriods);
 
     for (int node=0;node<inpPeriods;node++)
     {

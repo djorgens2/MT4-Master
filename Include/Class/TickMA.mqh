@@ -188,7 +188,7 @@ void CTickMA::CalcSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::CalcLinear(double &Buffer[])
   {
-    int periods           = fmin(Count(Segments)-1,tmaPeriods);
+    int periods           = 0;
 
     //--- Linear regression line
     double m[5]           = {0.00,0.00,0.00,0.00,0.00};    //--- slope
@@ -197,17 +197,20 @@ void CTickMA::CalcLinear(double &Buffer[])
     double sumx           = 0.00;
     double sumy           = 0.00;
 
-    for (int idx=0;idx<periods;idx++)
-    {
-      sumx += idx+1;
-      sumy += fdiv(sma.High[idx]+sma.Low[idx],2);
+    for (int idx=0;idx<tmaPeriods;idx++)
+      if (fdiv(sma.High[idx]+sma.Low[idx],2)>0.00)
+      {
+        sumx += idx+1;
+        sumy += fdiv(sma.High[idx]+sma.Low[idx],2);
       
-      m[1] += (idx+1)*fdiv(sma.High[idx]+sma.Low[idx],2);  // Exy
-      m[3] += pow(idx+1,2);                                // E(x^2)
-    }
+        m[1] += (idx+1)*fdiv(sma.High[idx]+sma.Low[idx],2);  // Exy
+        m[3] += pow(idx+1,2);                                // E(x^2)
+
+        periods++;
+      }
     
-    m[2]    = fdiv(sumx*sumy,periods);                  // (Ex*Ey)/n
-    m[4]    = fdiv(pow(sumx,2),periods);                // [(Ex)^2]/n
+    m[2]    = fdiv(sumx*sumy,periods);                     // (Ex*Ey)/n
+    m[4]    = fdiv(pow(sumx,2),periods);                   // [(Ex)^2]/n
     
     m[0]    = (m[1]-m[2])/(m[3]-m[4]);
     b       = (sumy-m[0]*sumx)/periods;
@@ -474,11 +477,11 @@ void CTickMA::UpdateSMA(void)
   }
 
 //+------------------------------------------------------------------+
-//| UpdateLinear - Calc linear regression from Poly Regression       |
+//| UpdateLinear - Update Linear Events and calc FOC metrics         |
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
-    int        periods      = fmin(Count(Segments)-1,tmaPeriods);
+    int        periods      = fmin(ArraySize(line.Price)-1,tmaPeriods);
     int        bias         = line.Bias;
     int        direction    = NoDirection;
     AlertType  alert        = NoAlert;
@@ -488,8 +491,6 @@ void CTickMA::UpdateLinear(void)
     double nowFOC           = fabs(line.FOC[Now]);
 
     line.Event              = NoEvent;
-
-    CalcLinear(line.Price);
 
     //--- compute FOC metrics
     if (Event(NewTick)||Event(NewDirection,Minor))
@@ -610,9 +611,12 @@ void CTickMA::Update(void)
     UpdateRange();
 
     if (Count(Segments)>Slow)
-    {
       UpdateSMA();
-      UpdateLinear();      
+
+    if (Count(Segments)>30)
+    {
+      CalcLinear(line.Price);
+      UpdateLinear();
     }
   }
 

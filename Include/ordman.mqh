@@ -132,8 +132,6 @@ double FormatPrice(int Action, string Price, bool Pips=false)
     double pips     = 0.00;
     double price    = StringToDouble(Price);
 
-//    Order.SetStopLoss(ActionCode(params[1]),FormatPrice(ActionCode(params[1],0,InContrarian),params[2]),InStr(params[3],"HIDDENHIDE"),InStr(params[2],"P"));
-
     if (StringSubstr(Price,StringLen(Price)-1,1)=="P")
     {
       pips          = point(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)));
@@ -180,6 +178,9 @@ void ProcessComFile(COrder &Order)
     int    pCount         = NoValue;
     bool   lComment       = false;
     bool   bComment       = false;
+
+    if (comfile=="")
+      return;
     
     //--- process command file
     while(fHandle==INVALID_HANDLE)

@@ -223,8 +223,10 @@ void ResetBuffer(double &Buffer[], double &Source[])
 //+------------------------------------------------------------------+
 void UpdateTickMA(void)
   {
-    double smahi     = t.Range().Low;
-    double smalo     = t.Range().High;
+    double smahi     = t.SMA().High[0];
+    double smalo     = t.SMA().Low[0];
+    int    cflat     = 0;
+    int    tflat     = 0;
 
     t.Update();
 
@@ -233,15 +235,37 @@ void UpdateTickMA(void)
 
     for (int node=2;node<fmin(t.Count(Segments),inpPeriods)-1;node++)
     {
-      if (t.SMA().High[node]>t.SMA().High[node-1])
-        if (t.SMA().High[node]>t.SMA().High[node+1])
-          if (IsHigher(t.SMA().High[node],smahi))
+      if (IsHigher(t.SMA().High[node],smahi))
+        if (t.SMA().High[node]>t.SMA().High[node-1])
+        {
+          if (t.SMA().High[node]>t.SMA().High[node+1])
             crest[node]      = smahi;
 
-      if (t.SMA().Low[node]<t.SMA().Low[node-1])
-        if (t.SMA().Low[node]<t.SMA().Low[node+1])
-          if (IsLower(t.SMA().Low[node],smalo))
+          cflat              = BoolToInt(IsEqual(t.SMA().High[node],t.SMA().High[node+1]),node);
+        }
+        
+      if (cflat>0)
+        if (t.SMA().High[node]<t.SMA().High[cflat])
+        {
+          crest[cflat]       = smahi;
+          UpdatePriceLabel("crest-"+(string)cflat,crest[cflat],clrGoldenrod,cflat);
+        }
+
+      if (IsLower(t.SMA().Low[node],smalo))
+        if (t.SMA().Low[node]<t.SMA().Low[node-1])
+        {
+          if (t.SMA().Low[node]<t.SMA().Low[node+1])
             trough[node]     = smalo;
+
+          tflat              = BoolToInt(IsEqual(t.SMA().Low[node],t.SMA().Low[node+1]),node);
+        }
+
+      if (tflat>0)
+        if (t.SMA().Low[node]>t.SMA().Low[tflat])
+        {
+          trough[tflat]      = smalo;
+          UpdatePriceLabel("trough-"+(string)tflat,trough[tflat],clrGoldenrod,tflat);
+        }
 
       UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
       UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
