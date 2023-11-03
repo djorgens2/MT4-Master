@@ -343,6 +343,11 @@ int OnCalculate(const int rates_total,
     UpdateSegment(rates_total!=prev_calculated);
     RefreshScreen();
 
+    if (t[NewBoundary])
+      Pause(BoolToStr(t[NewHigh],EnumToString(t.Alert(NewHigh))+" New High",
+            BoolToStr(t[NewLow],EnumToString(t.Alert(NewLow))+" New Low",
+            EnumToString(t.Alert(NewBoundary))+" New Boundary")),"NewBoundary() Check");
+
     return(rates_total);
   }
 
