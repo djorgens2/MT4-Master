@@ -73,9 +73,7 @@ string FibonacciStr(string Type, FibonacciRec &Fibonacci)
     string text    = Type;
 
     Append(text,EnumToString(Fibonacci.Level));
-    Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
-
-//    Append(text,"      Now/Min/Max:   ","\n");
+    Append(text,DoubleToStr(Fibonacci.Price,Digits));
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Max]*100,1)+"%");

@@ -22,15 +22,6 @@ enum FractalModel
      };
 
 
-//--- SMA Summary
-enum SMAMeasure
-     {
-       Crest,
-       Trough,
-       SMAMeasures       // Term
-     };
-
-
 //--- Display Configuration
 enum ShowType
      {
@@ -106,6 +97,7 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
             RoleTypes
           };
 
+
   //-- Manager Config by Role
   struct  ManagerRec
           {
@@ -123,10 +115,9 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   //-- Pivot Metrics for Position Management
   struct  PivotDetail
           {
+            int              Head;              //-- Lead Pivot Node
             int              Count;             //-- Pivot Count
             double           Pivot[];           //-- Pivot prices
-            double           High;              //-- Max Pivot Boundary;
-            double           Low;               //-- Min Pivot Boundary
             bool             Trigger;           //-- Pivot Change trigger
           };
 
@@ -287,15 +278,14 @@ RoleType Manager(SessionRec &Session)
 //+------------------------------------------------------------------+
 void UpdateSignal(FractalModel Model, CFractal &Signal)
   {
-    signal.Model[Model]       = Signal.ActiveEvent();
-
     if (Signal.ActiveEvent())
     {
-      signal.Source           = Model;
+      signal.Model[Model]     = true;
       signal.Event            = Exception;
 
       if (Signal.Event(NewFractal))
       {
+        signal.Source         = Model;
         signal.Type           = (FractalType)BoolToInt(Signal.Event(NewFractal,Critical),Origin,
                                              BoolToInt(Signal.Event(NewFractal,Major),Trend,Term));
         signal.State          = Reversal;
@@ -381,13 +371,16 @@ void UpdateSignal(void)
   {    
     double crest             = t.SMA().High[0];
     double trough            = t.SMA().Low[0];
+
+    double chead             = signal.Crest.Pivot[signal.Crest.Head];
+    double thead             = signal.Trough.Pivot[signal.Trough.Head];
+
     int    cflat             = 0;
     int    tflat             = 0;
-    int    ccount            = signal.Crest.Count;
-    int    tcount            = signal.Trough.Count;
 
     signal.Crest.Trigger     = false;
     signal.Trough.Trigger    = false;
+
     signal.Crest.Count       = 0;
     signal.Trough.Count      = 0;
 
@@ -401,8 +394,8 @@ void UpdateSignal(void)
         {
           if (t.SMA().High[node]>t.SMA().High[node+1])
           {
-            signal.Crest.Count++;
             signal.Crest.Pivot[node]     = crest;
+            signal.Crest.Head            = BoolToInt(IsEqual(signal.Crest.Count++,0),node,signal.Crest.Head);
           }
 
           cflat              = BoolToInt(IsEqual(t.SMA().High[node],t.SMA().High[node+1]),node);
@@ -418,8 +411,8 @@ void UpdateSignal(void)
         {
           if (t.SMA().Low[node]<t.SMA().Low[node+1])
           {
-            signal.Trough.Count++;
             signal.Trough.Pivot[node]    = trough;
+            signal.Trough.Head           = BoolToInt(IsEqual(signal.Trough.Count++,0),node,signal.Trough.Head);
           }
 
           tflat              = BoolToInt(IsEqual(t.SMA().Low[node],t.SMA().Low[node+1]),node);
@@ -431,8 +424,8 @@ void UpdateSignal(void)
             signal.Trough.Count++;
     }
 
-    signal.Crest.Trigger     = IsChanged(ccount,signal.Crest.Count);
-    signal.Trough.Trigger    = IsChanged(tcount,signal.Trough.Count);
+    signal.Crest.Trigger     = IsChanged(chead,signal.Crest.Head);
+    signal.Trough.Trigger    = IsChanged(thead,signal.Trough.Head);
   }
 
 
@@ -442,7 +435,8 @@ void UpdateSignal(void)
 void UpdateManager(void)
   {
     //-- Reset Manager Targets
-    if (NewManager(master.Lead,Manager(s[Daily][ActiveSession])))
+//    if (NewManager(master.Lead,Manager(s[Daily][ActiveSession])))
+    if (NewManager(master.Lead,Manager(t[Term].Lead)))
       if (master.Lead>Unassigned)
         ArrayInitialize(manager[master.Lead].Equity,order[master.Lead].Equity);
 
@@ -480,7 +474,7 @@ void UpdateMaster(void)
     UpdateSignal(TickMA,t);
     UpdateSignal();
     UpdateManager();
-    
+
     DebugPrint();
   }
 
@@ -665,10 +659,6 @@ void ManagePosition(RoleType Role)
 //+------------------------------------------------------------------+
 void Execute(void)
   {
-    //-- Only occurs during testing
-    if (t.Count(Segments)<inpPeriods)
-      return;
-
     //-- Handle Active Management
     if (IsBetween(master.Lead,Buyer,Seller))
     {

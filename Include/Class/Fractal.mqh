@@ -118,7 +118,7 @@ protected:
          {
            EventType     Event;                    //-- Event related to State Changed tick cleared
            FibonacciType Level;                    //-- Current Fibonacci Level
-           double        Pivot;                    //-- Fibonacci Pivot from Last Event
+           double        Price;                    //-- Fibonacci Pivot from Last Event
            double        Percent[MeasureTypes];    //-- Actual Fibonacci Percents by Measure
          };
 
@@ -181,7 +181,7 @@ public:
                         ~CFractal();
                     
         void             UpdateFractal(double Support, double Resistance, double Pivot, int Bar);
-         int             InitHistory(int TimeFrame, int MaxBars=144000);
+        int              InitHistory(int TimeFrame, int MaxBars=144000);
 
         void             Flag(FractalType Type, bool FlagEvent=false);
         void             SetDisplayOptions(FractalType Type)  {fShowFlags=Type;};
@@ -249,7 +249,7 @@ bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=fal
         SetEvent(NewState,Alert(Type),fPrice.Close);
 
       Fractal.Event        = Fractal.Extension.Event;
-      Fractal.Pivot.Price  = Fractal.Extension.Pivot;
+      Fractal.Pivot.Price  = Fractal.Extension.Price;
       
       if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Extension|"+FractalStr(Trend));
       return true;
@@ -261,7 +261,7 @@ bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=fal
         SetEvent(NewState,Alert(Type),fPrice.Close);
 
       Fractal.Event        = Fractal.Retrace.Event;
-      Fractal.Pivot.Price  = Fractal.Retrace.Pivot;
+      Fractal.Pivot.Price  = Fractal.Retrace.Price;
 
       if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Retrace|"+FractalStr(Trend));
       return true;
@@ -361,7 +361,7 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
       //-- Reset Extension
       ArrayInitialize(Extension.Percent,fext(Fractal[fpBase],Fractal[fpRoot],Fractal[fpExpansion],InDecimal));
       Extension.Level          = Level(Extension.Percent[Max]);
-      Extension.Pivot          = Fractal[fpBase];
+      Extension.Price          = Fractal[fpBase];
       Extension.Event          = BoolToEvent(IsEqual(Fractal[fpRoot],fpoint[fpRoot]),NewBreakout,NewReversal);
     }
     else
@@ -376,14 +376,14 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
       if (IsHigher(Level(Extension.Percent[Max]),Extension.Level))
       {
         Extension.Event        = NewExtension;
-        Extension.Pivot        = fprice(Fractal[fpBase],Fractal[fpRoot],Extension.Level);
+        Extension.Price        = fprice(Fractal[fpBase],Fractal[fpRoot],Extension.Level);
       }
 
       //-- Handle New Extension
       if (IsEqual(Extension.Percent[Min],Extension.Percent[Max],3))
         if (Retrace.Level>FiboRoot)
         {
-          Extension.Pivot      = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
+          Extension.Price      = BoolToDouble(IsBetween(fpoint[fpExpansion],fpoint[fpRoot],fpoint[fpBase]),Fractal[fpBase],fpoint[fpExpansion]);
           Extension.Event      = NewBreakout;
         }
     }
@@ -415,7 +415,7 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
         if (IsBetween(Retrace.Level,Fibo23,Fibo38))
           Retrace.Event        = BoolToEvent(IsEqual(Direction(Fractal[fpBase]-Fractal[fpRoot]),DirectionUp),NewPullback,NewRally);
 
-        Retrace.Pivot          = fprice(Fractal[fpRoot],Fractal[fpExpansion],Retrace.Level);
+        Retrace.Price          = fprice(Fractal[fpRoot],Fractal[fpExpansion],Retrace.Level);
       }
 
       if (Retrace.Percent[Max]>fibonacci[FiboCorrection])
@@ -423,12 +423,12 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
           if (Retrace.Percent[Min]<fibonacci[Fibo23])
           {
             Retrace.Event      = NewRecovery;
-            Retrace.Pivot      = fprice(Fractal[fpRoot],Fractal[fpExpansion],Fibo23);
+            Retrace.Price      = fprice(Fractal[fpRoot],Fractal[fpExpansion],Fibo23);
           }
     }
 
-    SetEvent(Extension.Event,Nominal,Extension.Pivot);
-    SetEvent(Retrace.Event,Nominal,Retrace.Pivot);
+    SetEvent(Extension.Event,Nominal,Extension.Price);
+    SetEvent(Retrace.Event,Nominal,Retrace.Price);
   }
 
 //+------------------------------------------------------------------+
@@ -871,7 +871,7 @@ string CFractal::FibonacciStr(FibonacciRec &Fibonacci)
 
     Append(text,EnumToString(Fibonacci.Event));
     Append(text,EnumToString(Fibonacci.Level),"|");
-    Append(text,DoubleToStr(Fibonacci.Pivot,Digits),"|");
+    Append(text,DoubleToStr(Fibonacci.Price,Digits),"|");
     
     for (MeasureType measure=0;measure<MeasureTypes;measure++)
       Append(text,DoubleToStr(Fibonacci.Percent[measure]*100,1),"|");
@@ -943,7 +943,7 @@ string CFractal::DisplayStr(FractalState State, FibonacciRec &Fibonacci)
 
     Append(text,StringSubstr(EnumToString(State),0,3)+" [");
     Append(text,StringSubstr(EnumToString(Fibonacci.Level),4)+" ]:");
-    Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
+    Append(text,DoubleToStr(Fibonacci.Price,Digits));
 
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
     Append(text,DoubleToStr(Fibonacci.Percent[Min]*100,1)+"%");
