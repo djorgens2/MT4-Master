@@ -126,7 +126,6 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   struct  SignalRec
           {
             FractalModel     Source;
-            bool             Model[2];
             FractalType      Type;
             FractalState     State;
             EventType        Event;
@@ -174,13 +173,29 @@ void DebugPrint(void)
       if (signal.Alert>NoAlert)
       {
         Append(text,"|"+BoolToStr(signal.Trigger,"Fired","Idle"));
-        Append(text,BoolToStr(signal.Model[Session],"Session","Idle"),"|");
-        Append(text,BoolToStr(signal.Model[TickMA],"TickMA","Idle"),"|");
-        Append(text,TimeToStr(TimeCurrent()),"|");
+        Append(text,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
+        Append(text,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
+        Append(text,TimeToStr(TimeCurrent(),),"|");
         Append(text,EnumToString(signal.Alert),"|");
 
-        for (EventType type=1;type<EventTypes;type++) 
-          Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+        for (EventType type=1;type<EventTypes;type++)
+        {
+          if (type<CrossCheck||type>Exception)
+            Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+
+          switch (type)
+          {
+            case NewSegment: Append(text,BoolToStr(t.Logged(NewLead,Nominal),"Nominal",
+                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","NoAlert")),"|");
+                             break;
+            case NewChannel: Append(text,BoolToStr(t.Logged(NewLead,Notify),"Notify","NoAlert"),"|");
+                             break;
+            case CrossCheck: Append(text,BoolToStr(IsEqual(signal.Event,CrossCheck),"Notify","NoAlert"),"|");
+                             break;
+            case Exception:  Append(text,BoolToStr(IsEqual(signal.Event,Exception),"Critical","NoAlert"),"|");
+                             break;
+          }
+        }
 
         Print(text);
       }
@@ -280,7 +295,6 @@ void UpdateSignal(FractalModel Model, CFractal &Signal)
   {
     if (Signal.ActiveEvent())
     {
-      signal.Model[Model]     = true;
       signal.Event            = Exception;
 
       if (Signal.Event(NewFractal))
@@ -436,7 +450,7 @@ void UpdateManager(void)
   {
     //-- Reset Manager Targets
 //    if (NewManager(master.Lead,Manager(s[Daily][ActiveSession])))
-    if (NewManager(master.Lead,Manager(t[Term].Lead)))
+    if (NewManager(master.Lead,Manager(t[Term])))
       if (master.Lead>Unassigned)
         ArrayInitialize(manager[master.Lead].Equity,order[master.Lead].Equity);
 
@@ -475,6 +489,8 @@ void UpdateMaster(void)
     UpdateSignal();
     UpdateManager();
 
+//if (t[NewLead])
+//  Pause(t.EventLogStr(),"Display EventLog");
     DebugPrint();
   }
 
@@ -684,7 +700,7 @@ void OnTick()
     ProcessComFile(order);
     UpdateMaster();
 
-    Execute();
+//    Execute();
 
     RefreshScreen();
     RefreshPanel();

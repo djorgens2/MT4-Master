@@ -343,10 +343,15 @@ int OnCalculate(const int rates_total,
     UpdateSegment(rates_total!=prev_calculated);
     RefreshScreen();
 
-    //if (t[NewBoundary])
-    if (t[NewLead])
+    //-- SMA NewLead
+    if (IsEqual(t.SMA().Event,NewLead))
       Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
             t.ActiveEventStr(),"LeadChange() Check");
+
+    //if (t[NewBoundary])
+    //if (t[NewLead])
+    //  Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
+    //        t.ActiveEventStr(),"LeadChange() Check");
             //BoolToStr(t[NewHigh],EnumToString(t.Alert(NewHigh))+" New High",
             //BoolToStr(t[NewLow],EnumToString(t.Alert(NewLow))+" New Low",
             //EnumToString(t.Alert(NewBoundary))+" New Boundary")),"NewBoundary() Check");

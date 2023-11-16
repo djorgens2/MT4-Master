@@ -61,6 +61,7 @@ private:
     struct SMARec
            {
              int            Direction;   //-- Expansion Direction
+             int            Lead;        //-- Lead based on Hi/Lo Touch
              int            Bias;        //-- Open/Close cross
              EventType      Event;       //-- Aggregate event
              FractalState   State;       //-- Aggregate state
@@ -471,8 +472,16 @@ void CTickMA::UpdateSMA(void)
     if (IsChanged(sma.State,(FractalState)BoolToInt(IsEqual(state,NoState),sma.State,state)))
     {
       sma.Event      = event;
-
       SetEvent(sma.Event,Minor);
+    }
+    else
+
+    //-- Handle Lead Changes
+    if (NewAction(sma.Lead,BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].High,Digits)>sma.High[0],OP_BUY,
+                           BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].Low,Digits)<sma.Low[0],OP_SELL,NoAction))))
+    {
+      sma.Event      = NewLead;
+      SetEvent(NewLead,Notify,BoolToDouble(IsEqual(sma.Lead,OP_BUY),sma.High[0],sma.Low[0]));
     }
   }
 

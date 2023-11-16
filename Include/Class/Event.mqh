@@ -104,7 +104,7 @@ public:
       EventLog       LastEvent(void)                             {return eLog[0];};
 
       EventLog       Log(EventType Event);
-      bool           Log(EventType Event, AlertType Alert=NoAlert);
+      bool           Logged(EventType Event, AlertType Alert=NoAlert);
 
       //---  General use events
       bool           Event(EventType Event)                      {return eEvent[Event];};
@@ -114,6 +114,7 @@ public:
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       string         EventStr(EventType Begin, EventType End);
+      string         EventLogStr(void);
       
       bool           operator[](const EventType Event)           {return eEvent[Event];};
       bool           operator[](const AlertType Alert)           {return Alert==eMaxAlert;};
@@ -132,7 +133,6 @@ void CEvent::SetEvent(EventType Event, AlertType Alert=Notify, double Price=NoVa
     eAlert[Event]           = fmax(Alert,eAlert[Event]);
     eMaxAlert               = fmax(Alert,eMaxAlert);
     
-    ArrayResize(eLog,ArraySize(eLog)+1,32);
     ArrayCopy(eLog,eLog,1,0,WHOLE_ARRAY);
     
     eLog[0].Event           = Event;
@@ -177,9 +177,9 @@ EventLog CEvent::Log(EventType Event)
   }
 
 //+------------------------------------------------------------------+
-//| Log - Returns true if Event logged for the supplied alert        |
+//| Logged - Returns true if Event logged for the supplied alert     |
 //+------------------------------------------------------------------+
-bool CEvent::Log(EventType Event, AlertType Alert=NoAlert)
+bool CEvent::Logged(EventType Event, AlertType Alert=NoAlert)
   {
     if (eEvent[Event])
       for (int node=0;node<ArraySize(eLog);node++)
@@ -197,8 +197,8 @@ void CEvent::ClearEvents(void)
   {
     ArrayInitialize(eEvent,false);    
     ArrayInitialize(eAlert,NoAlert);
-    ArrayResize(eLog,0,12);
-    
+    ArrayResize(eLog,0,100);
+
     eEvent[NoEvent]         = true;
     eMaxAlert               = NoAlert;
   }
@@ -271,6 +271,23 @@ string CEvent::EventStr(EventType Begin, EventType End)
       Append(text,EnumToString(eAlert[event]),"|");
 
     Append(text,EnumToString(End),"|");
+    
+    return text;
+  }
+
+//+------------------------------------------------------------------+
+//| EventLogStr - returns the event log in order of execution        |
+//+------------------------------------------------------------------+
+string CEvent::EventLogStr(void)
+  {
+    string text   = "";
+
+    for (int node=0;node<ArraySize(eLog);node++)
+    {
+      Append(text,EnumToString(eLog[node].Alert),"\n");
+      Append(text,EnumToString(eLog[node].Event));
+      Append(text,DoubleToStr(eLog[node].Price,Digits),"@");
+    }
     
     return text;
   }

@@ -216,7 +216,7 @@ public:
 //+------------------------------------------------------------------+
 void CFractal::Flag(FractalType Type, bool FlagEvent=false)
   {
-    string name    = fObjectStr+EnumToString(Type)+":"+StringSubstr(EnumToString(frec[Type].Event),4);
+    string name    = fObjectStr+EnumToString(Type)+":"+StringSubstr(EnumToString(frec[Type].Event),3);
 
     if (FlagEvent)
       if (fPrice.Bar<Bars-1)
