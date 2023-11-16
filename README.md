@@ -1,9 +1,11 @@
 # MT4-Master
 # Copyright 2014, Dennis Jorgenson
 
-Metatrader 4 code for trade automation in the forex markets.
+# Metatrader 4 code for trade automation in the forex markets.
 
-Stable release(s):
+#-----------------------------------------------------------------------------------------------------------------
+# Stable release(s):
+#-----------------------------------------------------------------------------------------------------------------
 
 Indicators: All indictors are Zero-Repaint, Event Triggers are real-time
 
@@ -36,6 +38,24 @@ Indicators: All indictors are Zero-Repaint, Event Triggers are real-time
    - Linear Regression
    - Event Handling
 
-Development release(s):
+Experts:
+
+1. man-v1: Non-integrated release; command-line interface
+
+#-----------------------------------------------------------------------------------------------------------------
+#Development release(s):
+#-----------------------------------------------------------------------------------------------------------------
+
+Indicators:
+
 1. TickMA-v2: Working releases to test TickMA-v1
 2. Session-v2: Working releases to test Session-v1
+
+Experts:
+
+1. man-v5: (WIP) Current integration release;
+   - Classes
+     - /Include/Class/Fractal.mqh  ; Fractal Calculations/Events [Origin|Trend|Term] Macro/Meso/Micro 
+     - /Include/Class/Session.mqh  ; Data collection for Fractal; time-based collection
+     - /Include/Class/TickMA.mqh   ; Data collection for fractal; range-based collection
+     - //Include/Class/Order.mqh   ; Comprehensive Order management utilities
