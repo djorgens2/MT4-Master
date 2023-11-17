@@ -55,7 +55,8 @@ Experts:
 
 1. man-v5: (WIP) Current integration release;
    - Classes
-     - /Include/Class/Fractal.mqh  ; Fractal Calculations/Events [Origin|Trend|Term] Macro/Meso/Micro 
-     - /Include/Class/Session.mqh  ; Data collection for Fractal; time-based collection
-     - /Include/Class/TickMA.mqh   ; Data collection for fractal; range-based collection
-     - //Include/Class/Order.mqh   ; Comprehensive Order management utilities
+     - /Include/Class/Fractal.mqh   ; Fractal Calculations/Events [Origin|Trend|Term] Macro/Meso/Micro 
+     - /Include/Class/Session.mqh   ; Data collection for Fractal; time-based collection
+     - /Include/Class/TickMA.mqh    ; Data collection for fractal; range-based collection
+     - /Include/Class/Order.mqh     ; Comprehensive Order management utilities
+     - /Include/Class-CPanel-v2.mqh ; Seperate window indicator displaying Requests/Orders/TickMA detail 
