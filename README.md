@@ -41,6 +41,8 @@ Indicators: All indictors are Zero-Repaint, Event Triggers are real-time
 Experts:
 
 1. man-v1: Non-integrated release; command-line interface
+    - /Include/manual.mqh; manual console command processor
+    - /Include/order.mqh; order handling processor
 
 #-----------------------------------------------------------------------------------------------------------------
 #Development release(s):
