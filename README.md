@@ -1,7 +1,9 @@
 # MT4-Master
 # Copyright 2014, Dennis Jorgenson
 
+# 
 # Metatrader 4 code for trade automation in the forex markets.
+# 
 
 #-----------------------------------------------------------------------------------------------------------------
 # Stable release(s):
