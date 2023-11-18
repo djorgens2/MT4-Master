@@ -1,0 +1,5 @@
+risk 60 20
+eq 7.5 2.5
+
+verify
+sell 0.00 "Correction (Short)"

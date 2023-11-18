@@ -246,4 +246,3 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 Logs
-/Files/*.csv
