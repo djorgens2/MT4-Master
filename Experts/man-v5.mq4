@@ -8,7 +8,7 @@
 #property version   "5.10"
 #property strict
 
-#define debug false
+#define debug true
 
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
@@ -175,7 +175,7 @@ void DebugPrint(void)
         Append(text,"|"+BoolToStr(signal.Trigger,"Fired","Idle"));
         Append(text,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
         Append(text,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
-        Append(text,TimeToStr(TimeCurrent(),),"|");
+        Append(text,TimeToStr(TimeCurrent()),"|");
         Append(text,EnumToString(signal.Alert),"|");
 
         for (EventType type=1;type<EventTypes;type++)
