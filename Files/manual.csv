@@ -1,1 +1,52 @@
+//-----------------------------------
+//--- General Config
+//-----------------------------------
 
+risk 80 20
+eq 7.5 2.5
+
+verify
+
+//close profit
+//close all
+//close max
+//close half
+//hold cancel
+
+//hedge
+
+//-----------------------------------
+//--- Short
+//-----------------------------------
+
+//hold short
+//q cancel short
+
+//sell
+//sell 0.5
+sell 0.07 "In-Trend Build Contrarian 23.6"
+//sell 0.36 "Trend build"
+//limit sell 1.343
+//q stop sell 1.34255 2.5 1.33255
+
+//close short
+//tp short 1.3430
+//stop short 1.25110
+//dca short 5 all
+
+//-----------------------------------
+//--- Long
+//-----------------------------------
+
+//hold long
+//q cancel long
+
+//buy 0.00 "Rally (Hedge)"
+//buy 0.36 "Expansion Bounce"
+//buy .6 " "Go 4 It"
+//buy limit 1.24355 0.0 0.00 0.00 "Contrarian (In Trend)" "2014.07.31 23:59" buy MIT 1.23555 1.34555 2.5
+//q stop buy 1.2445 2.5 1.2485
+
+//close long
+//stop buy 1.2425
+//tp long 1.3445
