@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                                  std_utility.mqh |
-//|                        Copyright 2014, MetaQuotes Software Corp. |
-//|                                              http://www.mql5.com |
+//|                                 Copyright 2014, Dennis Jorgenson |
+//|                        2023 (Deprecated) Merged into stdutil.mqh |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, MetaQuotes Software Corp."
 #property link      "http://www.mql5.com"

@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                                      stdutil.mqh |
 //|                                 Copyright 2014, Dennis Jorgenson |
-//|                                                                  |
+//|                                               Standard Utilities |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""

@@ -8,7 +8,7 @@
 #property version   "5.10"
 #property strict
 
-#define debug true
+#define debug false
 
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
@@ -186,13 +186,13 @@ void DebugPrint(void)
           switch (type)
           {
             case NewSegment: Append(text,BoolToStr(t.Logged(NewLead,Nominal),"Nominal",
-                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","NoAlert")),"|");
+                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","No Alert")),"|");
                              break;
-            case NewChannel: Append(text,BoolToStr(t.Logged(NewLead,Notify),"Notify","NoAlert"),"|");
+            case NewChannel: Append(text,BoolToStr(t.Logged(NewLead,Notify),"Notify","No Alert"),"|");
                              break;
-            case CrossCheck: Append(text,BoolToStr(IsEqual(signal.Event,CrossCheck),"Notify","NoAlert"),"|");
+            case CrossCheck: Append(text,BoolToStr(IsEqual(signal.Event,CrossCheck),"Notify","No Alert"),"|");
                              break;
-            case Exception:  Append(text,BoolToStr(IsEqual(signal.Event,Exception),"Critical","NoAlert"),"|");
+            case Exception:  Append(text,BoolToStr(IsEqual(signal.Event,Exception),"Critical","No Alert"),"|");
                              break;
           }
         }
