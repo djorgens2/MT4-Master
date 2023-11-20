@@ -533,7 +533,7 @@ void SetLeadStrategy(RoleType Role, bool Trigger)
 
 //+------------------------------------------------------------------+
 //| SetRiskStrategy - Set Strategy for supplied Role                 |
-//+--------------------------------------------------------- ---------+
+//+------------------------------------------------------------------+
 void SetRiskStrategy(RoleType Role, bool Trigger)
   {
 //Opener,          //-- New Position (Opener)
