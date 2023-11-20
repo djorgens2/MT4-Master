@@ -4,7 +4,7 @@
 	filemode = true
 	logallrefupdates = true
 [remote "origin"]
-	url = https://github.com/djorgens2/MT4-Master.git
+	url = git@github.com:djorgens2/MT4-Master.git
 	fetch = +refs/heads/*:refs/remotes/origin/*
 [branch "master"]
 	remote = origin
