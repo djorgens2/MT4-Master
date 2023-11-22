@@ -449,7 +449,6 @@ void UpdateSignal(void)
 void UpdateManager(void)
   {
     //-- Reset Manager Targets
-//    if (NewManager(master.Lead,Manager(s[Daily][ActiveSession])))
     if (NewManager(master.Lead,Manager(t[Term])))
       if (master.Lead>Unassigned)
         ArrayInitialize(manager[master.Lead].Equity,order[master.Lead].Equity);

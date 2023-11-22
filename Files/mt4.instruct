@@ -2,4 +2,13 @@ risk 60 20
 eq 7.5 2.5
 
 verify
+Close Profit
+
+//-------------------------------------
+//- Short Stuff
+//-------------------------------------
+
 sell 0.00 "Correction (Short)"
+
+//stop short 1.1000
+//tp short cancel
