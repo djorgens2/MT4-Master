@@ -8,7 +8,7 @@ Close Profit
 //- Short Stuff
 //-------------------------------------
 
-sell 0.00 "Correction (Short)"
+sell 0.00 "Term (Short)"
 
 //stop short 1.1000
 //tp short cancel

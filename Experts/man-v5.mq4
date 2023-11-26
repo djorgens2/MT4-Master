@@ -44,19 +44,19 @@ input int              inpIndSNVersion     = 2;             // Control Panel Ver
 
 
 //--- Regression Config
-input string           regrHeader          = "";           // +--- Regression Config ----+
-input int              inpPeriods          = 80;           // Retention
-input double           inpAgg              = 2.5;          // Tick Aggregation
+input string           regrHeader          = "";            // +--- Regression Config ----+
+input int              inpPeriods          = 80;            // Retention
+input double           inpAgg              = 2.5;           // Tick Aggregation
 
 
 //---- Session Config
-input string           sessHeader         = "";            // +----- Session Hours ------+
-input int              inpAsiaOpen        = 1;               // Asia Session Opening Hour
-input int              inpAsiaClose       = 10;              // Asia Session Closing Hour
-input int              inpEuropeOpen      = 8;               // Europe Session Opening Hour
-input int              inpEuropeClose     = 18;              // Europe Session Closing Hour
-input int              inpUSOpen          = 14;              // US Session Opening Hour
-input int              inpUSClose         = 23;              // US Session Closing Hour
+input string           sessHeader          = "";            // +----- Session Hours ------+
+input int              inpAsiaOpen         = 1;             // Asia Session Opening Hour
+input int              inpAsiaClose        = 10;            // Asia Session Closing Hour
+input int              inpEuropeOpen       = 8;             // Europe Session Opening Hour
+input int              inpEuropeClose      = 18;            // Europe Session Closing Hour
+input int              inpUSOpen           = 14;            // US Session Opening Hour
+input int              inpUSClose          = 23;            // US Session Closing Hour
 
 
 //---- Order Config
@@ -208,6 +208,7 @@ void DebugPrint(void)
 //+------------------------------------------------------------------+
 void RefreshPanel(void)
   {
+  UpdateLabel("testLbl",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrGoldenrod);
     //-- Update Control Panel (Application)
     if (IsChanged(winid,ChartWindowFind(0,indSN)))
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
@@ -675,18 +676,18 @@ void ManagePosition(RoleType Role)
 void Execute(void)
   {
     //-- Handle Active Management
-    if (IsBetween(master.Lead,Buyer,Seller))
-    {
-      ManageLead(master.Lead);
-      ManageRisk((RoleType)Action(master.Lead,InAction,InContrarian));
-    }
-    else
-
-    //-- Handle Unassigned Manager
-    {
-      ManagePosition(Buyer);
-      ManagePosition(Seller);
-    }
+//    if (IsBetween(master.Lead,Buyer,Seller))
+//    {
+//      ManageLead(master.Lead);
+//      ManageRisk((RoleType)Action(master.Lead,InAction,InContrarian));
+//    }
+//    else
+//
+//    //-- Handle Unassigned Manager
+//    {
+//      ManagePosition(Buyer);
+//      ManagePosition(Seller);
+//    }
 
     order.ExecuteRequests();
   }
@@ -699,7 +700,7 @@ void OnTick()
     ProcessComFile(order);
     UpdateMaster();
 
-//    Execute();
+    Execute();
 
     RefreshScreen();
     RefreshPanel();
@@ -734,6 +735,8 @@ int OnInit()
   {
     NewPriceLabel("sigHi");
     NewPriceLabel("sigLo");
+
+    NewLabel("lbvAC-Processed","",5,5,clrNONE,SCREEN_UR);
     
     s[Daily]   = new CSession(Daily,0,23,0,false,(FractalType)BoolToInt(inpFractalModel==Session,inpShowFractal,NoValue));
     s[Asia]    = new CSession(Asia,inpAsiaOpen,inpAsiaClose,0);
@@ -750,12 +753,6 @@ int OnInit()
     ArrayInitialize(signal.Crest.Pivot,0.00);
     ArrayInitialize(signal.Trough.Pivot,0.00);
 
-    //int offset=0;
-    //for (uchar chr=133;chr<220;chr++)
-    //{
-    //  NewLabel("char"+(string)chr,"",200,4+(24*offset++),clrYellow);
-    //  UpdateLabel("char"+(string)chr,CharToStr(chr),clrYellow,24,"Consolas");
-    //}
     return(INIT_SUCCEEDED);
   }
 

@@ -14,12 +14,14 @@ string    params[];
 string    commands[];
 string    comfile;
 
+long      fTime       = NoValue;
+
 //+------------------------------------------------------------------+
 //| ActionCode - returns order action id (buy/sell)                  |
 //+------------------------------------------------------------------+
 int ActionCode(string Action, double Price=0.00, bool Contrarian=false)
   {
-    int action                             = NoAction;
+    int action                              = NoAction;
     
     if (InStr("BUYLONG",Action))   action   = BoolToInt(Contrarian,OP_SELL,OP_BUY);
     if (InStr("SELLSHORT",Action)) action   = BoolToInt(Contrarian,OP_BUY,OP_SELL);
@@ -193,7 +195,14 @@ void ProcessComFile(COrder &Order)
         return;
       }
     }
-    
+
+    ObjectSet("lbvAC-Processed",OBJPROP_COLOR,clrDarkGray);
+
+    if (IsChanged(fTime,FileGetInteger(fHandle,FILE_MODIFY_DATE)))
+    {
+      UpdateLabel("lbvAC-File",comfile,clrYellow);
+      UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
+
     while (!FileIsEnding(fHandle))
     {
       fRecord      = FileReadString(fHandle);
@@ -264,14 +273,14 @@ void ProcessComFile(COrder &Order)
 
             request.Type             = ActionCode(params[0],request.Price);
             request.Lots             = StringToDouble(params[1]);
-            request.TakeProfit       = BoolToDouble(InStr(params[3],"P"),request.Price+
-                                          point(StringToDouble(StringSubstr(params[3],0,StringLen(params[3])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),1,NoValue),
-                                          FormatPrice(request.Action,params[3]));
-            request.StopLoss         = BoolToDouble(InStr(params[4],"P"),request.Price+
-                                          point(StringToDouble(StringSubstr(params[4],0,StringLen(params[4])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
+            request.TakeProfit       = BoolToDouble(InStr(params[4],"P"),request.Price+
+                                          point(StringToDouble(StringSubstr(params[4],0,StringLen(params[4])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),1,NoValue),
                                           FormatPrice(request.Action,params[4]));
-            request.Requestor        = "Manual";
-            request.Memo             = params[5];
+            request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
+                                          point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
+                                          FormatPrice(request.Action,params[5]));
+            request.Requestor        = StringSubstr(comfile,0,StringLen(comfile)-4);
+            request.Memo             = params[3];
             request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
             
             switch (ActionCode(params[7]))
@@ -297,9 +306,9 @@ void ProcessComFile(COrder &Order)
             }
             
             if (Order.Submitted(request))
-              Print(Order.OrderDetailStr(Order.Ticket(request.Ticket)));
-            else
               Print(Order.RequestStr(request));
+            else
+              Print("Bad Request Format: FileString: "+fRecord+" RequestStr: "+Order.RequestStr(request));
           }
           else
 
@@ -390,30 +399,21 @@ void ProcessComFile(COrder &Order)
           //-- Order State Management
           if (MethodCode(params[0])>NoValue)
           {
-            FormatTrade(params);            
+            FormatTrade(params);
             Order.SetMethod(ActionCode(params[1]),MethodCode(params[0]),GroupCode(params[2]),(int)params[3]);
           }
         }
       }
     }
-
-    UpdateLabel("lbvAC-File",comfile,clrDarkGray);
+    }
 
     FileClose(fHandle);
-
-    fHandle=FileOpen(comfile,FILE_CSV|FILE_WRITE);
-
-    if(fHandle!=INVALID_HANDLE)
-    {
-      FileWrite(fHandle,"");
-      FileClose(fHandle);
-    }
   }
 
 //+------------------------------------------------------------------+
-//| Init - Configures Manual for operation                           |
+//| ManualConfig - Configures Manual for operation                   |
 //+------------------------------------------------------------------+
-void ManualInit(string ComFile)
+void ManualConfig(string ComFile)
   {        
     int         fHandle;
     

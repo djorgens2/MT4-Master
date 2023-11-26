@@ -166,8 +166,7 @@ void CopyTrade()
     msg  = ChannelName+" ("+tcSymbol+":"+IntegerToString(glbHandle)+")\n" +
            "Master: Long("+IntegerToString(tcLongCount)+") Short("+IntegerToString(tcShortCount)+")\n"
            "Slave: "+tcSymbol+" ("+IntegerToString(tcSlaveCount)+":"+IntegerToString(tcSlaveLongCount)+":"+IntegerToString(tcSlaveShortCount)
-                    +") CS: "+IntegerToString(CloseShort)+" CL:"+IntegerToString(CloseLong)+" OS:"+IntegerToString(OpenShort)+" OL:"+IntegerToString(OpenLong)+"\n"+
-                    +order;
+                    +") CS: "+IntegerToString(CloseShort)+" CL:"+IntegerToString(CloseLong)+" OS:"+IntegerToString(OpenShort)+" OL:"+IntegerToString(OpenLong)+"\n"+order;
 
     Comment(msg);
     
