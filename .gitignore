@@ -3,7 +3,7 @@
 
 # My ignore files
 mqlcache.dat
-
+./Logs/*
 
 # User-specific files
 *.suo
