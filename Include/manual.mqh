@@ -17,7 +17,7 @@ input string    manComFile     = "manual.csv";  // Command File Name
 
   string    params[];
   string    commands[];
-
+  long      fTime         = NoValue;
 
 //+------------------------------------------------------------------+
 //| IsChanged - Returns true on TradeMode change                     |
@@ -211,6 +211,7 @@ void GetManualRequest(string Command="")
       }
     }
     
+   if (IsChanged(fTime,FileGetInteger(fHandle,FILE_MODIFY_DATE)))
     while (!FileIsEnding(fHandle))
     {
         fRecord=FileReadString(fHandle);
@@ -699,14 +700,6 @@ void GetManualRequest(string Command="")
     }
 
     FileClose(fHandle);
-
-    fHandle=FileOpen(manComFile,FILE_CSV|FILE_WRITE);
-
-    if(fHandle!=INVALID_HANDLE)
-    {
-      FileWrite(fHandle,"");
-      FileClose(fHandle);
-    }
   }
 
 //+------------------------------------------------------------------+

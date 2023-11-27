@@ -1,1 +1,8 @@
+//-- Demo debug
 
+verify
+
+//---- Long stuff
+//risk 80 10 60
+//fund 10 2.5 60
+buy 0.00 0.00 "Trend Contrarian"

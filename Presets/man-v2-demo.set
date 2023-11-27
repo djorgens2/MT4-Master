@@ -1,0 +1,16 @@
+appHeader=
+inpBrokerModel=0
+inpComFile=demo.csv
+inpShowComments=1
+inpIndSNVersion=2
+ordHeader=
+inpMinTarget=7.5
+inpMinProfit=2.5
+inpMaxRisk=60
+inpMaxMargin=60.0
+inpLotFactor=5
+inpLotSize=0.0
+inpDefaultStop=0
+inpDefaultTarget=0
+inpZoneStep=2.5
+inpMaxZoneMargin=20

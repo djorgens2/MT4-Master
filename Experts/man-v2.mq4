@@ -132,7 +132,7 @@ void OrderConfig(void)
 
       //-- Order Config
       order.SetFundLimits(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
+      order.SetRiskLimits(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
       order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
     }
   }

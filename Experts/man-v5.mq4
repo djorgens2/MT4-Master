@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "5.10"
+#property version   "5.20"
 #property strict
 
 #define debug false
@@ -208,7 +208,6 @@ void DebugPrint(void)
 //+------------------------------------------------------------------+
 void RefreshPanel(void)
   {
-  UpdateLabel("testLbl",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrGoldenrod);
     //-- Update Control Panel (Application)
     if (IsChanged(winid,ChartWindowFind(0,indSN)))
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
@@ -489,8 +488,6 @@ void UpdateMaster(void)
     UpdateSignal();
     UpdateManager();
 
-//if (t[NewLead])
-//  Pause(t.EventLogStr(),"Display EventLog");
     DebugPrint();
   }
 
@@ -746,7 +743,7 @@ int OnInit()
     t = new CTickMA(inpPeriods,inpAgg,(FractalType)BoolToInt(inpFractalModel==TickMA,inpShowFractal,NoValue));
 
     OrderConfig();
-    ManualInit(inpComFile);
+    ManualConfig(inpComFile);
 
     ArrayResize(signal.Crest.Pivot,inpPeriods);
     ArrayResize(signal.Trough.Pivot,inpPeriods);

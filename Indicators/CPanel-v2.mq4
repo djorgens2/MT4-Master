@@ -151,14 +151,18 @@ void RefreshScreen(void)
     UpdateRay("lnS_Retrace:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpRetrace],-8,0);
     UpdateRay("lnS_Recovery:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpRecovery],-8,0);
 
-    for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
+    //-- Show Fibonacci Lines
+    if (inpShowEvents>stNone)
     {
-      UpdateRay("lnS_"+EnumToString(fibo)+":"+(string)indWinId,inpPeriods,t.Price(fibo,pivot,Extension),-8,0,Color(t[pivot].Direction,IN_DARK_DIR));
-      UpdateText("lnT_"+EnumToString(fibo)+":"+(string)indWinId,"",t.Price(fibo,pivot,Extension),-5,Color(t[pivot].Direction,IN_DARK_DIR));
-    }
+      for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
+      {
+        UpdateRay("lnS_"+EnumToString(fibo)+":"+(string)indWinId,inpPeriods,t.Price(fibo,pivot,Extension),-8,0,Color(t[pivot].Direction,IN_DARK_DIR));
+        UpdateText("lnT_"+EnumToString(fibo)+":"+(string)indWinId,"",t.Price(fibo,pivot,Extension),-5,Color(t[pivot].Direction,IN_DARK_DIR));
+      }
 
-    for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-      UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[pivot].Fractal[point],-7);
+      for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
+        UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[pivot].Fractal[point],-7);
+    }
 
     //-- Fractal
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
