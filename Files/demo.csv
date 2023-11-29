@@ -6,6 +6,6 @@ verify
 //buy 0.00 0.00 "Trend Contrarian"
 
 //---- Short stuff
-risk short 80 10 60
+risk short 80 10 80
 fund short 10 2.5
 sell 0.00 0.00 "Contrarian Recovery"

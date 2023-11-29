@@ -18,6 +18,6 @@
         "**/*.ex5": true
     },
     "C_Cpp.default.forcedInclude": [
-        "/home/djorgenson/.vscode/extensions/l-i-v.mql-tools-2.0.2/data/mql4_en.mqh"
+        "c:\\Users\\djorg\\.vscode\\extensions\\l-i-v.mql-tools-2.0.2\\data\\mql4_en.mqh"
     ]
 }

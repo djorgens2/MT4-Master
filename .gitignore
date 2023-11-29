@@ -4,6 +4,7 @@
 # My ignore files
 mqlcache.dat
 ./Logs/*
+settings.json
 
 # User-specific files
 *.suo
@@ -245,3 +246,4 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 Logs
+.vscode/settings.json
