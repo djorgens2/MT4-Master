@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, Dennis Jorgenson"
 #property link      ""
-#property version   "5.10"
+#property version   "5.20"
 #property strict
 
 #define debug false
@@ -15,7 +15,7 @@
 #include <ordman.mqh>
 
 //--- Fractal Model
-enum FractalModel
+enum IndicatorType
      {
        Session,   // Session
        TickMA     // TickMA
@@ -35,7 +35,7 @@ enum ShowType
 //--- App Configuration
 input string           appHeader           = "";            // +--- Application Config ---+
 input BrokerModel      inpBrokerModel      = Discount;      // Broker Model
-input FractalModel     inpFractalModel     = TickMA;        // Fractal Model
+input IndicatorType    inpFractalSource    = Session;       // Fractal to Display
 input ShowType         inpShowFractal      = stNone;        // Show Fractal/Pivot Lines
 input string           inpBaseCurrency     = "XRPUSD";      // Account Base Currency
 input string           inpComFile          = "manual.csv";  // Command File Name
@@ -125,7 +125,7 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   //-- Signals (Events) requiring Manager Action (Response)
   struct  SignalRec
           {
-            FractalModel     Source;
+            IndicatorType    Source;
             FractalType      Type;
             FractalState     State;
             EventType        Event;
@@ -137,21 +137,22 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
             PivotDetail      Crest;
             PivotDetail      Trough;
             bool             Trigger;
+            bool             ActiveEvent;
           };
 
 
   //-- Master Control Operationals
   struct  MasterRec
           {
-            RoleType         Lead;                  //-- Process Manager (Owner|Lead)
-            RoleType         OnCall;                //-- Manager on deck while unassigned
+            RoleType         Lead;              //-- Process Manager (Owner|Lead)
+            RoleType         OnCall;            //-- Manager on deck while unassigned
           };
 
 
   //-- Data Collections
   MasterRec              master;
   SignalRec              signal;
-  ManagerRec             manager[RoleTypes];  //-- Manager Detail Data
+  ManagerRec             manager[RoleTypes];    //-- Manager Detail Data
   
   //-- Class defs
   COrder                *order;
@@ -160,6 +161,7 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
 
   //-- Operational Variables
   int    winid         = NoValue;
+
 
 //+------------------------------------------------------------------+
 //| DebugPrint - Prints debug/event data                             |
@@ -248,6 +250,7 @@ void RefreshPanel(void)
     }
   }
 
+
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
@@ -255,6 +258,7 @@ void RefreshScreen(void)
   {
 //    Comment("Source Value ["+inpBaseCurrency+"]:"+DoubleToStr(iClose(inpBaseCurrency,0,0)));
   }
+
 
 //+------------------------------------------------------------------+
 //| NewManager - Returns true on change in Operations Manager        |
@@ -292,7 +296,7 @@ RoleType Manager(SessionRec &Session)
 //+------------------------------------------------------------------+
 //| UpdateSignal - Updates Fractal data from Supplied Fractal        |
 //+------------------------------------------------------------------+
-void UpdateSignal(FractalModel Model, CFractal &Signal)
+void UpdateSignal(IndicatorType Source, CFractal &Signal)
   {
     if (Signal.ActiveEvent())
     {
@@ -300,7 +304,7 @@ void UpdateSignal(FractalModel Model, CFractal &Signal)
 
       if (Signal.Event(NewFractal))
       {
-        signal.Source         = Model;
+        signal.Source         = Source;
         signal.Type           = (FractalType)BoolToInt(Signal.Event(NewFractal,Critical),Origin,
                                              BoolToInt(Signal.Event(NewFractal,Major),Trend,Term));
         signal.State          = Reversal;
@@ -395,6 +399,7 @@ void UpdateSignal(void)
 
     signal.Crest.Trigger     = false;
     signal.Trough.Trigger    = false;
+    signal.ActiveEvent       = t.ActiveEvent()||s[Daily].ActiveEvent();
 
     signal.Crest.Count       = 0;
     signal.Trough.Count      = 0;
@@ -489,15 +494,13 @@ void UpdateMaster(void)
     UpdateSignal();
     UpdateManager();
 
-//if (t[NewLead])
-//  Pause(t.EventLogStr(),"Display EventLog");
     DebugPrint();
   }
 
 //+------------------------------------------------------------------+
-//| SetLeadStrategy - Set Strategy for supplied Role                 |
+//| SetStrategy - Set Strategy for supplied Role                     |
 //+------------------------------------------------------------------+
-void SetLeadStrategy(RoleType Role, bool Trigger)
+void SetStrategy(RoleType Role)
   {
 //Wait             //-- Hold, wait for signal
 //Manage,          //-- Manage Margin; Seek Profit
@@ -510,7 +513,7 @@ void SetLeadStrategy(RoleType Role, bool Trigger)
 //    RoleType     contrarian = (RoleType)Action(Role,InAction,InContrarian);
 //    StrategyType strategy   = Wait;
     
-    if (Trigger)
+    if (signal.ActiveEvent)
       switch (Role)
       {
         case Buyer:   if (t[NewTick])
@@ -532,40 +535,12 @@ void SetLeadStrategy(RoleType Role, bool Trigger)
 
 
 //+------------------------------------------------------------------+
-//| SetRiskStrategy - Set Strategy for supplied Role                 |
-//+------------------------------------------------------------------+
-void SetRiskStrategy(RoleType Role, bool Trigger)
-  {
-//Opener,          //-- New Position (Opener)
-//Build,           //-- Increase Position
-//Cover,           //-- Aggressive balancing on excessive drawdown
-//Capture,         //-- Contrarian profit protection
-//Mitigate,        //-- Risk management on pattern change
-//Defer,           //-- Defer to contrarian manager
-//Wait             //-- Hold, wait for signal
-    if (Trigger)
-      switch (Role)
-      {
-        case Buyer:   if (IsEqual(order.Entry(Role).Count,0))
-                        if (signal.Crest.Trigger)
-                        {}
-                      //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
-                      break;
-
-        case Seller:  if (IsEqual(order.Entry(Role).Count,0))
-                       if (signal.Crest.Trigger)
-                       {}
-                     //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
-      }
-  }
-
-//+------------------------------------------------------------------+
 //| ManageLead - Lead Manager order processor                        |
 //+------------------------------------------------------------------+
-void ManageLead(RoleType Role)
+void ManageFund(RoleType Role)
   {
     //-- Position checks
-    SetLeadStrategy(Role,signal.Crest.Trigger||signal.Trough.Trigger);
+    SetStrategy(Role);
     
     //-- Free Zone/Order Entry
     if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
@@ -613,60 +588,14 @@ void ManageLead(RoleType Role)
     order.ExecuteOrders(Role,manager[Role].Hold);
   }
 
+
 //+------------------------------------------------------------------+
 //| ManageRisk - Risk Manager order processor and risk mitigation    |
 //+------------------------------------------------------------------+
 void ManageRisk(RoleType Role)
   {
-    SetRiskStrategy(Role,IsEqual(manager[Action(Role,InAction,InContrarian)].Strategy,Defer));
+    SetStrategy(Role);
     order.ExecuteOrders(Role);
-  }
-
-
-//+------------------------------------------------------------------+
-//| ManagePosition - Manage order positioning during consolidations  |
-//+------------------------------------------------------------------+
-void ManagePosition(RoleType Role)
-  {
-    if (order[Net].Count>0)
-    {    
-      //-- Free Zone/Order Entry
-      if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
-      {
-        OrderRequest  request  = order.BlankRequest(EnumToString(Role));
-
-        request.Action         = Role;
-        request.Requestor      = "Auto ("+request.Requestor+")";
-
-        switch (Role)
-        {
-          case Buyer:          if (t[NewTick])
-                                 manager[Role].Trigger  = false;
-                               break;
-
-          case Seller:         if (t[NewTick])
-                                 manager[Role].Trigger  = false;
-                     
-                               //switch (manager[Role].Strategy)
-                               //{
-                               //  case Build:   if (t.Event(NewHigh,Nominal))
-                               //                {
-                               //                  request.Type    = OP_SELL;
-                               //                  request.Lots    = order.LotSize(OP_SELL)*t[Term].Retrace.Percent[Now];
-                               //                  request.Memo    = "Contrarian (In-Trend)";
-                               //                }
-                               //                break;
-                               //}
-                               break;
-        }
-
-        if (IsBetween(request.Type,OP_BUY,OP_SELLSTOP))
-          if (order.Submitted(request))
-            Print(order.RequestStr(request));
-      }
-
-      order.ExecuteOrders(Role,manager[Role].Hold);
-    }
   }
 
 
@@ -676,18 +605,18 @@ void ManagePosition(RoleType Role)
 void Execute(void)
   {
     //-- Handle Active Management
-//    if (IsBetween(master.Lead,Buyer,Seller))
-//    {
-//      ManageLead(master.Lead);
-//      ManageRisk((RoleType)Action(master.Lead,InAction,InContrarian));
-//    }
-//    else
-//
-//    //-- Handle Unassigned Manager
-//    {
-//      ManagePosition(Buyer);
-//      ManagePosition(Seller);
-//    }
+   if (IsBetween(master.Lead,Buyer,Seller))
+   {
+     ManageFund(master.Lead);
+     ManageRisk((RoleType)Action(master.Lead,InAction,InContrarian));
+   }
+   else
+
+   //-- Handle Unassigned Manager
+   {
+     ManageRisk(Buyer);
+     ManageRisk(Seller);
+   }
 
     order.ExecuteRequests();
   }
@@ -738,15 +667,15 @@ int OnInit()
 
     NewLabel("lbvAC-Processed","",5,5,clrNONE,SCREEN_UR);
     
-    s[Daily]   = new CSession(Daily,0,23,0,false,(FractalType)BoolToInt(inpFractalModel==Session,inpShowFractal,NoValue));
+    s[Daily]   = new CSession(Daily,0,23,0,false,(FractalType)BoolToInt(inpFractalSource==Session,inpShowFractal,NoValue));
     s[Asia]    = new CSession(Asia,inpAsiaOpen,inpAsiaClose,0);
     s[Europe]  = new CSession(Europe,inpEuropeOpen,inpEuropeClose,0);
     s[US]      = new CSession(US,inpUSOpen,inpUSClose,0);
 
-    t = new CTickMA(inpPeriods,inpAgg,(FractalType)BoolToInt(inpFractalModel==TickMA,inpShowFractal,NoValue));
+    t = new CTickMA(inpPeriods,inpAgg,(FractalType)BoolToInt(inpFractalSource==TickMA,inpShowFractal,NoValue));
 
     OrderConfig();
-    ManualInit(inpComFile);
+    ManualConfig(inpComFile);
 
     ArrayResize(signal.Crest.Pivot,inpPeriods);
     ArrayResize(signal.Trough.Pivot,inpPeriods);
