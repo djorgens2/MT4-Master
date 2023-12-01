@@ -136,9 +136,9 @@ private:
   struct              OrderResubmit
                       {
                         int             Type;                 //-- Order Type following fill
-                        double          Cancel;               //-- Cancel order on Stop
-                        double          Limit;                //-- Cancel order on Limit
-                        double          Step;                 //-- Resubmit Stop/Limit from fill
+                        double          LBound;               //-- Cancel order on Lower Boundary
+                        double          UBound;               //-- Cancel order on Upper Boundary
+                        double          Step;                 //-- Resubmit Stop/Limit from last fill
                       };
 
   struct              OrderRequest
@@ -343,6 +343,7 @@ public:
 
           //-- Formatted Output Text
           void         PrintLog(void);
+          void         PrintLog(int History);
 
           string       OrderDetailStr(OrderDetail &Order);
           string       OrderStr(int Action=NoAction);
@@ -599,7 +600,7 @@ void COrder::UpdatePanel(void)
       }
 
       //-- Col 2: Request Queue
-      for (int request=0;request<25;request++)
+      for (int request=0;request<12;request++)
         if (request<ArraySize(Queue))
         {
           UpdateLabel("lbvRQ-"+(string)request+"-Key",IntegerToString(BoolToInt(IsEqual(Queue[request].Status,Fulfilled),
@@ -629,8 +630,8 @@ void COrder::UpdatePanel(void)
           }
         
           UpdateLabel("lbvRQ-"+(string)request+"-Expiry",TimeToStr(Queue[request].Expiry),clrDarkGray);
-          UpdateLabel("lbvRQ-"+(string)request+"-Limit",DoubleToStr(Queue[request].Pend.Limit,Digits),clrDarkGray);
-          UpdateLabel("lbvRQ-"+(string)request+"-Cancel",DoubleToStr(Queue[request].Pend.Cancel,Digits),clrDarkGray);
+          UpdateLabel("lbvRQ-"+(string)request+"-LBound",DoubleToStr(Queue[request].Pend.LBound,Digits),clrDarkGray);
+          UpdateLabel("lbvRQ-"+(string)request+"-UBound",DoubleToStr(Queue[request].Pend.UBound,Digits),clrDarkGray);
           UpdateLabel("lbvRQ-"+(string)request+"-Resubmit",proper(ActionText(Queue[request].Pend.Type)),clrDarkGray);
         
           if (IsBetween(Queue[request].Pend.Type,OP_BUY,OP_SELLSTOP))
@@ -653,8 +654,8 @@ void COrder::UpdatePanel(void)
           UpdateLabel("lbvRQ-"+(string)request+"-Target","");
           UpdateLabel("lbvRQ-"+(string)request+"-Stop","");
           UpdateLabel("lbvRQ-"+(string)request+"-Expiry","");
-          UpdateLabel("lbvRQ-"+(string)request+"-Limit","");
-          UpdateLabel("lbvRQ-"+(string)request+"-Cancel","");
+          UpdateLabel("lbvRQ-"+(string)request+"-LBound","");
+          UpdateLabel("lbvRQ-"+(string)request+"-UBound","");
           UpdateLabel("lbvRQ-"+(string)request+"-Resubmit","");
           UpdateLabel("lbvRQ-"+(string)request+"-Step","");
           UpdateLabel("lbvRQ-"+(string)request+"-Memo","");
@@ -1360,8 +1361,8 @@ void COrder::ProcessRequests(void)
         }
         else
         if (IsBetween(price,
-           BoolToDouble(IsEqual(Queue[request].Pend.Limit,0.00),price,Queue[request].Pend.Limit),
-           BoolToDouble(IsEqual(Queue[request].Pend.Cancel,0.00),price,Queue[request].Pend.Cancel)))
+           BoolToDouble(IsEqual(Queue[request].Pend.LBound,0.00),price,Queue[request].Pend.LBound),
+           BoolToDouble(IsEqual(Queue[request].Pend.UBound,0.00),price,Queue[request].Pend.UBound)))
         {
           switch(Queue[request].Type)
           {
@@ -1382,7 +1383,7 @@ void COrder::ProcessRequests(void)
         else
         {
           Queue[request].Status                        = Expired;
-          Queue[request].Memo                          = "Limit/Cancel bounds exceeded";
+          Queue[request].Memo                          = "Price bounds exceeded";
         }
       else
         if (TimeCurrent()>Queue[request].Expiry+(Period()*60))
@@ -1819,8 +1820,8 @@ OrderRequest COrder::BlankRequest(string Requestor)
     Request.Memo             = "";
     Request.Expiry           = TimeCurrent()+(Period()*60);
     Request.Pend.Type        = NoAction;
-    Request.Pend.Limit       = 0.00;
-    Request.Pend.Cancel      = 0.00;
+    Request.Pend.LBound      = 0.00;
+    Request.Pend.UBound      = 0.00;
     Request.Pend.Step        = 0.00;
 
     return (Request);
@@ -2048,6 +2049,18 @@ void COrder::PrintLog(void)
     Print (text);
   }
 
+
+//+------------------------------------------------------------------+
+//| PrintLog                                                         |
+//+------------------------------------------------------------------+
+void COrder::PrintLog(int History)
+  {
+    int history       = BoolToInt(History>0,fmin(History,ArraySize(Log)),ArraySize(Log));
+
+    for (int line=0;line<history;line++)
+      Print(TimeToStr(Log[line].Received)+"["+(string)Log[line].Key+":"+(string)Log[line].Ticket+"]:"+Log[line].Note);
+  }
+
 //+------------------------------------------------------------------+
 //| OrderDetailStr - Returns formatted Order text                    |
 //+------------------------------------------------------------------+
@@ -2124,8 +2137,8 @@ string COrder::RequestStr(OrderRequest &Request)
     if (IsBetween(Request.Pend.Type,OP_BUYLIMIT,OP_SELLSTOP))
     {
       Append(text,"[Resubmit/"+ActionText(Request.Pend.Type)+"]");
-      Append(text,"Limit: "+DoubleToStr(Request.Pend.Limit,Digits));
-      Append(text,"Cancel: "+DoubleToStr(Request.Pend.Cancel,Digits));
+      Append(text,"Lower: "+DoubleToStr(Request.Pend.LBound,Digits));
+      Append(text,"Upper: "+DoubleToStr(Request.Pend.UBound,Digits));
       Append(text,"Step: "+DoubleToStr(Request.Pend.Step,Digits)+"]");
     }
     

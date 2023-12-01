@@ -101,6 +101,12 @@ enum FeatureType
        Enabled          // Enabled
      };
 
+enum OutputFormat
+     {
+       Display,         // Formatted for Screen
+       Logfile          // Formatted for Log
+     };
+
 //--- Quantitative measure types
 enum SummaryType
      { 

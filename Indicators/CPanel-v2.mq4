@@ -592,9 +592,9 @@ int OnInit()
     NewLabel("lbhRQ-"+"-Lots","Lots",668,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbhRQ-"+"-Target","Target",716,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbhRQ-"+"-Stop","Stop",764,30,clrGold,SCREEN_UL,indWinId);
-    NewLabel("lbhRQ-"+"-Expiry","Expiration",810,30,clrGold,SCREEN_UL,indWinId);
-    NewLabel("lbhRQ-"+"-Limit","Limit",906,30,clrGold,SCREEN_UL,indWinId);
-    NewLabel("lbhRQ-"+"-Cancel","Cancel",954,30,clrGold,SCREEN_UL,indWinId);
+    NewLabel("lbhRQ-"+"-Expiry","--- Expiration -----",810,30,clrGold,SCREEN_UL,indWinId);
+    NewLabel("lbhRQ-"+"-LBound","Low ---",906,30,clrGold,SCREEN_UL,indWinId);
+    NewLabel("lbhRQ-"+"-UBound","High ---",950,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbhRQ-"+"-Resubmit","Resubmit",1002,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbhRQ-"+"-Step","Step",1058,30,clrGold,SCREEN_UL,indWinId);
     NewLabel("lbhRQ-"+"-Memo","Order Comments",1092,30,clrGold,SCREEN_UL,indWinId);
@@ -612,8 +612,8 @@ int OnInit()
       NewLabel("lbvRQ-"+(string)row+"-Target","0.00000",716,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvRQ-"+(string)row+"-Stop","0.00000",764,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvRQ-"+(string)row+"-Expiry","12/1/2019 11:00",810,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
-      NewLabel("lbvRQ-"+(string)row+"-Limit","0.00000",906,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
-      NewLabel("lbvRQ-"+(string)row+"-Cancel","0.00000",954,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
+      NewLabel("lbvRQ-"+(string)row+"-LBound","0.00000",906,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
+      NewLabel("lbvRQ-"+(string)row+"-UBound","0.00000",954,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvRQ-"+(string)row+"-Resubmit","Sell Limit",1002,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvRQ-"+(string)row+"-Step","99.9",1058,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);
       NewLabel("lbvRQ-"+(string)row+"-Memo","1234567890123456789012345678901234567",1092,44+(row*11),clrDarkGray,SCREEN_UL,indWinId);

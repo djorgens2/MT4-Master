@@ -116,7 +116,7 @@ string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   struct  PivotDetail
           {
             int              Head;              //-- Lead Pivot Node
-            int              Count;             //-- Pivot Count
+            int              Count;             //-- Pivot Count within inpPeriods
             double           Pivot[];           //-- Pivot prices
             bool             Trigger;           //-- Pivot Change trigger
           };
@@ -494,6 +494,9 @@ void UpdateMaster(void)
     UpdateSignal();
     UpdateManager();
 
+    //if (signal.ActiveEvent)
+    //  Print(SignalStr(signal,Logfile));
+
     DebugPrint();
   }
 
@@ -513,29 +516,28 @@ void SetStrategy(RoleType Role)
 //    RoleType     contrarian = (RoleType)Action(Role,InAction,InContrarian);
 //    StrategyType strategy   = Wait;
     
-    if (signal.ActiveEvent)
-      switch (Role)
-      {
-        case Buyer:   if (t[NewTick])
-                        if (t.Linear().Head<Close[0])
-                          manager[Role].Strategy      = (StrategyType)BoolToInt(order[OP_SELL].Lots>0,Manage);
-                        else
-                          manager[Role].Strategy      = (StrategyType)BoolToInt(IsEqual(t.Linear().Direction,t.Range().Direction),Build);
-                      //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
-                      break;
+      // switch (Role)
+      // {
+      //   case Buyer:   if (t[NewTick])
+      //                   if (t.Linear().Head<Close[0])
+      //                     manager[Role].Strategy      = (StrategyType)BoolToInt(order[OP_SELL].Lots>0,Manage);
+      //                   else
+      //                     manager[Role].Strategy      = (StrategyType)BoolToInt(IsEqual(t.Linear().Direction,t.Range().Direction),Build);
+      //                 //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
+      //                 break;
 
-        case Seller:  if (t[NewTick])
-                        if (t.Linear().Head>Close[0])
-                          manager[Role].Strategy      = (StrategyType)BoolToInt(order[OP_SELL].Lots>0,Manage);
-                        else
-                          manager[Role].Strategy      = (StrategyType)BoolToInt(IsEqual(t.Linear().Direction,t.Range().Direction),Build);
-                     //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
-      }
+      //   case Seller:  if (t[NewTick])
+      //                   if (t.Linear().Head>Close[0])
+      //                     manager[Role].Strategy      = (StrategyType)BoolToInt(order[OP_SELL].Lots>0,Manage);
+      //                   else
+      //                     manager[Role].Strategy      = (StrategyType)BoolToInt(IsEqual(t.Linear().Direction,t.Range().Direction),Build);
+      //                //Pause("Setting Profit Strategy\n Trigger: "+BoolToStr(signal.Crest>0,"High","Low"),"StrategyCheck()");
+      // }
   }
 
 
 //+------------------------------------------------------------------+
-//| ManageLead - Lead Manager order processor                        |
+//| ManageFund - Fund Manager order processor                        |
 //+------------------------------------------------------------------+
 void ManageFund(RoleType Role)
   {
@@ -657,6 +659,7 @@ void OrderConfig(void)
     }
   }
 
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -685,6 +688,7 @@ int OnInit()
     return(INIT_SUCCEEDED);
   }
 
+
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
@@ -696,3 +700,44 @@ void OnDeinit(const int reason)
     for (SessionType type=Daily;type<SessionTypes;type++)
       delete s[type];
   }
+
+
+//+------------------------------------------------------------------+
+//| SignalStr                                                        |
+//+------------------------------------------------------------------+
+string SignalStr(SignalRec &Signal, OutputFormat Format=Display)
+  {
+    string text      = "";
+
+            // IndicatorType    Source;
+            // FractalType      Type;
+            // FractalState     State;
+            // EventType        Event;
+            // AlertType        Alert;
+            // int              Direction;
+            // RoleType         Lead;
+            // RoleType         Bias;
+            // PivotRec         Pivot;
+            // PivotDetail      Crest;
+            // PivotDetail      Trough;
+            // bool             Trigger;
+            // bool             ActiveEvent;
+
+    if (signal.ActiveEvent)
+    {
+      text      = EnumToString(Signal.Source);
+      Append(text,EnumToString(Signal.Type),BoolToStr(IsEqual(Format,Logfile),"|"));
+      Append(text,EnumToString(Signal.State),BoolToStr(IsEqual(Format,Logfile),"|"," ["));
+      Append(text,EnumToString(Signal.Alert),BoolToStr(IsEqual(Format,Logfile),"|","]\n"));
+      Append(text,EnumToString(Signal.Event),BoolToStr(IsEqual(Format,Logfile),"|",":"));
+      Append(text,DirText(Signal.Direction),BoolToStr(IsEqual(Format,Logfile),"|","\n"));
+      Append(text,EnumToString(Signal.Lead),BoolToStr(IsEqual(Format,Logfile),"|"," ["));
+      Append(text,ActionText(Signal.Bias),BoolToStr(IsEqual(Format,Logfile),"|",":"));
+      Append(text,BoolToStr(Signal.Trigger,"Fired","Idle"),BoolToStr(IsEqual(Format,Logfile),"|","]"));
+      Append(text,BoolToStr(Signal.ActiveEvent,"Active","Idle"),BoolToStr(IsEqual(Format,Logfile),"|"," > "));
+    }
+
+    return text;
+  }
+
+  

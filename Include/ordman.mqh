@@ -287,28 +287,31 @@ void ProcessComFile(COrder &Order)
             {
               case OP_BUY:             request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
                                                                 BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
-                                       request.Pend.Limit     = FormatPrice(Action(OP_BUY,InAction,InContrarian),params[9]);
-                                       request.Pend.Cancel    = FormatPrice(OP_BUY,params[10]);
+                                       request.Pend.LBound    = FormatPrice(Action(OP_BUY,InAction,InContrarian),params[9]);
+                                       request.Pend.UBound    = FormatPrice(OP_BUY,params[10]);
                                        request.Pend.Step      = StringToDouble(params[11]);
                                        break;
 
               case OP_SELL:            request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
                                                                 BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
-                                       request.Pend.Limit     = FormatPrice(Action(OP_SELL,InAction,InContrarian),params[9]);
-                                       request.Pend.Cancel    = FormatPrice(OP_SELL,params[10]);
+                                       request.Pend.LBound    = FormatPrice(Action(OP_SELL,InAction,InContrarian),params[9]);
+                                       request.Pend.UBound    = FormatPrice(OP_SELL,params[10]);
                                        request.Pend.Step      = StringToDouble(params[11]);
                                        break;
 
               default:                 request.Pend.Type      = NoAction;
-                                       request.Pend.Limit     = 0.00;
-                                       request.Pend.Cancel    = 0.00;
+                                       request.Pend.LBound    = 0.00;
+                                       request.Pend.UBound    = 0.00;
                                        request.Pend.Step      = 0.00;
             }
             
             if (Order.Submitted(request))
               Print(Order.RequestStr(request));
             else
+            {
               Print("Bad Request Format: FileString: "+fRecord+" RequestStr: "+Order.RequestStr(request));
+              Order.PrintLog(0);
+            }
           }
           else
 
