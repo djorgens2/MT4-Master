@@ -473,6 +473,7 @@ void CTickMA::UpdateSMA(void)
     {
       sma.Event      = event;
       SetEvent(sma.Event,Minor);
+      SetEvent(CrossCheck,Notify);
     }
     else
 

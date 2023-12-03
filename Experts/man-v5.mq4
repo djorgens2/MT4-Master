@@ -8,7 +8,7 @@
 #property version   "5.20"
 #property strict
 
-#define debug false
+#define debug true
 
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
@@ -41,6 +41,10 @@ input string           inpBaseCurrency     = "XRPUSD";      // Account Base Curr
 input string           inpComFile          = "manual.csv";  // Command File Name
 input YesNoType        inpShowComments     = No;            // Show Comments
 input int              inpIndSNVersion     = 2;             // Control Panel Version
+
+//--- Debug parms
+input string           inpDay;                              // Day
+input AlertType        inpAlert;                            // Alert Level
 
 
 //--- Regression Config
@@ -179,25 +183,24 @@ void DebugPrint(void)
         Append(text,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
         Append(text,TimeToStr(TimeCurrent()),"|");
         Append(text,EnumToString(signal.Alert),"|");
+        Append(text,"T:"+EnumToString(t.MaxEvent())+"/S:"+EnumToString(s[Daily].MaxEvent()),"|");
+
+        Pause (text+"\n\n"+t.ActiveEventStr()+"\n\n"+s[Daily].ActiveEventStr(),"Debug Event Check");
 
         for (EventType type=1;type<EventTypes;type++)
-        {
-          if (type<CrossCheck||type>Exception)
-            Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
-
           switch (type)
           {
-            case NewSegment: Append(text,BoolToStr(t.Logged(NewLead,Nominal),"Nominal",
-                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","No Alert")),"|");
+            case NewSegment: Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+                             Append(text,BoolToStr(t.Logged(NewLead,Nominal),"Nominal",
+                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","NoAlert")),"|");
                              break;
-            case NewChannel: Append(text,BoolToStr(t.Logged(NewLead,Notify),"Notify","No Alert"),"|");
-                             break;
-            case CrossCheck: Append(text,BoolToStr(IsEqual(signal.Event,CrossCheck),"Notify","No Alert"),"|");
+            case NewChannel: Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+                             Append(text,BoolToStr(t.Logged(NewLead,Notify),"Notify","NoAlert"),"|");
                              break;
             case Exception:  Append(text,BoolToStr(IsEqual(signal.Event,Exception),"Critical","No Alert"),"|");
                              break;
+            default:         Append(text,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
           }
-        }
 
         Print(text);
       }
@@ -336,7 +339,7 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
         else
         if (IsEqual(Signal.MaxAlert(),Nominal))   signal.Event = NewSegment;
         else
-        if (Signal.Event(NewFlatline)||Signal.Event(NewConsolidation)||Signal.Event(NewParabolic)||Signal.Event(NewChannel))
+        if (Signal.Event(CrossCheck))
                                                   signal.Event = CrossCheck;
         else
         if (Signal.Event(NewBias))                signal.Event = NewBias;
@@ -345,7 +348,7 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
 
         else                                      signal.Event = NewBoundary;
       else
-        if (Signal.Event(NewFlatline)||Signal.Event(NewConsolidation)||Signal.Event(NewParabolic)||Signal.Event(NewChannel))
+        if (Signal.Event(CrossCheck))
                                                   signal.Event = CrossCheck;
         else
         if (Signal.Event(NewBias))                signal.Event = NewBias;
@@ -487,6 +490,7 @@ void UpdateMaster(void)
     //-- Update Signals
     signal.Event              = NoEvent;
     signal.Alert              = fmax(s[Daily].MaxAlert(),t.MaxAlert());
+    signal.Event              = fmax(s[Daily].MaxEvent(),t.MaxEvent());
     signal.Trigger            = false;
 
     UpdateSignal(Session,s[Daily]);
@@ -621,7 +625,13 @@ void Execute(void)
    }
 
     order.ExecuteRequests();
+
+    // if (!IsEqual(signal.Direction,NoDirection))
+    // if (TimeToStr(TimeCurrent(),TIME_DATE)==inpDay)
+    //   if (IsEqual(signal.Alert,inpAlert))
+    // Pause(SignalStr(signal,Display),"TimeCheck");
   }
+
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -733,11 +743,9 @@ string SignalStr(SignalRec &Signal, OutputFormat Format=Display)
       Append(text,DirText(Signal.Direction),BoolToStr(IsEqual(Format,Logfile),"|","\n"));
       Append(text,EnumToString(Signal.Lead),BoolToStr(IsEqual(Format,Logfile),"|"," ["));
       Append(text,ActionText(Signal.Bias),BoolToStr(IsEqual(Format,Logfile),"|",":"));
-      Append(text,BoolToStr(Signal.Trigger,"Fired","Idle"),BoolToStr(IsEqual(Format,Logfile),"|","]"));
+      Append(text,BoolToStr(Signal.Trigger,"Fired","Idle"),BoolToStr(IsEqual(Format,Logfile),"|","]: "));
       Append(text,BoolToStr(Signal.ActiveEvent,"Active","Idle"),BoolToStr(IsEqual(Format,Logfile),"|"," > "));
     }
 
     return text;
   }
-
-  

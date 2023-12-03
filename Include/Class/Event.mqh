@@ -42,6 +42,11 @@ protected:
                   NewTick,       //-- Tick level event; aggregate or trade
                   NewSegment,    //-- Segment level event; aggregate of Ticks
                   NewContraction,
+                  NewFlatline,
+                  NewConsolidation,
+                  NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
+                  NewChannel,
+                  CrossCheck,
                   NewFractal,    //-- Fractal Direction change
                   NewFibonacci,  //-- Fibonacci Level change only
                   NewPivot,
@@ -61,11 +66,6 @@ protected:
                   NewBreakout,
                   NewReversal,
                   NewExtension,
-                  NewFlatline,
-                  NewConsolidation,
-                  NewParabolic,  //-- Expanding, Multidirectional (parabolic) event
-                  NewChannel,
-                  CrossCheck,
                   Exception,
                   SessionOpen,
                   SessionClose,
@@ -86,6 +86,7 @@ private:
       bool           eEvent[EventTypes];
       AlertType      eAlert[EventTypes];
       AlertType      eMaxAlert;
+      EventType      eMaxEvent;
       EventLog       eLog[];
 
 public:
@@ -96,13 +97,11 @@ public:
       void           ClearEvent(EventType Event);
       void           ClearEvents(void);
 
-      bool           IsChanged(EventType &Compare, EventType Value);
-      bool           IsEqual(EventType Event1, EventType Event2) {return Event1==Event2;};
-
+      EventLog       LastEvent(void)                             {return eLog[0];};
+      EventType      MaxEvent(void)                              {return eMaxEvent;};
       AlertType      MaxAlert(void)                              {return eMaxAlert;};
       AlertType      Alert(EventType Event)                      {return eAlert[Event];};
-      EventLog       LastEvent(void)                             {return eLog[0];};
-
+      
       EventLog       Log(EventType Event);
       bool           Logged(EventType Event, AlertType Alert=NoAlert);
 
@@ -131,8 +130,13 @@ void CEvent::SetEvent(EventType Event, AlertType Alert=Notify, double Price=NoVa
     eEvent[NoEvent]         = false;
     eEvent[Event]           = true;
     eAlert[Event]           = fmax(Alert,eAlert[Event]);
-    eMaxAlert               = fmax(Alert,eMaxAlert);
-    
+
+    if (IsHigher(Alert,eMaxAlert))
+      eMaxEvent             = Event;
+
+    if (IsEqual(eMaxAlert,Alert))
+      eMaxEvent             = fmax(eMaxEvent,Event);
+
     ArrayCopy(eLog,eLog,1,0,WHOLE_ARRAY);
     
     eLog[0].Event           = Event;
@@ -151,14 +155,33 @@ void CEvent::ClearEvent(EventType Event)
     eEvent[NoEvent]         = true;
     eEvent[Event]           = false;
     eAlert[Event]           = NoAlert;
+
     eMaxAlert               = NoAlert;
-    
+    eMaxEvent               = NoEvent;
+
     for (EventType event=NoEvent;event<EventTypes;event++)
       if (eEvent[event])
       {
         eEvent[NoEvent]     = false;
         eMaxAlert           = fmax(eAlert[event],eMaxAlert);
+
+        if (IsEqual(eMaxAlert,eAlert[event]))
+          eMaxEvent         = fmax(eMaxEvent,Event);
       }
+  }
+
+//+------------------------------------------------------------------+
+//| ClearEvents - Initializes all events to false                    |
+//+------------------------------------------------------------------+
+void CEvent::ClearEvents(void)
+  {
+    ArrayInitialize(eEvent,false);    
+    ArrayInitialize(eAlert,NoAlert);
+    ArrayResize(eLog,0,100);
+
+    eEvent[NoEvent]         = true;
+    eMaxAlert               = NoAlert;
+    eMaxEvent               = NoEvent;
   }
 
 //+------------------------------------------------------------------+
@@ -188,34 +211,6 @@ bool CEvent::Logged(EventType Event, AlertType Alert=NoAlert)
             return true;
         
     return false;
-  }
-
-//+------------------------------------------------------------------+
-//| ClearEvents - Initializes all events to false                    |
-//+------------------------------------------------------------------+
-void CEvent::ClearEvents(void)
-  {
-    ArrayInitialize(eEvent,false);    
-    ArrayInitialize(eAlert,NoAlert);
-    ArrayResize(eLog,0,100);
-
-    eEvent[NoEvent]         = true;
-    eMaxAlert               = NoAlert;
-  }
-
-//+------------------------------------------------------------------+
-//| IsChanged - Compares events to determine if a change occurred    |
-//+------------------------------------------------------------------+
-bool CEvent::IsChanged(EventType &Compare, EventType Change)
-  {
-    if (Compare==NoEvent)
-      return false;
-
-    if (Compare==Change)
-      return false;
-      
-    Compare = Change;
-    return true;
   }
 
 //+------------------------------------------------------------------+
@@ -311,6 +306,11 @@ string EventText(EventType Event)
                    "New Tick",
                    "New Segment",
                    "New Contraction",
+                   "New Flatline",
+                   "New Consolidation",
+                   "New Parabolic",
+                   "New Channel",
+                   "Cross Check",
                    "New Fractal",
                    "New Fibonacci",
                    "New Pivot",
@@ -330,11 +330,6 @@ string EventText(EventType Event)
                    "New Breakout",
                    "New Reversal",
                    "New Extension",
-                   "New Flatline",
-                   "New Consolidation",
-                   "New Parabolic",
-                   "New Channel",
-                   "Cross Check",
                    "Exception",
                    "Session Open",
                    "Session Close",
@@ -365,5 +360,55 @@ AlertType BoolToAlert(bool IsTrue, AlertType TrueValue, AlertType FalseValue=NoA
       return TrueValue;
 
     return FalseValue;
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(EventType &Check, EventType Compare, bool Update=true)
+  {
+    if (Check==Compare)
+      return false;
+   
+    if (Update) 
+      Check   = Compare;
+  
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(AlertType &Check, AlertType Compare, bool Update=true)
+  {
+    if (Check==Compare)
+      return false;
+   
+    if (Update) 
+      Check   = Compare;
+  
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| IsHigher - Returns true on higher FibonacciType                  |
+//+------------------------------------------------------------------+
+bool IsHigher(EventType Check, EventType &Change, bool Update=true)
+  {
+    if (Check>Change)
+      return (IsChanged(Change,Check,Update));
+
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
+//| IsHigher - Returns true on higher FibonacciType                  |
+//+------------------------------------------------------------------+
+bool IsHigher(AlertType Check, AlertType &Change, bool Update=true)
+  {
+    if (Check>Change)
+      return (IsChanged(Change,Check,Update));
+
+    return (false);
   }
 
