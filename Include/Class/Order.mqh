@@ -1211,7 +1211,7 @@ bool COrder::OrderApproved(OrderRequest &Request)
     }
     else Request.Status                    = Rejected;
 
-    AppendLog(Request.Key,NoValue,"[Approval]"+Request.Memo);
+    AppendLog(Request.Key,NoValue,"["+EnumToString(Request.Status)+"]"+Request.Memo);
 
     return (false);
   }

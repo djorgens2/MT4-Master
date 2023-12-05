@@ -185,7 +185,7 @@ void DebugPrint(void)
         Append(text,EnumToString(signal.Alert),"|");
         Append(text,"T:"+EnumToString(t.MaxEvent())+"/S:"+EnumToString(s[Daily].MaxEvent()),"|");
 
-        Pause (text+"\n\n"+t.ActiveEventStr()+"\n\n"+s[Daily].ActiveEventStr(),"Debug Event Check");
+//        Pause (text+"\n\n"+t.ActiveEventStr()+"\n\n"+s[Daily].ActiveEventStr(),"Debug Event Check");
 
         for (EventType type=1;type<EventTypes;type++)
           switch (type)
