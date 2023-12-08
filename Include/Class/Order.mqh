@@ -245,8 +245,7 @@ private:
           void         UpdateMaster(void);
           void         UpdateOrder(OrderDetail &Order, QueueStatus Status);
 
-          OrderRequest SubmitOrder(OrderRequest &Request, bool Resubmit=false);
-
+          OrderRequest SubmitRequest(OrderRequest &Request, bool Resubmit=false);
           OrderDetail  MergeRequest(OrderRequest &Request);
           void         MergeOrder(int Action, int Ticket);
           void         MergeSplit(OrderDetail &Order);
@@ -266,9 +265,11 @@ public:
                        COrder(BrokerModel Model, OrderMethod Long, OrderMethod Short);
                       ~COrder();
 
-          void         Update(double BaseCurrency=1.0);
-          void         ExecuteOrders(int Action, bool Hold=Off);
-          void         ExecuteRequests(void);
+          //-- Order Operational Control methods
+          void         Update(double BaseCurrency=1.0);              //-- Update Order Statistics, Display, Manage Logs
+          void         ExecuteOrders(int Action, bool Hold=Off);     //-- Manage open orders by Action Type
+          void         ExecuteRequests(void);                        //-- Manage Request Queue, Open, Expiry, Cancels
+          void         ExecuteHedge(string Requestor);               //-- Hedges on Market (Immediate)
 
           bool         Enabled(int Action);
           bool         Enabled(OrderRequest &Request);
@@ -303,7 +304,7 @@ public:
           //-- Request methods
           void         Cancel(int Type, string Reason="");
           void         Cancel(OrderRequest &Request, string Reason="");
-
+          bool         Submitted(OrderRequest &Request);
 
           //-- Order States
           bool         Status(QueueStatus State, int Type=NoAction);
@@ -317,7 +318,6 @@ public:
           bool         Processing(int Type=NoAction)         {return(Status(Processing,Type));};
           bool         Processed(int Type=NoAction)          {return(Status(Processed,Type));};
           bool         Closed(int Type=NoAction)             {return(Status(Closed,Type));};
-          bool         Submitted(OrderRequest &Request);
           
           bool         IsChanged(QueueStatus &Compare, QueueStatus Value);
           bool         IsEqual(QueueStatus &Compare, QueueStatus Value) {return Compare==Value;};
@@ -992,9 +992,9 @@ void COrder::UpdateOrder(OrderDetail &Order, QueueStatus Status)
   }
 
 //+------------------------------------------------------------------+
-//| SubmitOrder - Adds screened orders to Request Processing Queue   |
+//| SubmitRequest - Adds screened orders to Request Queue            |
 //+------------------------------------------------------------------+
-OrderRequest COrder::SubmitOrder(OrderRequest &Request, bool Resubmit=false)
+OrderRequest COrder::SubmitRequest(OrderRequest &Request, bool Resubmit=false)
   {
     static int key                    = 0;
     int        request                = ArraySize(Queue);
@@ -1395,7 +1395,7 @@ void COrder::ProcessRequests(void)
           {
             //-- Resubmit Queued Pending Orders
             if (IsBetween(Queue[request].Pend.Type,OP_BUYLIMIT,OP_SELLSTOP))
-              SubmitOrder(Queue[request],true);
+              SubmitRequest(Queue[request],true);
 
             //-- Merge fulfilled requests/update stops
             UpdateOrder(MergeRequest(Queue[request]),Fulfilled);
@@ -1624,6 +1624,34 @@ void COrder::ExecuteOrders(int Action, bool Hold=Off)
   }
 
 //+------------------------------------------------------------------+
+//| ExecuteHedge - Opens offsetting position to Zero-Net             |
+//+------------------------------------------------------------------+
+void COrder::ExecuteHedge(string Requestor)
+  {
+    OrderRequest request        = BlankRequest(Requestor);
+
+    if (fabs(Summary[Net].Lots)>0.00)
+    {
+      request.Action           = Action(Summary[Net].Lots);
+      request.Type             = Action(Summary[Net].Lots);
+      request.Lots             = fabs(Summary[Net].Lots);
+      // request.TakeProfit       = BoolToDouble(InStr(params[4],"P"),request.Price+
+      //                               point(StringToDouble(StringSubstr(params[4],0,StringLen(params[4])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),1,NoValue),
+      //                               FormatPrice(request.Action,params[4]));
+      // request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
+      //                               point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
+      //                               FormatPrice(request.Action,params[5]));
+      // request.Memo             = params[3];
+      // request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
+
+      if (Submitted(request))
+        Print(RequestStr(request));
+      else
+        PrintLog(0);
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| Enabled - returns true if trade is open for supplied Action      |
 //+------------------------------------------------------------------+
 bool COrder::Enabled(int Action)
@@ -1778,6 +1806,17 @@ void COrder::Cancel(OrderRequest &Request, string Reason="")
   }
 
 //+------------------------------------------------------------------+
+//| Submitted - Adds screened orders to the Order Processing Queue   |
+//+------------------------------------------------------------------+
+bool COrder::Submitted(OrderRequest &Request)
+  {
+    if (IsEqual(SubmitRequest(Request).Status,Pending))
+      return (true);
+      
+    return (false);
+  }
+
+//+------------------------------------------------------------------+
 //| Status - True on Order/Request Status by Type on current tick    |
 //+------------------------------------------------------------------+
 bool COrder::Status(QueueStatus State, int Type=NoAction)
@@ -1787,17 +1826,6 @@ bool COrder::Status(QueueStatus State, int Type=NoAction)
         return (Snapshot[State].Type[type].Count>0);
 
     return (Snapshot[State].Type[Type].Count>0);
-  }
-
-//+------------------------------------------------------------------+
-//| Submitted - Adds screened orders to the Order Processing Queue   |
-//+------------------------------------------------------------------+
-bool COrder::Submitted(OrderRequest &Request)
-  {
-    if (IsEqual(SubmitOrder(Request).Status,Pending))
-      return (true);
-      
-    return (false);
   }
 
 //+------------------------------------------------------------------+

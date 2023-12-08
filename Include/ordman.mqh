@@ -240,6 +240,12 @@ void ProcessComFile(COrder &Order)
         if (go)
         {
           //-- Print utilities
+          if (params[0]=="HEDGE")
+            if (fabs(Order[Net].Lots)>0)
+              Order.ExecuteHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+            else
+              Alert("Nothing to hedge");
+          else
           if (params[0]=="PRINT")
             switch (pCount)
             {
@@ -251,12 +257,18 @@ void ProcessComFile(COrder &Order)
 
                           if (InStr("ORDER",params[1]))
                             Print(Order.OrderStr());
+
+                          if (InStr("LOG",params[1]))
+                            Order.PrintLog();
                           break;
               case 3:     if (InStr("ORDER",params[1]))
                             Print(Order.OrderStr(ActionCode(params[2])));
 
                           if (InStr("MASTER",params[1]))
                             Print(Order.MasterStr(ActionCode(params[2])));
+
+                          if (InStr("LOG",params[1]))
+                            Order.PrintLog((int)params[2]);
             }
           else
 
@@ -265,12 +277,9 @@ void ProcessComFile(COrder &Order)
           {
             FormatOrder(params);
 
-            request.Status           = Initial;
-            request.Key              = NoValue;
-            request.Ticket           = NoValue;
+            request                  = Order.BlankRequest(StringSubstr(comfile,0,StringLen(comfile)-4));
             request.Action           = ActionCode(params[0]);
             request.Price            = FormatPrice(request.Action,params[2]);
-
             request.Type             = ActionCode(params[0],request.Price);
             request.Lots             = StringToDouble(params[1]);
             request.TakeProfit       = BoolToDouble(InStr(params[4],"P"),request.Price+
@@ -279,7 +288,6 @@ void ProcessComFile(COrder &Order)
             request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
                                           point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
                                           FormatPrice(request.Action,params[5]));
-            request.Requestor        = StringSubstr(comfile,0,StringLen(comfile)-4);
             request.Memo             = params[3];
             request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
             

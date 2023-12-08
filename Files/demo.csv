@@ -1,4 +1,8 @@
 //enable short
+// cancel request 5
+// cancel request 6
+// cancel request 7
+cancel request 29
 verify
 
 //---- Long stuff
@@ -6,11 +10,13 @@ verify
 //fund long 10 2.5 60
 //buy 0.00 0.00 "Trend Contrarian"
 
+sell 0.00 0.00 "In Trend Contrarian (Crest #1)"
 //---- Short stuff
-risk short 80 10 60
+//risk short 80 10 60
 //fund short 10 2.5
-//sell 0.00 0.00 "Contrarian Recovery"
-//sell 0.00 0.00 "Term Correction (Contrarian)" 0.00 0.00 2023.12.05 sell limit 30p 20P 3p
+//sell 0.00 0.00 "Trend Contrarian (f423)"
+sell 0.00 3p "Trend f423% (Contrarian)" 0.00 0.00 2023.12.09 sell limit 30p 20P 3p
+//sell 0.00 0.00 "Trend f423%+ (In Motion)" 0.00. 0.00 2023.12.06 sell stop 30p 20p 3p
 
 //kill short
-split short
+//split short

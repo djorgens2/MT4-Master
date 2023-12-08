@@ -1,6 +1,6 @@
 {
     "files.associations": {
-        "*.mqh": "cpp",
+        "*.mqh": "mq4",
         "*.mq4": "cpp",
         "*.mq5": "cpp"
     },
