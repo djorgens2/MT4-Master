@@ -5,11 +5,9 @@
 # Metatrader 4 code for trade automation in the forex markets.
 # 
 
-#---------------------------------------------------------------------------------------------
-Stable release(s):
-#---------------------------------------------------------------------------------------------
+**Stable release(s):**
 
-Indicators: All indictors are Zero-Repaint, Event Triggers are real-time
+**Indicators: All indictors are Zero-Repaint, Event Triggers are real-time**
 
 1. Session-v1.[MQ4|EX4] - Time-based Single market session [Daily|Asia|Europe|US] Fractal/Fibonacci Calculation
    - Fractal [Origin|Trend|Term]
@@ -46,7 +44,7 @@ Indicators: All indictors are Zero-Repaint, Event Triggers are real-time
    - Request queue for Pending Orders
    - Order queue for Open Orders, broken out by Action and summarized by zone.
 
-Experts:
+**Experts:**
 
 1. man-v1: Legacy Non-integrated release; command-line interface
     - /Include/manual.mqh; manual console command processor
@@ -57,16 +55,16 @@ Experts:
     - /Include/ordman.mqh; manual console command processor
     - /Include/Class/Order.mqh; order handling processor
 
-#---------------------------------------------------------------------------------------------
-Development release(s):
-#---------------------------------------------------------------------------------------------
+![image](https://github.com/djorgens2/MT4-Master/assets/21344166/968f7fdf-d233-4e9a-8330-b2ea715629ea)
 
-Indicators:
+**Development release(s):**
+
+**Indicators:**
 
 1. TickMA-v2: Working releases to test TickMA-v1
 2. Session-v2: Working releases to test Session-v1
 
-Experts:
+**Experts:**
 
 1. man-v5: (WIP) Current integration release; Full-Auto
    - Classes
