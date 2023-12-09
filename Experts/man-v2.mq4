@@ -35,7 +35,6 @@
   input double           inpZoneStep         = 2.5;           // Zone Step (pips)
   input double           inpMaxZoneMargin    = 5.0;           // Max Zone Margin
 
-
   //-- Internal EA Configuration
   string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   string                 objectstr           = "[man-v2]";
