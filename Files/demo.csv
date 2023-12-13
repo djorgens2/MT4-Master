@@ -1,26 +1,27 @@
-//enable short
 // cancel request 5
 // cancel request 6
 // cancel request 7
-cancel request 14
+// cancel request 14
 verify
 
 //---- Long stuff
 // enable long
-// risk long 80 10 60
-// fund long 10 2.5
-// buy 0.00 0.00 "Trend Contrarian"
-// full long
+full long
+risk long 80 10 60
+fund long 10 2.5
+buy 0.00 0.00 "Trend Contrarian"
 //buy 0.00 -3p "Term Rally @+50% (Contrarian)" 0.00 0.00 2023.12.19 buy stop 30p 20P 3p
-close long 
+//close long 
 
-//sell 0.00 0.00 "In Trend Contrarian (Crest #1)"
 //---- Short stuff
-// risk short 80 10 60
-// fund short 10 2.5
-// //sell 0.00 0.00 "Trend Contrarian (f423)"
-// sell 0.00 3p "Term Retrace 50% (Contrarian)" 0.00 0.00 2023.12.19 sell limit 30p 20P 3p
-// //sell 0.00 0.00 "Trend f423%+ (In Motion)" 0.00. 0.00 2023.12.06 sell stop 30p 20p 3p
+enable short
+split short
+risk short 80 10 60
+fund short 10 2.5
 
-// //kill short
-// split short
+// sell 0.00 0.00 "Trend Contrarian (f423)"
+// sell 0.00 3p "Term Retrace 50% (Contrarian)" 0.00 0.00 2023.12.19 sell limit 30p 20P 3p
+// sell 0.00 0.00 "Trend f423%+ (In Motion)" 0.00. 0.00 2023.12.06 sell stop 30p 20p 3p
+//sell 0.00 0.00 "In Trend Contrarian (Crest #1)"
+
+// kill short
