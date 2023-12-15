@@ -26,7 +26,7 @@ void OnStart()
       if(bfirst)
         {
          bfirst=false;
-         Print("Client: waiting for pipe server");
+         Print("Client: waiting for pipe server: \\\\.\\pipe\\MQL5.Pipe.Server");
         }
       Sleep(250);
      }
