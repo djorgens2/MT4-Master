@@ -464,7 +464,7 @@ int OnInit()
     NewLabel("lbhAC-File","File",1175,7,clrWhite,SCREEN_UL,indWinId);
     NewLabel("lbvAC-Trading","Trade",408,7,clrDarkGray,SCREEN_UL,indWinId);
     NewLabel("lbvAC-SysMsg","",508,7,clrDarkGray,SCREEN_UL,indWinId);
-    NewLabel("lbvAC-File","",1200,7,clrGold,SCREEN_UL,indWinId);
+    NewLabel("lbvAC-File","N/A",1200,7,clrGold,SCREEN_UL,indWinId);
 
     //-- Order Config
     DrawBox("bxfOC-Long",5,174,352,144,C'0,42,0',BORDER_FLAT,SCREEN_UL,indWinId);

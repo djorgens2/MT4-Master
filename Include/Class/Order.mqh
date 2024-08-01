@@ -24,7 +24,7 @@ protected:
                       };
 
   //-- Margin Model Configurations
-  enum                TicketGroup
+  enum                OrderGroup
                       {
                         ByZone,
                         ByTicket,
@@ -203,8 +203,8 @@ private:
                         double         DefaultStop;           //-- Default stop (in Pips)
                         double         DefaultTarget;         //-- Default target (in Pips)
                         //-- Order Management
-                        double         StopLoss;              //-- Specific stop loss price
-                        double         TakeProfit;            //-- Specific profit price target
+                        double         StopLoss;              //-- Default stop loss price
+                        double         TakeProfit;            //-- Defaault profit price target
                         bool           HideStop;              //-- Hide stops (controlled thru EA)
                         bool           HideTarget;            //-- Hide targets (controlled thru EA)
                         //-- Distribution Management
@@ -256,7 +256,6 @@ private:
 
           void         AdverseEquityHandler(void);
 
-          void         ProcessRequests(void);
           void         ProcessProfits(int Action);
           void         ProcessLosses(int Action);
 
@@ -267,9 +266,9 @@ public:
 
           //-- Order Operational Control methods
           void         Update(double BaseCurrency=1.0);              //-- Update Order Statistics, Display, Manage Logs
-          void         ExecuteOrders(int Action, bool Hold=Off);     //-- Manage open orders by Action Type
-          void         ExecuteRequests(void);                        //-- Manage Request Queue, Open, Expiry, Cancels
-          void         ExecuteHedge(string Requestor);               //-- Hedges on Market (Immediate)
+          void         ProcessRequests(void);                        //-- Process pending orders in the Request Queue
+          void         ProcessOrders(int Action, bool Hold=Off);     //-- Manage open orders by Action Type
+          void         ProcessHedge(string Requestor);               //-- Hedges on Market (Immediate)
 
           bool         Enabled(int Action);
           bool         Enabled(OrderRequest &Request);
@@ -284,7 +283,7 @@ public:
           void         ConsoleAlert(string Message, color Color=clrDarkGray) {UpdateLabel("lbvAC-SysMsg",Message,Color);};
 
           //-- Order properties
-          double       Price(SummaryType Type, int Action, double Requested, double Basis=0.00);
+          double       Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00, bool InPips=false);
           double       Forecast(int Action, double Equity, double Spread=0.00);
           double       LotSize(int Action, double Lots=0.00, double Margin=0.00);
 
@@ -329,14 +328,18 @@ public:
           OrderSummary Recap(int Action, SummaryType Type)   {return(Master[Action].Summary[Type]);};
           OrderSummary Entry(int Action)                     {return(Master[Action].Entry);};
 
+          void         GetGroup(int Action, OrderGroup Group, int &Tickets[], int Key=NoValue);
           void         GetZone(int Action, int Zone, OrderSummary &Node);
           int          Zones(int Action) {return (ArraySize(Master[Action].Zone));};
           int          Zone(int Action, double Price=0.00);
 
           //-- Configuration methods
-          void         SetStopLoss(int Action, double StopLoss, bool Hidden, bool Pips=false, bool FromClose=true);
-          void         SetTakeProfit(int Action, double TakeProfit, bool Hidden, bool Pips=false, bool FromClose=true);
-          void         SetMethod(int Action, OrderMethod Method, TicketGroup Group, int Key=NoValue);
+          void         SetDefaultStop(int Action, double Price, int Pips, bool Hide);
+          void         SetDefaultTarget(int Action, double Price, int Pips, bool Hide);
+
+          void         SetStopLoss(int Action, OrderGroup Group, double StopLoss, bool InPips, int Key=NoValue);
+          void         SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, bool InPips, int Key=NoValue);
+          void         SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue);
           void         SetFundLimits(int Action, double EquityTarget, double EquityMin, double LotSize);
           void         SetRiskLimits(int Action, double Risk, double Scale, double Margin);
           void         SetZoneLimits(int Action, double Step, double Margin);
@@ -1346,6 +1349,8 @@ void COrder::ProcessRequests(void)
     
     ArrayResize(updated,0,1000);
 
+    AdverseEquityHandler();
+
     for (int request=0;request<ArraySize(Queue);request++)
     {
       double price                                     = BoolToDouble(IsEqual(Queue[request].Action,OP_BUY),Ask,Bid);
@@ -1595,19 +1600,9 @@ void COrder::Update(double BaseCurrency=1.0)
   }
 
 //+------------------------------------------------------------------+
-//| ExecuteRequests - Processes the Order Request Queue              |
+//| ProcessOrders - Updates/Closes orders by Action                  |
 //+------------------------------------------------------------------+
-void COrder::ExecuteRequests(void)
-  {  
-    AdverseEquityHandler();
-    ProcessRequests();
-    UpdatePanel();
-  }
-
-//+------------------------------------------------------------------+
-//| ExecuteOrders - Updates/Closes orders by Action                  |
-//+------------------------------------------------------------------+
-void COrder::ExecuteOrders(int Action, bool Hold=Off)
+void COrder::ProcessOrders(int Action, bool Hold=Off)
   {
     Master[Action].EquityHold              = Hold;
 
@@ -1624,9 +1619,9 @@ void COrder::ExecuteOrders(int Action, bool Hold=Off)
   }
 
 //+------------------------------------------------------------------+
-//| ExecuteHedge - Opens offsetting position to Zero-Net             |
+//| ProcessHedge - Opens offsetting position to Zero-Net             |
 //+------------------------------------------------------------------+
-void COrder::ExecuteHedge(string Requestor)
+void COrder::ProcessHedge(string Requestor)
   {
     OrderRequest request        = BlankRequest(Requestor);
 
@@ -1641,7 +1636,7 @@ void COrder::ExecuteHedge(string Requestor)
       // request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
       //                               point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
       //                               FormatPrice(request.Action,params[5]));
-      // request.Memo             = params[3];
+      request.Memo             = "Hedge";
       // request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
 
       if (Submitted(request))
@@ -1685,7 +1680,7 @@ bool COrder::Enabled(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| Price - returns Stop(loss)|Profit prices by Action from Basis    |
 //+------------------------------------------------------------------+
-double COrder::Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00)
+double COrder::Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00, bool InPips=false)
   {
     //-- Set Initial Values
     int    action       = Operation(RequestType);
@@ -1694,7 +1689,8 @@ double COrder::Price(SummaryType Type, int RequestType, double Requested, double
 
     Basis               = BoolToDouble(IsEqual(Basis,0.00),BoolToDouble(IsEqual(action,OP_BUY),Bid,Ask),Basis,Digits);
 
-    double requested    = fmax(0.00,Requested);
+    double requested    = BoolToDouble(IsEqual(fmax(0.00,Requested),0.00),0.00,BoolToDouble(InPips,Basis+(direction*point(Requested)),Requested));
+
     double stored       = BoolToDouble(IsBetween(action,OP_BUY,OP_SELL),BoolToDouble(IsEqual(Type,Profit),
                             Master[action].TakeProfit,Master[action].StopLoss),0.00,Digits);
     double calculated   = BoolToDouble(IsEqual(Type,Profit),
@@ -1862,16 +1858,13 @@ OrderDetail COrder::Ticket(int Ticket)
   {
     OrderDetail search;
     
-    for (int detail=0;detail<fmax(ArraySize(Master[OP_BUY].Order),ArraySize(Master[OP_SELL].Order));detail++)
-    {
-      if (detail<ArraySize(Master[OP_BUY].Order))
-        if (IsEqual(Master[OP_BUY].Order[detail].Ticket,Ticket))
-          return (Master[OP_BUY].Order[detail]);
+    for (int detail=0;detail<ArraySize(Master[OP_BUY].Order);detail++)
+      if (IsEqual(Master[OP_BUY].Order[detail].Ticket,Ticket))
+        return (Master[OP_BUY].Order[detail]);
 
-      if (detail<ArraySize(Master[OP_SELL].Order))
-        if (IsEqual(Master[OP_SELL].Order[detail].Ticket,Ticket))
-          return (Master[OP_SELL].Order[detail]);
-    }
+    for (int detail=0;detail<ArraySize(Master[OP_SELL].Order);detail++)
+      if (IsEqual(Master[OP_SELL].Order[detail].Ticket,Ticket))
+        return (Master[OP_SELL].Order[detail]);
 
     search.Ticket            = Ticket;
     search.Status            = Invalid;
@@ -1895,6 +1888,42 @@ OrderRequest COrder::Request(int Key, int Ticket=NoValue)
     search.Memo              = "Request not found: "+IntegerToString(Key,10,'-');
 
     return (search);
+  }
+
+//+------------------------------------------------------------------+
+//| GetGroup - Loads Ticket[] for the specified OrderGroup           |
+//+------------------------------------------------------------------+
+void COrder::GetGroup(int Action, OrderGroup Group, int &Ticket[], int Key=NoValue)
+  {
+    OrderSummary zone;
+    
+    if (IsBetween(Action,OP_BUY,OP_SELL))
+      switch (Group)
+      {
+        case ByZone:    GetZone(Action,Key,zone);
+                        ArrayCopy(Ticket,zone.Ticket);
+                        break;
+        case ByTicket:  if (Ticket(Key).Status<Invalid)
+                        {
+                          ArrayResize(Ticket,1,100);
+                          Ticket[0]    = Key;
+                        }
+                        break;
+        case ByAction:  ArrayCopy(Ticket,Master[Action].Summary[Net].Ticket);
+                        break;
+        case ByProfit:  ArrayCopy(Ticket,Master[Action].Summary[Profit].Ticket);
+                        break;
+        case ByLoss:    ArrayCopy(Ticket,Master[Action].Summary[Loss].Ticket);
+                        break;
+        case ByMethod:  for (int index=0;index<ArraySize(Master[Action].Order);index++)
+                          if (IsEqual(Master[Action].Order[index].Method,Key))
+                          {
+                            ArrayResize(Ticket,ArraySize(Ticket)+1,100);
+                            Ticket[ArraySize(Ticket)-1] = Master[Action].Order[index].Ticket;
+                          }
+      }
+
+
   }
 
 //+------------------------------------------------------------------+
@@ -1931,7 +1960,7 @@ int COrder::Zone(int Action, double Price=0.00)
 //+------------------------------------------------------------------+
 //| SetMethod - Set Order handling by Action/Method                  |
 //+------------------------------------------------------------------+
-void COrder::SetMethod(int Action, OrderMethod Method, TicketGroup Group, int Key=NoValue)
+void COrder::SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue)
   {
     OrderSummary zone;
     int          ticket[];
@@ -1976,42 +2005,74 @@ void COrder::SetMethod(int Action, OrderMethod Method, TicketGroup Group, int Ke
   }
 
 //+------------------------------------------------------------------+
-//| SetStopLoss - Sets order stops and hide restrictions             |
+//| SetDefaultStop - Set stop price, pip, hide defaults; reset stops |
 //+------------------------------------------------------------------+
-void COrder::SetStopLoss(int Action, double StopLoss, bool Hidden, bool Pips=false, bool FromClose=true)
+void COrder::SetDefaultStop(int Action, double Price, int Pips, bool Hide)
   {
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      if (Pips) //-- InPips
-        Master[Action].DefaultStop      = fmax(0.00,StopLoss);
-      else      //-- InPrice
-        Master[Action].StopLoss         = fmax(0.00,StopLoss);
+      Master[Action].DefaultStop                = fmax(0.00,Pips);
+      Master[Action].StopLoss                   = fmax(0.00,Price);
+      Master[Action].HideStop                   = Hide;
+    }
 
-      Master[Action].HideStop           = Hidden;
+    SetStopLoss(Action,ByAction,0,false);
+  }
 
-      for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
-        Master[Action].Order[detail].StopLoss   =
-          Price(Loss,Action,0,BoolToDouble(FromClose,0.00,Master[Action].Order[detail].Price));
+//+------------------------------------------------------------------+
+//| SetDefaultTarget - Set TP price, pip, hide defaults; reset TPs   |
+//+------------------------------------------------------------------+
+void COrder::SetDefaultTarget(int Action, double Price, int Pips, bool Hide)
+  {
+    if (IsBetween(Action,OP_BUY,OP_SELL))
+    {
+      Master[Action].DefaultTarget              = fmax(0.00,Pips);
+      Master[Action].TakeProfit                 = fmax(0.00,Price);
+      Master[Action].HideTarget                 = Hide;
+    }
+
+    SetTakeProfit(Action,ByAction,0,false);
+  }
+
+//+------------------------------------------------------------------+
+//| SetStopLoss - Sets order stops and hide restrictions             |
+//+------------------------------------------------------------------+
+void COrder::SetStopLoss(int Action, OrderGroup Group, double StopLoss, bool InPips, int Key=NoValue)
+  {
+    int ticket[];
+    
+    if (IsEqual(Group,ByTicket))
+      Action                                    = Ticket(Key).Action;
+    
+    if (IsBetween(Action,OP_BUY,OP_SELL))
+    {
+      GetGroup(Action,Group,ticket,Key);
+  
+      for (int index=0;index<ArraySize(ticket);index++)
+        for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
+          if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
+            Master[Action].Order[detail].StopLoss = Price(Loss,Action,StopLoss,0.00,InPips);
     }
   }
 
 //+------------------------------------------------------------------+
 //| SetTakeProfit - Sets order targets and hide restrictions         |
 //+------------------------------------------------------------------+
-void COrder::SetTakeProfit(int Action, double TakeProfit, bool Hidden, bool Pips=false, bool FromClose=true)
-  {    
+void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, bool InPips, int Key=NoValue)
+  {
+    int ticket[];
+    
+    if (IsEqual(Group,ByTicket))
+      Action                                    = Ticket(Key).Action;
+    
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      if (Pips) //-- InPips
-        Master[Action].DefaultTarget    = fmax(0.00,TakeProfit);
-      else      //-- InPrice
-        Master[Action].TakeProfit       = fmax(0.00,TakeProfit);
-
-      Master[Action].HideTarget         = Hidden;
-
-      for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
-        Master[Action].Order[detail].TakeProfit =
-          Price(Profit,Action,0,BoolToDouble(FromClose,0.00,Master[Action].Order[detail].Price));
+      GetGroup(Action,Group,ticket,Key);
+  
+      for (int index=0;index<ArraySize(ticket);index++)
+        for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
+          if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
+            Master[Action].Order[detail].TakeProfit = Price(Profit,Action,TakeProfit,0.00,InPips);
     }
   }
 

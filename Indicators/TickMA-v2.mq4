@@ -344,9 +344,9 @@ int OnCalculate(const int rates_total,
     RefreshScreen();
 
     //-- SMA NewLead
-    if (IsEqual(t.SMA().Event,NewLead))
-      Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
-            t.ActiveEventStr(),"LeadChange() Check");
+    //if (IsEqual(t.SMA().Event,NewLead))
+    //  Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
+    //        t.ActiveEventStr(),"LeadChange() Check");
 
     //if (t[NewBoundary])
     //if (t[NewLead])

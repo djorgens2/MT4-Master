@@ -56,21 +56,25 @@ void RefreshScreen(void)
     }
   }
 
-////+------------------------------------------------------------------+
-////| RefreshPanel - Updates control panel display                     |
-////+------------------------------------------------------------------+
-//void RefreshPanel(void)
-//  {
+//+------------------------------------------------------------------+
+//| RefreshPanel - Updates control panel display                     |
+//+------------------------------------------------------------------+
+void RefreshPanel(void)
+  {
 //    static FractalType fractal   = Prior;
-//    static int         winid     = NoValue;
-//    
-//    //-- Update Control Panel (Application)
-//    if (IsChanged(winid,ChartWindowFind(0,indSN)))
-//      order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
-//
+    static int         winid     = NoValue;
+    
+    //-- Update Control Panel (Application)
+    if (IsChanged(winid,ChartWindowFind(0,indSN)))
+    {
+      order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
+      UpdateLabel("lbvAC-File",inpComFile,clrGoldenrod);
+
+    }
+
 //    if (winid>NoValue)
 //    {
-//      //-- Update Control Panel (Session)
+//      -- Update Control Panel (Session)
 //      for (SessionType type=Daily;type<SessionTypes;type++)
 //        if (ObjectGet("bxhAI-Session"+EnumToString(type),OBJPROP_BGCOLOR)==clrBoxOff||s.Event(NewTerm)||s.Event(NewHour))
 //        {
@@ -88,8 +92,7 @@ void RefreshScreen(void)
 //      UpdateLabel("lbvOC-BUY-Manager",BoolToStr(IsEqual(master.Lead,Buyer),CharToStr(108)),clrGold,11,"Wingdings");
 //      UpdateLabel("lbvOC-SELL-Manager",BoolToStr(IsEqual(master.Lead,Seller),CharToStr(108)),clrGold,11,"Wingdings");
 //    }
-//  }
-//
+  }
 
 //+------------------------------------------------------------------+
 //| Execute                                                          |
@@ -97,9 +100,9 @@ void RefreshScreen(void)
 void Execute(void)
   {
     order.Update();
-    order.ExecuteOrders(OP_SELL);
-    order.ExecuteOrders(OP_BUY);
-    order.ExecuteRequests();
+    order.ProcessOrders(OP_SELL);
+    order.ProcessOrders(OP_BUY);
+    order.ProcessRequests();
   }
 
 //+------------------------------------------------------------------+
@@ -111,7 +114,7 @@ void OnTick()
     Execute();
 
     RefreshScreen();
-//    RefreshPanel();
+    RefreshPanel();
   }
 
 //+------------------------------------------------------------------+
@@ -131,8 +134,11 @@ void OrderConfig(void)
 
       //-- Order Config
       order.SetFundLimits(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.SetRiskLimits(action,inpMaxRisk,inpMaxMargin,inpLotFactor);
+      order.SetRiskLimits(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
       order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
+      order.SetDefaultStop(action,0.00,inpDefaultStop,false);
+      order.SetDefaultTarget(action,0.00,inpDefaultTarget,false);
+     
     }
   }
 

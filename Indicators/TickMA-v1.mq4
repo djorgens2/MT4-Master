@@ -270,7 +270,6 @@ void UpdateTickMA(void)
       UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
       UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
     }
-
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open);
@@ -343,6 +342,19 @@ int OnCalculate(const int rates_total,
     UpdateTickMA();
     UpdateSegment(rates_total!=prev_calculated);
     RefreshScreen();
+
+    //-- SMA NewLead
+    //if (IsEqual(t.SMA().Event,NewLead))
+    //  Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
+    //        t.ActiveEventStr(),"LeadChange() Check");
+
+    if (t[NewBoundary])
+    if (t[NewLead])
+      Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
+            t.ActiveEventStr(),"LeadChange() Check");
+            //BoolToStr(t[NewHigh],EnumToString(t.Alert(NewHigh))+" New High",
+            //BoolToStr(t[NewLow],EnumToString(t.Alert(NewLow))+" New Low",
+            //EnumToString(t.Alert(NewBoundary))+" New Boundary")),"NewBoundary() Check");
 
     return(rates_total);
   }
@@ -488,7 +500,7 @@ int OnInit()
       NewPriceLabel("crest-"+(string)node,0.00,true,indWinId);
       NewPriceLabel("trough-"+(string)node,0.00,true,indWinId);
     }
-      
+
     return(INIT_SUCCEEDED);
   }
 

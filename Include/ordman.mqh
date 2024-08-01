@@ -1,13 +1,21 @@
 //+------------------------------------------------------------------+
-//|                                                       manual.mqh |
-//|                        Copyright 2014, MetaQuotes Software Corp. |
-//|                                              http://www.mql5.com |
+//|                                                       ordman.mqh |
+//|                                 Copyright 2013, Dennis Jorgenson |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2013 (c) Dennis Jorgenson"
-#property link      "http://www.mql5.com"
 #property strict
 
 #include <Class/Order.mqh>
+
+//-- Record Defs
+struct GroupRec 
+       {
+        int        Action;
+        OrderGroup Group;
+        double     Price;
+        bool       InPips;
+        int        Key;
+       };
 
 //-- Operational vars
 string    params[];
@@ -15,6 +23,71 @@ string    commands[];
 string    comfile;
 
 long      fTime       = NoValue;
+
+//+------------------------------------------------------------------+
+//| ExtractGroup - returns group extracted from comline              |
+//+------------------------------------------------------------------+
+GroupRec ExtractGroup(void)
+  {
+    GroupRec group;
+
+    switch ((int)params[1][0])
+    {
+      case 66:  //-- (B) Buy
+      case 83:  //-- (S) Sell
+           group.Action    = ActionCode(params[1]);
+           group.Group     = ByAction;
+           group.InPips    = StringSubstr(params[2],StringLen(params[2])-1)=="P";
+           group.Price     = FormatPrice(group.Action,params[2],group.InPips);
+           group.Key       = NoValue;
+           break;
+
+      case 43:  //-- (+) Profit
+      case 45:  //-- (-) Loss
+           group.Action    = ActionCode(StringSubstr(params[1],1));
+           group.Group     = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
+           group.InPips    = StringSubstr(params[2],StringLen(params[2])-1,1)=="P";
+           group.Price     = FormatPrice(group.Action,params[2],group.InPips);
+           group.Key       = BoolToInt(group.Group==ByTicket,(int)StringSubstr(params[1],1,100),NoValue);
+           break;
+
+      case 84:  //-- (T) Ticket
+           group.Action    = NoAction;
+           group.Group     = ByTicket;
+           group.Key       = BoolToInt(group.Group==ByTicket,(int)StringSubstr(params[1],1,100),NoValue);
+           
+           if (OrderSelect(group.Key,SELECT_BY_TICKET,MODE_TRADES))
+           {
+             group.Action  = OrderType();
+             group.InPips  = StringSubstr(params[2],StringLen(params[2])-1,1)=="P";
+             group.Price   = FormatPrice(group.Action,params[2],group.InPips);
+           }
+           break;
+
+      case 90:  //-- (Z) Zone
+           group.Action    = ActionCode(StringSubstr(params[2],1));
+           group.Group     = ByZone;
+           group.InPips    = StringSubstr(params[3],StringLen(params[3])-1,1)=="P";
+           group.Price     = FormatPrice(group.Action,params[3],group.InPips);
+           group.Key       = (int)StringSubstr(params[1],1);
+           break;
+
+      default:  //-- (M) Method
+           group.Action    = NoValue;
+           group.Group     = NoValue;
+           group.Key       = MethodCode(params[1]);
+
+           if (group.Key>NoValue)
+           {
+             group.Group   = ByMethod;
+             group.Action  = ActionCode(StringSubstr(params[2],1));
+             group.InPips  = StringSubstr(params[3],StringLen(params[3])-1,1)=="P";
+             group.Price   = FormatPrice(group.Action,params[3],group.InPips);
+           }
+    }
+    
+    return group;
+  }
 
 //+------------------------------------------------------------------+
 //| ActionCode - returns order action id (buy/sell)                  |
@@ -52,21 +125,6 @@ OrderMethod MethodCode(string Method)
     if (InStr("HEDGE",Method))       return (Hedge);
     if (InStr("RECAPTURE",Method))   return (Recapture);
     if (InStr("CLOSEKILL",Method))   return (Kill);
-
-    return (NoValue);
-  }
-
-//+------------------------------------------------------------------+
-//| GroupCode - returns group code from command text                 |
-//+------------------------------------------------------------------+
-TicketGroup GroupCode(string Group)
-  {
-    if (trim(Group)=="ZONE")        return (ByZone);
-    if (trim(Group)=="TICKET")      return (ByTicket);
-    if (trim(Group)=="PROFIT")      return (ByProfit);
-    if (trim(Group)=="LOSS")        return (ByLoss);
-    if (trim(Group)=="ACTION")      return (ByAction);
-    if (trim(Group)=="METHOD")      return (ByMethod);
 
     return (NoValue);
   }
@@ -129,7 +187,7 @@ void FormatConfig(string &Config[])
 //+------------------------------------------------------------------+
 //| FormatPrice - Formats manual entered price from text             |
 //+------------------------------------------------------------------+
-double FormatPrice(int Action, string Price, bool Pips=false)
+double FormatPrice(int Action, string Price, bool InPips=false)
   {
     double pips     = 0.00;
     double price    = StringToDouble(Price);
@@ -158,7 +216,7 @@ double FormatPrice(int Action, string Price, bool Pips=false)
       }
     }
 
-    return BoolToDouble(Pips,pip(pips),price,Digits);
+    return BoolToDouble(InPips,pip(pips),price,Digits);
   }
   
 
@@ -242,7 +300,7 @@ void ProcessComFile(COrder &Order)
           //-- Print utilities
           if (params[0]=="HEDGE")
             if (fabs(Order[Net].Lots)>0)
-              Order.ExecuteHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+              Order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
             else
               Alert("Nothing to hedge");
           else
@@ -252,25 +310,28 @@ void ProcessComFile(COrder &Order)
               case 2:     if (InStr("REQUEST",params[1]))
                             Print(Order.QueueStr());
 
-                          if (InStr("SUMMARY",params[1]))
-                            Print(Order.SummaryStr());
-
                           if (InStr("ORDER",params[1]))
                             Print(Order.OrderStr());
 
                           if (InStr("LOG",params[1]))
                             Order.PrintLog();
-                          break;
-              case 3:     if (InStr("ORDER",params[1]))
-                            Print(Order.OrderStr(ActionCode(params[2])));
 
-                          if (InStr("MASTER",params[1]))
-                            Print(Order.MasterStr(ActionCode(params[2])));
+                          if (InStr("SUMMARY",params[1]))
+                            Print(Order.SummaryStr());
+                          break;
+
+              case 3:     if (InStr("REQUEST",params[1]))
+                            Print(Order.QueueStr(ActionCode(params[2])));
+
+                          if (InStr("ORDER",params[1]))
+                            Print(Order.OrderStr(ActionCode(params[2])));
 
                           if (InStr("LOG",params[1]))
                             Order.PrintLog((int)params[2]);
-            }
-          else
+
+                          if (InStr("MASTER",params[1]))
+                            Print(Order.MasterStr(ActionCode(params[2])));
+            }          else
 
           //-- Order Requests
           if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
@@ -361,14 +422,14 @@ void ProcessComFile(COrder &Order)
                         else
                         switch (ActionCode(params[1]))
                         {
-                          case OP_BUY:  request.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
-                                                            BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
+                          case OP_BUY:  request.Type      = BoolToInt(InStr("MITSTOP",params[2]),OP_BUYSTOP,
+                                                            BoolToInt(InStr("LIMIT",params[2]),OP_BUYLIMIT));
 
                                         Order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
                                         break;
                                                            
-                          case OP_SELL: request.Type     = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
-                                                           BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
+                          case OP_SELL: request.Type     = BoolToInt(InStr("MITSTOP",params[2]),OP_SELLSTOP,
+                                                           BoolToInt(InStr("LIMIT",params[2]),OP_SELLLIMIT));
 
                                         Order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
                                         break;
@@ -377,18 +438,26 @@ void ProcessComFile(COrder &Order)
           else
 
           //-- Default Configuration
-          if (InStr("STOPLOSSLTAKEPROFITPTARGETEQFUNDRISKZONE",params[0]))
+          if (InStr("STOPLOSSLTAKEPROFITARGETPEQFUNDRISKZONE",params[0]))
           {
             FormatConfig(params);
 
             //-- Risk Management
             if (InStr("STOPLOSSL",params[0]))
-              Order.SetStopLoss(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr("HIDDENHIDE",params[3]),InStr(params[2],"P"));
+            {
+              GroupRec grp = ExtractGroup();
+              if (IsBetween(grp.Action,OP_BUY,OP_SELL))
+                Order.SetStopLoss(grp.Action,grp.Group,grp.Price,grp.InPips,grp.Key);
+            }
             else
 
             //-- Target Management
-            if (InStr("TAKEPROFITPTARGET",params[0]))
-              Order.SetTakeProfit(ActionCode(params[1]),FormatPrice(ActionCode(params[1]),params[2],InStr(params[2],"P")),InStr("HIDDENHIDE",params[3]),InStr(params[2],"P"));
+            if (InStr("TAKEPROFITARGETP",params[0]))
+            {
+              GroupRec grp = ExtractGroup();
+              if (IsBetween(grp.Action,OP_BUY,OP_SELL))
+                Order.SetTakeProfit(grp.Action,grp.Group,grp.Price,grp.InPips,grp.Key);
+            }
             else
             
             //-- Fund Management
@@ -411,7 +480,7 @@ void ProcessComFile(COrder &Order)
           if (MethodCode(params[0])>NoValue)
           {
             FormatTrade(params);
-            Order.SetMethod(ActionCode(params[1]),MethodCode(params[0]),GroupCode(params[2]),(int)params[3]);
+            Order.SetMethod(ActionCode(params[1]),MethodCode(params[0]),ByMethod,(int)params[3]);
           }
         }
       }

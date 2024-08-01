@@ -25,15 +25,13 @@
 
 //--- Numeric format defines
 #define InInteger             0      //--- Double conversion to int
-#define InPoints              1      //--- Integer conversion to points
-#define InPips                2      //--- Double conversion to int+1
-#define InPercent             3      //--- Double conversion to int+1
-#define InDecimal             4      //--- Return in decimal, raw calculation
-#define InDollar              5      //--- Stated in dollars
-#define InEquity              6      //--- Stated as a percent of equity
-#define InDirection           7      //--- Stated as a Direction
-#define InAction              8      //--- Stated as an Action
-#define InState               9      //--- State definition
+#define InPercent             1      //--- Double conversion to int+1
+#define InDecimal             2      //--- Return in decimal, raw calculation
+#define InDollar              3      //--- Stated in dollars
+#define InEquity              4      //--- Stated as a percent of equity
+#define InDirection           5      //--- Stated as a Direction
+#define InAction              6      //--- Stated as an Action
+#define InState               7      //--- State definition
 
 //--- logical defines
 #define InTrueFalse          11      //--- Stated as True or False
@@ -115,7 +113,6 @@ enum SummaryType
        Profit,   //-- ** DO NOT MODIFY
        Total,    //--            
        Count,
-       Area,
        Highest,
        Lowest,
        SummaryTypes
