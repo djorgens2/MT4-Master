@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.mqh": "mq4",
+			"*.mq4": "cpp",
+			"*.mq5": "cpp"
+		},
+		"C_Cpp.default.includePath": [
+			"/home/djorgenson/.mt4/MQL4/Include"
+		],
+		"mql_tools.Metaeditor.Include4Dir": "/home/djorgenson/.mt4/MQL4",
+		"mql_tools.LogFile.NameLog": "/home/djorgenson/.mt4/MQL4/Logs/vscode.log",
+		"mql_tools.Metaeditor.Metaeditor4Dir": "/home/djorgenson/.mt4/dosdevices/c:/Program Files (x86)/MetaTrader 4/metaeditor.exe"
+	}
+}

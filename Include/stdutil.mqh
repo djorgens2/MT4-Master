@@ -516,9 +516,9 @@ void Append(string &Source, string Text, string Separator=" ")
 //+------------------------------------------------------------------+
 //| InStr - Returns true if pattern is found in source string        |
 //+------------------------------------------------------------------+
-bool InStr(string Source, string Search)
+bool InStr(string Source, string Search, int MinLen=1)
   {
-    if (Search!="")
+    if (StringLen(Search)>=MinLen)
       if (StringSubstr(Source,StringFind(Source,Search),StringLen(Search))==Search)
         return (true);
      

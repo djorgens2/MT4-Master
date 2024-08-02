@@ -283,7 +283,7 @@ public:
           void         ConsoleAlert(string Message, color Color=clrDarkGray) {UpdateLabel("lbvAC-SysMsg",Message,Color);};
 
           //-- Order properties
-          double       Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00, bool InPips=false);
+          double       Price(SummaryType Type, int Action, double Requested=0.00, double Basis=0.00, bool InPips=false);
           double       Forecast(int Action, double Equity, double Spread=0.00);
           double       LotSize(int Action, double Lots=0.00, double Margin=0.00);
 
@@ -506,12 +506,12 @@ void COrder::UpdatePanel(void)
                                                     BoolToInt(Master[action].TradeEnabled,clrLawnGreen,clrDarkGray));
         UpdateLabel("lbvOC-"+ActionText(action)+"-EqTarget",center(DoubleToStr(Master[action].EquityTarget,1)+"%",7),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-EqMin",center(DoubleToStr(Master[action].EquityMin,1)+"%",6),clrDarkGray,10);
-        UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action,0.00),Digits),9),clrDarkGray,10);
+        UpdateLabel("lbvOC-"+ActionText(action)+"-Target",center(DoubleToStr(Price(Profit,action),Digits),9),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-DfltTarget","Default "+DoubleToStr(Master[action].TakeProfit,Digits)+" ("+DoubleToStr(Master[action].DefaultTarget,1)+"p)",
                                                     Color(Master[action].TakeProfit+Master[action].DefaultTarget,IN_CHART_DIR),8);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MaxRisk",center(DoubleToStr(Master[action].MaxRisk,1)+"%",6),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MaxMargin",center(DoubleToStr(Master[action].MaxMargin,1)+"%",6),clrDarkGray,10);
-        UpdateLabel("lbvOC-"+ActionText(action)+"-Stop",center(DoubleToStr(Price(Loss,action,0.00),Digits),9),clrDarkGray,10);
+        UpdateLabel("lbvOC-"+ActionText(action)+"-Stop",center(DoubleToStr(Price(Loss,action),Digits),9),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-DfltStop","Default "+DoubleToStr(Master[action].StopLoss,Digits)+" ("+DoubleToStr(Master[action].DefaultStop,1)+"p)",
                                                     Color(Master[action].TakeProfit+Master[action].DefaultTarget,IN_CHART_DIR),8);
         UpdateLabel("lbvOC-"+ActionText(action)+"-EQBase",DoubleToStr(Account.NetProfit[action],0)+" ("+DoubleToStr(fdiv(Account.NetProfit[action],Account.Balance)*100,1)+"%)",clrDarkGray,10);
@@ -1680,10 +1680,10 @@ bool COrder::Enabled(OrderRequest &Request)
 //+------------------------------------------------------------------+
 //| Price - returns Stop(loss)|Profit prices by Action from Basis    |
 //+------------------------------------------------------------------+
-double COrder::Price(SummaryType Type, int RequestType, double Requested, double Basis=0.00, bool InPips=false)
+double COrder::Price(SummaryType Type, int Action, double Requested=0.00, double Basis=0.00, bool InPips=false)
   {
     //-- Set Initial Values
-    int    action       = Operation(RequestType);
+    int    action       = Operation(Action);
     int    direction    = BoolToInt(IsEqual(action,OP_BUY),DirectionUp,DirectionDown)
                             *BoolToInt(IsEqual(Type,Profit),DirectionUp,DirectionDown);
 
@@ -1962,46 +1962,16 @@ int COrder::Zone(int Action, double Price=0.00)
 //+------------------------------------------------------------------+
 void COrder::SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue)
   {
-    OrderSummary zone;
     int          ticket[];
     
-    if (IsEqual(Group,ByTicket))
-      if (Ticket(Key).Status<Invalid)
-        Action       = Ticket(Key).Action;
+    GetGroup(Action,Group,ticket,Key);
 
     if (IsBetween(Action,OP_BUY,OP_SELL))
-    {
-      switch (Group)
-      {
-        case ByZone:    GetZone(Action,Key,zone);
-                        ArrayCopy(ticket,zone.Ticket);
-                        break;
-        case ByTicket:  ArrayResize(ticket,1,100);
-                        ticket[0]    = Key;
-                        break;
-        case ByAction:  if (IsEqual(Method,Kill))
-                          Disable(Action,"User Requested Halt");
-                        else Master[Action].Method = Method;
-                        ArrayCopy(ticket,Master[Action].Summary[Net].Ticket);
-                        break;
-        case ByProfit:  ArrayCopy(ticket,Master[Action].Summary[Profit].Ticket);
-                        break;
-        case ByLoss:    ArrayCopy(ticket,Master[Action].Summary[Loss].Ticket);
-                        break;
-        case ByMethod:  for (int index=0;index<ArraySize(Master[Action].Order);index++)
-                          if (IsEqual(Master[Action].Order[index].Method,Key))
-                          {
-                            ArrayResize(ticket,ArraySize(ticket)+1,100);
-                            ticket[ArraySize(ticket)-1] = Key;
-                          }
-      }
-
       for (int index=0;index<ArraySize(ticket);index++)
         for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
           if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
-            Master[Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Full,Split),
-                                                                   BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Hold,Retain),Method));
-    }
+             Master[Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Full,Split),
+                                                                    BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Hold,Retain),Method));
   }
 
 //+------------------------------------------------------------------+
