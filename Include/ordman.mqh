@@ -10,72 +10,104 @@
 //-- Record Defs
 struct GroupRec 
        {
-        int        Action;
-        OrderGroup Group;
-        double     Price;
-        bool       InPips;
-        int        Key;
+        int           Action;
+        OrderGroup    Group;
+        double        Price;
+        bool          InPips;
+        int           Key;
+       };
+
+struct MethodRec
+       {
+         int          Action;
+         OrderGroup   Group;
+         int          Key;
        };
 
 //-- Operational vars
-string             params[];
-string             commands[];
-string             comfile;
-long               fTime  = NoValue;
+string                params[];
+string                commands[];
+string                comfile;
+long                  fTime  = NoValue;
 
 //+------------------------------------------------------------------+
 //| ExtractGroup - returns group extracted from comline              |
 //+------------------------------------------------------------------+
 GroupRec ParseGroup(void)
   {
-    GroupRec parser = {NoAction,NoValue,NoValue,false,NoValue};
+    GroupRec parser     = {NoAction,NoValue,NoValue,false,NoValue};
 
-    switch ((int)params[1][0])
+    parser.Action       = ActionCode(params[1]);
+    parser.InPips       = StringSubstr(params[2],StringLen(params[2])-1)=="P";
+    parser.Price        = FormatPrice(parser.Action,params[2],parser.InPips);
+    
+    if (IsBetween(parser.Action,OP_BUY,OP_SELL))
+      if (StringSubstr(params[3],0,1)=="Z")
+      {
+        parser.Group    = ByZone;
+        parser.Key      = (int)StringSubstr(params[3],1);
+      }
+      else
+      if (MethodCode(params[3])>NoValue)
+      {
+        parser.Group    = ByMethod;
+        parser.Key      = MethodCode(params[3]);
+      }      
+      else parser.Group = ByAction;
+    else
+    if (InStr("+-",StringSubstr(params[1],0,1),1))
     {
-      case 66:  //-- (B) Buy
-      case 83:  //-- (S) Sell
-           parser.Action    = ActionCode(params[1]);
-           parser.Group     = ByAction;
-           parser.InPips    = StringSubstr(params[2],StringLen(params[2])-1)=="P";
-           parser.Price     = FormatPrice(parser.Action,params[2],parser.InPips);
-           break;
-
-      case 43:  //-- (+) Profit
-      case 45:  //-- (-) Loss
-           parser.Action    = ActionCode(StringSubstr(params[1],1));
-           parser.Group     = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
-           parser.InPips    = StringSubstr(params[2],StringLen(params[2])-1)=="P";
-           parser.Price     = FormatPrice(parser.Action,params[2],parser.InPips);
-           break;
-
-      case 84:  //-- (T) Ticket
-           parser.Group     = ByTicket;
-           parser.InPips    = StringSubstr(params[2],StringLen(params[2])-1)=="P";
-           parser.Price     = FormatPrice(parser.Action,params[2],parser.InPips);
-           parser.Key       = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1,100),NoValue);
-           break;
-
-      case 90:  //-- (Z) Zone
-           parser.Action    = ActionCode(params[2]);
-           parser.Group     = ByZone;
-           parser.InPips    = StringSubstr(params[3],StringLen(params[3])-1)=="P";
-           parser.Price     = FormatPrice(parser.Action,params[3],parser.InPips);
-           parser.Key       = (int)StringSubstr(params[1],1);
-           break;
-
-      default:  //-- (M) Method
-           parser.Key       = MethodCode(params[1]);
-
-           if (parser.Key>NoValue)
-           {
-             parser.Action  = ActionCode(StringSubstr(params[2],1));
-             parser.Group   = ByMethod;
-             parser.InPips  = StringSubstr(params[3],StringLen(params[3])-1)=="P";
-             parser.Price   = FormatPrice(parser.Action,params[3],parser.InPips);
-           }
+      parser.Action     = ActionCode(StringSubstr(params[1],1));
+      parser.Group      = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
     }
-
+    else
+    if (StringSubstr(params[1],0,1)=="T")
+    {
+      parser.Group      = ByTicket;
+      parser.Key        = (int)StringSubstr(params[1],1);
+    }
+    
     Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+DoubleToStr(parser.Price,Digits)+":"+BoolToStr(parser.InPips,"InPips","InPrice")+":"+(string)parser.Key);
+    
+    return parser;
+  }
+
+//+------------------------------------------------------------------+
+//| ParseMethod - returns method extracted from comline              |
+//+------------------------------------------------------------------+
+MethodRec ParseMethod(void)
+  {
+    MethodRec parser = {NoAction,NoValue,NoValue};
+
+    parser.Action       = ActionCode(params[1]);
+
+    if (IsBetween(parser.Action,OP_BUY,OP_SELL))
+      if (StringSubstr(params[2],0,1)=="Z")
+      {
+        parser.Group    = ByZone;
+        parser.Key      = (int)StringSubstr(params[2],1);
+      }
+      else
+      if (MethodCode(params[2])>NoValue)
+      {
+        parser.Group    = ByMethod;
+        parser.Key      = MethodCode(params[2]);
+      }      
+      else parser.Group = ByAction;
+    else
+    if (InStr("+-",StringSubstr(params[1],0,1),1))
+    {
+      parser.Action     = ActionCode(StringSubstr(params[1],1));
+      parser.Group      = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
+    }
+    else
+    if (StringSubstr(params[1],0,1)=="T")
+    {
+      parser.Group      = ByTicket;
+      parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
+    }
+    
+    Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+(string)parser.Key);
     
     return parser;
   }
@@ -428,7 +460,8 @@ void ProcessComFile(COrder &Order)
           if (MethodCode(params[0])>NoValue)
           {
             FormatConfig(params);
-            Order.SetMethod(ActionCode(params[1]),MethodCode(params[0]),group.Group,group.Key);
+            MethodRec method = ParseMethod();
+            Order.SetMethod(method.Action,MethodCode(params[0]),method.Group,method.Key);
           }
           else
 
