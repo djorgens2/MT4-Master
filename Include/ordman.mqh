@@ -31,7 +31,7 @@ string                comfile;
 long                  fTime  = NoValue;
 
 //+------------------------------------------------------------------+
-//| ExtractGroup - returns group extracted from comline              |
+//| ParseGroup - returns group extracted from comline                |
 //+------------------------------------------------------------------+
 GroupRec ParseGroup(void)
   {
@@ -66,9 +66,7 @@ GroupRec ParseGroup(void)
       parser.Group      = ByTicket;
       parser.Key        = (int)StringSubstr(params[1],1);
     }
-    
-    Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+DoubleToStr(parser.Price,Digits)+":"+BoolToStr(parser.InPips,"InPips","InPrice")+":"+(string)parser.Key);
-    
+
     return parser;
   }
 
@@ -106,9 +104,7 @@ MethodRec ParseMethod(void)
       parser.Group      = ByTicket;
       parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
     }
-    
-    Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+(string)parser.Key);
-    
+
     return parser;
   }
 
