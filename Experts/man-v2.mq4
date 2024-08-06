@@ -49,29 +49,41 @@
 void RefreshScreen(void)
   {
     string text     = "";
-
-    if (inpShowComments==Yes)
-    {
-      Comment(text);
-    }
-  }
-
-//+------------------------------------------------------------------+
-//| RefreshPanel - Updates control panel display                     |
-//+------------------------------------------------------------------+
-void RefreshPanel(void)
-  {
-//    static FractalType fractal   = Prior;
     static int         winid     = NoValue;
     
     //-- Update Control Panel (Application)
     if (IsChanged(winid,ChartWindowFind(0,indSN)))
     {
+      //-- Update Panel
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
       UpdateLabel("lbvAC-File",inpComFile,clrGoldenrod);
+      
+      for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
+      {
+        UpdateLabel("lbvOQ-"+ActionText(action)+"-ShowTP",
+          CharToStr((uchar)BoolToInt(order.Config(action).HideTarget,251,252)),BoolToInt(order.Config(action).HideTarget,clrRed,clrLawnGreen),12,"Wingdings");
+
+        UpdateLabel("lbvOQ-"+ActionText(action)+"-ShowSL",
+          CharToStr((uchar)BoolToInt(order.Config(action).HideStop,251,252)),BoolToInt(order.Config(action).HideStop,clrRed,clrLawnGreen),12,"Wingdings");
+      }
+
+      //-- Hide non-Panel elements
+      UpdateLabel("pvEquity","",clrNONE,16);
+      UpdateLabel("pvBalance","",clrNONE,16);
+      UpdateLabel("pvMargin","",clrNONE,16);
 
     }
 
+    if (IsEqual(winid,NoValue))
+    {
+      UpdateLabel("pvBalance","$"+dollar(order.Metrics().Balance,11),clrLightGray,12,"Consolas");
+      UpdateLabel("pvProfitLoss","$"+dollar(order.Metrics().Equity,11),clrLightGray,12,"Consolas");
+      UpdateLabel("pvNetEquity","$"+dollar(order.Metrics().EquityBalance,11),clrLightGray,12,"Consolas");
+      UpdateLabel("pvEquity",DoubleToStr(order.Metrics().EquityClosed*100,1)+"%",Color(order[Net].Value),14,"Consolas");
+      UpdateLabel("pvMargin",DoubleToString(order.Metrics().Margin*100,1)+"%",Color(order[Net].Lots),14,"Consolas");
+
+      Comment(order.QueueStr()+order.OrderStr());
+    }
 //    if (winid>NoValue)
 //    {
 //      -- Update Control Panel (Session)
@@ -114,7 +126,18 @@ void OnTick()
     Execute();
 
     RefreshScreen();
-    RefreshPanel();
+  }
+
+//+------------------------------------------------------------------+
+//| PanelConfig Sets up display alternative CPanel                   |
+//+------------------------------------------------------------------+
+void PanelConfig(void)
+  {
+    NewLabel("pvBalance","",80,10,clrLightGray,SCREEN_UR);
+    NewLabel("pvProfitLoss","",80,26,clrLightGray,SCREEN_UR);
+    NewLabel("pvNetEquity","",80,42,clrLightGray,SCREEN_UR);
+    NewLabel("pvEquity","",10,10,clrLightGray,SCREEN_UR);
+    NewLabel("pvMargin","",10,40,clrLightGray,SCREEN_UR);
   }
 
 //+------------------------------------------------------------------+
@@ -138,7 +161,6 @@ void OrderConfig(void)
       order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
       order.SetDefaultStop(action,0.00,inpDefaultStop,false);
       order.SetDefaultTarget(action,0.00,inpDefaultTarget,false);
-     
     }
   }
 
@@ -147,6 +169,7 @@ void OrderConfig(void)
 //+------------------------------------------------------------------+
 int OnInit()
   {
+    PanelConfig();
     OrderConfig();
     ManualConfig(inpComFile);
 

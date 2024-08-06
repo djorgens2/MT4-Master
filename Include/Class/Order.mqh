@@ -190,7 +190,6 @@ private:
                         bool           TradeEnabled;          //-- Enables/Disables trading by Action
                         OrderMethod    Method;                //-- Order Processing Method by Action
                         //-- Profit Management
-                        bool           EquityHold;            //-- Temporary Equity Hold by Action
                         double         EquityTarget;          //-- Principal equity target
                         double         EquityMin;             //-- Minimum profit target
                         //-- Risk Management
@@ -265,10 +264,10 @@ public:
                       ~COrder();
 
           //-- Order Operational Control methods
-          void         Update(double BaseCurrency=1.0);              //-- Update Order Statistics, Display, Manage Logs
-          void         ProcessRequests(void);                        //-- Process pending orders in the Request Queue
-          void         ProcessOrders(int Action, bool Hold=Off);     //-- Manage open orders by Action Type
-          void         ProcessHedge(string Requestor);               //-- Hedges on Market (Immediate)
+          void         Update(double BaseCurrency=1.0);         //-- Update Order Statistics, Display, Manage Logs
+          void         ProcessRequests(void);                   //-- Process pending orders in the Request Queue
+          void         ProcessOrders(int Action);               //-- Manage open orders by Action Type
+          void         ProcessHedge(string Requestor);          //-- Hedges on Market (Immediate)
 
           bool         Enabled(int Action);
           bool         Enabled(OrderRequest &Request);
@@ -322,11 +321,13 @@ public:
           bool         IsEqual(QueueStatus &Compare, QueueStatus Value) {return Compare==Value;};
 
           //-- Order Property Fetch Methods
-          OrderRequest BlankRequest(string Requestor);
-          OrderRequest Request(int Key, int Ticket=NoValue);
-          OrderDetail  Ticket(int Ticket);
-          OrderSummary Recap(int Action, SummaryType Type)   {return(Master[Action].Summary[Type]);};
-          OrderSummary Entry(int Action)                     {return(Master[Action].Entry);};
+          OrderRequest   BlankRequest(string Requestor);
+          OrderRequest   Request(int Key, int Ticket=NoValue);
+          OrderDetail    Ticket(int Ticket);
+          OrderSummary   Recap(int Action, SummaryType Type)   {return(Master[Action].Summary[Type]);};
+          OrderSummary   Entry(int Action)                     {return(Master[Action].Entry);};
+          OrderMaster    Config(int Action) {return Master[Action];};
+          AccountMetrics Metrics(void)      {return Account;};
 
           void         GetGroup(int Action, OrderGroup Group, int &Tickets[], int Key=NoValue);
           void         GetZone(int Action, int Zone, OrderSummary &Node);
@@ -425,7 +426,6 @@ void COrder::InitMaster(int Action, OrderMethod Method)
   {
     Master[Action].Method          = Method;
     Master[Action].TradeEnabled    = true;
-    Master[Action].EquityHold      = false;    
     Master[Action].EquityTarget    = 0.00;
     Master[Action].EquityMin       = 0.00;
     Master[Action].MaxRisk         = 0.00;
@@ -565,10 +565,8 @@ void COrder::UpdatePanel(void)
             OrderDetail detail = Ticket(Master[action].Zone[node].Ticket[ticket]);
           
             UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Ticket",IntegerToString(detail.Ticket,10,'-'),clrDarkGray,9,"Consolas");
-            UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-State",BoolToStr(IsEqual(detail.Status,Working),
-                         BoolToStr(Master[action].EquityHold,CharToStr(149)+"Hold",
-                         BoolToStr(IsEqual(detail.Method,Hold),CharToStr(176)+"Hold",EnumToString(detail.Method))),EnumToString(detail.Status)),
-                         BoolToInt(Master[action].EquityHold,clrYellow,clrDarkGray),9,"Consolas");
+            UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-State",BoolToStr(IsEqual(detail.Status,Working),EnumToString(detail.Method),EnumToString(detail.Status)),
+                                                                         BoolToInt(IsEqual(detail.Method,Hold),clrWhite,clrDarkGray),9,"Consolas");
             UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Price",DoubleToStr(detail.Price,Digits),clrDarkGray,9,"Consolas");
             UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-Lots",DoubleToStr(detail.Lots,Account.LotPrecision),clrDarkGray,9,"Consolas");
             UpdateLabel("lbvOQ-"+ActionText(action)+(string)row+"-TP",DoubleToStr(detail.TakeProfit,Digits),clrDarkGray,9,"Consolas");
@@ -1434,10 +1432,6 @@ void COrder::ProcessProfits(int Action)
     double netDCA        = 0.00;
     double netRecapture  = 0.00;
 
-    //-- Early exit on Equity Hold
-    if (Master[Action].EquityHold)
-      return;
-      
     //-- Calculate Profit Taking types
     for (int ticket=0;ticket<ArraySize(Master[Action].Summary[Net].Ticket);ticket++)
     {
@@ -1602,10 +1596,8 @@ void COrder::Update(double BaseCurrency=1.0)
 //+------------------------------------------------------------------+
 //| ProcessOrders - Updates/Closes orders by Action                  |
 //+------------------------------------------------------------------+
-void COrder::ProcessOrders(int Action, bool Hold=Off)
+void COrder::ProcessOrders(int Action)
   {
-    Master[Action].EquityHold              = Hold;
-
     //-- Set stops/targets
     for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
       UpdateOrder(Master[Action].Order[detail],Working);
@@ -1627,17 +1619,10 @@ void COrder::ProcessHedge(string Requestor)
 
     if (fabs(Summary[Net].Lots)>0.00)
     {
-      request.Action           = Action(Summary[Net].Lots);
-      request.Type             = Action(Summary[Net].Lots);
+      request.Action           = Action(Summary[Net].Lots,InDirection,InContrarian);
+      request.Type             = Action(Summary[Net].Lots,InDirection,InContrarian);
       request.Lots             = fabs(Summary[Net].Lots);
-      // request.TakeProfit       = BoolToDouble(InStr(params[4],"P"),request.Price+
-      //                               point(StringToDouble(StringSubstr(params[4],0,StringLen(params[4])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),1,NoValue),
-      //                               FormatPrice(request.Action,params[4]));
-      // request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
-      //                               point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
-      //                               FormatPrice(request.Action,params[5]));
       request.Memo             = "Hedge";
-      // request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
 
       if (Submitted(request))
         Print(RequestStr(request));
@@ -1964,44 +1949,54 @@ void COrder::SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key
   {
     int          ticket[];
     
-    GetGroup(Action,Group,ticket,Key);
+    if (IsEqual(Group,ByTicket))
+      Action                                    = Ticket(Key).Action;
 
     if (IsBetween(Action,OP_BUY,OP_SELL))
+    {
+      if (Group==ByAction)
+        Master[Action].Method                   = Method;
+
+      GetGroup(Action,Group,ticket,Key);
+
       for (int index=0;index<ArraySize(ticket);index++)
         for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
           if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
-             Master[Action].Order[detail].Method     = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Full,Split),
-                                                                    BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Hold,Retain),Method));
+             Master[Action].Order[detail].Method   = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Full,Split),
+                                                                  BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Hold,Retain),Method));
+    }
   }
 
 //+------------------------------------------------------------------+
-//| SetDefaultStop - Set stop price, pip, hide defaults; reset stops |
+//| SetDefaultStop - Set Stop price, defaullt pip, hide property     |
 //+------------------------------------------------------------------+
 void COrder::SetDefaultStop(int Action, double Price, int Pips, bool Hide)
   {
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      Master[Action].DefaultStop                = fmax(0.00,Pips);
-      Master[Action].StopLoss                   = fmax(0.00,Price);
-      Master[Action].HideStop                   = Hide;
-    }
+      if (Pips>NoValue)   Master[Action].DefaultStop      = Pips;
+      if (Price>NoValue)  Master[Action].StopLoss         = Price;
 
-    SetStopLoss(Action,ByAction,0,false);
+      if (IsChanged(Master[Action].HideStop,Hide))
+        UpdateLabel("lbvOQ-"+ActionText(Action)+"-ShowSL",
+          CharToStr((uchar)BoolToInt(Hide,251,252)),BoolToInt(Hide,clrRed,clrLawnGreen),12,"Wingdings");
+    }
   }
 
 //+------------------------------------------------------------------+
-//| SetDefaultTarget - Set TP price, pip, hide defaults; reset TPs   |
+//| SetDefaultTarget - Set Target price, default pip, hide property  |
 //+------------------------------------------------------------------+
 void COrder::SetDefaultTarget(int Action, double Price, int Pips, bool Hide)
   {
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      Master[Action].DefaultTarget              = fmax(0.00,Pips);
-      Master[Action].TakeProfit                 = fmax(0.00,Price);
-      Master[Action].HideTarget                 = Hide;
-    }
+      if (Pips>NoValue)   Master[Action].DefaultTarget    = Pips;
+      if (Price>NoValue)  Master[Action].TakeProfit       = Price;
 
-    SetTakeProfit(Action,ByAction,0,false);
+      if (IsChanged(Master[Action].HideTarget,Hide))
+        UpdateLabel("lbvOQ-"+ActionText(Action)+"-ShowTP",
+          CharToStr((uchar)BoolToInt(Hide,251,252)),BoolToInt(Hide,clrRed,clrLawnGreen),12,"Wingdings");
+    }
   }
 
 //+------------------------------------------------------------------+

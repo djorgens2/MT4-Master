@@ -544,11 +544,16 @@ int OnInit()
           NewLabel("lbvOQ-"+ActionText(col)+"-State","State",760,176+(col*146),clrGold,SCREEN_UL,indWinId);
           NewLabel("lbvOQ-"+ActionText(col)+"-Price","Open",840,176+(col*146),clrGold,SCREEN_UL,indWinId);
           NewLabel("lbvOQ-"+ActionText(col)+"-Lots","Lots",906,176+(col*146),clrGold,SCREEN_UL,indWinId);
-          NewLabel("lbvOQ-"+ActionText(col)+"-Target","Target",966,176+(col*146),clrGold,SCREEN_UL,indWinId);
-          NewLabel("lbvOQ-"+ActionText(col)+"-Stop","Stop",1026,176+(col*146),clrGold,SCREEN_UL,indWinId);
+          NewLabel("lbvOQ-"+ActionText(col)+"-ShowTP","X",966,176+(col*146),clrGold,SCREEN_UL,indWinId);
+          NewLabel("lbvOQ-"+ActionText(col)+"-Target","Target",980,176+(col*146),clrGold,SCREEN_UL,indWinId);
+          NewLabel("lbvOQ-"+ActionText(col)+"-ShowSL","X",1026,176+(col*146),clrGold,SCREEN_UL,indWinId);
+          NewLabel("lbvOQ-"+ActionText(col)+"-Stop","Stop",1040,176+(col*146),clrGold,SCREEN_UL,indWinId);
           NewLabel("lbvOQ-"+ActionText(col)+"-Profit","----- Profit -----",1090,176+(col*146),clrGold,SCREEN_UL,indWinId);
           NewLabel("lbvOQ-"+ActionText(col)+"-Swap","----- Swap ----",1170,176+(col*146),clrGold,SCREEN_UL,indWinId);
           NewLabel("lbvOQ-"+ActionText(col)+"-Net","----- Net -----",1252,176+(col*146),clrGold,SCREEN_UL,indWinId);
+          
+          UpdateLabel("lbvOQ-"+ActionText(col)+"-ShowTP",CharToStr(251),clrRed,12,"Wingdings");
+          UpdateLabel("lbvOQ-"+ActionText(col)+"-ShowSL",CharToStr(252),clrLawnGreen,12,"Wingdings");
         }
 
         NewLabel("lbvOZ-"+ActionText(col)+(string)row+"Z","",370,(180+(col*146))+(11*(row+1)),clrDarkGray,SCREEN_UL,indWinId);
