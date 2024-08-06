@@ -68,9 +68,11 @@ void RefreshScreen(void)
       }
 
       //-- Hide non-Panel elements
-      UpdateLabel("pvEquity","",clrNONE,16);
-      UpdateLabel("pvBalance","",clrNONE,16);
-      UpdateLabel("pvMargin","",clrNONE,16);
+      UpdateLabel("pvBalance","",clrNONE,1);
+      UpdateLabel("pvProfitLoss","",clrNONE,1);
+      UpdateLabel("pvNetEquity","",clrNONE,1);
+      UpdateLabel("pvEquity","",clrNONE,1);
+      UpdateLabel("pvMargin","",clrNONE,1);
 
     }
 
