@@ -26,7 +26,8 @@ void OnStart()
     DrawBox("frCharset",660,5,655,430,C'0,12,24',BORDER_FLAT,SCREEN_UR,0);
     for (int chr=0;chr<255;chr++)
     {
-      NewLabel("lbh"+Charset+":"+string(chr),string(chr)+":",630-((chr/32)*80),36+((int)fmod(chr,32)*12),clrDarkGray,SCREEN_UR);
-      NewLabel("lbv"+Charset+":"+string(chr),CharToStr((uchar)chr),605-((chr/32)*80),36+((int)fmod(chr,32)*12),clrDarkGray,SCREEN_UR);
+      NewLabel("lbh"+string(chr),string(chr)+":",630-((chr/32)*80),36+((int)fmod(chr,32)*12),clrDarkGray,SCREEN_UR);
+      NewLabel("lbv"+string(chr),CharToStr((uchar)chr),605-((chr/32)*80),36+((int)fmod(chr,32)*12),clrDarkGray,SCREEN_UR);
+      UpdateLabel("lbv"+string(chr),CharToStr((uchar)chr),clrDarkGray,8,Charset);
     }
   }

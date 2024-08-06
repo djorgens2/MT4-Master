@@ -249,7 +249,6 @@ int Operation(int Action, bool Contrarian=false)
 //+------------------------------------------------------------------+
 int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
   {
-    const int dInverseState   = 3;
     int       dContrarian     = BoolToInt(Contrarian,-1,1);
     
     switch (ValueType)
@@ -277,7 +276,6 @@ int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
 //+------------------------------------------------------------------+
 int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
   {
-    const int dInverseState   = 3;
     int       dContrarian     = BoolToInt(Contrarian,-1,1);
     
     switch (ValueType)

@@ -20,6 +20,7 @@ struct GroupRec
 struct MethodRec
        {
          int          Action;
+         OrderMethod  Method;
          OrderGroup   Group;
          int          Key;
        };
@@ -31,6 +32,7 @@ string                comfile;
 long                  fTime  = NoValue;
 
 //+------------------------------------------------------------------+
+//| ParseGroup - returns group extracted from comline                |
 //| ParseGroup - returns group extracted from comline                |
 //+------------------------------------------------------------------+
 GroupRec ParseGroup(void)
@@ -75,9 +77,10 @@ GroupRec ParseGroup(void)
 //+------------------------------------------------------------------+
 MethodRec ParseMethod(void)
   {
-    MethodRec parser = {NoAction,NoValue,NoValue};
+    MethodRec parser = {NoAction,NoValue,NoValue,NoValue};
 
     parser.Action       = ActionCode(params[1]);
+    parser.Method       = MethodCode(params[0]);
 
     if (IsBetween(parser.Action,OP_BUY,OP_SELL))
       if (StringSubstr(params[2],0,1)=="Z")
@@ -187,28 +190,12 @@ double FormatPrice(int Action, string Price, bool OutPips=false)
     if (StringSubstr(Price,StringLen(Price)-1,1)=="P")
     {
       pips          = point(StringToDouble(StringSubstr(Price,0,StringLen(Price)-1)));
-
-      switch (Action)
-      {
-        case OP_SELLLIMIT:
-        case OP_SELL:       price = Bid+pips;
-                            break;
-
-        case OP_BUYLIMIT:
-        case OP_BUY:        price = Ask-pips;
-                            break;
-
-        case OP_BUYSTOP:    price = Ask+pips;
-                            break;
-
-        case OP_SELLSTOP:   price = Bid-pips;
-      }
+      price         = BoolToDouble(Action==OP_BUY,Ask+pips,Bid+pips,Digits);
     }
 
     return BoolToDouble(OutPips,pip(pips),price,Digits);
   }
   
-
 //+------------------------------------------------------------------+
 //| ProcessComFile - retrieves and submits manual commands           |
 //+------------------------------------------------------------------+
@@ -276,6 +263,7 @@ void ProcessComFile(COrder &Order)
 
         fRecord = "";
         pCount  = ArraySize(params);
+
         for (int i=0;i<pCount;i++)
           Append(fRecord,params[i],"|");
 
@@ -286,18 +274,12 @@ void ProcessComFile(COrder &Order)
         }
         else
         if (verify)
-          go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
+          go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command ["+(string)pCount+"]: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
 
         //--- Verify Mode
         if (go)
         {
           //-- Print utilities
-          if (params[0]=="HEDGE")
-            if (fabs(Order[Net].Lots)>0)
-              Order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
-            else
-              Alert("Nothing to hedge");
-          else
           if (params[0]=="PRINT")
             switch (pCount)
             {
@@ -328,6 +310,27 @@ void ProcessComFile(COrder &Order)
             }
           else
 
+          //-- Hide Stops/TPs
+          if (params[0]=="HIDE"||params[0]=="SHOW")
+          {
+            FormatConfig(params);
+
+            if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+            {
+              if (pCount<3||InStr("STOPLOSSL",params[2],2)) Order.SetDefaultStop(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+              if (pCount<3||InStr("TAKEPROFITP",params[2],2)) Order.SetDefaultTarget(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+            }
+          }
+          else
+
+          //-- Hedge Requests
+          if (params[0]=="HEDGE")
+            if (fabs(Order[Net].Lots)>0)
+              Order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+            else
+              Alert("Nothing to hedge");
+          else
+
           //-- Order Requests
           if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
           {
@@ -338,14 +341,13 @@ void ProcessComFile(COrder &Order)
             request.Price            = FormatPrice(request.Action,params[2]);
             request.Type             = ActionCode(params[0],request.Price);
             request.Lots             = StringToDouble(params[1]);
-            request.TakeProfit       = BoolToDouble(InStr(params[4],"P"),request.Price+
-                                          point(StringToDouble(StringSubstr(params[4],0,StringLen(params[4])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),1,NoValue),
-                                          FormatPrice(request.Action,params[4]));
-            request.StopLoss         = BoolToDouble(InStr(params[5],"P"),request.Price+
-                                          point(StringToDouble(StringSubstr(params[5],0,StringLen(params[5])-1)))*BoolToInt(IsEqual(request.Action,OP_BUY),NoValue,1),
-                                          FormatPrice(request.Action,params[5]));
+            request.TakeProfit       = Order.Price(Profit,request.Action,FormatPrice(request.Action,params[4],InStr(params[4],"P")),request.Price,InStr(params[4],"P"));
+            request.StopLoss         = Order.Price(Loss,request.Action,FormatPrice(request.Action,params[5],InStr(params[5],"P")),request.Price,InStr(params[5],"P"));
             request.Memo             = params[3];
-            request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),TimeCurrent()+(Period()*60));
+            request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),
+                                         BoolToDate(StringSubstr(params[6],0,1)=="H",TimeCurrent()+(Period()*60*(int)StringSubstr(params[6],1)),
+                                         BoolToDate(StringSubstr(params[6],0,1)=="D",TimeCurrent()+(Period()*60*24*(int)StringSubstr(params[6],1)),
+                                         TimeCurrent()+(Period()*60))));
             
             switch (ActionCode(params[7]))
             {
@@ -457,7 +459,7 @@ void ProcessComFile(COrder &Order)
           {
             FormatConfig(params);
             MethodRec method = ParseMethod();
-            Order.SetMethod(method.Action,MethodCode(params[0]),method.Group,method.Key);
+            Order.SetMethod(method.Action,method.Method,method.Group,method.Key);
           }
           else
 
