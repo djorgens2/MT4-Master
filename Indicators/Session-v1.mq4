@@ -165,9 +165,6 @@ int OnCalculate(const int rates_total,
     s.Update(indPriorBuffer,indOffBuffer);
     s.Fractal(indFractalBuffer);
 
-    UpdateDirection(sObjectStr+"lbS_Direction:Bias",Direction(s[ActiveSession].Lead,InAction),
-                      BoolToInt(s[ActiveSession].Bias==s[ActiveSession].Lead,
-                      Color(Direction(s[ActiveSession].Bias,InAction)),clrDarkGray),24);
     RefreshScreen();
 
     return(rates_total);
