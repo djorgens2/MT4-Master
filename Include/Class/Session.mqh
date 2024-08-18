@@ -232,7 +232,6 @@ void CSession::UpdatePanel(void)
     if (Event(NewFibonacci))
       pivot                   = (FractalType)BoolToInt(Event(NewFibonacci,Critical),Origin,
                                              BoolToInt(Event(NewFibonacci,Major),Trend,Term));
-
     if (indWinId>NoValue)
     {
       if (IsEqual(sType,Daily))

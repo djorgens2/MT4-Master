@@ -163,12 +163,7 @@ void RefreshScreen(void)
         UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[pivot].Fractal[point],-7);
     }
 
-    //-- Fractal
-//          Correction
-//       Term Breakout
-//Correction      .
-//Term Breakout   .
-
+    //-- Fractal Box
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
     UpdateDirection("tmaFractalTermDir"+(string)indWinId,t[Term].Direction,Color(t[Term].Direction),32);
     UpdateLabel("tmaFractalTrendState"+(string)indWinId,rpad(EnumToString(t[Trend].State)," ",20),Color(t[Trend].Direction),12,"Noto Sans Mono CJK HK");

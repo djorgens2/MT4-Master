@@ -90,7 +90,7 @@ protected:
                      FibonacciTypes
                    };             
 
-  //-- Pivot Record
+  //-- Bar Record
   struct BarRec
          {
            int           Bar;                      //-- Bar matching visible Chart Bar
@@ -160,7 +160,7 @@ private:
          string          fObjectStr;
          FractalType     fShowFlags;
 
-         bool            NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=false);
+         bool            FibonacciChanged(FractalType Type, FractalRec &Fractal);
 
          void            InitPivot(PivotRec &Pivot, EventLog &Log);
          void            InitFractal(void);
@@ -193,6 +193,7 @@ public:
         AlertType        Alert(FractalType Type);
         FractalState     State(EventType Event);
         FibonacciType    Level(double Percent);
+        PivotRec         Pivot(FractalType Type) {return frec[Type].Pivot;};
 
         BarRec           Price(int Bar);
         double           Price(FibonacciType Level, FractalType Type, FractalState Method);
@@ -241,9 +242,9 @@ void CFractal::Flag(FractalType Type, bool FlagEvent=false)
   }
 
 //+------------------------------------------------------------------+
-//| NewState - Returns true on detected change of Fibonacci State    |
+//| FibonacciChanged - Returns true on change to Fibonacci State     |
 //+------------------------------------------------------------------+
-bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=false)
+bool CFractal::FibonacciChanged(FractalType Type, FractalRec &Fractal)
   {
     if (IsBetween(Fractal.Extension.Event,NewRally,NewExtension))
     {
@@ -253,7 +254,6 @@ bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=fal
       Fractal.Event        = Fractal.Extension.Event;
       Fractal.Pivot.Price  = Fractal.Extension.Price;
       
-      if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Extension|"+FractalStr(Trend));
       return true;
     }
 
@@ -265,7 +265,6 @@ bool CFractal::NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=fal
       Fractal.Event        = Fractal.Retrace.Event;
       Fractal.Pivot.Price  = Fractal.Retrace.Price;
 
-      if (PrintLog) Print("|"+TimeToStr(fPrice.Time)+"|Retrace|"+FractalStr(Trend));
       return true;
     }
 
@@ -450,8 +449,6 @@ void CFractal::UpdatePivot(FractalType Type, PivotRec &Pivot)
     if (IsLower(fPrice.Close,Pivot.Low))
       if (ActionChanged(Pivot.Lead,OP_SELL))
         Pivot.Event  = NewLead;
-
-    SetEvent(Pivot.Event,Alert(Type),fPrice.Close);
   }
 
 //+------------------------------------------------------------------+
@@ -545,10 +542,9 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
     if (Event(NewLead,Alert(Type)))
       SetEvent(BoolToEvent(IsEqual(frec[Type].Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)),NewConvergence,NewDivergence),Alert(Type),fPrice.Close);
 
-    if (NewState(Type,frec[Type]))
+    if (FibonacciChanged(Type,frec[Type]))
     {
       SetEvent(NewFibonacci,Alert(Type),frec[Type].Pivot.Price);
-      SetEvent(frec[Type].Event,Alert(Type),frec[Type].Pivot.Price);
 
       InitPivot(frec[Type].Pivot,LastEvent());
       Flag(Type,Type==fShowFlags);
