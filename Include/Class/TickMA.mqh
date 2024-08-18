@@ -8,7 +8,7 @@
 #property version   "2.00"
 #property strict
 
-#include <Class\Fractal.mqh>
+#include <Class/Fractal.mqh>
 
 #define Fast           2
 #define Slow           3
@@ -305,14 +305,14 @@ void CTickMA::UpdateTick(void)
 void CTickMA::UpdateSegment(void)
   {
     if (Count(Ticks)>1)
-      if (NewDirection(tmaDirection[Lead],Direction(tr[0].Open-tr[1].Close)))
+      if (DirectionChanged(tmaDirection[Lead],Direction(tr[0].Open-tr[1].Close)))
         NewSegment();
 
     if (IsHigher(tr[0].High,sr[0].High))
     {
       if (Count(Segments)>1)
         if (IsHigher(sr[0].High,sr[1].High,NoUpdate,Digits))
-          if (NewDirection(tmaDirection[Term],DirectionUp))
+          if (DirectionChanged(tmaDirection[Term],DirectionUp))
           {
             seg.Support      = seg.Active;
             seg.Active       = sr[0].High;
@@ -331,7 +331,7 @@ void CTickMA::UpdateSegment(void)
     {
       if (Count(Segments)>1)
         if (IsLower(sr[0].Low,sr[1].Low,NoUpdate,Digits))
-          if (NewDirection(tmaDirection[Term],DirectionDown))
+          if (DirectionChanged(tmaDirection[Term],DirectionDown))
           {
             seg.Resistance   = seg.Active;
             seg.Active       = sr[0].Low;
@@ -346,7 +346,7 @@ void CTickMA::UpdateSegment(void)
       SetEvent(NewBoundary,Nominal);
     }
 
-    if (NewDirection(sr[0].Direction[Term],tmaDirection[Term]))
+    if (DirectionChanged(sr[0].Direction[Term],tmaDirection[Term]))
       SetEvent(NewLead,Nominal);
 
     if (!IsBetween(seg.Active,seg.Support,seg.Resistance,Digits))
@@ -356,7 +356,7 @@ void CTickMA::UpdateSegment(void)
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
     
-    SetEvent(BoolToEvent(NewAction(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
+    SetEvent(BoolToEvent(ActionChanged(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
 
     sr[0].Event            = BoolToEvent(Event(NewLead),               NewLead,
                              BoolToEvent(Event(NewRally,Nominal),      NewRally,
@@ -408,7 +408,7 @@ void CTickMA::UpdateRange(void)
     }
 
     if (Event(NewBoundary,Minor))
-      if (NewDirection(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
+      if (DirectionChanged(range.Direction,BoolToInt(Event(NewHigh),DirectionUp,DirectionDown)))
         SetEvent(NewDirection,Minor);
 
     range.Event           = BoolToEvent(Event(NewDirection,Minor),    NewDirection,
@@ -445,7 +445,7 @@ void CTickMA::UpdateSMA(void)
     //-- Handle convergences
     if (IsEqual(dirHigh,dirLow))
     {
-      if (NewDirection(sma.Direction,dirHigh))
+      if (DirectionChanged(sma.Direction,dirHigh))
         SetEvent(NewDirection,Nominal);
 
       event          = NewChannel;
@@ -478,7 +478,7 @@ void CTickMA::UpdateSMA(void)
     else
 
     //-- Handle Lead Changes
-    if (NewAction(sma.Lead,BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].High,Digits)>sma.High[0],OP_BUY,
+    if (ActionChanged(sma.Lead,BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].High,Digits)>sma.High[0],OP_BUY,
                            BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].Low,Digits)<sma.Low[0],OP_SELL,NoAction))))
     {
       sma.Event      = NewLead;
@@ -515,7 +515,7 @@ void CTickMA::UpdateLinear(void)
           SetEvent(AdverseEvent,Critical);
 
       //-- Linear Directional Slope Change (Lead-Prior Node)
-      if (NewDirection(line.Direction,Direction(line.FOC[Now])))
+      if (DirectionChanged(line.Direction,Direction(line.FOC[Now])))
       {
         maxFOC              = NoValue;
         line.Event          = NewDirection;
@@ -554,7 +554,7 @@ void CTickMA::UpdateLinear(void)
                                           BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Convergent,Divergent),
                                           BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
 
-    NewAction(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
+    ActionChanged(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
   }
 
 //+------------------------------------------------------------------+

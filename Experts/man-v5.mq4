@@ -591,7 +591,7 @@ void ManageFund(RoleType Role)
           Print(order.RequestStr(request));
     }
 
-    order.ExecuteOrders(Role,manager[Role].Hold);
+    order.ProcessOrders(Role);
   }
 
 
@@ -601,7 +601,7 @@ void ManageFund(RoleType Role)
 void ManageRisk(RoleType Role)
   {
     SetStrategy(Role);
-    order.ExecuteOrders(Role);
+    order.ProcessOrders(Role);
   }
 
 
@@ -624,7 +624,7 @@ void Execute(void)
      ManageRisk(Seller);
    }
 
-    order.ExecuteRequests();
+    order.ProcessRequests();
 
     // if (!IsEqual(signal.Direction,NoDirection))
     // if (TimeToStr(TimeCurrent(),TIME_DATE)==inpDay)

@@ -1,19 +1,23 @@
 //--- LIVE ---//
-risk long 80 15 60
-fund 15 3 0
-zone 3 20
+risk long 80 15 80
+fund long 15 3 0
+zone long 3 20
 
 risk short 80 10 80
-fund short 15 3 0
-zone 3 20
+fund short 12 3 0
+zone short 3 20
+
+split long
+//cancel req 2
+//full short
 
 verify
-//full short
-//split long
 
-/*
+close long
+
 //-- Order Management --//
 //cancel all
 //buy 0 -5p expansion 0 0 d1 buy mit 1.08493 1.1080 3
-buy 0 -10p retrace 0 0 d2 buy limit 1.08493 1.1080 10
+//buy 0 -10p retrace 0 0 d2 buy limit 1.08493 1.1080 10
+//buy 0 -5p recapture
 

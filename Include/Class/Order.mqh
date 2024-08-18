@@ -537,6 +537,12 @@ void COrder::UpdatePanel(void)
         int row           = 0;
         int ticket        = 0;
 
+        UpdateLabel("lbvOQ-"+ActionText(action)+"-ShowTP",
+          CharToStr((uchar)BoolToInt(Master[action].HideTarget,251,252)),BoolToInt(Master[action].HideTarget,clrRed,clrLawnGreen),12,"Wingdings");
+
+        UpdateLabel("lbvOQ-"+ActionText(action)+"-ShowSL",
+          CharToStr((uchar)BoolToInt(Master[action].HideStop,251,252)),BoolToInt(Master[action].HideStop,clrRed,clrLawnGreen),12,"Wingdings");
+
         while (row<11)
         {
           if (node<ArraySize(Master[action].Zone)&&IsEqual(ticket,0))
@@ -1962,8 +1968,8 @@ void COrder::SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key
       for (int index=0;index<ArraySize(ticket);index++)
         for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
           if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
-             Master[Action].Order[detail].Method   = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Full,Split),
-                                                                  BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<LotSize(Action),Hold,Retain),Method));
+             Master[Action].Order[detail].Method   = (OrderMethod)BoolToInt(IsEqual(Method,Split),BoolToInt(Master[Action].Order[detail].Lots<Split(Action),Full,Split),
+                                                                  BoolToInt(IsEqual(Method,Retain),BoolToInt(Master[Action].Order[detail].Lots<Split(Action),Hold,Retain),Method));
     }
   }
 

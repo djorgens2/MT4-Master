@@ -144,6 +144,10 @@ void RefreshScreen(void)
     }
 
     Append(text,s.ActiveEventStr(),"\n\n");
+    
+//    if (s[NewLead]) Flag("s-NewLead",Color(Direction(s[ActiveSession].Bias,InAction)));
+    if (s[NewBias]) Flag("s-NewBias",Color(Direction(s[ActiveSession].Bias,InAction)));
+    if (s[NewBias]) Pause(s.EventLogStr(NewBias),"Bias()");
 
     Comment(text);
   }

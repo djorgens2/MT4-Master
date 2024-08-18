@@ -113,7 +113,7 @@ public:
       string         ActiveEventStr(bool WithHeader=true);
       string         EventStr(void);
       string         EventStr(EventType Begin, EventType End);
-      string         EventLogStr(void);
+      string         EventLogStr(EventType Type=NoEvent);
       
       bool           operator[](const EventType Event)           {return eEvent[Event];};
       bool           operator[](const AlertType Alert)           {return Alert==eMaxAlert;};
@@ -273,16 +273,18 @@ string CEvent::EventStr(EventType Begin, EventType End)
 //+------------------------------------------------------------------+
 //| EventLogStr - returns the event log in order of execution        |
 //+------------------------------------------------------------------+
-string CEvent::EventLogStr(void)
+string CEvent::EventLogStr(EventType Type=NoEvent)
   {
     string text   = "";
 
-    for (int node=0;node<ArraySize(eLog);node++)
-    {
-      Append(text,EnumToString(eLog[node].Alert),"\n");
-      Append(text,EnumToString(eLog[node].Event));
-      Append(text,DoubleToStr(eLog[node].Price,Digits),"@");
-    }
+    if (ActiveEvent())
+      for (int node=0;node<ArraySize(eLog);node++)
+        if (Type==NoEvent||Type==eLog[node].Event)
+        {
+          Append(text,EnumToString(eLog[node].Alert),"\n");
+          Append(text,EnumToString(eLog[node].Event));
+          Append(text,DoubleToStr(eLog[node].Price,Digits),"@");
+        }
     
     return text;
   }

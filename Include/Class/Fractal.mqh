@@ -17,7 +17,7 @@ const string fp[7]   = {"(o)","(b)","(r)","(e)","(rt)","(rc)","(cl)"};
 #define   fret(r,e,rt,f) fdiv(rt-e,r-e)*format(f)
 #define   fprice(b,r,p) ((b-r)*fibonacci[p])+r
 
-#include <Class\Event.mqh>
+#include <Class/Event.mqh>
 
 class CFractal : public CEvent
   {
@@ -160,9 +160,6 @@ private:
          string          fObjectStr;
          FractalType     fShowFlags;
 
-         FractalRec      frec[FractalTypes];
-         double          fpoint[FractalPoints];
-
          bool            NewState(FractalType Type, FractalRec &Fractal, bool PrintLog=false);
 
          void            InitPivot(PivotRec &Pivot, EventLog &Log);
@@ -175,6 +172,11 @@ private:
 
          void            UpdateBuffer(void);
          void            ManageBuffer(void);
+
+protected:
+
+         FractalRec      frec[FractalTypes];
+         double          fpoint[FractalPoints];
 
 public:
                          CFractal(FractalType ShowFlags);
@@ -438,15 +440,15 @@ void CFractal::UpdatePivot(FractalType Type, PivotRec &Pivot)
   {
     Pivot.Event      = NoEvent;
 
-    if (NewAction(Pivot.Bias,Action(fPrice.Close-Pivot.Price)))
+    if (ActionChanged(Pivot.Bias,Action(fPrice.Close-Pivot.Price)))
       Pivot.Event    = NewBias;
 
     if (IsHigher(fPrice.Close,Pivot.High))
-      if (NewAction(Pivot.Lead,OP_BUY))
+      if (ActionChanged(Pivot.Lead,OP_BUY))
         Pivot.Event  = NewLead;
       
     if (IsLower(fPrice.Close,Pivot.Low))
-      if (NewAction(Pivot.Lead,OP_SELL))
+      if (ActionChanged(Pivot.Lead,OP_SELL))
         Pivot.Event  = NewLead;
 
     SetEvent(Pivot.Event,Alert(Type),fPrice.Close);
@@ -467,7 +469,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
     frec[Type].Fractal[fpClose]             = fPrice.Close;
 
     //--- Handle Reversals
-    if (NewDirection(frec[Type].Direction,direction))
+    if (DirectionChanged(frec[Type].Direction,direction))
     {
       frec[Type].Fractal[fpOrigin]          = frec[Type].Fractal[fpRoot];
       frec[Type].Fractal[fpBase]            = BoolToDouble(IsEqual(direction,DirectionUp),Resistance,Support,Digits);

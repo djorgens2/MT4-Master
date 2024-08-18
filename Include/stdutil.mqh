@@ -316,9 +316,9 @@ string ActionText(int Action)
   }
 
 //+------------------------------------------------------------------+
-//| NewAction - Updates Action on change; filters OP_NO_ACTION       |
+//| ActionChanged - Sets action on change; filters OP_NO_ACTION      |
 //+------------------------------------------------------------------+
-bool NewAction(int &Change, int Compare, bool Update=true)
+bool ActionChanged(int &Change, int Compare, bool Update=true)
   {
     if (Compare==NoAction)
       return (false);
@@ -327,9 +327,9 @@ bool NewAction(int &Change, int Compare, bool Update=true)
   }
 
 //+------------------------------------------------------------------+
-//| NewDirection - Updates Direction on change;filters NoDirection   |
+//| DirectionChanged - Sets direction on change; filters NoDirection |
 //+------------------------------------------------------------------+
-bool NewDirection(int &Change, int Compare, bool Update=true)
+bool DirectionChanged(int &Change, int Compare, bool Update=true)
   {
     if (IsBetween(Compare,DirectionUp,DirectionDown))
     {

@@ -57,6 +57,7 @@ private:
 
          //--- Panel Indicators
          string           indSN;
+         int              indWinId;
 
          //--- Private Class properties
          SessionType      sType;
@@ -79,6 +80,7 @@ private:
          void             UpdateBuffers(void);
 
          void             InitSession(EventType Event);
+         void             UpdatePanel(void);
          void             UpdateSession(void);
          void             OpenSession(void);
          void             CloseSession(void);
@@ -177,10 +179,10 @@ void CSession::UpdateSession(void)
 
     if (Event(NewBoundary))
     {
-      if (NewDirection(srec[ActiveSession].Direction,Direction(Pivot(ActiveSession)-BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)))))
+      if (DirectionChanged(srec[ActiveSession].Direction,Direction(Pivot(ActiveSession)-BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)))))
         SetEvent(NewDirection,Nominal);
       
-      if (Event(NewHigh)&&Event(NewLow))
+      if (Event(NewHigh)&&Event(NewLow))  //-- Only occurs in history
       {
         SetEvent(AdverseEvent,BoolToAlert(High[sBar]>srec[PriorSession].High&&Low[sBar]<srec[PriorSession].Low,Major,Minor),
           BoolToDouble(IsEqual(srec[ActiveSession].Lead,OP_BUY),srec[ActiveSession].High,srec[ActiveSession].Low,Digits));
@@ -193,7 +195,7 @@ void CSession::UpdateSession(void)
           SetEvent(NewLead,Nominal,BoolToDouble(Event(NewHigh),session.High,session.Low,Digits));
     }
 
-    if (NewAction(srec[ActiveSession].Bias,Action(direction)))
+    if (ActionChanged(srec[ActiveSession].Bias,Action(direction)))
     {
       SetEvent(NewBias,alert,BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)));
       SetEvent(BoolToEvent(IsEqual(alert,Notify),NewDivergence,NewConvergence),alert,BoolToDouble(IsOpen(),Pivot(PriorSession),Pivot(OffSession)));
@@ -214,6 +216,43 @@ void CSession::UpdateBuffers(void)
         
         sbuf[period].Price[0]             = 0.00;
       }
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| UpdatePanel - updates control panel if loaded                    |
+//+------------------------------------------------------------------+
+void CSession::UpdatePanel(void)
+  {
+    static FractalType pivot  = Term;
+
+    indSN     = "CPanel-v2";
+    indWinId  = ChartWindowFind(0,indSN);
+
+    if (Event(NewFibonacci))
+      pivot                   = (FractalType)BoolToInt(Event(NewFibonacci,Critical),Origin,
+                                             BoolToInt(Event(NewFibonacci,Major),Trend,Term));
+
+    if (indWinId>NoValue)
+    {
+      if (IsEqual(sType,Daily))
+      {
+        UpdateDirection("tmaSessionTrendDir"+(string)indWinId,frec[Trend].Direction,Color(frec[Trend].Direction),16);
+        UpdateDirection("tmaSessionTermDir"+(string)indWinId,frec[Term].Direction,Color(frec[Term].Direction),32);
+        UpdateLabel("tmaSessionState"+(string)indWinId,rpad(EnumToString(frec[Trend].State)," ",20),Color(frec[Trend].Direction),12,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionFractalState"+(string)indWinId,rpad(EnumToString(pivot)+" "+EnumToString(frec[pivot].State)," ",20),Color(frec[pivot].Direction),12,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotRet"+(string)indWinId,StringSubstr(EnumToString(frec[pivot].Retrace.Level),4,4),Color(Direction(frec[pivot].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotExt"+(string)indWinId,StringSubstr(EnumToString(frec[pivot].Extension.Level),4),Color(Direction(frec[pivot].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(frec[pivot].Pivot.Lead,InAction),Color(Direction(frec[pivot].Pivot.Lead,InAction)),16);
+        UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(frec[pivot].Pivot.Bias,InAction),Color(Direction(frec[pivot].Pivot.Bias,InAction)),16);
+      }
+
+      //-- Update Control Panel (Session)
+       if (ObjectGet("bxhAI-Session"+EnumToString(sType),OBJPROP_BGCOLOR)==clrBoxOff||Event(NewTerm)||Event(NewHour))
+       {
+         UpdateBox("bxhAI-Session"+EnumToString(sType),Color(frec[Term].Direction,IN_DARK_DIR));
+         UpdateBox("bxbAI-OpenInd"+EnumToString(sType),BoolToInt(IsOpen(),clrYellow,clrBoxOff));
+       }
     }
   }
 
@@ -299,11 +338,6 @@ CSession::CSession(SessionType Type, int HourOpen, int HourClose, int HourOffset
 
     for (sBar=sBar;sBar>0;sBar--)
       Update();
-    //double fbuffer[];
-    //Fractal(fbuffer);
-    //for (int node=Bars-1;node>0;node--)
-    //  if (fbuffer[node]>0.00)
-    //    Print(BufferStr(node));
   }
 
 //+------------------------------------------------------------------+
@@ -345,6 +379,7 @@ void CSession::Update(void)
     UpdateSession();
     UpdateRange();
     UpdateFractal(srec[PriorSession].Low,srec[PriorSession].High,Pivot(OffSession),sBar);
+    UpdatePanel();
   }
 
 //+------------------------------------------------------------------+

@@ -68,6 +68,8 @@ GroupRec ParseGroup(void)
       parser.Key        = (int)StringSubstr(params[1],1);
     }
 
+    Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+DoubleToStr(parser.Price,Digits)+":"+BoolToStr(parser.InPips,"InPips","InPrice")+":"+IntegerToString(parser.Key>NoValue,parser.Key));
+    
     return parser;
   }
 
@@ -107,6 +109,8 @@ MethodRec ParseMethod(void)
       parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
     }
 
+    Print(ActionText(parser.Action)+":"+EnumToString(parser.Method)+":"+EnumToString(parser.Group)+":"+BoolToStr(parser.Key>NoValue,(string)parser.Key));
+    
     return parser;
   }
 
@@ -222,7 +226,7 @@ void ProcessComFile(COrder &Order)
     {
       fHandle=FileOpen(comfile,FILE_CSV|FILE_READ);
       
-      if (++try==20)
+      if (++try>20)
       {
         Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
         return;

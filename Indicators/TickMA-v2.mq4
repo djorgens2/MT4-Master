@@ -270,6 +270,7 @@ void UpdateTickMA(void)
       UpdatePriceLabel("trough-"+(string)node,trough[node],clrRed,node);
       UpdatePriceLabel("crest-"+(string)node,crest[node],clrYellow,node);
     }
+    
     SetIndexStyle(6,DRAW_LINE,STYLE_SOLID,1,Color(t.Linear().Direction,IN_CHART_DIR));
 
     ResetBuffer(plSMAOpenBuffer,t.SMA().Open);

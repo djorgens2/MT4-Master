@@ -109,17 +109,17 @@ input double           inpAgg             = 2.5;         // Tick Aggregation
 
 
 //--- Session Inputs
-input string           sessHeader        = "";           // +--- Session Config -------+
-input int              inpAsiaOpen       = 1;            // Asia Session Opening Hour
-input int              inpAsiaClose      = 10;           // Asia Session Closing Hour
-input int              inpEuropeOpen     = 8;            // Europe Session Opening Hour
-input int              inpEuropeClose    = 18;           // Europe Session Closing Hour
-input int              inpUSOpen         = 14;           // US Session Opening Hour
-input int              inpUSClose        = 23;           // US Session Closing Hour
-input int              inpGMTOffset      = 0;            // Offset from GMT+3
+input string           sessHeader         = "";           // +--- Session Config -------+
+input int              inpAsiaOpen        = 1;            // Asia Session Opening Hour
+input int              inpAsiaClose       = 10;           // Asia Session Closing Hour
+input int              inpEuropeOpen      = 8;            // Europe Session Opening Hour
+input int              inpEuropeClose     = 18;           // Europe Session Closing Hour
+input int              inpUSOpen          = 14;           // US Session Opening Hour
+input int              inpUSClose         = 23;           // US Session Closing Hour
+input int              inpGMTOffset       = 0;            // Offset from GMT+3
 
-  CTickMA             *t                 = new CTickMA(inpPeriods,inpDegree,inpAgg);
-  COrder              *order             = new COrder(inpBrokerModel,Hold,Hold);
+  CTickMA             *t                  = new CTickMA(inpPeriods,inpDegree,inpAgg);
+  COrder              *order              = new COrder(inpBrokerModel,Hold,Hold);
   CSession            *s[SessionTypes];
   
   MasterRec            master;
@@ -581,9 +581,9 @@ int OnInit()
    
     //-- Initialize Session
     s[Daily]             = new CSession(Daily,0,23,inpGMTOffset);
-    //s[Asia]              = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
-    //s[Europe]            = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
-    //s[US]                = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
+    s[Asia]              = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
+    s[Europe]            = new CSession(Europe,inpEuropeOpen,inpEuropeClose,inpGMTOffset);
+    s[US]                = new CSession(US,inpUSOpen,inpUSClose,inpGMTOffset);
 
     //-- Initialize Session
     s[Daily].Update();
