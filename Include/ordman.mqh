@@ -14,6 +14,7 @@ struct GroupRec
         OrderGroup    Group;
         double        Price;
         bool          InPips;
+        bool          HardStop;
         int           Key;
        };
 
@@ -26,6 +27,7 @@ struct MethodRec
        };
 
 //-- Operational vars
+int                   pcount;
 string                params[];
 string                commands[];
 string                comfile;
@@ -43,18 +45,21 @@ GroupRec ParseGroup(void)
     parser.Price        = FormatPrice(parser.Action,params[2],parser.InPips);
     
     if (IsBetween(parser.Action,OP_BUY,OP_SELL))
-      if (StringSubstr(params[3],0,1)=="Z")
-      {
-        parser.Group    = ByZone;
-        parser.Key      = (int)StringSubstr(params[3],1);
-      }
-      else
-      if (MethodCode(params[3])>NoValue)
-      {
-        parser.Group    = ByMethod;
-        parser.Key      = MethodCode(params[3]);
-      }      
-      else parser.Group = ByAction;
+    {
+      parser.Group      = ByAction;
+      
+      if (pcount>3)
+        if (MethodCode(params[3])>NoValue)
+        {
+          parser.Group    = ByMethod;
+          parser.Key      = MethodCode(params[3]);
+        }      
+        else
+        {
+          parser.Group    = ByZone;
+          parser.Key      = (int)params[3];
+        }
+    }
     else
     if (InStr("+-",StringSubstr(params[1],0,1),1))
     {
@@ -62,13 +67,13 @@ GroupRec ParseGroup(void)
       parser.Group      = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
     }
     else
-    if (StringSubstr(params[1],0,1)=="T")
+    if ((int)params[1]>0)
     {
       parser.Group      = ByTicket;
-      parser.Key        = (int)StringSubstr(params[1],1);
+      parser.Key        = (int)params[1];
     }
 
-    Print(ActionText(parser.Action)+":"+EnumToString(parser.Group)+":"+DoubleToStr(parser.Price,Digits)+":"+BoolToStr(parser.InPips,"InPips","InPrice")+":"+IntegerToString(parser.Key>NoValue,parser.Key));
+    Print(GroupStr(parser));
     
     return parser;
   }
@@ -109,7 +114,7 @@ MethodRec ParseMethod(void)
       parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
     }
 
-    Print(ActionText(parser.Action)+":"+EnumToString(parser.Method)+":"+EnumToString(parser.Group)+":"+BoolToStr(parser.Key>NoValue,(string)parser.Key));
+    Print(ActionText(parser.Action)+"|"+EnumToString(parser.Method)+"|"+EnumToString(parser.Group)+"|"+BoolToStr(parser.Key>NoValue,(string)parser.Key));
     
     return parser;
   }
@@ -198,7 +203,44 @@ double FormatPrice(int Action, string Price, bool OutPips=false)
 
     return BoolToDouble(OutPips,pip(pips),price,Digits);
   }
-  
+
+//+------------------------------------------------------------------+
+//| GroupStr - Returns translated parsed GroupRec text               |
+//+------------------------------------------------------------------+
+string GroupStr(GroupRec &Group)
+  {
+    string text    = "";
+
+    Append(text,(string)pcount,"|");
+    Append(text,ActionText(Group.Action),"|");
+    Append(text,EnumToString(Group.Group),"|");
+    Append(text,DoubleToString(Group.Price,_Digits),"|");
+    Append(text,BoolToStr(Group.InPips,"Pips","Price"),"|");
+    
+    if (Group.Key>NoValue)
+      Append(text,(string)Group.Key,"|");
+
+    return text;
+  }
+
+//+------------------------------------------------------------------+
+//| MethodStr - Returns translated parsed MetthodRec text            |
+//+------------------------------------------------------------------+
+string MethodStr(MethodRec &Method)
+  {
+    string text    = "";
+
+    Append(text,(string)pcount,"|");
+    Append(text,ActionText(Method.Action),"|");
+    Append(text,EnumToString(Method.Method),"|");
+    Append(text,EnumToString(Method.Group),"|");
+    
+    if (Method.Key>NoValue)
+      Append(text,(string)Method.Key,"|");
+
+    return text;
+  }
+
 //+------------------------------------------------------------------+
 //| ProcessComFile - retrieves and submits manual commands           |
 //+------------------------------------------------------------------+
@@ -208,13 +250,13 @@ void ProcessComFile(COrder &Order)
 
     int    try            =  0;
     int    fHandle        = INVALID_HANDLE;
+    
     string fRecord;
     string memo           = "Manual Entry";
 
     bool   go             = true;
     bool   verify         = false;
-
-    int    pCount         = NoValue;
+    
     bool   lComment       = false;
     bool   bComment       = false;
 
@@ -265,9 +307,9 @@ void ProcessComFile(COrder &Order)
         SplitStr(fRecord," ",params);
 
         fRecord = "";
-        pCount  = ArraySize(params);
+        pcount  = ArraySize(params);
 
-        for (int i=0;i<pCount;i++)
+        for (int i=0;i<pcount;i++)
           Append(fRecord,params[i],"|");
 
         if (params[0]=="VERIFY")
@@ -277,14 +319,14 @@ void ProcessComFile(COrder &Order)
         }
         else
         if (verify)
-          go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command ["+(string)pCount+"]: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
+          go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command ["+(string)pcount+"]: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
 
         //--- Verify Mode
         if (go)
         {
           //-- Print utilities
           if (params[0]=="PRINT")
-            switch (pCount)
+            switch (pcount)
             {
               case 2:     if (InStr("REQUEST",params[1],3))
                             Print(Order.QueueStr());
@@ -320,8 +362,8 @@ void ProcessComFile(COrder &Order)
 
             if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
             {
-              if (pCount<3||InStr("STOPLOSSL",params[2],2)) Order.SetDefaultStop(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
-              if (pCount<3||InStr("TAKEPROFITP",params[2],2)) Order.SetDefaultTarget(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+              if (pcount<3||InStr("STOPLOSSL",params[2],2)) Order.SetDefaultStop(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+              if (pcount<3||InStr("TAKEPROFITP",params[2],2)) Order.SetDefaultTarget(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
             }
           }
           else
@@ -386,7 +428,7 @@ void ProcessComFile(COrder &Order)
 
           //-- System/Action Halt
           if (params[0]=="DISABLE"||params[0]=="HALT")
-            switch (pCount)
+            switch (pcount)
             {
               case 1:  Order.Disable("Manual System Halt");
                        break;
@@ -397,7 +439,7 @@ void ProcessComFile(COrder &Order)
 
           //-- System/Action Resume
           if (params[0]=="ENABLE"||params[0]=="RESUME"||params[0]=="START")
-            switch (pCount)
+            switch (pcount)
             {
               case 1:  Order.Enable("Manual System Enabled");
                        break;
@@ -408,19 +450,19 @@ void ProcessComFile(COrder &Order)
 
           //-- Order Cancelations
           if (InStr("CANCEL",params[0],3))
-            switch (pCount)
+            switch (pcount)
             {
               case 2:   if (InStr("ALL",params[1],3))
                           Order.Cancel(NoAction,"Manual Close [All Requests]");
                         else
                         if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
                           Order.Cancel(ActionCode(params[1]),"Manual Close [All "+proper(params[1])+"]");
+                        else
+                        if ((int)params[1]>0)
+                          Order.Cancel(Order.Request((int)params[1]),"Manual Close [By Request #]");
                         break;
 
-              case 3:   if (InStr("REQUEST",params[1],3))
-                          Order.Cancel(Order.Request((int)params[2]),"Manual Close [By Request #]");
-                        else
-                        switch (ActionCode(params[1]))
+              case 3:   switch (ActionCode(params[1]))
                         {
                           case OP_BUY:  request.Type      = BoolToInt(InStr("MITSTOP",params[2],3),OP_BUYSTOP,
                                                             BoolToInt(params[2]=="LIMIT",OP_BUYLIMIT));

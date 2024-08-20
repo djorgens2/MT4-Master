@@ -8,16 +8,23 @@ fund short 12 3 0
 zone short 3 20
 
 split long
+full short
+
 //cancel req 2
 //full short
-
+//hide long tp
 verify
+//hedge
+//buy
+//sell
+sell
+//tp long 1.11005
 
-close long
+//close long
 
 //-- Order Management --//
-//cancel all
-//buy 0 -5p expansion 0 0 d1 buy mit 1.08493 1.1080 3
+cancel all
+//buy 0 0 expansion 0 0 d1 buy limit 1.0950 1.1085 10
 //buy 0 -10p retrace 0 0 d2 buy limit 1.08493 1.1080 10
 //buy 0 -5p recapture
 

@@ -170,6 +170,12 @@
 //+------------------------------------------------------------------+
 void DebugPrint(void)
   {
+    if (s[Daily].Pivot(Trend).Event==NewFibonacci)
+    {
+      Flag("s.Pivot-NewFiibo",Color(Direction(s[Daily].Pivot(Trend).Lead,InAction)));
+//      if (debug) Pause("New Fibonacci Pivot","Pivot Test");
+    }
+
     if (debug)
     {
       if (signal.Alert>NoAlert)
@@ -198,7 +204,7 @@ void DebugPrint(void)
             default:         Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
           }
 
-        //FileWrite(fhandle,ftext);
+        FileWrite(fhandle,ftext);
       }
 
       if (signal.EntryState>NoValue)
@@ -206,13 +212,14 @@ void DebugPrint(void)
         UpdateDirection("pvMasterLead",Direction(signal.Bias,InAction),Color(Direction(signal.Bias,InAction)),24);
 
         if (s[Daily][NewLead])
-          Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction)));
-        //else
-        //if (t[NewLead])
-        //  Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction),IN_DARK_DIR));
-//        else Flag("NoLead",clrYellow);
-
-//        Pause(TimeToString(TimeCurrent())+":  "+EnumToString(signal.EntryState)+": "+BoolToStr(t[NewLead],"Tick",BoolToStr(s[Daily][NewLead],"Session","No Lead Change")),"Entry Trigger");
+          //Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction)));
+          UpdatePriceLabel("pvMajorLead"+BoolToStr(signal.Bias==Buyer,"Long","Short"),Close[0],Color(Direction(signal.Bias,InAction)));
+        else
+        if (t[NewLead])
+//          Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction),IN_DARK_DIR));
+          UpdatePriceLabel("pvMinorLead"+BoolToStr(signal.Bias==Buyer,"Long","Short"),Close[0],Color(Direction(signal.Bias,InAction),IN_DARK_DIR));
+        else // Flag("NoLead",clrYellow);
+          UpdatePriceLabel("pvLeadFibonacci",Close[0],clrYellow);
       }
     }
   }
@@ -681,7 +688,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 //| ScreenConfig Sets up display alternative in-lieu of CPanel       |
 //+------------------------------------------------------------------+
-void PanelConfig(void)
+void ScreenConfig(void)
   {
     NewLabel("pvBalance","",80,10,clrLightGray,SCREEN_UR);
     NewLabel("pvProfitLoss","",80,26,clrLightGray,SCREEN_UR);
@@ -690,6 +697,12 @@ void PanelConfig(void)
     NewLabel("pvMargin","",10,42,clrLightGray,SCREEN_UR);
     NewLabel("pvMasterLead","",5,5,clrNONE,SCREEN_LL);
     NewLabel("pvManager","",5,40,clrNONE,SCREEN_LL);
+    
+    NewPriceLabel("pvMinorLeadLong");
+    NewPriceLabel("pvMajorLeadLong");
+    NewPriceLabel("pvMinorLeadShort");
+    NewPriceLabel("pvMajorLeadShort");
+    NewPriceLabel("pvLeadFibonacci");
   }
 
 //+------------------------------------------------------------------+
@@ -756,7 +769,7 @@ void InitMaster(void)
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    PanelConfig();
+    ScreenConfig();
     OrderConfig();
     SessionConfig();
     SignalConfig();
@@ -764,6 +777,8 @@ int OnInit()
 
     InitMaster();
 
+    string price="-20p*";
+    
     if (debug)
       fhandle = FileOpen("debug-man-v2.csv",FILE_CSV|FILE_WRITE|FILE_ANSI);
     

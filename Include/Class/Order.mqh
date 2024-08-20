@@ -45,6 +45,7 @@ protected:
                         DCA,           // Close profit on DCA
                         Hedge,         // Short Term equity capture/protection
                         Recapture,     // Risk mitigation position (not coded)
+                        Stop,
                         Kill,          // Close on market
                         OrderMethods
                       };

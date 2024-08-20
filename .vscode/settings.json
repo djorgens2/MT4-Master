@@ -8,7 +8,8 @@
         "${workspaceFolder}/**",
         "${workspaceFolder}/Include",
         "Include",
-        "/home/djorgenson/.mt4/drive_c/users/djorgenson/AppData/Roaming/MetaQuotes/Terminal/50CA3DFB510CC5A8F28B48D1BF2A5702/MQL4/Include/Include"
+        "/home/djorgenson/.mt4/drive_c/users/djorgenson/AppData/Roaming/MetaQuotes/Terminal/50CA3DFB510CC5A8F28B48D1BF2A5702/MQL4/Include/Include",
+        "/home/djorgenson/.mt4/MQL4/Include"
     ],
     "C_Cpp.default.compilerPath": "",
     "C_Cpp.default.intelliSenseMode": "gcc-x64",

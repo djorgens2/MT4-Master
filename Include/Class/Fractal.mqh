@@ -160,6 +160,9 @@ private:
          string          fObjectStr;
          FractalType     fShowFlags;
 
+         FractalRec      frec[FractalTypes];
+         double          fpoint[FractalPoints];
+
          bool            FibonacciChanged(FractalType Type, FractalRec &Fractal);
 
          void            InitPivot(PivotRec &Pivot, EventLog &Log);
@@ -173,10 +176,6 @@ private:
          void            UpdateBuffer(void);
          void            ManageBuffer(void);
 
-protected:
-
-         FractalRec      frec[FractalTypes];
-         double          fpoint[FractalPoints];
 
 public:
                          CFractal(FractalType ShowFlags);

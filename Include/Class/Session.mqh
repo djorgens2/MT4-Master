@@ -236,20 +236,20 @@ void CSession::UpdatePanel(void)
     {
       if (IsEqual(sType,Daily))
       {
-        UpdateDirection("tmaSessionTrendDir"+(string)indWinId,frec[Trend].Direction,Color(frec[Trend].Direction),16);
-        UpdateDirection("tmaSessionTermDir"+(string)indWinId,frec[Term].Direction,Color(frec[Term].Direction),32);
-        UpdateLabel("tmaSessionState"+(string)indWinId,rpad(EnumToString(frec[Trend].State)," ",20),Color(frec[Trend].Direction),12,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionFractalState"+(string)indWinId,rpad(EnumToString(pivot)+" "+EnumToString(frec[pivot].State)," ",20),Color(frec[pivot].Direction),12,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionPivotRet"+(string)indWinId,StringSubstr(EnumToString(frec[pivot].Retrace.Level),4,4),Color(Direction(frec[pivot].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionPivotExt"+(string)indWinId,StringSubstr(EnumToString(frec[pivot].Extension.Level),4),Color(Direction(frec[pivot].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
-        UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(frec[pivot].Pivot.Lead,InAction),Color(Direction(frec[pivot].Pivot.Lead,InAction)),16);
-        UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(frec[pivot].Pivot.Bias,InAction),Color(Direction(frec[pivot].Pivot.Bias,InAction)),16);
+        UpdateDirection("tmaSessionTrendDir"+(string)indWinId,this[Trend].Direction,Color(this[Trend].Direction),16);
+        UpdateDirection("tmaSessionTermDir"+(string)indWinId,this[Term].Direction,Color(this[Term].Direction),32);
+        UpdateLabel("tmaSessionState"+(string)indWinId,rpad(EnumToString(this[Trend].State)," ",20),Color(this[Trend].Direction),12,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionFractalState"+(string)indWinId,rpad(EnumToString(pivot)+" "+EnumToString(this[pivot].State)," ",20),Color(this[pivot].Direction),12,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotRet"+(string)indWinId,StringSubstr(EnumToString(this[pivot].Retrace.Level),4,4),Color(Direction(this[pivot].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotExt"+(string)indWinId,StringSubstr(EnumToString(this[pivot].Extension.Level),4),Color(Direction(this[pivot].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(this[pivot].Pivot.Lead,InAction),Color(Direction(this[pivot].Pivot.Lead,InAction)),16);
+        UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(this[pivot].Pivot.Bias,InAction),Color(Direction(this[pivot].Pivot.Bias,InAction)),16);
       }
 
       //-- Update Control Panel (Session)
        if (ObjectGet("bxhAI-Session"+EnumToString(sType),OBJPROP_BGCOLOR)==clrBoxOff||Event(NewTerm)||Event(NewHour))
        {
-         UpdateBox("bxhAI-Session"+EnumToString(sType),Color(frec[Term].Direction,IN_DARK_DIR));
+         UpdateBox("bxhAI-Session"+EnumToString(sType),Color(this[Term].Direction,IN_DARK_DIR));
          UpdateBox("bxbAI-OpenInd"+EnumToString(sType),BoolToInt(IsOpen(),clrYellow,clrBoxOff));
        }
     }
