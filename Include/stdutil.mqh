@@ -112,9 +112,6 @@ enum SummaryType
        Net,      //-- Hard Sequence
        Profit,   //-- ** DO NOT MODIFY
        Total,    //--            
-       Count,
-       Highest,
-       Lowest,
        SummaryTypes
      };
              

@@ -339,8 +339,8 @@ public:
           void         SetDefaultStop(int Action, double Price, int Pips, bool Hide);
           void         SetDefaultTarget(int Action, double Price, int Pips, bool Hide);
 
-          void         SetStopLoss(int Action, OrderGroup Group, double StopLoss, bool InPips, int Key=NoValue);
-          void         SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, bool InPips, int Key=NoValue);
+          void         SetStopLoss(int Action, OrderGroup Group, double StopLoss, int Key=NoValue);
+          void         SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int Key=NoValue, bool HardStop=false);
           void         SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue);
           void         SetFundLimits(int Action, double EquityTarget, double EquityMin, double LotSize);
           void         SetRiskLimits(int Action, double Risk, double Scale, double Margin);
@@ -1461,6 +1461,16 @@ void COrder::ProcessProfits(int Action)
                             if (IsEqual(Master[Action].Order[ticket].Status,Qualified))
                               netEquity     += Master[Action].Order[ticket].Profit;
                             break;
+                            
+          case Stop:        if (IsEqual(Action,OP_BUY)&&IsHigher(Bid,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
+                              Master[Action].Order[ticket].Status  = Qualified;
+                            else
+                            if (IsEqual(Action,OP_SELL)&&IsLower(Ask,Master[Action].Order[ticket].TakeProfit,NoUpdate,Digits))
+                              Master[Action].Order[ticket].Status  = Qualified;
+
+                            if (IsEqual(Master[Action].Order[ticket].Status,Qualified))
+                              netEquity     += Master[Action].Order[ticket].Profit;
+                            break;
 
           case Recapture:   Master[Action].Order[ticket].Status      = Qualified;
                             netRecapture    += Master[Action].Order[ticket].Profit;
@@ -1484,6 +1494,9 @@ void COrder::ProcessProfits(int Action)
           case Split:
           case Full:      if (IsHigher(Equity(netEquity),Master[Action].EquityTarget,NoUpdate,3))
                             Master[Action].Order[ticket].Status      = Processing;
+                          break;
+                          
+          case Stop:      Master[Action].Order[ticket].Status        = Processing;
                           break;
 
           case DCA:       if (IsHigher(Equity(netDCA,InPercent),Master[Action].EquityMin,NoUpdate,3))
@@ -2009,7 +2022,7 @@ void COrder::SetDefaultTarget(int Action, double Price, int Pips, bool Hide)
 //+------------------------------------------------------------------+
 //| SetStopLoss - Sets order stops and hide restrictions             |
 //+------------------------------------------------------------------+
-void COrder::SetStopLoss(int Action, OrderGroup Group, double StopLoss, bool InPips, int Key=NoValue)
+void COrder::SetStopLoss(int Action, OrderGroup Group, double StopLoss, int Key=NoValue)
   {
     int ticket[];
     
@@ -2023,14 +2036,14 @@ void COrder::SetStopLoss(int Action, OrderGroup Group, double StopLoss, bool InP
       for (int index=0;index<ArraySize(ticket);index++)
         for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
           if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
-            Master[Action].Order[detail].StopLoss = Price(Loss,Action,StopLoss,0.00,InPips);
+            Master[Action].Order[detail].StopLoss = Price(Loss,Action,StopLoss,0.00);
     }
   }
 
 //+------------------------------------------------------------------+
 //| SetTakeProfit - Sets order targets and hide restrictions         |
 //+------------------------------------------------------------------+
-void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, bool InPips, int Key=NoValue)
+void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int Key=NoValue, bool HardStop=false)
   {
     int ticket[];
     
@@ -2044,7 +2057,13 @@ void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, bool
       for (int index=0;index<ArraySize(ticket);index++)
         for (int detail=0;detail<ArraySize(Master[Action].Order);detail++)
           if (IsEqual(Master[Action].Order[detail].Ticket,ticket[index]))
-            Master[Action].Order[detail].TakeProfit = Price(Profit,Action,TakeProfit,0.00,InPips);
+          {
+            Master[Action].Order[detail].TakeProfit = Price(Profit,Action,TakeProfit,0.00);
+            
+            if (HardStop)
+              if (Master[Action].Order[detail].TakeProfit>0.00)
+                Master[Action].Order[detail].Method = Stop;
+          }
     }
   }
 

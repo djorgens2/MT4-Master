@@ -14,6 +14,12 @@
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
 
+//-- Class defs
+COrder                *order;
+CSession              *s[SessionTypes];
+CTickMA               *t;
+
+
 #include <ordman.mqh>
 
   //--- Fractal Model
@@ -157,12 +163,6 @@
   string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   string                 objectstr           = "[man-v2]";
   int                    fhandle;
-
-
-  //-- Class defs
-  COrder                *order;
-  CSession              *s[SessionTypes];
-  CTickMA               *t                   = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowType);
 
 
 //+------------------------------------------------------------------+
@@ -678,7 +678,7 @@ void OnTick()
   {
     UpdateMaster();
 
-    ProcessComFile(order);
+    ProcessComFile();
 
     Execute();
 
@@ -734,6 +734,9 @@ void OrderConfig(void)
 //+------------------------------------------------------------------+
 void SessionConfig(void)
   {
+    //-- Initialize TickMA
+    t                    = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowType);
+
     //-- Initialize Session
     s[Daily]             = new CSession(Daily,0,23,inpGMTOffset);
     s[Asia]              = new CSession(Asia,inpAsiaOpen,inpAsiaClose,inpGMTOffset);
