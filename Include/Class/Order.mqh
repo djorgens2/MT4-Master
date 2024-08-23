@@ -43,9 +43,8 @@ protected:
                         Split,         // Close half orders 
                         Retain,        // Close half orders and hold
                         DCA,           // Close profit on DCA
-                        Hedge,         // Short Term equity capture/protection
                         Recapture,     // Risk mitigation position (not coded)
-                        Stop,
+                        Stop,          // Sets Hard Target (Take Profit even if negative)
                         Kill,          // Close on market
                         OrderMethods
                       };
@@ -1635,19 +1634,22 @@ void COrder::ProcessOrders(int Action)
 //+------------------------------------------------------------------+
 void COrder::ProcessHedge(string Requestor)
   {
-    OrderRequest request        = BlankRequest(Requestor);
+    OrderRequest request       = BlankRequest(Requestor);
 
     if (fabs(Summary[Net].Lots)>0.00)
     {
+      int hedges               = (int)ceil(fdiv(fabs(Summary[Net].Lots),Account.LotSizeMax));
+
       request.Action           = Action(Summary[Net].Lots,InDirection,InContrarian);
       request.Type             = Action(Summary[Net].Lots,InDirection,InContrarian);
-      request.Lots             = fabs(Summary[Net].Lots);
+      request.Lots             = fdiv(fabs(Summary[Net].Lots),hedges,Account.LotPrecision);
       request.Memo             = "Hedge";
 
-      if (Submitted(request))
-        Print(RequestStr(request));
-      else
-        PrintLog(0);
+      while (hedges-->0)
+        if (Submitted(request))
+          Print(RequestStr(request));
+        else
+          PrintLog(0);
     }
   }
 

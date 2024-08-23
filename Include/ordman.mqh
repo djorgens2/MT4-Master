@@ -32,7 +32,7 @@ string                commands[];
 string                comfile;
 long                  fTime  = NoValue;
 
-COrder *order;
+//COrder *order;
 
 //+------------------------------------------------------------------+
 //| ParseEntryPrice - Format manual entry price from comfile         |
@@ -185,7 +185,6 @@ OrderMethod MethodCode(string Method)
     if (InStr("SPLITEQH",Method,3))     return (Split);
     if (InStr("RETAINEQR",Method,3))    return (Retain);
     if (trim(Method)=="DCA")            return (DCA);
-    if (trim(Method)=="HEDGE")          return (Hedge);
     if (InStr("RECAPTURE",Method,5))    return (Recapture);
     if (InStr("CLOSEKILL",Method,4))    return (Kill);
 

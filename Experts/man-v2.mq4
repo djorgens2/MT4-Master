@@ -418,8 +418,8 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
     if (IsLower(Close[0],signal.Pivot.Low))
       signal.Lead           = Seller;
       
-    UpdatePriceLabel("sigHi",signal.Pivot.High,clrLawnGreen,-3);
-    UpdatePriceLabel("sigLo",signal.Pivot.Low,clrRed,-3);
+    UpdatePriceLabel("sigHi",signal.Pivot.High,clrLawnGreen,-6);
+    UpdatePriceLabel("sigLo",signal.Pivot.Low,clrRed,-6);
   }
 
 
