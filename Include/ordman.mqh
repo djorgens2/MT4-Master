@@ -27,10 +27,21 @@ struct MethodRec
 
 //-- Operational vars
 int                   pcount;
+
 string                params[];
 string                commands[];
+string                fRecord;
+
+int                   fHandle       = INVALID_HANDLE;
+int                   logHandle     = INVALID_HANDLE; 
+
+bool                  fReplay       = false;
+long                  fTime         = NoValue;
+long                  fTick         = NoValue;
+long                  rTick         = NoValue;
+
 string                comfile;
-long                  fTime  = NoValue;
+
 
 //COrder *order;
 
@@ -106,8 +117,6 @@ GroupRec ParseGroup(SummaryType Type)
       parser.Key        = (int)params[1];
     }
 
-    Print(GroupStr(parser));
-    
     return parser;
   }
 
@@ -147,8 +156,6 @@ MethodRec ParseMethod(void)
       parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
     }
 
-    Print(ActionText(parser.Action)+"|"+EnumToString(parser.Method)+"|"+EnumToString(parser.Group)+"|"+BoolToStr(parser.Key>NoValue,(string)parser.Key));
-    
     return parser;
   }
 
@@ -257,310 +264,373 @@ string MethodStr(MethodRec &Method)
   }
 
 //+------------------------------------------------------------------+
+//| WriteLog - Writes executed manual commands to logfile            |
+//+------------------------------------------------------------------+
+void WriteLog(string Command)
+  {
+    if (logHandle!=INVALID_HANDLE)
+    {
+      string text = (string)(fmax(1,fTick));
+    
+      Append(text,TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),"|");
+      Append(text,Command,"|");
+    
+      FileWrite(logHandle,text);
+    }
+  }
+
+//+------------------------------------------------------------------+
+//| ProcessCommand - Executes commands from ComFile/Replay LogFile   |
+//+------------------------------------------------------------------+
+void ProcessCommand(string Command)
+  {
+    OrderRequest request;
+
+    WriteLog(Command);
+
+    //-- Print utilities
+    if (params[0]=="REPLAY")
+      fReplay                    = true;
+    else
+    if (params[0]=="PRINT")
+      switch (pcount)
+      {
+        case 2:     if (InStr("REQUEST",params[1],3))
+                      Print(order.QueueStr());
+
+                    if (InStr("ORDER",params[1],3))
+                      Print(order.OrderStr());
+
+                    if (InStr("LOG",params[1],3))
+                      order.PrintLog();
+
+                    if (InStr("SUMMARY",params[1],3))
+                      Print(order.SummaryStr());
+                    break;
+
+        case 3:     if (InStr("REQUEST",params[1],3))
+                      Print(order.QueueStr(ActionCode(params[2])));
+
+                    if (InStr("ORDER",params[1],3))
+                      Print(order.OrderStr(ActionCode(params[2])));
+
+                    if (InStr("LOG",params[1],3))
+                      order.PrintLog((int)params[2]);
+
+                    if (InStr("MASTER",params[1],6))
+                      Print(order.MasterStr(ActionCode(params[2])));
+      }
+    else
+
+    //-- Hide Stops/TPs
+    if (params[0]=="HIDE"||params[0]=="SHOW")
+    {
+      FormatConfig(params);
+
+      if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+      {
+        if (pcount<3||InStr("STOPLOSSL",params[2],2)) order.SetDefaultStop(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+        if (pcount<3||InStr("TAKEPROFITP",params[2],2)) order.SetDefaultTarget(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
+      }
+    }
+    else
+
+    //-- Hedge Requests
+    if (params[0]=="HEDGE")
+      if (fabs(order[Net].Lots)>0)
+        order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+      else
+        Alert("Nothing to hedge");
+    else
+
+    //-- Order Requests
+    if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
+    {
+      FormatOrder(params);
+
+      request                  = order.BlankRequest(StringSubstr(comfile,0,StringLen(comfile)-4));
+      request.Action           = ActionCode(params[0]);
+      request.Price            = ParseEntryPrice(request.Action,params[2]);
+      request.Type             = ActionCode(params[0],request.Price);
+      request.Lots             = StringToDouble(params[1]);
+      request.TakeProfit       = ParseExitPrice(Profit,request.Action,params[4],request.Price);
+      request.StopLoss         = ParseExitPrice(Loss,request.Action,params[5],request.Price);
+      request.Memo             = params[3];
+      request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),
+                                    BoolToDate(StringSubstr(params[6],0,1)=="H",TimeCurrent()+(Period()*60*(int)StringSubstr(params[6],1)),
+                                    BoolToDate(StringSubstr(params[6],0,1)=="D",TimeCurrent()+(Period()*60*24*(int)StringSubstr(params[6],1)),
+                                    TimeCurrent()+(Period()*60))));
+      
+      switch (ActionCode(params[7]))
+      {
+        case OP_BUY:             request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
+                                                          BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
+                                  request.Pend.LBound    = ParseEntryPrice(Action(OP_BUY,InAction,InContrarian),params[9]);
+                                  request.Pend.UBound    = ParseEntryPrice(OP_BUY,params[10]);
+                                  request.Pend.Step      = StringToDouble(params[11]);
+                                  break;
+
+        case OP_SELL:            request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
+                                                          BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
+                                  request.Pend.LBound    = ParseEntryPrice(Action(OP_SELL,InAction,InContrarian),params[9]);
+                                  request.Pend.UBound    = ParseEntryPrice(OP_SELL,params[10]);
+                                  request.Pend.Step      = StringToDouble(params[11]);
+                                  break;
+
+        default:                 request.Pend.Type      = NoAction;
+                                  request.Pend.LBound    = 0.00;
+                                  request.Pend.UBound    = 0.00;
+                                  request.Pend.Step      = 0.00;
+      }
+      
+      if (order.Submitted(request))
+        Print(order.RequestStr(request));
+      else
+      {
+        Print("Bad Request Format: RequestStr: "+order.RequestStr(request));
+        order.PrintLog(0);
+      }
+    }
+    else
+
+    //-- System/Action Halt
+    if (params[0]=="DISABLE"||params[0]=="HALT")
+      switch (pcount)
+      {
+        case 1:  order.Disable("Manual System Halt");
+                  break;
+        default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+                    order.Disable(ActionCode(params[1]),"Manual "+proper(params[1])+" Halt");
+      }
+    else
+
+    //-- System/Action Resume
+    if (params[0]=="ENABLE"||params[0]=="RESUME"||params[0]=="START")
+      switch (pcount)
+      {
+        case 1:  order.Enable("Manual System Enabled");
+                  break;
+        default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+                    order.Enable(ActionCode(params[1]),"Manual "+proper(params[1])+" Enabled");
+      }
+    else
+
+    //-- Order Cancelations
+    if (InStr("CANCEL",params[0],3))
+      switch (pcount)
+      {
+        case 2:   if (InStr("ALL",params[1],3))
+                    order.Cancel(NoAction,"Manual Close [All Requests]");
+                  else
+                  if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
+                    order.Cancel(ActionCode(params[1]),"Manual Close [All "+proper(params[1])+"]");
+                  else
+                  if ((int)params[1]>0)
+                    order.Cancel(order.Request((int)params[1]),"Manual Close [By Request #]");
+                  break;
+
+        case 3:   switch (ActionCode(params[1]))
+                  {
+                    case OP_BUY:  request.Type      = BoolToInt(InStr("MITSTOP",params[2],3),OP_BUYSTOP,
+                                                      BoolToInt(params[2]=="LIMIT",OP_BUYLIMIT));
+
+                                  order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
+                                  break;
+                                                      
+                    case OP_SELL: request.Type     = BoolToInt(InStr("MITSTOP",params[2],3),OP_SELLSTOP,
+                                                      BoolToInt(params[2]=="LIMIT",OP_SELLLIMIT));
+
+                                  order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
+                                  break;
+                  }
+      }
+    else
+
+    if (InStr("EQFUNDRISKZONE",params[0],2))
+    {
+      FormatConfig(params);
+      
+      //-- Fund Management
+      if (params[0]=="EQ"||params[0]=="FUND")
+        order.SetFundLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
+      else
+
+      //-- Risk Mitigation
+      if (params[0]=="RISK")
+        order.SetRiskLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
+      else
+    
+      //-- Zone Management
+      if (params[0]=="ZONE")
+        order.SetZoneLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]));
+    }
+    else
+    
+    //-- Order State Management
+    if (MethodCode(params[0])>NoValue)
+    {
+      FormatConfig(params);
+      MethodRec method = ParseMethod();
+      order.SetMethod(method.Action,method.Method,method.Group,method.Key);
+    }
+    else
+
+    //-- Order State Configuration
+    {
+      FormatConfig(params);
+      
+      //-- Risk Management
+      if (InStr("STOPLOSSL",params[0]))
+      {
+        GroupRec group = ParseGroup(Loss);
+        order.SetStopLoss(group.Action,group.Group,group.Price,group.Key);
+      }
+      else
+
+      //-- Target Management
+      if (InStr("TAKEPROFITARGETP",params[0]))
+      {
+        GroupRec group = ParseGroup(Profit);
+        order.SetTakeProfit(group.Action,group.Group,group.Price,group.Key,group.HardStop);
+      }
+    }
+  }
+
+
+//+------------------------------------------------------------------+
 //| ProcessComFile - retrieves and submits manual commands           |
 //+------------------------------------------------------------------+
 void ProcessComFile(void)
   {
-    OrderRequest request;
-
-    int    try            =  0;
-    int    fHandle        = INVALID_HANDLE;
-    
-    string fRecord;
-    string memo           = "Manual Entry";
-
-    bool   go             = true;
     bool   verify         = false;
-    
     bool   lComment       = false;
     bool   bComment       = false;
-
+    
     if (comfile=="")
       return;
+
+    fTick++;
     
-    //--- process command file
-    while(fHandle==INVALID_HANDLE)
+    if (fReplay)
     {
-      fHandle=FileOpen(comfile,FILE_CSV|FILE_READ);
-      
-      if (++try>20)
+      while (rTick<=fTick)
+      {
+        if (rTick==fTick)
+          ProcessCommand(fRecord);
+
+        if (FileIsEnding(fHandle))
+          break;
+        else
+        {
+          fRecord      = FileReadString(fHandle);
+          fRecord      = StringTrimLeft(StringTrimRight(fRecord));
+
+          SplitStr(fRecord,"|",params);
+
+          pcount       = ArraySize(params)-2;
+          rTick        = (int)params[0];
+
+          ArrayCopy(params,params,0,2);
+        }
+      }
+    }
+    else
+    //--- process command file
+    {
+      fHandle             = FileOpen(comfile,FILE_CSV|FILE_READ);
+
+      if (fHandle==INVALID_HANDLE)
       {
         Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
         return;
       }
-    }
 
-    if (IsChanged(fTime,FileGetInteger(fHandle,FILE_MODIFY_DATE)))
-    {
-      UpdateLabel("lbvAC-File",comfile,clrYellow);
-      UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
-    }
-    else
-    {
-      ObjectSet("lbvAC-Processed",OBJPROP_COLOR,clrDarkGray);
-      FileClose(fHandle);
-      return;
-    } 
-
-    while (!FileIsEnding(fHandle))
-    {
-      fRecord      = FileReadString(fHandle);
-      fRecord      = StringTrimLeft(StringTrimRight(fRecord));
-
-      lComment     = false;
-      if (InStr(fRecord,"//"))
-        lComment   = true;
-          
-      if (InStr(fRecord,"/*"))
-        bComment   = true;
-
-      if (InStr(fRecord,"*/"))
-        bComment   = false;
-          
-      if (StringLen(fRecord)>0&&!lComment&&!bComment&&!InStr(fRecord,"*/"))
+      if (IsChanged(fTime,FileGetInteger(fHandle,FILE_MODIFY_DATE)))
       {
-        SplitStr(fRecord," ",params);
+        UpdateLabel("lbvAC-File",comfile,clrYellow);
+        UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
 
-        fRecord = "";
-        pcount  = ArraySize(params);
-
-        for (int i=0;i<pcount;i++)
-          Append(fRecord,params[i],"|");
-
-        if (params[0]=="VERIFY")
+        while (!FileIsEnding(fHandle)&&!fReplay)
         {
-          verify = true;
-          go     = false;
-        }
-        else
-        if (verify)
-          go = MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command ["+(string)pcount+"]: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES;
+          fRecord      = FileReadString(fHandle);
+          fRecord      = StringTrimLeft(StringTrimRight(fRecord));
 
-        //--- Verify Mode
-        if (go)
-        {
-          //-- Print utilities
-          if (params[0]=="PRINT")
-            switch (pcount)
-            {
-              case 2:     if (InStr("REQUEST",params[1],3))
-                            Print(order.QueueStr());
+          lComment     = false;
+          if (InStr(fRecord,"//"))
+            lComment   = true;
+              
+          if (InStr(fRecord,"/*"))
+            bComment   = true;
 
-                          if (InStr("ORDER",params[1],3))
-                            Print(order.OrderStr());
-
-                          if (InStr("LOG",params[1],3))
-                            order.PrintLog();
-
-                          if (InStr("SUMMARY",params[1],3))
-                            Print(order.SummaryStr());
-                          break;
-
-              case 3:     if (InStr("REQUEST",params[1],3))
-                            Print(order.QueueStr(ActionCode(params[2])));
-
-                          if (InStr("ORDER",params[1],3))
-                            Print(order.OrderStr(ActionCode(params[2])));
-
-                          if (InStr("LOG",params[1],3))
-                            order.PrintLog((int)params[2]);
-
-                          if (InStr("MASTER",params[1],6))
-                            Print(order.MasterStr(ActionCode(params[2])));
-            }
-          else
-
-          //-- Hide Stops/TPs
-          if (params[0]=="HIDE"||params[0]=="SHOW")
+          if (InStr(fRecord,"*/"))
+            bComment   = false;
+              
+          if (StringLen(fRecord)>0&&!lComment&&!bComment&&!InStr(fRecord,"*/"))
           {
-            FormatConfig(params);
+            SplitStr(fRecord," ",params);
 
-            if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
-            {
-              if (pcount<3||InStr("STOPLOSSL",params[2],2)) order.SetDefaultStop(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
-              if (pcount<3||InStr("TAKEPROFITP",params[2],2)) order.SetDefaultTarget(ActionCode(params[1]),NoValue,NoValue,params[0]=="HIDE");
-            }
-          }
-          else
+            fRecord = "";
+            pcount  = ArraySize(params);
 
-          //-- Hedge Requests
-          if (params[0]=="HEDGE")
-            if (fabs(order[Net].Lots)>0)
-              order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+            for (int i=0;i<pcount;i++)
+              Append(fRecord,params[i],"|");
+
+            if (params[0]=="VERIFY")
+              verify = true;
             else
-              Alert("Nothing to hedge");
-          else
-
-          //-- Order Requests
-          if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
-          {
-            FormatOrder(params);
-
-            request                  = order.BlankRequest(StringSubstr(comfile,0,StringLen(comfile)-4));
-            request.Action           = ActionCode(params[0]);
-            request.Price            = ParseEntryPrice(request.Action,params[2]);
-            request.Type             = ActionCode(params[0],request.Price);
-            request.Lots             = StringToDouble(params[1]);
-            request.TakeProfit       = ParseExitPrice(Profit,request.Action,params[4],request.Price);
-            request.StopLoss         = ParseExitPrice(Loss,request.Action,params[5],request.Price);
-            request.Memo             = params[3];
-            request.Expiry           = BoolToDate(StringLen(params[6])>9,StringToTime(params[6]),
-                                         BoolToDate(StringSubstr(params[6],0,1)=="H",TimeCurrent()+(Period()*60*(int)StringSubstr(params[6],1)),
-                                         BoolToDate(StringSubstr(params[6],0,1)=="D",TimeCurrent()+(Period()*60*24*(int)StringSubstr(params[6],1)),
-                                         TimeCurrent()+(Period()*60))));
-            
-            switch (ActionCode(params[7]))
+            if (verify)
             {
-              case OP_BUY:             request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
-                                                                BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
-                                       request.Pend.LBound    = ParseEntryPrice(Action(OP_BUY,InAction,InContrarian),params[9]);
-                                       request.Pend.UBound    = ParseEntryPrice(OP_BUY,params[10]);
-                                       request.Pend.Step      = StringToDouble(params[11]);
-                                       break;
-
-              case OP_SELL:            request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
-                                                                BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
-                                       request.Pend.LBound    = ParseEntryPrice(Action(OP_SELL,InAction,InContrarian),params[9]);
-                                       request.Pend.UBound    = ParseEntryPrice(OP_SELL,params[10]);
-                                       request.Pend.Step      = StringToDouble(params[11]);
-                                       break;
-
-              default:                 request.Pend.Type      = NoAction;
-                                       request.Pend.LBound    = 0.00;
-                                       request.Pend.UBound    = 0.00;
-                                       request.Pend.Step      = 0.00;
+              if (MessageBoxW(0,Symbol()+"> Verify Command\n"+"  Execute command ["+(string)pcount+"]: "+fRecord,"Command Verification",MB_ICONHAND|MB_YESNO)==IDYES)
+                ProcessCommand(fRecord);
             }
-            
-            if (order.Submitted(request))
-              Print(order.RequestStr(request));
-            else
-            {
-              Print("Bad Request Format: FileString: "+fRecord+" RequestStr: "+order.RequestStr(request));
-              order.PrintLog(0);
-            }
-          }
-          else
-
-          //-- System/Action Halt
-          if (params[0]=="DISABLE"||params[0]=="HALT")
-            switch (pcount)
-            {
-              case 1:  order.Disable("Manual System Halt");
-                       break;
-              default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
-                         order.Disable(ActionCode(params[1]),"Manual "+proper(params[1])+" Halt");
-            }
-          else
-
-          //-- System/Action Resume
-          if (params[0]=="ENABLE"||params[0]=="RESUME"||params[0]=="START")
-            switch (pcount)
-            {
-              case 1:  order.Enable("Manual System Enabled");
-                       break;
-              default: if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
-                         order.Enable(ActionCode(params[1]),"Manual "+proper(params[1])+" Enabled");
-            }
-          else
-
-          //-- Order Cancelations
-          if (InStr("CANCEL",params[0],3))
-            switch (pcount)
-            {
-              case 2:   if (InStr("ALL",params[1],3))
-                          order.Cancel(NoAction,"Manual Close [All Requests]");
-                        else
-                        if (IsBetween(ActionCode(params[1]),OP_BUY,OP_SELL))
-                          order.Cancel(ActionCode(params[1]),"Manual Close [All "+proper(params[1])+"]");
-                        else
-                        if ((int)params[1]>0)
-                          order.Cancel(order.Request((int)params[1]),"Manual Close [By Request #]");
-                        break;
-
-              case 3:   switch (ActionCode(params[1]))
-                        {
-                          case OP_BUY:  request.Type      = BoolToInt(InStr("MITSTOP",params[2],3),OP_BUYSTOP,
-                                                            BoolToInt(params[2]=="LIMIT",OP_BUYLIMIT));
-
-                                        order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
-                                        break;
-                                                           
-                          case OP_SELL: request.Type     = BoolToInt(InStr("MITSTOP",params[2],3),OP_SELLSTOP,
-                                                           BoolToInt(params[2]=="LIMIT",OP_SELLLIMIT));
-
-                                        order.Cancel(request.Type,"Manual Close [All "+proper(ActionText(request.Type))+"]");
-                                        break;
-                        }
-            }
-          else
-
-          if (InStr("EQFUNDRISKZONE",params[0],2))
-          {
-            FormatConfig(params);
-            
-            //-- Fund Management
-            if (params[0]=="EQ"||params[0]=="FUND")
-              order.SetFundLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
-            else
-
-            //-- Risk Mitigation
-            if (params[0]=="RISK")
-              order.SetRiskLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
-            else
-          
-            //-- Zone Management
-            if (params[0]=="ZONE")
-              order.SetZoneLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]));
-          }
-          else
-          
-          //-- Order State Management
-          if (MethodCode(params[0])>NoValue)
-          {
-            FormatConfig(params);
-            MethodRec method = ParseMethod();
-            order.SetMethod(method.Action,method.Method,method.Group,method.Key);
-          }
-          else
-
-          //-- Order State Configuration
-          {
-            FormatConfig(params);
-            
-            //-- Risk Management
-            if (InStr("STOPLOSSL",params[0]))
-            {
-              GroupRec group = ParseGroup(Loss);
-              order.SetStopLoss(group.Action,group.Group,group.Price,group.Key);
-            }
-            else
-
-            //-- Target Management
-            if (InStr("TAKEPROFITARGETP",params[0]))
-            {
-              GroupRec group = ParseGroup(Profit);
-              order.SetTakeProfit(group.Action,group.Group,group.Price,group.Key,group.HardStop);
-            }
+            else ProcessCommand(fRecord);
           }
         }
       }
-    }
+      else ObjectSet("lbvAC-Processed",OBJPROP_COLOR,clrDarkGray);
 
-    FileClose(fHandle);
+      FileClose(fHandle);
+    }
   }
 
 //+------------------------------------------------------------------+
 //| ManualConfig - Configures Manual for operation                   |
 //+------------------------------------------------------------------+
-void ManualConfig(string ComFile)
-  {        
-    int         fHandle;
-    
-    comfile             = ComFile;
+bool ManualConfig(string ComFile="", string LogFile="")
+  {    
+    comfile            = ComFile;
 
-    //---- If not Exists, create file
-    fHandle=FileOpen(ComFile,FILE_CSV|FILE_READ|FILE_WRITE);
-    
-    if(fHandle!=INVALID_HANDLE)
+    if (StringLen(LogFile)>0)
+    {
+      logHandle        = FileOpen(LogFile,FILE_CSV|FILE_WRITE);
+
+      if (logHandle==INVALID_HANDLE)
+      {
+        Print(">>>Error opening file ("+IntegerToString(logHandle)+") for write: ",GetLastError());
+        return false;
+      }
+    }
+
+    if (StringLen(comfile)>0)
+    {
+      ProcessComFile();
       FileClose(fHandle);
+
+      if (fReplay)
+      {
+        comfile        = params[1];
+        fHandle        = FileOpen(comfile,FILE_CSV|FILE_READ);
+
+        if (fHandle==INVALID_HANDLE)
+        {
+          Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
+          return false;
+        }
+
+        UpdateLabel("lbvAC-File",comfile,clrYellow);
+        UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
+      }
+    }
+      
+    return true;
   }

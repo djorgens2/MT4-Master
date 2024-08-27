@@ -214,7 +214,7 @@ void RefreshScreen(void)
 
 
     //-- General
-    UpdateLabel("Clock",TimeToStr(TimeCurrent()),clrDodgerBlue,16);
+    UpdateLabel("Clock",TimeToStr(TimeCurrent(),TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrDodgerBlue,16);
     UpdateLabel("Price",Symbol()+"  "+DoubleToStr(Close[0],Digits),Color(Close[0]-Open[0]),16);
 
     if (inpShowComment==Yes)
@@ -725,9 +725,11 @@ int OnInit()
     }
 
     //-- Clock & Price
-    NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,indWinId);
-    NewLabel("Price","",10,30,clrDarkGray,SCREEN_LR,indWinId);
+    NewLabel("Tick","99999999",10,5,clrDarkGray,SCREEN_LR,indWinId);
+    NewLabel("Clock","",10,18,clrDarkGray,SCREEN_LR,indWinId);
+    NewLabel("Price","",10,44,clrDarkGray,SCREEN_LR,indWinId);
 
+UpdateLabel("Tick","99999999",clrDarkGray,8,"Hack");
     return(INIT_SUCCEEDED);
   }
 
