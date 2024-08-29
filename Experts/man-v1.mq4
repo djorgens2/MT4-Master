@@ -75,9 +75,8 @@ void RefreshScreen(void)
     else
     {
       UpdateLabel("Tick",(string)fTick,clrDarkGray,8,"Hack");
-      UpdateLabel("lbvAC-File",lower(comfile),clrGoldenrod);
+      UpdateLabel("lbvAC-File",lower(comfile),BoolToInt(fTick==rTick,clrGoldenrod,clrDarkGray));
     }
-
   }
 
 //+------------------------------------------------------------------+
@@ -121,7 +120,7 @@ void ScreenConfig(void)
 //+------------------------------------------------------------------+
 void OrderConfig(void)
   {
-    order = new COrder(inpBrokerModel,Hold,Hold);
+    order = new COrder(inpBrokerModel);
     order.Enable("System Enabled "+TimeToString(TimeCurrent()));
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
@@ -132,9 +131,10 @@ void OrderConfig(void)
         order.Enable(action,"Action Enabled "+TimeToString(TimeCurrent()));
 
       //-- Order Config
-      order.SetFundLimits(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.SetRiskLimits(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
-      order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
+      order.ConfigureFund(action,inpMinTarget,inpMinProfit,inpLotSize);
+      order.ConfigureRisk(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
+      order.ConfigureZone(action,inpZoneStep,inpMaxZoneMargin);
+
       order.SetDefaultStop(action,0.00,inpDefaultStop,false);
       order.SetDefaultTarget(action,0.00,inpDefaultTarget,false);
     }

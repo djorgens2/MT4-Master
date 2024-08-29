@@ -39,6 +39,7 @@ bool                  fReplay       = false;
 long                  fTime         = NoValue;
 long                  fTick         = NoValue;
 long                  rTick         = NoValue;
+datetime              rTime         = NoValue;
 
 string                comfile;
 
@@ -264,6 +265,21 @@ string MethodStr(MethodRec &Method)
   }
 
 //+------------------------------------------------------------------+
+//| ParamStr - Returns parsed pipe delimitted params                 |
+//+------------------------------------------------------------------+
+string ParamStr(void)
+  {
+    string text    = BoolToStr(pcount==ArraySize(params),">","!");
+
+    Append(text,(string)pcount,"|");
+
+    for (int i=0;i<ArraySize(params);i++)
+      Append(text,params[i],"|");
+
+    return text;
+  }
+
+//+------------------------------------------------------------------+
 //| WriteLog - Writes executed manual commands to logfile            |
 //+------------------------------------------------------------------+
 void WriteLog(string Command)
@@ -448,21 +464,45 @@ void ProcessCommand(string Command)
 
     if (InStr("EQFUNDRISKZONE",params[0],2))
     {
+      OrderMethod method   = NoValue;
+        
       FormatConfig(params);
-      
-      //-- Fund Management
-      if (params[0]=="EQ"||params[0]=="FUND")
-        order.SetFundLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
-      else
 
-      //-- Risk Mitigation
-      if (params[0]=="RISK")
-        order.SetRiskLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
-      else
-    
-      //-- Zone Management
-      if (params[0]=="ZONE")
-        order.SetZoneLimits(ActionCode(params[1]),StringToDouble(params[2]),StringToDouble(params[3]));
+      int         item     = 2;
+      int         action   = ActionCode(params[1]);
+
+      if (IsBetween(action,OP_BUY,OP_SELL))
+      {
+        //-- Fund Management
+        if (params[0]=="EQ"||params[0]=="FUND")
+        {
+          for (int config=item;config<6;config++)
+            if (MethodCode(params[config])>NoValue)
+              method           = MethodCode(params[config]);
+            else
+            {
+              if (IsEqual(StringToDouble(params[config]),0.00,2))
+              {
+                if (item==2)   params[config]  = DoubleToString(order.Config(action).EquityTarget);
+                if (item==3)   params[config]  = DoubleToString(order.Config(action).EquityMin);
+              }
+
+              params[item++]   = params[config];
+            }
+          
+          order.ConfigureFund(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]),(OrderMethod)BoolToInt(method==NoValue,order.Config(action).Method,method));
+        }
+        else
+
+        //-- Risk Mitigation
+        if (params[0]=="RISK")
+          order.ConfigureRisk(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
+        else
+      
+        //-- Zone Management
+        if (params[0]=="ZONE")
+          order.ConfigureZone(action,StringToDouble(params[2]),StringToDouble(params[3]));
+      }
     }
     else
     
@@ -519,7 +559,10 @@ void ProcessComFile(void)
           ProcessCommand(fRecord);
 
         if (FileIsEnding(fHandle))
+        {
+//          fReplay      = false;
           break;
+        }
         else
         {
           fRecord      = FileReadString(fHandle);
@@ -529,8 +572,10 @@ void ProcessComFile(void)
 
           pcount       = ArraySize(params)-2;
           rTick        = (int)params[0];
+          rTime        = StringToTime(params[1]);
 
           ArrayCopy(params,params,0,2);
+          ArrayResize(params,pcount);
         }
       }
     }

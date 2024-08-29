@@ -44,7 +44,7 @@ CTickMA               *t;
   input string           appHeader           = "";            // +--- Application Config ---+
   input BrokerModel      inpBrokerModel      = Discount;      // Broker Model
   input string           inpComFile          = "manual.csv";  // Command File
-  input YesNoType        inpShowComments     = No;            // Show Comments
+  input string           inpLogFile          = "";            // Log File for Processed Commands
   input int              inpIndSNVersion     = 2;             // Control Panel Version
 
   //--- Order Config
@@ -162,7 +162,7 @@ CTickMA               *t;
   //-- Internal EA Configuration
   string                 indSN               = "CPanel-v"+(string)inpIndSNVersion;
   string                 objectstr           = "[man-v2]";
-  int                    fhandle;
+  int                    dHandle;
 
 
 //+------------------------------------------------------------------+
@@ -170,18 +170,13 @@ CTickMA               *t;
 //+------------------------------------------------------------------+
 void DebugPrint(void)
   {
-    if (s[Daily].Pivot(Trend).Event==NewFibonacci)
-    {
-      Flag("s.Pivot-NewFiibo",Color(Direction(s[Daily].Pivot(Trend).Lead,InAction)));
-//      if (debug) Pause("New Fibonacci Pivot","Pivot Test");
-    }
-
     if (debug)
     {
       if (signal.Alert>NoAlert)
       {
-        string ftext  = DoubleToString(Close[0],_Digits);
+        string ftext  = (string)fTick;
         
+        Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,BoolToStr(signal.Trigger,"Fired","Idle"),"|");
         Append(ftext,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
         Append(ftext,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
@@ -199,12 +194,12 @@ void DebugPrint(void)
             case NewChannel: Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
                              Append(ftext,BoolToStr(t.Logged(NewLead,Notify),"Notify","NoAlert"),"|");
                              break;
-            case Exception:  Append(ftext,BoolToStr(IsEqual(signal.Event,Exception),"Critical","No Alert"),"|");
+            case Exception:  Append(ftext,BoolToStr(IsEqual(signal.Event,Exception),"Critical","NoAlert"),"|");
                              break;
             default:         Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
           }
 
-        FileWrite(fhandle,ftext);
+        FileWrite(dHandle,ftext);
       }
 
       if (signal.EntryState>NoValue)
@@ -212,13 +207,11 @@ void DebugPrint(void)
         UpdateDirection("pvMasterLead",Direction(signal.Bias,InAction),Color(Direction(signal.Bias,InAction)),24);
 
         if (s[Daily][NewLead])
-          //Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction)));
           UpdatePriceLabel("pvMajorLead"+BoolToStr(signal.Bias==Buyer,"Long","Short"),Close[0],Color(Direction(signal.Bias,InAction)));
         else
         if (t[NewLead])
-//          Flag(EnumToString(signal.Bias),Color(Direction(signal.Bias,InAction),IN_DARK_DIR));
           UpdatePriceLabel("pvMinorLead"+BoolToStr(signal.Bias==Buyer,"Long","Short"),Close[0],Color(Direction(signal.Bias,InAction),IN_DARK_DIR));
-        else // Flag("NoLead",clrYellow);
+        else 
           UpdatePriceLabel("pvLeadFibonacci",Close[0],clrYellow);
       }
     }
@@ -272,7 +265,7 @@ void RefreshScreen(void)
     {
       //-- Update Panel
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
-      UpdateLabel("lbvAC-File",inpComFile,clrGoldenrod);
+      UpdateLabel("lbvAC-File",lower(comfile),clrGoldenrod);
       
       //-- Hide non-Panel elements
       UpdateLabel("pvBalance","",clrNONE,1);
@@ -292,6 +285,11 @@ void RefreshScreen(void)
       UpdateLabel("pvMargin",DoubleToString(order.Metrics().Margin*100,1)+"%",Color(order[Net].Lots),14,"Consolas");
 
       Comment(order.QueueStr()+order.OrderStr());
+    }
+    else
+    {
+      UpdateLabel("Tick",(string)fTick,clrDarkGray,8,"Hack");
+      UpdateLabel("lbvAC-File",lower(comfile),BoolToInt(fTick==rTick,clrGoldenrod,clrDarkGray));
     }
   }
 
@@ -710,7 +708,7 @@ void ScreenConfig(void)
 //+------------------------------------------------------------------+
 void OrderConfig(void)
   {
-    order = new COrder(inpBrokerModel,Hold,Hold);
+    order = new COrder(inpBrokerModel);
     order.Enable("System Enabled "+TimeToString(TimeCurrent()));
 
     for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELL);action++)
@@ -721,18 +719,19 @@ void OrderConfig(void)
         order.Enable(action,"Action Enabled "+TimeToString(TimeCurrent()));
 
       //-- Order Config
-      order.SetFundLimits(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.SetRiskLimits(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
-      order.SetZoneLimits(action,inpZoneStep,inpMaxZoneMargin);
+      order.ConfigureFund(action,inpMinTarget,inpMinProfit,inpLotSize);
+      order.ConfigureRisk(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
+      order.ConfigureZone(action,inpZoneStep,inpMaxZoneMargin);
+
       order.SetDefaultStop(action,0.00,inpDefaultStop,false);
       order.SetDefaultTarget(action,0.00,inpDefaultTarget,false);
     }
   }
 
 //+------------------------------------------------------------------+
-//| SessionConfig Session class initialization function              |
+//| IndicatorConfig - Class initialization/construction function     |
 //+------------------------------------------------------------------+
-void SessionConfig(void)
+void IndicatorConfig(void)
   {
     //-- Initialize TickMA
     t                    = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowType);
@@ -774,16 +773,14 @@ int OnInit()
   {
     ScreenConfig();
     OrderConfig();
-    SessionConfig();
+    IndicatorConfig();
     SignalConfig();
-    ManualConfig(inpComFile);
+    ManualConfig(inpComFile,inpLogFile);
 
     InitMaster();
 
-    string price="-20p*";
-    
     if (debug)
-      fhandle = FileOpen("debug-man-v2.csv",FILE_CSV|FILE_WRITE|FILE_ANSI);
+      dHandle = FileOpen("debug-man-v2.csv",FILE_CSV|FILE_WRITE);
     
     return(INIT_SUCCEEDED);
   }
@@ -800,5 +797,18 @@ void OnDeinit(const int reason)
       delete s[type];
 
     if (debug)
-      FileClose(fhandle);
+      if (dHandle>INVALID_HANDLE)
+      {
+        FileFlush(dHandle);
+        FileClose(dHandle);
+      }
+
+    if (fHandle>INVALID_HANDLE)
+      FileClose(fHandle);
+
+    if (logHandle>INVALID_HANDLE)
+    {
+      FileFlush(logHandle);
+      FileClose(logHandle);
+    }
   }

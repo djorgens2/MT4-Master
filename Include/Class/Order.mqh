@@ -260,7 +260,7 @@ private:
 
 public:
 
-                       COrder(BrokerModel Model, OrderMethod Long, OrderMethod Short);
+                       COrder(BrokerModel Model);
                       ~COrder();
 
           //-- Order Operational Control methods
@@ -326,8 +326,8 @@ public:
           OrderDetail    Ticket(int Ticket);
           OrderSummary   Recap(int Action, SummaryType Type)   {return(Master[Action].Summary[Type]);};
           OrderSummary   Entry(int Action)                     {return(Master[Action].Entry);};
-          OrderMaster    Config(int Action) {return Master[Action];};
-          AccountMetrics Metrics(void)      {return Account;};
+          OrderMaster    Config(int Action)                    {return Master[Action];};
+          AccountMetrics Metrics(void)                         {return Account;};
 
           void         GetGroup(int Action, OrderGroup Group, int &Tickets[], int Key=NoValue);
           void         GetZone(int Action, int Zone, OrderSummary &Node);
@@ -341,9 +341,10 @@ public:
           void         SetStopLoss(int Action, OrderGroup Group, double StopLoss, int Key=NoValue);
           void         SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int Key=NoValue, bool HardStop=false);
           void         SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue);
-          void         SetFundLimits(int Action, double EquityTarget, double EquityMin, double LotSize);
-          void         SetRiskLimits(int Action, double Risk, double Scale, double Margin);
-          void         SetZoneLimits(int Action, double Step, double Margin);
+
+          void         ConfigureFund(int Action, double EquityTarget, double EquityMin, double LotSize, OrderMethod=Hold);
+          void         ConfigureRisk(int Action, double Risk, double Scale, double Margin);
+          void         ConfigureZone(int Action, double Step, double Margin);
 
           //-- Formatted Output Text
           void         PrintLog(void);
@@ -519,8 +520,9 @@ void COrder::UpdatePanel(void)
         UpdateLabel("lbvOC-"+ActionText(action)+"-LotSize",center(DoubleToStr(LotSize(action),Account.LotPrecision),7),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MinLotSize",center(DoubleToStr(Account.LotSizeMin,Account.LotPrecision),6),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MaxLotSize",center(DoubleToStr(Account.LotSizeMax,Account.LotPrecision),7),clrDarkGray,10);
-        UpdateLabel("lbvOC-"+ActionText(action)+"-DfltLotSize",BoolToStr(IsEqual(Master[action].LotScale,0.00),"Default "+DoubleToStr(Master[action].DefaultLotSize,Account.LotPrecision),
-                                                   "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%"),clrDarkGray,8);
+        UpdateLabel("lbvOC-"+ActionText(action)+"-DfltLotSize",BoolToStr(IsEqual(Master[action].DefaultLotSize,0.00),
+                                                   "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%",
+                                                   "Default "+DoubleToStr(Master[action].DefaultLotSize,Account.LotPrecision)),clrDarkGray,8);
         UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneNow",center((string)Zone(action),8),clrDarkGray,10);
@@ -1566,7 +1568,7 @@ void COrder::ProcessLosses(int Action)
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
 //+------------------------------------------------------------------+
-COrder::COrder(BrokerModel Model, OrderMethod Long, OrderMethod Short)
+COrder::COrder(BrokerModel Model)
   {
     //--- Set Panel Indicator Short Name
     indSN                            = "CPanel-v2";
@@ -1583,8 +1585,8 @@ COrder::COrder(BrokerModel Model, OrderMethod Long, OrderMethod Short)
     Account.LotPrecision   = BoolToInt(IsEqual(Account.LotSizeMin,0.01),2,1);
     Account.BaseCurrency   = 1;
 
-    InitMaster(OP_BUY,Long);
-    InitMaster(OP_SELL,Short);
+    InitMaster(OP_BUY,Hold);
+    InitMaster(OP_SELL,Hold);
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
       Account.NetProfit[action]                   = 0.00;
@@ -1760,17 +1762,11 @@ double COrder::LotSize(int Action, double Lots=0.00, double Margin=0.00)
   {
     if (IsBetween(Action,OP_BUY,OP_SELLSTOP))
     {
+      if(IsBetween(Lots,Account.LotSizeMin,Account.LotSizeMax,Account.LotPrecision))
+        return(NormalizeDouble(Lots,Account.LotPrecision));
+
       if (Master[Operation(Action)].DefaultLotSize>0.00)
         return NormalizeDouble(Master[Operation(Action)].DefaultLotSize,Account.LotPrecision);
-      else
-      if(NormalizeDouble(Lots,Account.LotPrecision)>0.00)
-        if (NormalizeDouble(Lots,Account.LotPrecision)<=Account.LotSizeMin)
-          return (Account.LotSizeMin);
-        else
-        if(Lots>Account.LotSizeMax)
-          return (Account.LotSizeMax);
-        else
-          return(NormalizeDouble(Lots,Account.LotPrecision));
 
       return NormalizeDouble(fmax(fmin((Account.Balance*BoolToDouble(Margin>0.00,Margin,Master[Operation(Action)].LotScale/100))/
                 MarketInfo(Symbol(),MODE_MARGINREQUIRED),Account.LotSizeMax),Account.LotSizeMin),Account.LotPrecision);
@@ -1976,9 +1972,6 @@ void COrder::SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key
 
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
-      if (Group==ByAction)
-        Master[Action].Method                   = Method;
-
       GetGroup(Action,Group,ticket,Key);
 
       for (int index=0;index<ArraySize(ticket);index++)
@@ -2070,22 +2063,23 @@ void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int 
   }
 
 //+------------------------------------------------------------------+
-//| SetFundLimits - Configures profit/equity management options      |
+//| ConfigureFund - Configures profit/equity management options      |
 //+------------------------------------------------------------------+
-void COrder::SetFundLimits(int Action, double EquityTarget, double EquityMin, double LotSize)
+void COrder::ConfigureFund(int Action, double EquityTarget, double EquityMin, double LotSize, OrderMethod Method=Hold)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
        Master[Action].EquityTarget      = fmax(0.00,EquityTarget);
        Master[Action].EquityMin         = fmax(0.00,EquityMin);
-       Master[Action].DefaultLotSize    = fmax(0.00,LotSize);
+       Master[Action].DefaultLotSize    = fmin(fmax(0.00,LotSize),Account.LotSizeMax);
+       Master[Action].Method            = Method;
      }
   }
 
 //+------------------------------------------------------------------+
-//| SetRiskLimits - Configures risk mitigation management options    |
+//| ConfigureRisk - Configures risk mitigation management options    |
 //+------------------------------------------------------------------+
-void COrder::SetRiskLimits(int Action, double Risk, double Scale, double Margin)
+void COrder::ConfigureRisk(int Action, double Risk, double Scale, double Margin)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
@@ -2096,9 +2090,9 @@ void COrder::SetRiskLimits(int Action, double Risk, double Scale, double Margin)
   }
 
 //+------------------------------------------------------------------+
-//| SetZoneLimits - Configures zone management options               |
+//| ConfigureZone - Configures zone management options               |
 //+------------------------------------------------------------------+
-void COrder::SetZoneLimits(int Action, double Step, double Margin)
+void COrder::ConfigureZone(int Action, double Step, double Margin)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
