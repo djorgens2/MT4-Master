@@ -207,7 +207,7 @@ private:
                         bool           HideStop;              //-- Hide stops (controlled thru EA)
                         bool           HideTarget;            //-- Hide targets (controlled thru EA)
                         //-- Distribution Management
-                        double         Step;                  //-- Order Max Range Aggregation
+                        double         ZoneStep;              //-- Order Max Range Aggregation
                         int            TicketMax;             //-- Ticket w/Highest Profit
                         int            TicketMin;             //-- Ticket w/Least Profit
                         //-- Summarized Data & Arrays
@@ -342,8 +342,8 @@ public:
           void         SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int Key=NoValue, bool HardStop=false);
           void         SetMethod(int Action, OrderMethod Method, OrderGroup Group, int Key=NoValue);
 
-          void         ConfigureFund(int Action, double EquityTarget, double EquityMin, double LotSize, OrderMethod=Hold);
-          void         ConfigureRisk(int Action, double Risk, double Scale, double Margin);
+          void         ConfigureFund(int Action, double EquityTarget, double EquityMin, OrderMethod=Hold);
+          void         ConfigureRisk(int Action, double Risk, double Margin, double Scale, double LotSize);
           void         ConfigureZone(int Action, double Step, double Margin);
 
           //-- Formatted Output Text
@@ -440,7 +440,7 @@ void COrder::InitMaster(int Action, OrderMethod Method)
     Master[Action].TakeProfit      = 0.00;
     Master[Action].HideStop        = false;
     Master[Action].HideTarget      = false;
-    Master[Action].Step            = 0.00;
+    Master[Action].ZoneStep        = 0.00;
   }
 
 //+------------------------------------------------------------------+
@@ -523,7 +523,7 @@ void COrder::UpdatePanel(void)
         UpdateLabel("lbvOC-"+ActionText(action)+"-DfltLotSize",BoolToStr(IsEqual(Master[action].DefaultLotSize,0.00),
                                                    "Scaled "+DoubleToStr(Master[action].LotScale,1)+"%",
                                                    "Default "+DoubleToStr(Master[action].DefaultLotSize,Account.LotPrecision)),clrDarkGray,8);
-        UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].Step,1),6),clrDarkGray,10);
+        UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneStep",center(DoubleToStr(Master[action].ZoneStep,1),6),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-MaxZoneMargin",center(DoubleToStr(Master[action].MaxZoneMargin,1)+"%",5),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneNow",center((string)Zone(action),8),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-EntryZone",center("Entry "+DoubleToStr(Free(action),Account.LotPrecision),10),
@@ -645,7 +645,7 @@ void COrder::UpdatePanel(void)
         
           if (IsBetween(Queue[request].Pend.Type,OP_BUY,OP_SELLSTOP))
             UpdateLabel("lbvRQ-"+(string)request+"-Step",
-                        lpad(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),Master[Operation(Queue[request].Pend.Type)].Step,Queue[request].Pend.Step),1,4),
+                        lpad(BoolToDouble(IsEqual(Queue[request].Pend.Step,0.00),Master[Operation(Queue[request].Pend.Type)].ZoneStep,Queue[request].Pend.Step),1,4),
                         BoolToInt(IsEqual(Queue[request].Pend.Step,0.00),clrYellow,clrDarkGray));
           else
             UpdateLabel("lbvRQ-"+(string)request+"-Step"," ----",clrDarkGray);
@@ -763,8 +763,8 @@ void COrder::UpdateSummary(void)
     //-- Initialize Summaries
     for (int action=OP_BUY;action<=OP_SELL;action++)
     {
-      usHighBound[action]                = BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid)+(point(Master[action].Step*0.9,8));
-      usLowBound[action]                 = BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid)-(point(Master[action].Step*0.9,8));
+      usHighBound[action]                = BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid)+(point(Master[action].ZoneStep*0.9,8));
+      usLowBound[action]                 = BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid)-(point(Master[action].ZoneStep*0.9,8));
 
       Master[action].TicketMin           = NoValue;
       Master[action].TicketMax           = NoValue;
@@ -1022,7 +1022,7 @@ OrderRequest COrder::SubmitRequest(OrderRequest &Request, bool Resubmit=false)
         Queue[request].Type           = Request.Pend.Type;
         Queue[request].Price          = Request.Price+
                                             BoolToDouble(IsEqual(Request.Pend.Step,0.00),
-                                               point(Master[Operation(Request.Pend.Type)].Step),
+                                               point(Master[Operation(Request.Pend.Type)].ZoneStep),
                                                point(Request.Pend.Step)
                                            *Direction(Request.Pend.Type,InAction,IsEqual(Request.Pend.Type,OP_BUYLIMIT)||IsEqual(Request.Pend.Type,OP_SELLLIMIT)));
         Queue[request].Memo           = "["+ActionText(Request.Pend.Type)+"] resubmit";
@@ -1951,10 +1951,10 @@ int COrder::Zone(int Action, double Price=0.00)
     if (IsBetween(Action,OP_BUY,OP_SELL))
     {
       Price   = BoolToDouble(IsEqual(Price,0.00),BoolToDouble(IsEqual(Action,OP_BUY),Bid,Ask),Price,Digits)-
-                  (Master[Action].DCA-(fdiv(point(Master[Action].Step),2))*Direction(Action,InAction));
+                  (Master[Action].DCA-(fdiv(point(Master[Action].ZoneStep),2))*Direction(Action,InAction));
 
-      return (BoolToInt(IsEqual(Action,OP_BUY),(int)floor(fdiv(Price,point(Master[Action].Step),Digits)),
-                                               (int)ceil(fdiv(Price,point(Master[Action].Step)))));
+      return (BoolToInt(IsEqual(Action,OP_BUY),(int)floor(fdiv(Price,point(Master[Action].ZoneStep),Digits)),
+                                               (int)ceil(fdiv(Price,point(Master[Action].ZoneStep)))));
     }
 
     return (0);
@@ -2065,13 +2065,12 @@ void COrder::SetTakeProfit(int Action, OrderGroup Group, double TakeProfit, int 
 //+------------------------------------------------------------------+
 //| ConfigureFund - Configures profit/equity management options      |
 //+------------------------------------------------------------------+
-void COrder::ConfigureFund(int Action, double EquityTarget, double EquityMin, double LotSize, OrderMethod Method=Hold)
+void COrder::ConfigureFund(int Action, double EquityTarget, double EquityMin, OrderMethod Method=Hold)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
        Master[Action].EquityTarget      = fmax(0.00,EquityTarget);
        Master[Action].EquityMin         = fmax(0.00,EquityMin);
-       Master[Action].DefaultLotSize    = fmin(fmax(0.00,LotSize),Account.LotSizeMax);
        Master[Action].Method            = Method;
      }
   }
@@ -2079,13 +2078,14 @@ void COrder::ConfigureFund(int Action, double EquityTarget, double EquityMin, do
 //+------------------------------------------------------------------+
 //| ConfigureRisk - Configures risk mitigation management options    |
 //+------------------------------------------------------------------+
-void COrder::ConfigureRisk(int Action, double Risk, double Scale, double Margin)
+void COrder::ConfigureRisk(int Action, double Risk, double Margin, double Scale, double LotSize)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
        Master[Action].MaxRisk           = fmax(0.00,Risk);
-       Master[Action].LotScale          = fmax(0.00,Scale);     
        Master[Action].MaxMargin         = fmax(0.00,Margin);
+       Master[Action].LotScale          = fmax(0.00,Scale);     
+       Master[Action].DefaultLotSize    = fmin(fmax(0.00,LotSize),Account.LotSizeMax);
      }
   }
 
@@ -2096,7 +2096,7 @@ void COrder::ConfigureZone(int Action, double Step, double Margin)
   {
      if (IsBetween(Action,OP_BUY,OP_SELL))
      {
-       Master[Action].Step              = fmax(0.00,Step);     
+       Master[Action].ZoneStep          = fmax(0.00,Step);
        Master[Action].MaxZoneMargin     = fmax(0.00,Margin);
      }
   }
@@ -2309,7 +2309,7 @@ string COrder::MasterStr(int Action)
     Append(text,"TakeProfit:     "+DoubleToStr(Master[Action].TakeProfit,Digits),"\n");
     Append(text,"HideStop:       "+BoolToStr(Master[Action].HideStop,InYesNo),"\n");
     Append(text,"HideTarget:     "+BoolToStr(Master[Action].HideTarget,InYesNo),"\n");
-    Append(text,"Step:           "+DoubleToStr(Master[Action].Step,1),"\n");
+    Append(text,"Step:           "+DoubleToStr(Master[Action].ZoneStep,1),"\n");
 
     return (text);
   }

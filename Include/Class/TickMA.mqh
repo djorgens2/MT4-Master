@@ -21,8 +21,7 @@ private:
     enum   CountType
            {
              Ticks,
-             Segments,
-             Pivots
+             Segments
            };
 
     struct TickRec
@@ -550,7 +549,7 @@ void CTickMA::UpdateLinear(void)
     }
 
     //-- Set Range Fractal Type (shape)
-    line.Type              = (FractalType)BoolToInt(IsBetween(Pivot().Active,Pivot().Support,Pivot().Resistance),
+    line.Type              = (FractalType)BoolToInt(IsBetween(seg.Active,seg.Support,seg.Resistance),
                                           BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Convergent,Divergent),
                                           BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
 

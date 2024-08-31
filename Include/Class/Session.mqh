@@ -224,14 +224,14 @@ void CSession::UpdateBuffers(void)
 //+------------------------------------------------------------------+
 void CSession::UpdatePanel(void)
   {
-    static FractalType pivot  = Term;
+    static FractalType fractal  = Term;
 
     indSN     = "CPanel-v2";
     indWinId  = ChartWindowFind(0,indSN);
 
     if (Event(NewFibonacci))
-      pivot                   = (FractalType)BoolToInt(Event(NewFibonacci,Critical),Origin,
-                                             BoolToInt(Event(NewFibonacci,Major),Trend,Term));
+      fractal                   = (FractalType)BoolToInt(Event(NewFibonacci,Critical),Origin,
+                                               BoolToInt(Event(NewFibonacci,Major),Trend,Term));
     if (indWinId>NoValue)
     {
       if (IsEqual(sType,Daily))
@@ -239,11 +239,11 @@ void CSession::UpdatePanel(void)
         UpdateDirection("tmaSessionTrendDir"+(string)indWinId,this[Trend].Direction,Color(this[Trend].Direction),16);
         UpdateDirection("tmaSessionTermDir"+(string)indWinId,this[Term].Direction,Color(this[Term].Direction),32);
         UpdateLabel("tmaSessionState"+(string)indWinId,rpad(EnumToString(this[Trend].State)," ",20),Color(this[Trend].Direction),12,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionFractalState"+(string)indWinId,rpad(EnumToString(pivot)+" "+EnumToString(this[pivot].State)," ",20),Color(this[pivot].Direction),12,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionPivotRet"+(string)indWinId,StringSubstr(EnumToString(this[pivot].Retrace.Level),4,4),Color(Direction(this[pivot].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
-        UpdateLabel("tmaSessionPivotExt"+(string)indWinId,StringSubstr(EnumToString(this[pivot].Extension.Level),4),Color(Direction(this[pivot].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
-        UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(this[pivot].Pivot.Lead,InAction),Color(Direction(this[pivot].Pivot.Lead,InAction)),16);
-        UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(this[pivot].Pivot.Bias,InAction),Color(Direction(this[pivot].Pivot.Bias,InAction)),16);
+        UpdateLabel("tmaSessionFractalState"+(string)indWinId,rpad(EnumToString(fractal)+" "+EnumToString(this[fractal].State)," ",20),Color(this[fractal].Direction),12,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotRet"+(string)indWinId,StringSubstr(EnumToString(this[fractal].Retrace.Level),4,4),Color(Direction(this[fractal].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateLabel("tmaSessionPivotExt"+(string)indWinId,StringSubstr(EnumToString(this[fractal].Extension.Level),4),Color(Direction(this[fractal].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
+        UpdateDirection("tmaSessionPivotLead"+(string)indWinId,Direction(this[fractal].Pivot.Lead,InAction),Color(Direction(this[fractal].Pivot.Lead,InAction)),16);
+        UpdateDirection("tmaSessionPivotBias"+(string)indWinId,Direction(this[fractal].Pivot.Bias,InAction),Color(Direction(this[fractal].Pivot.Bias,InAction)),16);
       }
 
       //-- Update Control Panel (Session)

@@ -131,11 +131,11 @@ void CallPause(string Message, bool Pause)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    static FractalType pivot  = Term;
+    static FractalType fractal  = Term;
 
     if (t[NewFibonacci])
-      pivot                   = (FractalType)BoolToInt(t.Event(NewFibonacci,Critical),Origin,
-                                             BoolToInt(t.Event(NewFibonacci,Major),Trend,Term));
+      fractal                   = (FractalType)BoolToInt(t.Event(NewFibonacci,Critical),Origin,
+                                               BoolToInt(t.Event(NewFibonacci,Major),Trend,Term));
 
     UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed,-1);
     UpdatePriceLabel("tmaPL(rs):"+(string)indWinId,t.Pivot().Resistance,clrLawnGreen,-1);
@@ -144,34 +144,34 @@ void RefreshScreen(void)
 
     if (inpShowFractal>stNone)
     {
-      UpdateRay("lnS_Origin:"+EnumToString(pivot),inpPeriods,t[pivot].Fractal[fpOrigin],-8);
-      UpdateRay("lnS_Base:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpBase],-8);
-      UpdateRay("lnS_Root:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpRoot],-8,0,
-                               BoolToInt(IsEqual(t[pivot].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateRay("lnS_Expansion:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpExpansion],-8,0,
-                               BoolToInt(IsEqual(t[pivot].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateRay("lnS_Retrace:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpRetrace],-8,0);
-      UpdateRay("lnS_Recovery:"+(string)indWinId,inpPeriods,t[pivot].Fractal[fpRecovery],-8,0);
+      UpdateRay("lnS_Origin:"+EnumToString(fractal),inpPeriods,t[fractal].Point[fpOrigin],-8);
+      UpdateRay("lnS_Base:"+(string)indWinId,inpPeriods,t[fractal].Point[fpBase],-8);
+      UpdateRay("lnS_Root:"+(string)indWinId,inpPeriods,t[fractal].Point[fpRoot],-8,0,
+                               BoolToInt(IsEqual(t[fractal].Direction,DirectionUp),clrRed,clrLawnGreen));
+      UpdateRay("lnS_Expansion:"+(string)indWinId,inpPeriods,t[fractal].Point[fpExpansion],-8,0,
+                               BoolToInt(IsEqual(t[fractal].Direction,DirectionUp),clrLawnGreen,clrRed));
+      UpdateRay("lnS_Retrace:"+(string)indWinId,inpPeriods,t[fractal].Point[fpRetrace],-8,0);
+      UpdateRay("lnS_Recovery:"+(string)indWinId,inpPeriods,t[fractal].Point[fpRecovery],-8,0);
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        UpdateRay("lnS_"+EnumToString(fibo)+":"+(string)indWinId,inpPeriods,t.Price(fibo,pivot,Extension),-8,0,Color(t[pivot].Direction,IN_DARK_DIR));
-        UpdateText("lnT_"+EnumToString(fibo)+":"+(string)indWinId,"",t.Price(fibo,pivot,Extension),-5,Color(t[pivot].Direction,IN_DARK_DIR));
+        UpdateRay("lnS_"+EnumToString(fibo)+":"+(string)indWinId,inpPeriods,t.Price(fibo,fractal,Extension),-8,0,Color(t[fractal].Direction,IN_DARK_DIR));
+        UpdateText("lnT_"+EnumToString(fibo)+":"+(string)indWinId,"",t.Price(fibo,fractal,Extension),-5,Color(t[fractal].Direction,IN_DARK_DIR));
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[pivot].Fractal[point],-7);
+        UpdateText("lnT_"+fp[point]+":"+(string)indWinId,"",t[fractal].Point[point],-7);
     }
 
     //-- Fractal Box
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
     UpdateDirection("tmaFractalTermDir"+(string)indWinId,t[Term].Direction,Color(t[Term].Direction),32);
     UpdateLabel("tmaFractalTrendState"+(string)indWinId,rpad(EnumToString(t[Trend].State)," ",20),Color(t[Trend].Direction),12,"Noto Sans Mono CJK HK");
-    UpdateLabel("tmaFractalPivot"+(string)indWinId,rpad(EnumToString(pivot)+" "+EnumToString(t[pivot].State)," ",20),Color(t[pivot].Direction),12,"Noto Sans Mono CJK HK");
-    UpdateLabel("tmaFractalPivotRet"+(string)indWinId,StringSubstr(EnumToString(t[pivot].Retrace.Level),4,4),Color(Direction(t[pivot].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
-    UpdateLabel("tmaFractalPivotExt"+(string)indWinId,StringSubstr(EnumToString(t[pivot].Extension.Level),4),Color(Direction(t[pivot].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
-    UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[pivot].Pivot.Lead,InAction),Color(Direction(t[pivot].Pivot.Lead,InAction)),16);
-    UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[pivot].Pivot.Bias,InAction),Color(Direction(t[pivot].Pivot.Bias,InAction)),16);
+    UpdateLabel("tmaFractalPivot"+(string)indWinId,rpad(EnumToString(fractal)+" "+EnumToString(t[fractal].State)," ",20),Color(t[fractal].Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaFractalPivotRet"+(string)indWinId,StringSubstr(EnumToString(t[fractal].Retrace.Level),4,4),Color(Direction(t[fractal].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaFractalPivotExt"+(string)indWinId,StringSubstr(EnumToString(t[fractal].Extension.Level),4),Color(Direction(t[fractal].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[fractal].Pivot.Lead,InAction),Color(Direction(t[fractal].Pivot.Lead,InAction)),16);
+    UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[fractal].Pivot.Bias,InAction),Color(Direction(t[fractal].Pivot.Bias,InAction)),16);
 
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
@@ -729,7 +729,6 @@ int OnInit()
     NewLabel("Clock","",10,18,clrDarkGray,SCREEN_LR,indWinId);
     NewLabel("Price","",10,44,clrDarkGray,SCREEN_LR,indWinId);
 
-UpdateLabel("Tick","99999999",clrDarkGray,8,"Hack");
     return(INIT_SUCCEEDED);
   }
 

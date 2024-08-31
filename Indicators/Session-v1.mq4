@@ -112,14 +112,14 @@ void RefreshScreen(void)
     {
       int bar      = 80;
 
-      UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpOrigin],-8);
-      UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpBase],-8);
-      UpdateRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRoot],-8,0,
+      UpdateRay(sObjectStr+"lnS_Origin:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpOrigin],-8);
+      UpdateRay(sObjectStr+"lnS_Base:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpBase],-8);
+      UpdateRay(sObjectStr+"lnS_Root:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpRoot],-8,0,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpExpansion],-8,0,
+      UpdateRay(sObjectStr+"lnS_Expansion:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpExpansion],-8,0,
                              BoolToInt(IsEqual(s[ShowFractal].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRetrace],-8,0);
-      UpdateRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),bar,s[ShowFractal].Fractal[fpRecovery],-8,0);
+      UpdateRay(sObjectStr+"lnS_Retrace:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpRetrace],-8,0);
+      UpdateRay(sObjectStr+"lnS_Recovery:"+EnumToString(inpType),bar,s[ShowFractal].Point[fpRecovery],-8,0);
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
@@ -128,7 +128,7 @@ void RefreshScreen(void)
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Fractal[point],-6);
+        UpdateText(sObjectStr+"lnT_"+fp[point]+":"+EnumToString(inpType),"",s[ShowFractal].Point[point],-6);
     }
 
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)

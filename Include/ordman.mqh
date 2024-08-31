@@ -267,7 +267,7 @@ string MethodStr(MethodRec &Method)
 //+------------------------------------------------------------------+
 //| ParamStr - Returns parsed pipe delimitted params                 |
 //+------------------------------------------------------------------+
-string ParamStr(void)
+string ParamStr(OrderMethod Method=NoValue)
   {
     string text    = BoolToStr(pcount==ArraySize(params),">","!");
 
@@ -275,6 +275,8 @@ string ParamStr(void)
 
     for (int i=0;i<ArraySize(params);i++)
       Append(text,params[i],"|");
+
+    Append(text,BoolToStr(Method>NoValue,EnumToString(Method)),"|");
 
     return text;
   }
@@ -473,35 +475,49 @@ void ProcessCommand(string Command)
 
       if (IsBetween(action,OP_BUY,OP_SELL))
       {
-        //-- Fund Management
-        if (params[0]=="EQ"||params[0]=="FUND")
-        {
-          for (int config=item;config<6;config++)
-            if (MethodCode(params[config])>NoValue)
-              method           = MethodCode(params[config]);
-            else
+        for (int config=item;config<6;config++)
+          if (MethodCode(params[config])>NoValue)
+            method           = MethodCode(params[config]);
+          else
+          {
+            if (IsEqual(StringToDouble(params[config]),0.00,2))
             {
-              if (IsEqual(StringToDouble(params[config]),0.00,2))
+              //-- Fund Management
+              if (params[0]=="EQ"||params[0]=="FUND")
               {
                 if (item==2)   params[config]  = DoubleToString(order.Config(action).EquityTarget);
                 if (item==3)   params[config]  = DoubleToString(order.Config(action).EquityMin);
               }
+              else
 
-              params[item++]   = params[config];
+              //-- Risk Mitigation
+              if (params[0]=="RISK")
+              {
+                if (item==2)   params[config]  = DoubleToString(order.Config(action).MaxRisk);
+                if (item==3)   params[config]  = DoubleToString(order.Config(action).MaxMargin);
+                if (item==4)   params[config]  = DoubleToString(order.Config(action).LotScale);
+                if (item==5)   params[config]  = BoolToStr(params[config]=="",DoubleToString(order.Config(action).DefaultLotSize));
+              }
+              else
+
+              //-- Zone Management
+              if (params[0]=="ZONE")
+              {
+                if (item==2)   params[config]  = DoubleToString(order.Config(action).ZoneStep);
+                if (item==3)   params[config]  = DoubleToString(order.Config(action).MaxZoneMargin);
+              }
             }
-          
-          order.ConfigureFund(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]),(OrderMethod)BoolToInt(method==NoValue,order.Config(action).Method,method));
-        }
-        else
 
-        //-- Risk Mitigation
-        if (params[0]=="RISK")
-          order.ConfigureRisk(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]));
+            params[item++]   = params[config];
+          }
+
+        if (params[0]=="RISK")                  
+          order.ConfigureRisk(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]),StringToDouble(params[4]));
         else
-      
-        //-- Zone Management
-        if (params[0]=="ZONE")
+        if (params[0]=="ZONE")      
           order.ConfigureZone(action,StringToDouble(params[2]),StringToDouble(params[3]));
+        else
+          order.ConfigureFund(action,StringToDouble(params[2]),StringToDouble(params[3]),(OrderMethod)BoolToInt(method==NoValue,order.Config(action).Method,method));
       }
     }
     else

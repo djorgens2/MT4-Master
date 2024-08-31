@@ -22,14 +22,6 @@ CTickMA               *t;
 
 #include <ordman.mqh>
 
-  //--- Fractal Model
-  enum IndicatorType
-       {
-         Session,   // Session
-         TickMA     // TickMA
-       };
-
-
   //--- Show Fractal Event Flag
   enum ShowType
        {
@@ -53,7 +45,7 @@ CTickMA               *t;
   input double           inpMinProfit        = 0.8;           // Minimum take profit%
   input double           inpMaxRisk          = 50.0;          // Maximum Risk%
   input double           inpMaxMargin        = 60.0;          // Maximum Open Margin
-  input double           inpLotFactor        = 2.00;          // Scaling Lotsize Balance Risk%
+  input double           inpLotScale        = 2.00;          // Scaling Lotsize Balance Risk%
   input double           inpLotSize          = 0.00;          // Lotsize Override
   input int              inpDefaultStop      = 50;            // Default Stop Loss (pips)
   input int              inpDefaultTarget    = 50;            // Default Take Profit (pips)
@@ -77,6 +69,13 @@ CTickMA               *t;
   input int              inpUSClose          = 23;            // US Session Closing Hour
   input int              inpGMTOffset        = 0;             // Offset from GMT+3
 
+
+  //--- Data Source Type
+  enum    SourceType
+          {
+            Session,         //-- Session
+            TickMA           //-- TickMA
+          };
 
   //-- Strategy Types
   enum    StrategyType
@@ -128,7 +127,9 @@ CTickMA               *t;
   //-- Signals (Events) requiring Manager Action (Response)
   struct  SignalRec
           {
-            IndicatorType    Source;
+            long             Tick;
+            double           Price;
+            SourceType       Source;
             FractalType      Type;
             FractalState     State;
             EventType        Event;
@@ -136,14 +137,14 @@ CTickMA               *t;
             int              Direction;
             RoleType         Lead;
             RoleType         Bias;
-            PivotRec         Pivot;
-            PivotDetail      Crest;
-            PivotDetail      Trough;
             bool             Trigger;
             FractalState     EntryState;
             bool             ActiveEvent;
           };
 
+  PivotRec         pivot;
+  PivotDetail      crest;
+  PivotDetail      trough;
 
   //-- Master Control Operationals
   struct  MasterRec
@@ -166,6 +167,21 @@ CTickMA               *t;
 
 
 //+------------------------------------------------------------------+
+//| WriteSignal- Creates, maintains and writes Signal History        |
+//+------------------------------------------------------------------+
+void WriteSignal(void)
+  {
+    int sigHandle = FileOpen("sighist.csv",FILE_BIN|FILE_WRITE);
+
+    if (sigHandle>INVALID_HANDLE)
+    {
+      FileWriteStruct(sigHandle,signal);
+      FileFlush(sigHandle);
+      FileClose(sigHandle);
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| DebugPrint - Prints debug/event data                             |
 //+------------------------------------------------------------------+
 void DebugPrint(void)
@@ -176,6 +192,7 @@ void DebugPrint(void)
       {
         string ftext  = (string)fTick;
         
+        Pause("Tick: "+ftext+"\n\n"+t.EventLogStr()+"\n\nSession:\n"+s[Daily].EventLogStr(),"Signal Event");
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,BoolToStr(signal.Trigger,"Fired","Idle"),"|");
         Append(ftext,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
@@ -200,6 +217,7 @@ void DebugPrint(void)
           }
 
         FileWrite(dHandle,ftext);
+        WriteSignal();
       }
 
       if (signal.EntryState>NoValue)
@@ -331,10 +349,12 @@ RoleType Manager(SessionRec &Session)
 //+------------------------------------------------------------------+
 //| UpdateSignal - Updates Fractal data from Supplied Fractal        |
 //+------------------------------------------------------------------+
-void UpdateSignal(IndicatorType Source, CFractal &Signal)
+void UpdateSignal(SourceType Source, CFractal &Signal)
   {
     if (Signal.ActiveEvent())
     {
+      signal.Tick             = fTick;
+      signal.Price            = Close[0];
       signal.Event            = Exception;
 
       if (Signal.Event(NewFractal))
@@ -345,8 +365,9 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
         signal.State          = Reversal;
         signal.Event          = NewFractal;
         signal.Direction      = Signal[signal.Type].Direction;
-        signal.Pivot          = Signal[signal.Type].Pivot;
         signal.Trigger        = true;
+
+        pivot                 = Signal[signal.Type].Pivot;
       }
       else
       if (Signal.Event(NewFibonacci))
@@ -406,18 +427,18 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
     if (signal.Trigger)
     {
       signal.Lead           = signal.Bias;
-      signal.Pivot.High     = t.Segment().High;
-      signal.Pivot.Low      = t.Segment().Low;
+      pivot.High            = t.Segment().High;
+      pivot.Low             = t.Segment().Low;
     }
 
-    if (IsHigher(Close[0],signal.Pivot.High))
+    if (IsHigher(Close[0],pivot.High))
       signal.Lead           = Buyer;
 
-    if (IsLower(Close[0],signal.Pivot.Low))
+    if (IsLower(Close[0],pivot.Low))
       signal.Lead           = Seller;
       
-    UpdatePriceLabel("sigHi",signal.Pivot.High,clrLawnGreen,-6);
-    UpdatePriceLabel("sigLo",signal.Pivot.Low,clrRed,-6);
+    UpdatePriceLabel("sigHi",pivot.High,clrLawnGreen,-6);
+    UpdatePriceLabel("sigLo",pivot.Low,clrRed,-6);
   }
 
 
@@ -426,34 +447,35 @@ void UpdateSignal(IndicatorType Source, CFractal &Signal)
 //+------------------------------------------------------------------+
 void UpdateSignal(void)
   {    
-    double crest             = t.SMA().High[0];
-    double trough            = t.SMA().Low[0];
+    double high              = t.SMA().High[0];
+    double low               = t.SMA().Low[0];
 
-    double chead             = signal.Crest.Pivot[signal.Crest.Head];
-    double thead             = signal.Trough.Pivot[signal.Trough.Head];
+    double chead             = crest.Pivot[crest.Head];
+    double thead             = trough.Pivot[trough.Head];
 
     int    cflat             = 0;
     int    tflat             = 0;
 
-    signal.Crest.Trigger     = false;
-    signal.Trough.Trigger    = false;
     signal.ActiveEvent       = t.ActiveEvent()||s[Daily].ActiveEvent();
 
-    signal.Crest.Count       = 0;
-    signal.Trough.Count      = 0;
 
-    ArrayInitialize(signal.Crest.Pivot,0.00);
-    ArrayInitialize(signal.Trough.Pivot,0.00);
+    crest.Trigger            = false;
+    trough.Trigger           = false;
+    crest.Count              = 0;
+    trough.Count             = 0;
+
+    ArrayInitialize(crest.Pivot,0.00);
+    ArrayInitialize(trough.Pivot,0.00);
 
     for (int node=2;node<inpPeriods-1;node++)
     {
-      if (IsHigher(t.SMA().High[node],crest))
+      if (IsHigher(t.SMA().High[node],high))
         if (t.SMA().High[node]>t.SMA().High[node-1])
         {
           if (t.SMA().High[node]>t.SMA().High[node+1])
           {
-            signal.Crest.Pivot[node]     = crest;
-            signal.Crest.Head            = BoolToInt(IsEqual(signal.Crest.Count++,0),node,signal.Crest.Head);
+            crest.Pivot[node]     = high;
+            crest.Head            = BoolToInt(IsEqual(crest.Count++,0),node,crest.Head);
           }
 
           cflat              = BoolToInt(IsEqual(t.SMA().High[node],t.SMA().High[node+1]),node);
@@ -461,16 +483,16 @@ void UpdateSignal(void)
         
       if (cflat>0)
         if (t.SMA().High[node]<t.SMA().High[cflat])
-          if (IsChanged(signal.Crest.Pivot[cflat],crest))
-            signal.Crest.Count++;
+          if (IsChanged(crest.Pivot[cflat],high))
+            crest.Count++;
 
-      if (IsLower(t.SMA().Low[node],trough))
+      if (IsLower(t.SMA().Low[node],low))
         if (t.SMA().Low[node]<t.SMA().Low[node-1])
         {
           if (t.SMA().Low[node]<t.SMA().Low[node+1])
           {
-            signal.Trough.Pivot[node]    = trough;
-            signal.Trough.Head           = BoolToInt(IsEqual(signal.Trough.Count++,0),node,signal.Trough.Head);
+            trough.Pivot[node]    = low;
+            trough.Head           = BoolToInt(IsEqual(trough.Count++,0),node,trough.Head);
           }
 
           tflat              = BoolToInt(IsEqual(t.SMA().Low[node],t.SMA().Low[node+1]),node);
@@ -478,12 +500,12 @@ void UpdateSignal(void)
 
       if (tflat>0)
         if (t.SMA().Low[node]>t.SMA().Low[tflat])
-          if (IsChanged(signal.Trough.Pivot[tflat],trough))
-            signal.Trough.Count++;
+          if (IsChanged(trough.Pivot[tflat],low))
+            trough.Count++;
     }
 
-    signal.Crest.Trigger     = IsChanged(chead,signal.Crest.Head);
-    signal.Trough.Trigger    = IsChanged(thead,signal.Trough.Head);
+    crest.Trigger     = IsChanged(chead,crest.Head);
+    trough.Trigger    = IsChanged(thead,trough.Head);
   }
 
 
@@ -719,8 +741,8 @@ void OrderConfig(void)
         order.Enable(action,"Action Enabled "+TimeToString(TimeCurrent()));
 
       //-- Order Config
-      order.ConfigureFund(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.ConfigureRisk(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
+      order.ConfigureFund(action,inpMinTarget,inpMinProfit);
+      order.ConfigureRisk(action,inpMaxRisk,inpMaxMargin,inpLotScale,inpLotSize);
       order.ConfigureZone(action,inpZoneStep,inpMaxZoneMargin);
 
       order.SetDefaultStop(action,0.00,inpDefaultStop,false);
@@ -751,10 +773,10 @@ void SignalConfig(void)
     NewPriceLabel("sigHi");
     NewPriceLabel("sigLo");
 
-    ArrayResize(signal.Crest.Pivot,inpPeriods);
-    ArrayResize(signal.Trough.Pivot,inpPeriods);
-    ArrayInitialize(signal.Crest.Pivot,0.00);
-    ArrayInitialize(signal.Trough.Pivot,0.00);
+    ArrayResize(crest.Pivot,inpPeriods);
+    ArrayResize(trough.Pivot,inpPeriods);
+    ArrayInitialize(crest.Pivot,0.00);
+    ArrayInitialize(trough.Pivot,0.00);
   }
 
 //+------------------------------------------------------------------+
@@ -781,7 +803,7 @@ int OnInit()
 
     if (debug)
       dHandle = FileOpen("debug-man-v2.csv",FILE_CSV|FILE_WRITE);
-    
+
     return(INIT_SUCCEEDED);
   }
 
