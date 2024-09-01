@@ -26,6 +26,8 @@ private:
 
     struct TickRec
            {
+             int            Lead;
+             int            Bias;
              int            Count;
              double         Open;
              double         High;
@@ -238,7 +240,10 @@ void CTickMA::NewTick()
     tr[0].Close               = tmaPrice.Close;
     
     if (ArraySize(tr)>1)
+    {
+      tr[0].Lead              = Action(tr[0].Open-tr[1].Open,InDirection);
       SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow),Notify);
+    }
 
     SetEvent(NewTick,Notify);
   }
@@ -294,6 +299,8 @@ void CTickMA::UpdateTick(void)
 
     SetEvent(BoolToEvent(Event(NewHigh)||Event(NewLow),NewBoundary),Notify);
 
+    tr[0].Lead            = BoolToInt(Event(NewHigh),OP_BUY,BoolToInt(Event(NewLow),OP_SELL,tr[0].Lead));
+    tr[0].Bias            = Action(tr[0].Close-tr[0].Open,InDirection);
     tr[0].Close           = tmaPrice.Close;
     tr[0].Count++;
   }

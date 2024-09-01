@@ -192,7 +192,7 @@ void DebugPrint(void)
       {
         string ftext  = (string)fTick;
         
-        Pause("Tick: "+ftext+"\n\n"+t.EventLogStr()+"\n\nSession:\n"+s[Daily].EventLogStr(),"Signal Event");
+//        Pause("Tick: "+ftext+"\n\n"+t.EventLogStr()+"\n\nSession:\n"+s[Daily].EventLogStr(),"Signal Event");
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,BoolToStr(signal.Trigger,"Fired","Idle"),"|");
         Append(ftext,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
@@ -217,6 +217,8 @@ void DebugPrint(void)
           }
 
         FileWrite(dHandle,ftext);
+        FileFlush(dHandle);
+
         WriteSignal();
       }
 
@@ -275,11 +277,12 @@ color AlertColor(AlertType Type)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    string text     = "";
-    static int         winid     = NoValue;
+    static int     panelWinID   = NoValue;
+    static int     signalWinID  = NoValue;
+           string  text         = "";
     
     //-- Update Control Panel (Application)
-    if (IsChanged(winid,ChartWindowFind(0,indSN)))
+    if (IsChanged(panelWinID,ChartWindowFind(0,indSN)))
     {
       //-- Update Panel
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
@@ -294,7 +297,7 @@ void RefreshScreen(void)
 
     }
 
-    if (IsEqual(winid,NoValue))
+    if (IsEqual(panelWinID,NoValue))
     {
       UpdateLabel("pvBalance","$"+dollar(order.Metrics().Balance,11),clrLightGray,12,"Consolas");
       UpdateLabel("pvProfitLoss","$"+dollar(order.Metrics().Equity,11),clrLightGray,12,"Consolas");
@@ -376,6 +379,7 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
                                              BoolToInt(Signal.Event(NewFibonacci,Major),Trend,Term));
         signal.State          = Signal[signal.Type].State;
         signal.Event          = NewFibonacci;
+        signal.Direction      = Signal[signal.Type].Direction;
         signal.Trigger        = true;
       }
       else
