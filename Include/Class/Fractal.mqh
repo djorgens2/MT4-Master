@@ -11,6 +11,8 @@
 const double fibonacci[11] = {0.00,0.236,0.382,0.500,0.618,0.764,1.0,1.618,2.618,4.236,8.236};
 const string tag[12] = {"(o)","(tr)","(tm)","(p)","(b)","(r)","(e)","(d)","(c)","(iv)","(cv)","(l)"};
 const string fp[7]   = {"(o)","(b)","(r)","(e)","(rt)","(rc)","(cl)"};
+const int fpstyle[7]   = {STYLE_DOT,STYLE_SOLID,STYLE_SOLID,STYLE_SOLID,STYLE_DOT,STYLE_DOT,STYLE_SOLID};
+const int fpcolor[7]   = {clrDarkGray,clrYellow,clrRed,clrLawnGreen,clrGoldenrod,clrSteelBlue,clrDarkGray};
 
 #define   format(f) BoolToDouble(f==InDecimal,1,BoolToDouble(f==InPercent,100))
 #define   fext(b,r,e,f) fdiv(e-r,b-r)*format(f)

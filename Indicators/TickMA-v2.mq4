@@ -80,7 +80,7 @@ input ShowType     inpShowEvents     = stNone;      // Show Events
 
 //--- Indicator defs
 string         indObjectStr       = "[tv2]";
-string         indSN              = "TickMA-v2: "+(string)inpPeriods+":"+(string)inpAgg;
+string         indSN              = "TickMA-v2";
 int            indWinId           = NoValue;
 
 //--- Indicator buffers
@@ -114,10 +114,10 @@ double trough[];
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    static FractalType pivot  = Term;
+    static FractalType fractal  = Term;
 
     if (t[NewFibonacci])
-      pivot                   = (FractalType)BoolToInt(t.Event(NewFibonacci,Critical),Origin,
+      fractal                   = (FractalType)BoolToInt(t.Event(NewFibonacci,Critical),Origin,
                                              BoolToInt(t.Event(NewFibonacci,Major),Trend,Term));
 
     UpdatePriceLabel("tmaPL(sp):"+(string)indWinId,t.Pivot().Support,clrRed,-1);
@@ -145,50 +145,47 @@ void RefreshScreen(void)
         UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Point[point],-7);
     }
 
-    //-- Fractal
+    //-- Fractal Box
     UpdateDirection("tmaFractalTrendDir"+(string)indWinId,t[Trend].Direction,Color(t[Trend].Direction),16);
     UpdateDirection("tmaFractalTermDir"+(string)indWinId,t[Term].Direction,Color(t[Term].Direction),32);
-    UpdateLabel("tmaFractalTrendState"+(string)indWinId,center(EnumToString(t[Trend].State),12),Color(t[Trend].Direction),16);
-    UpdateLabel("tmaFractalPivot"+(string)indWinId,center(EnumToString(pivot)+" "+EnumToString(t[pivot].State),24),Color(t[pivot].Direction),12);
-    UpdateLabel("tmaFractalPivotRet"+(string)indWinId,"[ "+StringSubstr(EnumToString(t[pivot].Retrace.Level),4,4)+" ]",Color(Direction(t[pivot].Pivot.Lead,InAction)));
-    UpdateLabel("tmaFractalPivotExt"+(string)indWinId,"[ "+StringSubstr(EnumToString(t[pivot].Extension.Level),4)+" ]",Color(Direction(t[pivot].Pivot.Bias,InAction)));
-    UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[pivot].Pivot.Lead,InAction),Color(Direction(t[pivot].Pivot.Lead,InAction)),18);
-    UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[pivot].Pivot.Bias,InAction),Color(Direction(t[pivot].Pivot.Bias,InAction)),18);
+    UpdateLabel("tmaFractalTrendState"+(string)indWinId,rpad(EnumToString(t[Trend].State)," ",20),Color(t[Trend].Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaFractalPivot"+(string)indWinId,rpad(EnumToString(fractal)+" "+EnumToString(t[fractal].State)," ",20),Color(t[fractal].Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaFractalPivotRet"+(string)indWinId,StringSubstr(EnumToString(t[fractal].Retrace.Level),4,4),Color(Direction(t[fractal].Pivot.Lead,InAction)),10,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaFractalPivotExt"+(string)indWinId,StringSubstr(EnumToString(t[fractal].Extension.Level),4),Color(Direction(t[fractal].Pivot.Bias,InAction)),10,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaFractalPivotLead"+(string)indWinId,Direction(t[fractal].Pivot.Lead,InAction),Color(Direction(t[fractal].Pivot.Lead,InAction)),16);
+    UpdateDirection("tmaFractalPivotBias"+(string)indWinId,Direction(t[fractal].Pivot.Bias,InAction),Color(Direction(t[fractal].Pivot.Bias,InAction)),16);
 
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
     UpdateDirection("tmaLinearDir"+(string)indWinId,t.Linear().Direction,Color(t.Linear().Direction),16);
-    UpdateLabel("tmaLinearState"+(string)indWinId,center(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().Type),24),Color(t.Linear().Direction),12);
-    
-    UpdateDirection("tmaLinearLeadDir"+(string)indWinId,Direction(t.Linear().Lead,InAction),Color(Direction(t.Linear().Lead,InAction)),18);
-    UpdateLabel("tmaLinearFOC"+(string)indWinId,lpad(t.Linear().FOC[Now],3,8)+" "+lpad(t.Linear().FOC[Max],3,8)+" "+
-                  lpad(t.Linear().FOC[Min],3,8),Color(t.Linear().Direction),12);
-    UpdateDirection("tmaLinearBiasDir"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),18);
-
+    UpdateLabel("tmaLinearState"+(string)indWinId,rpad(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().Type)," ",20),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaLinearFOC"+(string)indWinId,center(lpad(t.Linear().FOC[Now],3,8)+lpad(t.Linear().FOC[Max],3,8)+lpad(t.Linear().FOC[Min],3,8),24),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaLinearLeadDir"+(string)indWinId,Direction(t.Linear().Lead,InAction),Color(Direction(t.Linear().Lead,InAction)),16);
+    UpdateDirection("tmaLinearBiasDir"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),16);
 
     //-- SMA Box
     UpdateDirection("tmaSMABias"+(string)indWinId,Direction(t.SMA().Bias,InAction)/*Lead*/,Color(Direction(t.SMA().Bias,InAction)),32);
     UpdateDirection("tmaSMADir"+(string)indWinId,t.SMA().Direction/*Lead*/,Color(t.SMA().Direction),16);
-    UpdateLabel("tmaSMAState"+(string)indWinId,center(BoolToStr(IsEqual(t.SMA().Event,NoEvent),
-                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText(t.SMA().Event)),16),
-                  Color(Direction(t.SMA().Close[0]-t.SMA().Open[0])),12);
-    UpdateDirection("tmaSMABiasHi"+(string)indWinId,t.Direction(t.SMA().High),Color(t.Direction(t.SMA().High)),18);
-    UpdateDirection("tmaSMABiasLo"+(string)indWinId,t.Direction(t.SMA().Low),Color(t.Direction(t.SMA().Low)),18);
+    UpdateLabel("tmaSMAState"+(string)indWinId,rpad(BoolToStr(IsEqual(t.SMA().Event,NoEvent),
+                  proper(DirText(t.SMA().Direction))+" "+EnumToString(t.SMA().State),EventText(t.SMA().Event))," ",20),
+                  Color(Direction(t.SMA().Close[0]-t.SMA().Open[0])),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaSMABiasHi"+(string)indWinId,t.Direction(t.SMA().High),Color(t.Direction(t.SMA().High)),16);
+    UpdateDirection("tmaSMABiasLo"+(string)indWinId,t.Direction(t.SMA().Low),Color(t.Direction(t.SMA().Low)),16);
 
     //-- Segment/Tick Box
     UpdateDirection("tmaSegmentTerm"+(string)indWinId,t.Segment().Direction[Term],Color(t.Segment().Direction[Term]),32);
     UpdateDirection("tmaSegmentTrend"+(string)indWinId,t.Segment().Direction[Trend],Color(t.Segment().Direction[Trend]),16);
-    UpdateLabel("tmaTickState"+(string)indWinId,proper(DirText(t.Segment().Direction[Lead]))+" ["+(string)t.Segment().Count+"]: "+
-                  proper(ActionText(Action(t.Segment().Direction[Lead]))),Color(t.Segment().Direction[Lead]),12);
-    UpdateDirection("tmaTickBias"+(string)indWinId,Direction(t.Tick().Lead,InAction),Color(Direction(t.Tick().Bias,InAction)),18);
-    UpdateLabel("tmaSegmentState"+(string)indWinId,proper(DirText(t.Segment().Direction[Term]))+" "+
+    UpdateLabel("tmaTickState"+(string)indWinId,rpad(proper(DirText(t.Segment().Direction[Lead]))+" ["+(string)t.Segment().Count+"]: "+
+                  proper(ActionText(Action(t.Segment().Direction[Lead])))," ",20),Color(t.Segment().Direction[Lead]),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaTickBias"+(string)indWinId,Direction(t.Tick().Lead,InAction),Color(Direction(t.Tick().Bias,InAction)),16);
+    UpdateLabel("tmaSegmentState"+(string)indWinId,rpad(proper(DirText(t.Segment().Direction[Term]))+" "+
                   BoolToStr(IsBetween(t.Pivot().Active,t.Pivot().Support,t.Pivot().Resistance),
                   BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Trend]),
-                      "Conforming: "+proper(ActionText(Action(t.Segment().Direction[Term]))),
-                      "Contrarian: "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
-                      "Breakout: "+proper(ActionText(Action(t.Segment().Direction[Term])))),
-                  Color(t.Segment().Direction[Term]),12);
-    UpdateDirection("tmaSegmentBias"+(string)indWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),18);
+                      "Conforming "+proper(ActionText(Action(t.Segment().Direction[Term]))),
+                      "Contrarian "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
+                      "Breakout "+proper(ActionText(Action(t.Segment().Direction[Term]))))," ",21),
+                  Color(t.Segment().Direction[Term]),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaSegmentBias"+(string)indWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),16);
 
     //-- Range Bounds
     UpdateRay("tmaPlanSup:"+(string)indWinId,inpPeriods-1,t.Range().Support);
@@ -443,51 +440,64 @@ int OnInit()
     NewRay("tmaClose:"+(string)indWinId,STYLE_SOLID,clrDarkGray,false,indWinId);
 
     //-- App Data Frames
-    DrawBox("bxhFractalDir"+(string)indWinId,300,5,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhFractalState"+(string)indWinId,230,5,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhFOCDir"+(string)indWinId,300,70,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhFOCState"+(string)indWinId,230,70,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhSMABias"+(string)indWinId,300,135,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhSMAState"+(string)indWinId,230,135,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhSegBias"+(string)indWinId,300,200,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
-    DrawBox("bxhSegState"+(string)indWinId,230,200,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSessionDir"+(string)indWinId,300,5,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSessionState"+(string)indWinId,230,5,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhFractalDir"+(string)indWinId,300,70,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhFractalState"+(string)indWinId,230,70,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhFOCDir"+(string)indWinId,300,135,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhFOCState"+(string)indWinId,230,135,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSMABias"+(string)indWinId,300,200,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSMAState"+(string)indWinId,230,200,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSegBias"+(string)indWinId,300,265,65,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+    DrawBox("bxhSegState"+(string)indWinId,230,265,220,60,C'0,42,0',BORDER_FLAT,SCREEN_UR,indWinId);
+
+    //-- Session Data
+    NewLabel("tmaHSession"+(string)indWinId,"Session",250,51,clrGold,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionTrendDir"+(string)indWinId,"",244,8,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionTermDir"+(string)indWinId,"",250,12,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionState"+(string)indWinId,"",64,10,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionFractalState"+(string)indWinId,"",64,34,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionPivotRet"+(string)indWinId,"",36,13,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionPivotExt"+(string)indWinId,"",36,38,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionPivotLead"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSessionPivotBias"+(string)indWinId,"",15,35,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Fractal Data
-    NewLabel("tmaHFractal"+(string)indWinId,"Fractal",250,51,clrGold,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTrendDir"+(string)indWinId,"",244,8,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTermDir"+(string)indWinId,"",250,12,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalTrendState"+(string)indWinId,"",80,10,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivot"+(string)indWinId,"",58,36,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivotRet"+(string)indWinId,"[ 999 ]",32,15,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivotExt"+(string)indWinId,"[ 999 ]",32,40,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivotLead"+(string)indWinId,"",15,10,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaFractalPivotBias"+(string)indWinId,"",15,35,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaHFractal"+(string)indWinId,"Fractal",250,116,clrGold,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalTrendDir"+(string)indWinId,"",244,73,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalTermDir"+(string)indWinId,"",250,77,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalTrendState"+(string)indWinId,"",64,75,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivot"+(string)indWinId,"",64,98,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotRet"+(string)indWinId,"[ 999 ]",36,79,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotExt"+(string)indWinId,"[ 999 ]",36,102,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotLead"+(string)indWinId,"",15,77,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaFractalPivotBias"+(string)indWinId,"",15,100,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Linear Data
-    NewLabel("tmaHLinear"+(string)indWinId,"Linear",252,116,clrGold,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearDir"+(string)indWinId,"",244,72,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearBias"+(string)indWinId,"",250,76,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearState"+(string)indWinId,"",54,78,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearLeadDir"+(string)indWinId,"",15,75,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearFOC"+(string)indWinId,"",36,104,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaLinearBiasDir"+(string)indWinId,"",15,100,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaHLinear"+(string)indWinId,"Linear",252,181,clrGold,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearDir"+(string)indWinId,"",244,137,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearBias"+(string)indWinId,"",250,141,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearState"+(string)indWinId,"",64,140,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearFOC"+(string)indWinId,"",34,164,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearLeadDir"+(string)indWinId,"",15,140,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaLinearBiasDir"+(string)indWinId,"",15,165,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- SMA Data
-    NewLabel("tmaHSMA"+(string)indWinId,"SMA",258,181,clrGold,SCREEN_UR,indWinId);
-    NewLabel("tmaSMABias"+(string)indWinId,"",250,142,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMADir"+(string)indWinId,"",244,138,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMAState"+(string)indWinId,"",76,154,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMABiasHi"+(string)indWinId,"",15,138,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSMABiasLo"+(string)indWinId,"",15,165,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaHSMA"+(string)indWinId,"SMA",258,246,clrGold,SCREEN_UR,indWinId);
+    NewLabel("tmaSMABias"+(string)indWinId,"",250,207,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSMADir"+(string)indWinId,"",244,203,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSMAState"+(string)indWinId,"",64,217,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSMABiasHi"+(string)indWinId,"",15,205,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSMABiasLo"+(string)indWinId,"",15,230,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Segment Data
-    NewLabel("tmaHSegment"+(string)indWinId,"Segment",248,246,clrGold,SCREEN_UR,indWinId);
-    NewLabel("tmaSegmentTerm"+(string)indWinId,"",250,207,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSegmentTrend"+(string)indWinId,"",244,203,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaTickState"+(string)indWinId,"",40,208,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaTickBias"+(string)indWinId,"",15,205,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSegmentState"+(string)indWinId,"",40,233,clrDarkGray,SCREEN_UR,indWinId);
-    NewLabel("tmaSegmentBias"+(string)indWinId,"",15,230,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaHSegment"+(string)indWinId,"Segment",248,311,clrGold,SCREEN_UR,indWinId);
+    NewLabel("tmaSegmentTerm"+(string)indWinId,"",250,272,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSegmentTrend"+(string)indWinId,"",244,268,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaTickState"+(string)indWinId,"",64,270,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSegmentState"+(string)indWinId,"",57,294,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaTickBias"+(string)indWinId,"",15,270,clrDarkGray,SCREEN_UR,indWinId);
+    NewLabel("tmaSegmentBias"+(string)indWinId,"",15,294,clrDarkGray,SCREEN_UR,indWinId);
 
     //-- Clock & Price
     NewLabel("Clock","",10,5,clrDarkGray,SCREEN_LR,indWinId);

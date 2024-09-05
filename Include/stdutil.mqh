@@ -123,6 +123,16 @@ enum MeasureType
        MeasureTypes      //--- must be last
      };
 
+//-- Roles
+enum RoleType
+     {
+       Buyer,           //-- Purchasing Manager
+       Seller,          //-- Selling Manager
+       Unassigned,      //-- No Manager
+       RoleTypes
+     };
+
+
 //+------------------------------------------------------------------+
 //| Pause - pauses execution and waits for user input                |
 //+------------------------------------------------------------------+
@@ -321,6 +331,26 @@ bool ActionChanged(int &Change, int Compare, bool Update=true)
       return (false);
       
     return (IsChanged(Change,Compare,Update));
+  }
+
+//+------------------------------------------------------------------+
+//| RoleChanged - Sets role on change with optional Unassigned's     |
+//+------------------------------------------------------------------+
+bool RoleChanged(RoleType &Change, RoleType Compare, bool AllowUnassigned=false, bool Update=true)
+  {
+    if (Change==Compare)
+      return false;
+
+    if (Compare==Unassigned)
+      if (AllowUnassigned)
+      {
+        if (Update) Change = Unassigned;
+        return true;
+      }
+      else return false;
+      
+    if (Update) Change = Compare;
+    return true;
   }
 
 //+------------------------------------------------------------------+

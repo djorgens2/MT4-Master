@@ -90,16 +90,6 @@ CTickMA               *t;
           };
 
 
-  //-- Roles
-  enum    RoleType
-          {
-            Buyer,           //-- Purchasing Manager
-            Seller,          //-- Selling Manager
-            Unassigned,      //-- No Manager
-            RoleTypes
-          };
-
-
   //-- Manager Config by Role
   struct  ManagerRec
           {
