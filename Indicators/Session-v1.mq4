@@ -145,14 +145,6 @@ void RefreshScreen(void)
 
     Append(text,s.ActiveEventStr(),"\n\n");
     
-//    if (s[NewLead]) Flag("s-NewLead",Color(Direction(s[ActiveSession].Bias,InAction)));
-//    if (s[NewLead]) Flag("s-NewLead",Color(Direction(s[ActiveSession].Lead,InAction)));
-//    if (s.Pivot(Trend).Event==NewLead) Flag("s.Pivot-NewLead",Color(Direction(s.Pivot(Trend).Lead,InAction),IN_DARK_DIR));
-    if (s.Pivot(Trend).Event==NewFibonacci) {
-      Flag("s.Pivot-NewFiibo",Color(Direction(s.Pivot(Trend).Lead,InAction)));
-      Pause("New Fibonacci Pivot","Pivot Test");
-    }
-
     UpdatePriceLabel(sObjectStr+"lbS_Pivot:High",s.Pivot(Trend).High,Color(Direction(s.Pivot(Trend).Lead,InAction)),-8);
     UpdatePriceLabel(sObjectStr+"lbS_Pivot:Low",s.Pivot(Trend).Low,Color(Direction(s.Pivot(Trend).Lead,InAction)),-8);
 
