@@ -201,7 +201,7 @@ public:
         double           Price(FibonacciType Level, double Root, double Reference, FractalState Method);
         double           Percent(FibonacciType Level, int Format=InDecimal) {return fibonacci[Level]*format(Format);};
         
-        void             Fractal(double &Buffer[])           {ArrayCopy(Buffer,fbuf);};
+        void             CopyBuffer(double &Buffer[])           {ArrayCopy(Buffer,fbuf);};
         FractalRec       operator[](const FractalType Type)  {return frec[Type];};
 
 

@@ -60,7 +60,7 @@ string FibonacciStr(string Type, FibonacciRec &Fibonacci)
     string text    = Type;
 
     Append(text,EnumToString(Fibonacci.Level));
-    Append(text,DoubleToStr(Fibonacci.Pivot,Digits));
+    Append(text,DoubleToStr(Fibonacci.Price,Digits));
 
 //    Append(text,"      Now/Min/Max:   ","\n");
     Append(text,DoubleToStr(Fibonacci.Percent[Now]*100,1)+"%");
@@ -80,14 +80,14 @@ void RefreshScreen(void)
 
     if (inpShowFibo>stNone)
     {
-      UpdateRay(indObjectStr+"lnS_Origin:"+EnumToString(show),inpPeriods,t[show].Fractal[fpOrigin],-8);
-      UpdateRay(indObjectStr+"lnS_Base:"+EnumToString(show),inpPeriods,t[show].Fractal[fpBase],-8);
-      UpdateRay(indObjectStr+"lnS_Root:"+EnumToString(show),inpPeriods,t[show].Fractal[fpRoot],-8,0,
+      UpdateRay(indObjectStr+"lnS_Origin:"+EnumToString(show),inpPeriods,t[show].Point[fpOrigin],-8);
+      UpdateRay(indObjectStr+"lnS_Base:"+EnumToString(show),inpPeriods,t[show].Point[fpBase],-8);
+      UpdateRay(indObjectStr+"lnS_Root:"+EnumToString(show),inpPeriods,t[show].Point[fpRoot],-8,0,
                              BoolToInt(IsEqual(t[show].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateRay(indObjectStr+"lnS_Expansion:"+EnumToString(show),inpPeriods,t[show].Fractal[fpExpansion],-8,0,
+      UpdateRay(indObjectStr+"lnS_Expansion:"+EnumToString(show),inpPeriods,t[show].Point[fpExpansion],-8,0,
                              BoolToInt(IsEqual(t[show].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateRay(indObjectStr+"lnS_Retrace:"+EnumToString(show),inpPeriods,t[show].Fractal[fpRetrace],-8,0);
-      UpdateRay(indObjectStr+"lnS_Recovery:"+EnumToString(show),inpPeriods,t[show].Fractal[fpRecovery],-8,0);
+      UpdateRay(indObjectStr+"lnS_Retrace:"+EnumToString(show),inpPeriods,t[show].Point[fpRetrace],-8,0);
+      UpdateRay(indObjectStr+"lnS_Recovery:"+EnumToString(show),inpPeriods,t[show].Point[fpRecovery],-8,0);
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
@@ -96,7 +96,7 @@ void RefreshScreen(void)
       }
 
       for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Fractal[point],-7);
+        UpdateText(indObjectStr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Point[point],-7);
     }
 
     //-- General
@@ -116,7 +116,7 @@ void RefreshScreen(void)
 void UpdateTickMA(void)
   {
     t.Update();
-    t.Fractal(plFractalBuffer);
+    t.CopyBuffer(plFractalBuffer);
 
     if (printevent)
       if (t.ActiveEvent())

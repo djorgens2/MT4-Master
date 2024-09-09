@@ -244,4 +244,7 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+
 Logs
+Files/sig*
+Files/debug*
