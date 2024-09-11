@@ -100,7 +100,7 @@ void RefreshScreen(void)
     
     for (FractalPoint point=0;point<FractalPoints;point++)
     {
-      UpdateRay("sig-"+(string)sigWinID+":"+EnumToString(point),30,
+      UpdateRay("sig-"+(string)sigWinID+":"+EnumToString(point),inpRetention,
         BoolToDouble(sigfp[point].Bar>NoValue,sigfp[point].Price),-6);
         
       UpdateLabel("sigFP-"+(string)sigWinID+":"+EnumToString(point),EnumToString(point)+":"+

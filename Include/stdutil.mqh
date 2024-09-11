@@ -12,6 +12,7 @@
 #import
 
 //--- Standard diectional defines
+#define DirectionPending     -2
 #define DirectionDown        -1
 #define NoDirection           0      //---No Direction
 #define DirectionUp           1
@@ -479,11 +480,10 @@ string DirText(int Direction, bool Contrarian=false)
     
   switch (Direction)
   {
-    case DirectionUp:    return("Long");
-    case NoDirection:    return("Flat");
-    case DirectionDown:  return("Short");
-//    case NewDirection:   return("Pending");
-    case -2:   return("Pending");
+    case DirectionUp:      return("Long");
+    case NoDirection:      return("Flat");
+    case DirectionDown:    return("Short");
+    case DirectionPending: return("Pending");
   }
 
   return("BAD DIRECTION CODE");

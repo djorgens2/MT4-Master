@@ -8,20 +8,20 @@
 #property version   "2.02"
 #property strict
 
-#define debug true
+#define debug false
 
 #include <Class/Order.mqh>
 #include <Class/Session.mqh>
 #include <Class/TickMA.mqh>
 
+#include <ordman.mqh>
+
 //-- Class defs
-COrder                *order;
+//COrder                *order;
 CSession              *s[SessionTypes];
 CTickMA               *t;
 
 FractalType show      = NoValue;
-
-#include <ordman.mqh>
 
   //--- Show Fractal Event Flag
   enum ShowType
@@ -163,8 +163,6 @@ void WriteSignal(void)
       FileWriteArray(sigHandle,signalFP);
       FileFlush(sigHandle);
       FileClose(sigHandle);
-      
-//      Pause("Tick: "+(string)fTick+"\n\n"+t.EventLogStr()+"\n\nSession:\n"+s[Daily].EventLogStr(),"Signal Event");
     }
   }
 
@@ -173,6 +171,8 @@ void WriteSignal(void)
 //+------------------------------------------------------------------+
 void DebugPrint(void)
   {
+    WriteSignal();
+
     if (debug)
     {
       if (signal.Alert>NoAlert)
@@ -208,8 +208,6 @@ void DebugPrint(void)
 
         FileWrite(dHandle,ftext);
         FileFlush(dHandle);
-
-        WriteSignal();
       }
     }
   }
@@ -269,6 +267,9 @@ void RefreshScreen(void)
     //-- Update Control Panel (Application)
     if (IsChanged(panelWinID,ChartWindowFind(0,indSN)))
     {
+      //-- Clear Comments
+      Comment("");
+      
       //-- Update Panel
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
       UpdateLabel("lbvAC-File",lower(comfile),clrGoldenrod);
@@ -549,8 +550,6 @@ void UpdateSignal(void)
           signalFP[fpRetrace]               = signalFP[fpRecovery];
           signalFP[fpBase].Price            = signalFP[fpRoot].Price;
           signalFP[fpRoot].Price            = signalFP[fpExpansion].Price;
-          
-          Flag("sigBounds:"+(string)signal.Tick,Color(signal.Direction,IN_CHART_DIR),0,signal.Price,Always);
         }
 
         signalFP[fpRecovery].Bar            = NoValue;
@@ -807,7 +806,6 @@ void OnTick()
     RefreshScreen();
     
     UpdateFractalScreen();
-    if (signal.Tick==33) Pause("Signal 33\n\n"+t.ActiveEventStr()+"\n"+s[Daily].ActiveEventStr()+"\n"+t.DisplayStr(),"Tick Check");
   }
 
 //+------------------------------------------------------------------+

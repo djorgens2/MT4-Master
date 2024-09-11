@@ -1,29 +1,35 @@
 //--- LIVE ---//
-risk long 80 15 80
-fund long 15 3 0
-zone long 3 20
+// risk long 80 80 10 0
+// fund long 10 2.5 full
+// zone long 3 20
+//
+// risk short 80 80 15 0
+// fund short 15 5 split
+// zone short 3 20
 
-risk short 80 10 80
-fund short 12 3 0
-zone short 3 20
+// close short
+// close long
+// full short
 
-close long
-full short
-
+// cancel 7
+// cancel 8
 //cancel req 2
 //full short
 //hide long tp
+//cancel 1
+
 verify
 //hedge
 //buy
+//sell 0 5p "Rally" 0 0 d1 sell limit -20p 20p 5
+sell 0 0 "Trend (Contrarian)" 0 0 d1 sell limit 35p 25p 5
 //sell
-sell
 //tp long 1.11005
 
 //close long
 
 //-- Order Management --//
-cancel all
+// cancel all
 //buy 0 0 expansion 0 0 d1 buy limit 1.0950 1.1085 10
 //buy 0 -10p retrace 0 0 d2 buy limit 1.08493 1.1080 10
 //buy 0 -5p recapture

@@ -41,10 +41,10 @@ long                  fTick         = NoValue;
 long                  rTick         = NoValue;
 datetime              rTime         = NoValue;
 
-string                comfile;
+string                comFile, resumeFile;
 
 
-//COrder *order;
+COrder *order;
 
 //+------------------------------------------------------------------+
 //| ParseEntryPrice - Format manual entry price from comfile         |
@@ -290,7 +290,7 @@ void WriteLog(string Command)
     {
       string text = (string)(fmax(1,fTick));
     
-      Append(text,TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),"|");
+      Append(text,TimeToStr(TimeCurrent(),TIME_DATE|TIME_MINUTES|TIME_SECONDS),"|");
       Append(text,Command,"|");
     
       FileWrite(logHandle,text);
@@ -305,6 +305,8 @@ void ProcessCommand(string Command)
     OrderRequest request;
 
     WriteLog(Command);
+
+    UpdateLabel("lbvAC-File",lower(comFile),clrYellow);
 
     //-- Print utilities
     if (params[0]=="REPLAY")
@@ -356,7 +358,7 @@ void ProcessCommand(string Command)
     //-- Hedge Requests
     if (params[0]=="HEDGE")
       if (fabs(order[Net].Lots)>0)
-        order.ProcessHedge(StringSubstr(comfile,0,StringLen(comfile)-4));
+        order.ProcessHedge(StringSubstr(comFile,0,StringLen(comFile)-4));
       else
         Alert("Nothing to hedge");
     else
@@ -366,7 +368,7 @@ void ProcessCommand(string Command)
     {
       FormatOrder(params);
 
-      request                  = order.BlankRequest(StringSubstr(comfile,0,StringLen(comfile)-4));
+      request                  = order.BlankRequest(StringSubstr(comFile,0,StringLen(comFile)-4));
       request.Action           = ActionCode(params[0]);
       request.Price            = ParseEntryPrice(request.Action,params[2]);
       request.Type             = ActionCode(params[0],request.Price);
@@ -381,24 +383,27 @@ void ProcessCommand(string Command)
       
       switch (ActionCode(params[7]))
       {
-        case OP_BUY:             request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
-                                                          BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
-                                  request.Pend.LBound    = ParseEntryPrice(Action(OP_BUY,InAction,InContrarian),params[9]);
-                                  request.Pend.UBound    = ParseEntryPrice(OP_BUY,params[10]);
-                                  request.Pend.Step      = StringToDouble(params[11]);
-                                  break;
+        case OP_BUY:             
+          request.Pend.Type    = BoolToInt(InStr("MITSTOP",params[8]),OP_BUYSTOP,
+                                 BoolToInt(InStr("LIMIT",params[8]),OP_BUYLIMIT));
+          request.Pend.LBound  = ParseEntryPrice(OP_BUY,"-"+params[9]);
+          request.Pend.UBound  = ParseEntryPrice(OP_BUY,params[10]);
+          request.Pend.Step    = StringToDouble(params[11]);
+          break;
 
-        case OP_SELL:            request.Pend.Type      = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
-                                                          BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
-                                  request.Pend.LBound    = ParseEntryPrice(Action(OP_SELL,InAction,InContrarian),params[9]);
-                                  request.Pend.UBound    = ParseEntryPrice(OP_SELL,params[10]);
-                                  request.Pend.Step      = StringToDouble(params[11]);
-                                  break;
+        case OP_SELL:
+          request.Pend.Type    = BoolToInt(InStr("MITSTOP",params[8]),OP_SELLSTOP,
+                                 BoolToInt(InStr("LIMIT",params[8]),OP_SELLLIMIT));
+          request.Pend.LBound  = ParseEntryPrice(OP_SELL,"-"+params[9]);
+          request.Pend.UBound  = ParseEntryPrice(OP_SELL,params[10]);
+          request.Pend.Step    = StringToDouble(params[11]);
+          break;
 
-        default:                 request.Pend.Type      = NoAction;
-                                  request.Pend.LBound    = 0.00;
-                                  request.Pend.UBound    = 0.00;
-                                  request.Pend.Step      = 0.00;
+        default:                 
+          request.Pend.Type    = NoAction;
+          request.Pend.LBound  = 0.00;
+          request.Pend.UBound  = 0.00;
+          request.Pend.Step    = 0.00;
       }
       
       if (order.Submitted(request))
@@ -496,7 +501,7 @@ void ProcessCommand(string Command)
                 if (item==2)   params[config]  = DoubleToString(order.Config(action).MaxRisk);
                 if (item==3)   params[config]  = DoubleToString(order.Config(action).MaxMargin);
                 if (item==4)   params[config]  = DoubleToString(order.Config(action).LotScale);
-                if (item==5)   params[config]  = BoolToStr(params[config]=="",DoubleToString(order.Config(action).DefaultLotSize));
+                if (item==5)   params[config]  = BoolToStr(params[config]=="",DoubleToString(order.Config(action).DefaultLotSize),params[config]);
               }
               else
 
@@ -512,12 +517,13 @@ void ProcessCommand(string Command)
           }
 
         if (params[0]=="RISK")                  
-          order.ConfigureRisk(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]),StringToDouble(params[4]));
+          order.ConfigureRisk(action,StringToDouble(params[2]),StringToDouble(params[3]),StringToDouble(params[4]),StringToDouble(params[5]));
         else
         if (params[0]=="ZONE")      
           order.ConfigureZone(action,StringToDouble(params[2]),StringToDouble(params[3]));
         else
-          order.ConfigureFund(action,StringToDouble(params[2]),StringToDouble(params[3]),(OrderMethod)BoolToInt(method==NoValue,order.Config(action).Method,method));
+          order.ConfigureFund(action,StringToDouble(params[2]),StringToDouble(params[3]),
+            (OrderMethod)BoolToInt(method>NoValue,method,order.Config(action).Method));
       }
     }
     else
@@ -562,10 +568,13 @@ void ProcessComFile(void)
     bool   lComment       = false;
     bool   bComment       = false;
     
-    if (comfile=="")
+    if (comFile=="")
       return;
 
     fTick++;
+    
+    UpdateLabel("lbvAC-File",lower(comFile),clrDarkGray);
+    UpdateLabel("Tick",(string)fTick,clrDarkGray,8,"Hack");
     
     if (fReplay)
     {
@@ -576,7 +585,8 @@ void ProcessComFile(void)
 
         if (FileIsEnding(fHandle))
         {
-//          fReplay      = false;
+          fReplay      = false;
+          comFile      = resumeFile;
           break;
         }
         else
@@ -598,7 +608,7 @@ void ProcessComFile(void)
     else
     //--- process command file
     {
-      fHandle             = FileOpen(comfile,FILE_CSV|FILE_READ);
+      fHandle             = FileOpen(comFile,FILE_TXT|FILE_READ);
 
       if (fHandle==INVALID_HANDLE)
       {
@@ -608,9 +618,6 @@ void ProcessComFile(void)
 
       if (IsChanged(fTime,FileGetInteger(fHandle,FILE_MODIFY_DATE)))
       {
-        UpdateLabel("lbvAC-File",comfile,clrYellow);
-        UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
-
         while (!FileIsEnding(fHandle)&&!fReplay)
         {
           fRecord      = FileReadString(fHandle);
@@ -648,7 +655,6 @@ void ProcessComFile(void)
           }
         }
       }
-      else ObjectSet("lbvAC-Processed",OBJPROP_COLOR,clrDarkGray);
 
       FileClose(fHandle);
     }
@@ -659,11 +665,11 @@ void ProcessComFile(void)
 //+------------------------------------------------------------------+
 bool ManualConfig(string ComFile="", string LogFile="")
   {    
-    comfile            = ComFile;
+    comFile            = ComFile;
 
     if (StringLen(LogFile)>0)
     {
-      logHandle        = FileOpen(LogFile,FILE_CSV|FILE_WRITE);
+      logHandle        = FileOpen(LogFile,FILE_TXT|FILE_WRITE);
 
       if (logHandle==INVALID_HANDLE)
       {
@@ -672,24 +678,22 @@ bool ManualConfig(string ComFile="", string LogFile="")
       }
     }
 
-    if (StringLen(comfile)>0)
+    if (StringLen(comFile)>0)
     {
       ProcessComFile();
       FileClose(fHandle);
 
       if (fReplay)
       {
-        comfile        = params[1];
-        fHandle        = FileOpen(comfile,FILE_CSV|FILE_READ);
+        comFile        = params[1];
+        resumeFile     = ComFile;
+        fHandle        = FileOpen(comFile,FILE_TXT|FILE_READ);
 
         if (fHandle==INVALID_HANDLE)
         {
           Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
           return false;
         }
-
-        UpdateLabel("lbvAC-File",comfile,clrYellow);
-        UpdateLabel("lbvAC-Processed",TimeToStr((datetime)fTime,TIME_DATE|TIME_MINUTES|TIME_SECONDS),clrYellow);
       }
     }
       

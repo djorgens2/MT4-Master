@@ -11,6 +11,7 @@
 #define debug true
 
 #include <Class/Order.mqh>
+#include <ordman.mqh>
 
 //--- EA Config
 input string           appHeader           = "";            // +--- Application Config ---+
@@ -25,19 +26,14 @@ input double           inpMinTarget        = 5.0;           // Equity% Target
 input double           inpMinProfit        = 0.8;           // Minimum take profit%
 input double           inpMaxRisk          = 50.0;          // Maximum Risk%
 input double           inpMaxMargin        = 60.0;          // Maximum Open Margin
-input double           inpLotFactor        = 2.00;          // Scaling Lotsize Balance Risk%
+input double           inpLotScale         = 2.00;          // Scaling Lotsize Balance Risk%
 input double           inpLotSize          = 0.00;          // Lotsize Override
 input int              inpDefaultStop      = 50;            // Default Stop Loss (pips)
 input int              inpDefaultTarget    = 50;            // Default Take Profit (pips)
 input double           inpZoneStep         = 2.5;           // Zone Step (pips)
 input double           inpMaxZoneMargin    = 5.0;           // Max Zone Margin
 
-//-- Class defs
-COrder                *order;
-
 string indSN         = "CPanel-v"+(string)inpCPanel;
-
-#include <ordman.mqh>
 
 //+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
@@ -71,11 +67,6 @@ void RefreshScreen(void)
       UpdateLabel("pvMargin",DoubleToString(order.Metrics().Margin*100,1)+"%",Color(order[Net].Lots),14,"Consolas");
 
       Comment(order.QueueStr()+order.OrderStr());
-    }
-    else
-    {
-      UpdateLabel("Tick",(string)fTick,clrDarkGray,8,"Hack");
-      UpdateLabel("lbvAC-File",lower(comfile),BoolToInt(fTick==rTick,clrGoldenrod,clrDarkGray));
     }
   }
 
@@ -131,8 +122,8 @@ void OrderConfig(void)
         order.Enable(action,"Action Enabled "+TimeToString(TimeCurrent()));
 
       //-- Order Config
-      order.ConfigureFund(action,inpMinTarget,inpMinProfit,inpLotSize);
-      order.ConfigureRisk(action,inpMaxRisk,inpLotFactor,inpMaxMargin);
+      order.ConfigureFund(action,inpMinTarget,inpMinProfit,Hold);
+      order.ConfigureRisk(action,inpMaxRisk,inpMaxMargin,inpLotScale,inpLotSize);
       order.ConfigureZone(action,inpZoneStep,inpMaxZoneMargin);
 
       order.SetDefaultStop(action,0.00,inpDefaultStop,false);
