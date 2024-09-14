@@ -16,22 +16,9 @@
 
 #include <ordman.mqh>
 
-//-- Class defs
-//COrder                *order;
-CSession              *s[SessionTypes];
-CTickMA               *t;
-
-FractalType show      = NoValue;
-
-  //--- Show Fractal Event Flag
-  enum ShowType
-       {
-         stNone   = NoValue,   // None
-         stOrigin = Origin,    // Origin
-         stTrend  = Trend,     // Trend
-         stTerm   = Term       // Term
-       };
-
+  //-- Class defs
+  CSession              *s[SessionTypes];
+  CTickMA               *t;
 
   //--- EA Config
   input string           appHeader           = "";            // +--- Application Config ---+
@@ -59,7 +46,7 @@ FractalType show      = NoValue;
   input int              inpPeriods          = 80;            // Retention
   input double           inpAgg              = 2.5;           // Tick Aggregation
   input int              inpSigRetain        = 240;           // Signal History Retention Count
-  input ShowType         inpShowType         = stNone;        // Show TickMA Fractal Events
+  input YesNoType        inpShowFibo         = No;            // Show Active Fibonacci Lines
 
 
   //--- Session Config
@@ -174,7 +161,8 @@ void WriteSignal(void)
 //+------------------------------------------------------------------+
 void DebugPrint(void)
   {
-    static int rangeDir  = NoDirection;
+    static int rangeDir    = NoDirection;
+    static int fractalDir  = NoDirection;
     
     if (debug)
     {
@@ -184,6 +172,7 @@ void DebugPrint(void)
         
         Append(ftext,EnumToString(signal.Type),"|");
         Append(ftext,EnumToString(Fractal().State),"|");
+        Append(ftext,BoolToStr(IsChanged(fractalDir,Fractal().Direction),DirText(Fractal().Direction),"------"),"|");
         Append(ftext,(string)fTick,"|");
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,EnumToString(signal.State),"|");
@@ -294,6 +283,24 @@ void RefreshScreen(void)
       UpdateLabel("pvMargin",DoubleToString(order.Metrics().Margin*100,1)+"%",Color(order[Net].Lots),14,"Consolas");
 
       Comment(order.QueueStr()+order.OrderStr());
+    }
+
+    if (inpShowFibo==Yes)
+    {
+      double price;
+       
+      for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
+      {
+        price = fprice(Fractal().Point[fpBase],Fractal().Point[fpRoot],fibo);
+        UpdateRay(objectstr+"lnS_"+EnumToString(fibo),inpPeriods,price,-8,0,Color(Fractal().Direction,IN_DARK_DIR));
+        UpdateText(objectstr+"lnT_"+EnumToString(fibo),"",price,-5,Color(Fractal().Direction,IN_DARK_DIR));
+      }
+
+      for (FractalPoint point=fpOrigin;IsBetween(point,fpOrigin,fpRecovery);point++)
+      {
+        UpdateRay(objectstr+"lnS_"+fp[point],inpPeriods,Fractal().Point[point],-8);
+        UpdateText(objectstr+"lnT_"+fp[point],"",Fractal().Point[point],-7);
+      }
     }
   }
 
@@ -549,8 +556,6 @@ void UpdateSignal(void)
           signalFP[fpRetrace]               = signalFP[fpRecovery];
           signalFP[fpBase].Price            = signalFP[fpRoot].Price;
           signalFP[fpRoot].Price            = signalFP[fpExpansion].Price;
-          
-          Flag("sigBounds:"+(string)signal.Tick,Color(signal.Direction,IN_CHART_DIR),0,signal.Price,Always);
         }
 
         signalFP[fpRecovery].Bar            = NoValue;
@@ -769,30 +774,6 @@ void Execute(void)
   }
 
 
-void UpdateFractalScreen(void)
-  {
-    if (inpShowType>NoValue)
-    {
-      UpdateRay(objectstr+"lnS_Origin:"+EnumToString(show),inpPeriods,t[show].Point[fpOrigin],-8);
-      UpdateRay(objectstr+"lnS_Base:"+EnumToString(show),inpPeriods,t[show].Point[fpBase],-8);
-      UpdateRay(objectstr+"lnS_Root:"+EnumToString(show),inpPeriods,t[show].Point[fpRoot],-8,0,
-                             BoolToInt(IsEqual(t[show].Direction,DirectionUp),clrRed,clrLawnGreen));
-      UpdateRay(objectstr+"lnS_Expansion:"+EnumToString(show),inpPeriods,t[show].Point[fpExpansion],-8,0,
-                             BoolToInt(IsEqual(t[show].Direction,DirectionUp),clrLawnGreen,clrRed));
-      UpdateRay(objectstr+"lnS_Retrace:"+EnumToString(show),inpPeriods,t[show].Point[fpRetrace],-8,0);
-      UpdateRay(objectstr+"lnS_Recovery:"+EnumToString(show),inpPeriods,t[show].Point[fpRecovery],-8,0);
-
-      for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
-      {
-        UpdateRay(objectstr+"lnS_"+EnumToString(fibo)+":"+EnumToString(show),inpPeriods,t.Price(fibo,show,Extension),-8,0,Color(t[show].Direction,IN_DARK_DIR));
-        UpdateText(objectstr+"lnT_"+EnumToString(fibo)+":"+EnumToString(show),"",t.Price(fibo,show,Extension),-5,Color(t[show].Direction,IN_DARK_DIR));
-      }
-
-      for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        UpdateText(objectstr+"lnT_"+fp[point]+":"+EnumToString(show),"",t[show].Point[point],-7);
-    }
-  }
-
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
@@ -805,9 +786,6 @@ void OnTick()
     Execute();
 
     RefreshScreen();
-    
-    UpdateFractalScreen();
-    if (signal.Tick==33) Pause("Signal 33\n\n"+t.ActiveEventStr()+"\n"+s[Daily].ActiveEventStr()+"\n"+t.DisplayStr(),"Tick Check");
   }
 
 //+------------------------------------------------------------------+
@@ -853,7 +831,7 @@ void OrderConfig(void)
 void IndicatorConfig(void)
   {
     //-- Initialize TickMA
-    t                    = new CTickMA(inpPeriods,inpAgg,(FractalType)inpShowType);
+    t                    = new CTickMA(inpPeriods,inpAgg,NoValue);
 
     //-- Initialize Session
     s[Daily]             = new CSession(Daily,0,23,inpGMTOffset);
@@ -904,24 +882,18 @@ int OnInit()
     InitMaster();
 
     //-- Fibonacci Display Option
-    if (inpShowType>NoValue)
+    if (inpShowFibo==Yes)
     {
-      show             = (FractalType)inpShowType;
-
-      NewRay(objectstr+"lnS_Origin:"+EnumToString(show),STYLE_DOT,clrWhite,Never);
-      NewRay(objectstr+"lnS_Base:"+EnumToString(show),STYLE_SOLID,clrYellow,Never);
-      NewRay(objectstr+"lnS_Root:"+EnumToString(show),STYLE_SOLID,clrDarkGray,Never);
-      NewRay(objectstr+"lnS_Expansion:"+EnumToString(show),STYLE_SOLID,clrDarkGray,Never);
-      NewRay(objectstr+"lnS_Retrace:"+EnumToString(show),STYLE_DOT,clrGoldenrod,Never);
-      NewRay(objectstr+"lnS_Recovery:"+EnumToString(show),STYLE_DOT,clrSteelBlue,Never);
-
-      for (FractalPoint point=fpBase;IsBetween(point,fpBase,fpRecovery);point++)
-        NewText(objectstr+"lnT_"+fp[point]+":"+EnumToString(show),fp[point]);
+      for (FractalPoint point=fpOrigin;IsBetween(point,fpOrigin,fpRecovery);point++)
+      {
+        NewRay(objectstr+"lnS_"+fp[point],fpstyle[point],fpcolor[point],Never);
+        NewText(objectstr+"lnT_"+fp[point],fp[point]);
+      }
 
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        NewRay(objectstr+"lnS_"+EnumToString(fibo)+":"+EnumToString(show),STYLE_DOT,clrDarkGray,Never);
-        NewText(objectstr+"lnT_"+EnumToString(fibo)+":"+EnumToString(show),DoubleToStr(fibonacci[fibo]*100,1)+"%");
+        NewRay(objectstr+"lnS_"+EnumToString(fibo),STYLE_DOT,clrDarkGray,Never);
+        NewText(objectstr+"lnT_"+EnumToString(fibo),DoubleToStr(fibonacci[fibo]*100,1)+"%");
       }
     }
 
