@@ -647,7 +647,7 @@ int OnInit()
     //--- Segment Boundaries
     NewPriceLabel("tmaPL(sp):"+(string)indWinId,0.00,false,indWinId);
     NewPriceLabel("tmaPL(rs):"+(string)indWinId,0.00,false,indWinId);
-    NewPriceLabel("tmaPL(ex):"+(string)indWinId,0.00,false,indWinId);
+    NewPriceLabel("tmaPL(ex):"+(string)indWinId,0.00,false,indWinId); 
 
     //--- Indicator Rays
     NewRay("tmaRangeMid:"+(string)indWinId,STYLE_DOT,clrDarkGray,false,indWinId);

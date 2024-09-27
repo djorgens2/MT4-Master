@@ -107,6 +107,7 @@ protected:
   struct PivotRec
          {
            EventType     Event;                    //-- Pivot Event
+           int           Direction;                //-- Opening Pivot Direction
            int           Lead;                     //-- Action of last Boundary Hit
            int           Bias;                     //-- Bias 
            double        Price;                    //-- Last Event Pivot (Fibonacci)
@@ -278,6 +279,7 @@ bool CFractal::FibonacciChanged(FractalType Type, FractalRec &Fractal)
 void CFractal::InitPivot(PivotRec &Pivot, EventLog &Log)
   {
     Pivot.Event      = Log.Event;
+    Pivot.Direction  = BoolToInt(this[NewHigh],DirectionUp,BoolToInt(this[NewLow],DirectionDown,NoDirection));
     Pivot.Price      = Log.Price;
     Pivot.Open       = fPrice.Close;
     Pivot.High       = fmax(fPrice.Close,Pivot.Price);
@@ -886,6 +888,7 @@ string CFractal::PivotStr(PivotRec &Pivot)
     string text    = "";
 
     Append(text,EnumToString(Pivot.Event));
+    Append(text,DirText(Pivot.Direction),"|");
     Append(text,ActionText(Pivot.Lead),"|");
     Append(text,ActionText(Pivot.Bias),"|");
     Append(text,DoubleToStr(Pivot.Price,Digits),"|");

@@ -1,0 +1,44 @@
+//replay replay.csv
+
+//--- MANUAL: TEST ---//
+risk long 80 80 10 0
+fund long 10 2.5 split
+zone long 3 21.5
+
+risk short 80 80 10 0
+fund short 10 2.5 full
+zone short 3 21.5
+
+//split long
+//split long
+
+//hedge
+
+// cancel 2
+//stop 2 1.01840
+//stop buy 25p stop
+//stop long 40p
+//hide long tp
+// hide long
+//tp long 20p*
+//tp long 1.02265*
+hide long
+hide short
+//full short
+verify
+//buy
+//sell
+//sell 0 0 "Rally" 0 0 d1 sell mit 20p 20p 5
+//buy 0 5p "Rally" 0 0 d1 buy limit 20p 20p 5
+
+//close long
+//hide long
+//tp long 1.02830
+
+//-- Order Management --//
+//cancel all
+//buy 0 1.10170 "Retrace" 0 0 d1 buy limit 1.0924 1.1099 10
+//buy 0 0 "Expansion" 0 0 d1 buy mit 1.0145 1.0278 5
+//buy 0 -10p retrace 0 0 d2 buy limit 1.08493 1.1080 10
+//buy 0 -5p recapture
+

@@ -204,7 +204,10 @@ OrderMethod MethodCode(string Method)
 //+------------------------------------------------------------------+
 void FormatOrder(string &Order[])
   {
-    string defaults[12] = {"","0.00","0.00","0.00","0.00","","","","","0.00","0.00","0.00"};
+    //-- Usage:
+    //-- ACTION,LOTS,PRICE,MEMO,TAKEPROFIT,STOPLOSS,EXPIRY,PENDING ACTION,MIT|STOP|LIMIT,LOWER BOUND,UPPER BOUND,STEP
+
+    string defaults[12] = {"","0.00","0.00","","0.00","0.00","","","","0.00","0.00","0.00"};
 
     for (int arg=0;arg<ArraySize(Order);arg++)
       if (arg<ArraySize(defaults))
@@ -608,11 +611,11 @@ void ProcessComFile(void)
     else
     //--- process command file
     {
-      fHandle             = FileOpen(comFile,FILE_TXT|FILE_READ);
+      fHandle             = FileOpen(comFile,FILE_TXT|FILE_READ|FILE_SHARE_READ);
 
       if (fHandle==INVALID_HANDLE)
       {
-        Print(">>>Error opening file ("+IntegerToString(fHandle)+") for read: ",GetLastError());
+        Print(">>>Error opening "+comFile+" ("+IntegerToString(fHandle)+") for read: ",GetLastError());
         return;
       }
 

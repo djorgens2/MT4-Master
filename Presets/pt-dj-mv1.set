@@ -1,0 +1,16 @@
+appHeader=
+inpBrokerModel=0
+inpComFile=pt-dj-live.csv
+inpLogFile=logfile.psv
+inpCPanel=2
+ordHeader=
+inpMinTarget=10.0
+inpMinProfit=2.5
+inpMaxRisk=80.0
+inpMaxMargin=60.0
+inpLotScale=10.0
+inpLotSize=0.0
+inpDefaultStop=0
+inpDefaultTarget=0
+inpZoneStep=3.0
+inpMaxZoneMargin=21.5

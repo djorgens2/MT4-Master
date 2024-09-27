@@ -23,7 +23,7 @@
 #include <Class/Fractal.mqh>
 
 input int    inpRetention  = 240;
-input string inpSigFile    = "sighist.csv";
+input string inpSigFile    = "signal.bin";
 
 
   //--- Data Source Type
@@ -34,20 +34,15 @@ input string inpSigFile    = "sighist.csv";
           };
 
 
-  //-- Strategy Types
-  enum    StrategyType
-          {
-            Wait,            //-- Hold, wait for signal
-            Manage,          //-- Maintain Margin, wait for profit oppty's
-            Build,           //-- Increase Position
-            Cover,           //-- Aggressive balancing on excessive drawdown
-            Capture,         //-- Contrarian profit protection
-            Mitigate,        //-- Risk management on pattern change
-            Defer            //-- Defer to contrarian manager
-          };
-
-
-  //-- Signals (Events) requiring Manager Action (Response)
+  struct SignalPivot
+         {
+           EventType        Event;
+           int              Direction;             //-- Pivot Direction
+           double           High;
+           double           Low;
+         };
+         
+  //-- Signals (Events) requesting Manager Action (Response)
   struct  SignalRec
           {
             long             Tick;              //-- Tick Signaled by Event 
@@ -58,19 +53,21 @@ input string inpSigFile    = "sighist.csv";
             RoleType         Lead;              //-- Calculated Signal Lead
             RoleType         Bias;              //-- Calculated Signal Bias
             double           Price;             //-- Event Price
-            bool             Trigger;           //-- Trigger (Major Events)
+            bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
             SourceType       Source;            //-- Signal Source (Session/TickMA)
             FractalType      Type;              //-- Source Fractal
             FractalState     Momentum;          //-- Triggered Pullback/Rally
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
+            SignalPivot      Boundary;          //-- Signal Boundary Events
+            SignalPivot      Recovery;          //-- Recovery Events
           };
-
 
   struct  SignalFractal
           {
             int              Bar;
             double           Price;
           };
+
   int               sigWinID      = NoValue;
   double            sigBuffer[];
   double            sigHist[];
@@ -94,7 +91,7 @@ void RefreshScreen(void)
     UpdateDirection("lbvSigLead",Direction(sig.Lead,InAction),Color(Direction(sig.Lead,InAction)),16);
     UpdateDirection("lbvSigBias",Direction(sig.Bias,InAction),Color(Direction(sig.Bias,InAction)),16);
 
-    UpdateLabel("lbvSigTrigger",BoolToStr(sig.Trigger,"FIRED","IDLE "),BoolToInt(sig.Trigger,clrWhite,clrDarkGray),8,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvSigTrigger",BoolToStr(sig.Recovery.Event>NoEvent,"FIRED","IDLE "),BoolToInt(sig.Recovery.Event>NoEvent,clrWhite,clrDarkGray),8,"Noto Sans Mono CJK HK");
     UpdateBox("sig-"+(string)sigWinID+":Trigger",Color(sig.Direction,IN_DARK_DIR));
     UpdateBox("sig-"+(string)sigWinID+":FractalPoint",BoolToInt(sig.Lead==Buyer,C'0,42,0',C'42,0,0'));
     
@@ -122,9 +119,12 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
   {
-    static double lastTick = NoValue;
+    static long lastTick = NoValue;
+    static long tick     = lastTick;
 
     int fhandle = FileOpen(inpSigFile,FILE_SHARE_READ|FILE_READ|FILE_BIN);
+    
+    tick++;
 
     if (fhandle>INVALID_HANDLE)
     {
@@ -161,7 +161,8 @@ int OnInit()
     sigWinID = ChartWindowFind(0,"Signal-v1");
 
     //--- Signal Panel Labels
-    NewLabel("lbvSigTick","",85,2,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvTick","",152,2,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSigTick","",82,2,clrDarkGray,SCREEN_UR,sigWinID);
     NewLabel("lbvSigPrice","",10,2,clrDarkGray,SCREEN_UR,sigWinID);
     NewLabel("lbvSigSource","",10,20,clrDarkGray,SCREEN_UR,sigWinID);
     NewLabel("lbvSigFibo","",10,38,clrDarkGray,SCREEN_UR,sigWinID);
