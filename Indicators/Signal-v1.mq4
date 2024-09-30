@@ -34,14 +34,21 @@ input string inpSigFile    = "signal.bin";
           };
 
 
+  struct SignalTrigger
+         {
+           int               Direction;
+           int               Count;
+           double            Price;
+         };
+
   struct SignalPivot
          {
            EventType        Event;
-           int              Direction;             //-- Pivot Direction
-           double           High;
-           double           Low;
+           SignalTrigger    High;
+           SignalTrigger    Low;
          };
-         
+
+
   //-- Signals (Events) requesting Manager Action (Response)
   struct  SignalRec
           {

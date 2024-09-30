@@ -97,12 +97,18 @@
             bool             Hold;                 //-- Hold Role Profit
           };
 
+  struct SignalTrigger
+         {
+           int               Direction;
+           int               Count;
+           double            Price;
+         };
+
   struct SignalPivot
          {
            EventType        Event;
-           int              Direction;             //-- Pivot Direction
-           double           High;
-           double           Low;
+           SignalTrigger    High;
+           SignalTrigger    Low;
          };
          
   struct SignalNode
@@ -197,8 +203,7 @@ void DebugPrint(void)
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,EnumToString(signal.State),"|");
         Append(ftext,BoolToStr(signal.Checkpoint,"Active","Idle"),"|");
-        Append(ftext,BoolToStr(signal.Recovery.Direction==DirectionUp,"Sell",
-                     BoolToStr(signal.Recovery.Direction==DirectionDown,"Buy","Idle")),"|");
+        Append(ftext,BoolToStr(signal.Recovery.Event>NoEvent,BoolToStr(signal.Direction==DirectionUp,"Sell","Buy"),"Idle"),"|");
         Append(ftext,BoolToStr(IsChanged(rangeDir,signal.Direction),DirText(signal.Direction),"------"),"|");
         Append(ftext,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
         Append(ftext,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
@@ -251,7 +256,6 @@ StrategyType StrategyCode(string Strategy)
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    static int     hold[2]      = {NoDirection,NoDirection};
     static int     panelWinID   = NoValue;
            int     signalWinID  = ChartWindowFind(0,indSignalSN);
 
@@ -268,30 +272,31 @@ void RefreshScreen(void)
     }
 
     if (signal.Recovery.Event>NoEvent)
-      switch (signal.Recovery.Direction)
+    {
+      switch (signal.Direction)
       {
-        case DirectionUp:    if (IsChanged(hold[Buyer],DirectionUp))
-                               if (signal.Recovery.Event==NewPullback)
-                               {
-                                 UpdateLabel("lbvOC-BUY-Hold",CharToStr(176),clrYellow,11,"Wingdings");
-                                 Arrow("RecoRally"+(string)fTick,ArrowDash,clrYellow);
-                               }
+        case DirectionUp:    UpdateLabel("lbvOC-BUY-Hold",CharToStr(176),clrYellow,11,"Wingdings");
+
+                             if (debug)
+                             if (IsBetween(signal.Recovery.Event,NewLow,NewHigh))
+                               if (signal.Recovery.Event==NewHigh)
+                                 Arrow("RecoPullback"+(string)fTick+":"+(string)signal.Recovery.High.Count,ArrowCheck,
+                                   BoolToInt(signal.Recovery.Event==NewHigh,clrLawnGreen,clrYellow));
                              break;
 
-        case DirectionDown:  if (IsChanged(hold[Seller],DirectionDown))
-                               if (signal.Recovery.Event==NewRally)
-                               {
-                                 UpdateLabel("lbvOC-SELL-Hold",CharToStr(176),clrYellow,11,"Wingdings");                 
-                                 Arrow("RecoPullback"+(string)fTick,ArrowDash,clrMagenta);
-                                 Pause("Recovery Down","Recovery Test");
-                               }
+        case DirectionDown:  UpdateLabel("lbvOC-SELL-Hold",CharToStr(176),clrYellow,11,"Wingdings");
+                             
+                             if (debug)
+                             if (IsBetween(signal.Recovery.Event,NewLow,NewHigh))
+                               if (signal.Recovery.Event==NewLow)
+                                 Arrow("RecoPullback"+(string)fTick+":"+(string)signal.Recovery.Low.Count,ArrowStop,
+                                   BoolToInt(signal.Recovery.Event==NewHigh,clrMagenta,clrRed));
                              break;
-
-        default:             for (int action=Buyer;IsBetween(action,Buyer,Seller);action++)
-                               if (IsChanged(hold[action],NoDirection))
-                                 UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),clrDarkGray,11,"Wingdings");
       }
-
+    }
+    else
+      for (int action=Buyer;IsBetween(action,Buyer,Seller);action++)
+        UpdateLabel("lbvOC-"+ActionText(action)+"-Hold",CharToStr(176),clrDarkGray,11,"Wingdings");
 
     //-- Update Control Panel (Application)
     if (IsChanged(panelWinID,ChartWindowFind(0,indPanelSN)))
@@ -470,12 +475,10 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
 //+------------------------------------------------------------------+
 void UpdateSignal(void)
   {    
-    FractalState      prevState    = signal.State;
-
     SignalNode        sighi        = {0,0.00};
     SignalNode        siglo        = {0,0.00};
 
-    signal.Recovery.Direction      = NoDirection;
+    signal.Recovery.Event          = NoEvent;
     signal.Boundary.Event          = NoEvent;
 
     if (signal.ActiveEvent&&signal.Tick>0)
@@ -493,6 +496,7 @@ void UpdateSignal(void)
           if (IsLower(sigHistory[bar],siglo.Price))  siglo.Bar=bar;
         }
 
+      //-- Make boundary corrections
       if (signalFP[fpRoot].Price>sighi.Price) signalFP[fpRoot]=sighi;
       if (signalFP[fpRoot].Price<siglo.Price) signalFP[fpRoot]=siglo;
       if (signalFP[fpBase].Price>sighi.Price) signalFP[fpBase]=sighi;
@@ -517,9 +521,11 @@ void UpdateSignal(void)
              {
                if (IsHigher(signal.Price,signalFP[fpRecovery].Price))
                {
-                 signal.Recovery.Direction   = DirectionUp;
-                 signal.Recovery.Event       = BoolToEvent(IsLower(signal.Price,signal.Recovery.High),NewPullback,NewRally);
-                 signal.Recovery.High        = signal.Price;
+                 signal.Lead                 = signal.Bias;
+                 signal.State                = Recovery;
+
+                 signal.Recovery.Event       = NewRally;
+                 signal.Recovery.High.Price  = signal.Price;
 
                  signalFP[fpRecovery].Bar    = 0;
                }
@@ -530,9 +536,11 @@ void UpdateSignal(void)
              {
                if (IsLower(signal.Price,signalFP[fpRecovery].Price))
                {
-                 signal.Recovery.Direction   = DirectionDown;
-                 signal.Recovery.Event       = BoolToEvent(IsHigher(signal.Price,signal.Recovery.Low),NewRally,NewPullback);
-                 signal.Recovery.Low         = signal.Price;
+                 signal.Lead                 = signal.Bias;
+                 signal.State                = Recovery;
+
+                 signal.Recovery.Event       = NewPullback;
+                 signal.Recovery.Low.Price   = signal.Price;
    
                  signalFP[fpRecovery].Bar    = 0;
                }
@@ -540,93 +548,113 @@ void UpdateSignal(void)
            }
            else
 
-           if (IsBetween(signal.State,Rally,Pullback))
+           //-- New Recoveries
            {
              signal.Lead                     = signal.Bias;
              signal.State                    = Recovery;
 
-             signal.Recovery.High            = BoolToDouble(signal.Lead==Buyer,signal.Price);
-             signal.Recovery.Low             = BoolToDouble(signal.Lead==Seller,signal.Price);
-
              signalFP[fpRecovery].Bar        = 0;
              signalFP[fpRecovery].Price      = signal.Price;
+             
+             if (signalFP[fpRetrace].Bar>signalFP[fpExpansion].Bar)
+             {
+               signalFP[fpRetrace].Bar       = 1;
+               signalFP[fpRetrace].Price     = sigHistory[0];
+             }
+ 
+             if (signal.Direction==DirectionUp)
+             {
+               signal.Recovery.Event         = BoolToEvent(IsLower(signal.Price,signal.Recovery.High.Price),NewLow,NewHigh);
+               signal.Recovery.High.Count    = BoolToInt(IsChanged(signal.Recovery.High.Direction,
+                                               BoolToInt(signal.Recovery.Event==NewHigh,DirectionUp,DirectionDown)),1,++signal.Recovery.High.Count);
+               signal.Recovery.High.Price    = signal.Price;
+             }
+ 
+             if (signal.Direction==DirectionDown)
+             {
+               signal.Recovery.Event         = BoolToEvent(IsHigher(signal.Price,signal.Recovery.Low.Price),NewHigh,NewLow);
+               signal.Recovery.Low.Count     = BoolToInt(IsChanged(signal.Recovery.Low.Direction,
+                                               BoolToInt(signal.Recovery.Event==NewLow,DirectionDown,DirectionUp)),1,++signal.Recovery.Low.Count);
+               signal.Recovery.Low.Price     = signal.Price;
+             }
            }
         }
         else
       
         //-- Handle Retraces
         {
-          if (signalFP[fpRecovery].Bar>NoValue)
+          signal.Lead                        = signal.Bias;
+          signal.State                       = (FractalState)BoolToInt(signal.Lead==Buyer,Rally,Pullback);
+
+          if (IsEqual(signalFP[fpRetrace].Bar,NoValue))
           {
-            if (prevState==Recovery)
-            {
-              signal.Lead                    = signal.Bias;
-              signal.State                   = Retrace;
-
-              signalFP[fpRetrace].Bar        = 0;
-              signalFP[fpRetrace].Price      = signal.Price;
-            }
-            else
-
-            if (signal.Direction==DirectionUp)
-            {
-              if (IsLower(signal.Price,signalFP[fpRetrace].Price))
-                signalFP[fpRetrace].Bar     = 0;
-            }
-            else
-          
-             if (signal.Direction==DirectionDown)
-            {
-              if (IsHigher(signal.Price,signalFP[fpRetrace].Price))
-                signalFP[fpRetrace].Bar     = 0;
-            }          
-          }
-          else
-          {
-            signal.Lead                     = signal.Bias;
-            signal.State                    = (FractalState)BoolToInt(signal.Lead==Buyer,Rally,Pullback);
-
             signalFP[fpRetrace].Bar         = 0;
             signalFP[fpRetrace].Price       = signal.Price;
           }
+
+          if (signal.Direction==DirectionUp)
+            if (IsLower(signal.Price,signalFP[fpRetrace].Price))
+            {
+              signal.State                = Retrace;
+              signalFP[fpRetrace].Bar     = 0;
+            }
+          
+          if (signal.Direction==DirectionDown)
+            if (IsHigher(signal.Price,signalFP[fpRetrace].Price))
+            {
+              signal.State                = Retrace;
+              signalFP[fpRetrace].Bar     = 0;
+            }
         }
       }
       else
 
       //-- Handle Expansions
       {
-        signal.State                        = (FractalState)BoolToInt(signal.State==Reversal,Reversal,Breakout);
-        signal.Lead                         = signal.Bias;
+        signal.State                         = (FractalState)BoolToInt(signal.State==Reversal,Reversal,Breakout);
+        signal.Lead                          = signal.Bias;
 
         if (DirectionChanged(signal.Direction,BoolToInt(signal.Price>signalFP[fpBase].Price,DirectionUp,DirectionDown)))
         {
-          signal.State                      = Reversal;
-          signal.Checkpoint                 = true;
+          signal.State                       = Reversal;
+          signal.Checkpoint                  = true;
 
-          signalFP[fpRetrace]               = signalFP[fpRecovery];
-          signalFP[fpBase]                  = signalFP[fpRoot];
-          signalFP[fpRoot]                  = signalFP[fpExpansion];
+          signalFP[fpRetrace]                = signalFP[fpRecovery];
+          signalFP[fpBase]                   = signalFP[fpRoot];
+          signalFP[fpRoot]                   = signalFP[fpExpansion];
 
           //-- Test Boundaries
           switch (signal.Direction)
           {
             case DirectionUp:
-                    signal.Boundary.Event   = BoolToEvent(IsHigher(signal.Price,signal.Boundary.High),NewHigh,NewRally);
-                    signal.Boundary.High    = signal.Price;
-//                    Flag("sigHi-"+(string)fTick,BoolToInt(signal.Boundary.Event==NewHigh,clrLawnGreen,clrForestGreen));
-                    break;
+                  signal.Boundary.Event      = BoolToEvent(IsHigher(signal.Price,signal.Boundary.High.Price),NewHigh,NewRally);
+                  signal.Boundary.High.Count = BoolToInt(IsChanged(signal.Boundary.High.Direction,
+                                               BoolToInt(signal.Boundary.Event==NewHigh,DirectionUp,DirectionDown)),1,++signal.Boundary.High.Count);
+                  signal.Boundary.High.Price = signal.Price;
+                  Flag("sigHi-"+(string)fTick+":"+(string)signal.Boundary.High.Count,
+                     BoolToInt(signal.Boundary.Event==NewHigh,clrLawnGreen,clrForestGreen),0,0,debug);
+                  break;
 
             case DirectionDown:
-                    signal.Boundary.Event   = BoolToEvent(IsLower(signal.Price,signal.Boundary.Low),NewLow,NewPullback);
-                    signal.Boundary.Low     = signal.Price;
-//                    Flag("sigLo-"+(string)fTick,BoolToInt(signal.Boundary.Event==NewLow,clrRed,clrMaroon));
+                  signal.Boundary.Event      = BoolToEvent(IsLower(signal.Price,signal.Boundary.Low.Price),NewLow,NewPullback);
+                  signal.Boundary.Low.Count  = BoolToInt(IsChanged(signal.Boundary.Low.Direction,
+                                               BoolToInt(signal.Boundary.Event==NewLow,DirectionDown,DirectionUp)),1,++signal.Boundary.Low.Count);
+                  signal.Boundary.Low.Price  = signal.Price;
+                  Flag("sigLo-"+(string)fTick+":"+(string)signal.Boundary.Low.Count,
+                     BoolToInt(signal.Boundary.Event==NewLow,clrRed,clrMaroon),0,0,debug);
           }
         }
 
-        signalFP[fpRecovery].Bar            = NoValue;
-        signalFP[fpRecovery].Price          = 0.00;
-        signalFP[fpExpansion].Bar           = 0;
-        signalFP[fpExpansion].Price         = signal.Price;
+        signalFP[fpRecovery].Bar             = NoValue;
+        signalFP[fpRecovery].Price           = 0.00;
+        signalFP[fpExpansion].Bar            = 0;
+        signalFP[fpExpansion].Price          = signal.Price;
+        
+        if (!IsBetween(signalFP[fpRetrace].Price,signalFP[fpRoot].Price,signalFP[fpExpansion].Price))
+        {
+          signalFP[fpRetrace].Bar            = NoValue;
+          signalFP[fpRetrace].Price          = 0.00;
+        }
       }
     }
   }
@@ -850,8 +878,9 @@ void OnTick()
 //    if (sigBoundary.Event>NoEvent)
     switch ((int)fTick)
     {
-      case 4097:    Pause("Signal test; "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Boundary.Event),"Signal Test()");
-                    Print(t.PivotStr(Pivot()));
+      case 1434206:  //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
+                     //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
+                     break;
     }
 
     Execute();
@@ -918,24 +947,30 @@ void IndicatorConfig(void)
 //+------------------------------------------------------------------+
 void SignalConfig(void)
   {
+    SignalTrigger trigger   = {NoDirection,NoValue,0.00};
+    trigger.Price           = Close[0];
+    
     for(FractalPoint point=0;point<FractalPoints;point++)
     {
-      signalFP[point].Bar         = BoolToInt(IsBetween(point,fpBase,fpExpansion),0,NoValue);
-      signalFP[point].Price       = BoolToDouble(IsBetween(point,fpBase,fpExpansion),Close[0]);
+      signalFP[point].Bar      = BoolToInt(IsBetween(point,fpBase,fpExpansion),0,NoValue);
+      signalFP[point].Price    = BoolToDouble(IsBetween(point,fpBase,fpExpansion),Close[0]);
     }
 
-    signal.Tick              = NoValue;
-    signal.Price             = Close[0];
-    signal.Direction         = NoDirection;
-    signal.Lead              = NoAction;
-    signal.Bias              = NoAction;
-    signal.State             = NoValue;
+    signal.Tick                = NoValue;
+    signal.Price               = Close[0];
+    signal.Direction           = NoDirection;
+    signal.Lead                = NoAction;
+    signal.Bias                = NoAction;
+    signal.State               = NoValue;
     
     NewPriceLabel("sigHi");
     NewPriceLabel("sigLo");
     
-    signal.Boundary.High     = Close[0];
-    signal.Boundary.Low      = Close[0];
+    signal.Boundary.High       = trigger;
+    signal.Boundary.Low        = trigger;
+    
+    signal.Recovery.High       = trigger;
+    signal.Recovery.Low        = trigger;
   }
 
 //+------------------------------------------------------------------+
@@ -943,12 +978,12 @@ void SignalConfig(void)
 //+------------------------------------------------------------------+
 void InitMaster(void)
   {
-    master.Lead              = Unassigned;
-    master.OnCall            = Unassigned;
-    master.HedgeLotSize      = 0.00;
+    master.Lead                = Unassigned;
+    master.OnCall              = Unassigned;
+    master.HedgeLotSize        = 0.00;
     
-    manager[Buyer].Strategy  = Wait;
-    manager[Seller].Strategy = Wait;
+    manager[Buyer].Strategy    = Wait;
+    manager[Seller].Strategy   = Wait;
   }
 
 //+------------------------------------------------------------------+
