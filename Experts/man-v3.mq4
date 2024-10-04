@@ -8,7 +8,7 @@
 #property version   "3.01"
 #property strict
 
-#define debug true
+#define debug false
 
 #define NetZero      0
 #define NetLong      1
@@ -117,7 +117,6 @@
            double           Price;
          };
 
-
   //-- Signals (Events) requesting Manager Action (Response)
   struct  SignalRec
           {
@@ -196,8 +195,8 @@ void DebugPrint(void)
         Append(ftext,EnumToString(manager[Seller].Strategy),"|");
         Append(ftext,EnumToString(signal.Source),"|");
         Append(ftext,EnumToString(signal.Type),"|");
-        Append(ftext,EnumToString(Fractal().State),"|");
-        Append(ftext,BoolToStr(IsChanged(fractalDir,Fractal().Direction),DirText(Fractal().Direction),"------"),"|");
+        Append(ftext,EnumToString(Fractal(signal.Type).State),"|");
+        Append(ftext,BoolToStr(IsChanged(fractalDir,Fractal(signal.Type).Direction),DirText(Fractal(signal.Type).Direction),"------"),"|");
         Append(ftext,BoolToStr(signal.Boundary.Event>NoEvent,EnumToString(signal.Boundary.Event),"------"),"|");
         Append(ftext,(string)fTick,"|");
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
@@ -228,8 +227,6 @@ void DebugPrint(void)
 
         FileWrite(dHandle,ftext);
         FileFlush(dHandle);
-
-        WriteSignal();
       }
     }
   }
@@ -261,14 +258,14 @@ void RefreshScreen(void)
 
     if (signalWinID>NoValue)
     {
-      UpdateLabel("lbvSigSource", EnumToString(signal.Source)+" "+EnumToString(signal.Type)+" "+EnumToString(Fractal().State),
-                                  BoolToInt(Fractal().Pivot.Lead==Buyer,clrLawnGreen,clrRed),12,"Noto Sans Mono CJK HK");
-      UpdateLabel("lbvSigFibo",   BoolToStr(IsBetween(Fractal().State,Rally,Correction),
-                                    "Retrace x"+DoubleToStr(Fractal().Retrace.Percent[Max]*100,1)+"% "+
-                                            "n"+DoubleToStr(Fractal().Retrace.Percent[Now]*100,1)+"%",
-                                    "Extends x"+DoubleToStr(Fractal().Extension.Percent[Max]*100,1)+"% "+
-                                            "n"+DoubleToStr(Fractal().Extension.Percent[Now]*100,1)+"%"),
-                                  BoolToInt(Fractal().Pivot.Bias==Buyer,clrLawnGreen,clrRed),12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigSource", EnumToString(signal.Source)+" "+EnumToString(signal.Type)+" "+EnumToString(Fractal(signal.Type).State),
+                                  BoolToInt(Fractal(signal.Type).Pivot.Lead==Buyer,clrLawnGreen,clrRed),12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigFibo",   BoolToStr(IsBetween(Fractal(signal.Type).State,Rally,Correction),
+                                    "Retrace x"+DoubleToStr(Fractal(signal.Type).Retrace.Percent[Max]*100,1)+"% "+
+                                            "n"+DoubleToStr(Fractal(signal.Type).Retrace.Percent[Now]*100,1)+"%",
+                                    "Extends x"+DoubleToStr(Fractal(signal.Type).Extension.Percent[Max]*100,1)+"% "+
+                                            "n"+DoubleToStr(Fractal(signal.Type).Extension.Percent[Now]*100,1)+"%"),
+                                  BoolToInt(Fractal(signal.Type).Pivot.Bias==Buyer,clrLawnGreen,clrRed),12,"Noto Sans Mono CJK HK");
     }
 
     if (signal.Recovery.Event>NoEvent)
@@ -335,15 +332,15 @@ void RefreshScreen(void)
        
       for (FibonacciType fibo=Fibo161;fibo<FibonacciTypes;fibo++)
       {
-        price = fprice(Fractal().Point[fpBase],Fractal().Point[fpRoot],fibo);
-        UpdateRay(objectstr+"lnS_"+EnumToString(fibo),inpPeriods,price,-8,0,Color(Fractal().Direction,IN_DARK_DIR));
-        UpdateText(objectstr+"lnT_"+EnumToString(fibo),"",price,-5,Color(Fractal().Direction,IN_DARK_DIR));
+        price = fprice(Fractal(signal.Type).Point[fpBase],Fractal(signal.Type).Point[fpRoot],fibo);
+        UpdateRay(objectstr+"lnS_"+EnumToString(fibo),inpPeriods,price,-8,0,Color(Fractal(signal.Type).Direction,IN_DARK_DIR));
+        UpdateText(objectstr+"lnT_"+EnumToString(fibo),"",price,-5,Color(Fractal(signal.Type).Direction,IN_DARK_DIR));
       }
 
       for (FractalPoint point=fpOrigin;IsBetween(point,fpOrigin,fpRecovery);point++)
       {
-        UpdateRay(objectstr+"lnS_"+fp[point],inpPeriods,Fractal().Point[point],-8);
-        UpdateText(objectstr+"lnT_"+fp[point],"",Fractal().Point[point],-7);
+        UpdateRay(objectstr+"lnS_"+fp[point],inpPeriods,Fractal(signal.Type).Point[point],-8);
+        UpdateText(objectstr+"lnT_"+fp[point],"",Fractal(signal.Type).Point[point],-7);
       }
     }
   }
@@ -362,12 +359,12 @@ PivotRec Pivot(void)
 //+------------------------------------------------------------------+
 //| Fractal - Returns the active Fractal record                      |
 //+------------------------------------------------------------------+
-FractalRec Fractal(void)
+FractalRec Fractal(FractalType Type)
   {
     if (signal.Source==TickMA)
-      return t[signal.Type];
+      return t[Type];
 
-    return s[Daily][signal.Type];
+    return s[Daily][Type];
   }
 
 //+------------------------------------------------------------------+
@@ -375,7 +372,9 @@ FractalRec Fractal(void)
 //+------------------------------------------------------------------+
 bool ManagerChanged(void)
   {
-    RoleType incoming     = (RoleType)BoolToInt(IsEqual(Fractal().State,Correction),Action(Fractal().Direction,InDirection,InContrarian),Action(Fractal().Direction));
+    RoleType incoming     = (RoleType)BoolToInt(IsEqual(Fractal(signal.Type).State,Correction),
+                                        Action(Fractal(signal.Type).Direction,InDirection,InContrarian),
+                                        Action(Fractal(signal.Type).Direction));
     RoleType incumbent    = (RoleType)BoolToInt(IsEqual(master.Lead,Unassigned),Action(incoming,InAction,InContrarian),master.Lead);
     
     if (IsEqual(incoming,incumbent))
@@ -688,7 +687,7 @@ void UpdateMaster(void)
   {
     //-- Update Classes
 //    order.Update(BoolToDouble(inpBaseCurrency=="XRPUSD",iClose(inpBaseCurrency,0,0),1));
-      order.Update();
+    order.Update();
 
     for (SessionType type=Daily;type<SessionTypes;type++)
       s[type].Update();
@@ -730,7 +729,7 @@ StrategyType Strategy(RoleType Role, EventType Event)
         {
           case Buyer:     return (StrategyType)BoolToInt(Event==NewPullback,Build);
           case Seller:    return (StrategyType)BoolToInt(Event==NewRally,Build);
-          default:   return Wait;
+          default:        return Wait;
         }
       else
       if (Role==master.OnCall)
@@ -738,18 +737,18 @@ StrategyType Strategy(RoleType Role, EventType Event)
         {
           case Buyer:     return (StrategyType)BoolToInt(Event==NewPullback,Spot);
           case Seller:    return (StrategyType)BoolToInt(Event==NewRally,Spot);
-          default:   return Wait;
+          default:        return Wait;
         }
-      else           return Wait;
+      else                return Wait;
     else
     if (Role==master.Lead)
       switch (Role)
       {
-        case Buyer:     return (StrategyType)BoolToInt(Event==NewHigh,Manage,
+        case Buyer:       return (StrategyType)BoolToInt(Event==NewHigh,Manage,
                                         BoolToInt(Event==NewLow,Mitigate,
                                         BoolToInt(Event==NewRally,Protect,
                                         BoolToInt(Event==NewLow,Build))));
-        case Seller:    return (StrategyType)BoolToInt(Event==NewHigh,Mitigate,
+        case Seller:      return (StrategyType)BoolToInt(Event==NewHigh,Mitigate,
                                         BoolToInt(Event==NewLow,Manage,
                                         BoolToInt(Event==NewRally,Build,
                                         BoolToInt(Event==NewLow,Protect))));
@@ -762,15 +761,15 @@ StrategyType Strategy(RoleType Role, EventType Event)
 
       switch (Role)
       {
-        case Buyer:     return (StrategyType)BoolToInt(Event==NewHigh,(BoolToInt(basis==NetShort,Hedge,Protect)),
+        case Buyer:       return (StrategyType)BoolToInt(Event==NewHigh,(BoolToInt(basis==NetShort,Hedge,Protect)),
                                         BoolToInt(Event==NewLow,Mitigate,
                                         BoolToInt(Event==NewRally,(BoolToInt(basis==NetShort,Wait,Protect)),
                                         BoolToInt(Event==NewPullback,(BoolToInt(basis==NetZero,Spot,(BoolToInt(basis==NetShort,Capture))))))));
-        case Seller:    return (StrategyType)BoolToInt(Event==NewLow,(BoolToInt(basis==NetLong,Hedge,Protect)),
+        case Seller:      return (StrategyType)BoolToInt(Event==NewLow,(BoolToInt(basis==NetLong,Hedge,Protect)),
                                         BoolToInt(Event==NewHigh,Mitigate,
                                         BoolToInt(Event==NewPullback,(BoolToInt(basis==NetLong,Wait,Protect)),
                                         BoolToInt(Event==NewRally,(BoolToInt(basis==NetZero,Spot,(BoolToInt(basis==NetLong,Capture))))))));
-        default:   return Wait;
+        default:          return Wait;
       }
     }
 
@@ -833,11 +832,60 @@ void ManageFund(RoleType Role)
 
 
 //+------------------------------------------------------------------+
+//| ExecuteSpot - Spots are contrarian, pre-build order placement    |
+//+------------------------------------------------------------------+
+void ExecuteSpot(RoleType Role)
+  {
+    OrderRequest request   = order.BlankRequest("Spot/"+EnumToString(Role));
+    
+    int    direction       = Direction(Role,InAction);
+    double price           = ParseEntryPrice(Role,BoolToStr(Role==Buyer,"-")+DoubleToStr(order.Config(Role).ZoneStep,1)+"P");
+    
+    if (order.Free(Role,price)>order.Split(Role))
+      //-- Handle Convergences
+      if (Fractal(Term).Direction==direction)      {
+        if (t.Segment().Bias==Role)
+          {
+            request.Type    = ActionCode(EnumToString(Role),price);
+            request.Lots    = order.Free(Role);
+            request.Price   = price;
+            request.Memo    = "[mv3] Auto Spot";
+            
+            if (order.Submitted(request))
+              Print(order.RequestStr(request));
+            else
+              Print("Order Not Submitted! \n\n"+order.RequestStr(request));
+          };
+      }
+      else
+      
+      //-- Handle Divergences
+      {
+      }
+  }
+
+//+------------------------------------------------------------------+
 //| ManageRisk - Risk Manager order processor and risk mitigation    |
 //+------------------------------------------------------------------+
 void ManageRisk(RoleType Role)
   {
-    StrategyChanged(Role,signal.Boundary.Event);
+    static double open     = 0.00;
+    static int    series   = 0;
+
+    if (StrategyChanged(Role,signal.Boundary.Event))
+      if (manager[Role].Strategy==Spot)
+      {
+        open               = Close[0];
+        series++;
+      }
+        
+    switch (manager[Role].Strategy)
+    {
+      case Spot:  ExecuteSpot(Role);
+    };
+    
+    //if (manager[Role].Strategy==Spot)
+    //  Print("|Spot|"+(string)fTick+"|"+(string)series+"|"+DoubleToStr(open,Digits)+"|"+ActionText(Role)+"|"+DoubleToStr(Close[0],Digits));
 
     order.ProcessOrders(Role);
   }
@@ -862,7 +910,7 @@ void Execute(void)
      ManageRisk(Seller);
    }
 
-    order.ProcessRequests();
+    order.ProcessRequests(0.00002);
   }
 
 
@@ -874,13 +922,57 @@ void OnTick()
     ProcessComFile();
 
     UpdateMaster();
+    WriteSignal();
 
 //    if (sigBoundary.Event>NoEvent)
     switch ((int)fTick)
     {
-      case 1434206:  //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
-                     //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
-                     break;
+      case 4097:    //--Sell
+      case 18167:   //--Sell
+      case 36029:   //--Sell
+      case 85079:   //--Sell
+      case 97841:   //--Buy
+      case 106247:  //--Buy
+      case 179942:  //--Buy
+      case 191936:  //--Buy
+      case 238624:  //--Buy
+      case 256666:  //--Buy
+      case 263178:  //--Buy
+      case 310228:  //--Buy
+      case 330244:  //--Buy
+      case 334574:  //--Buy
+      case 360198:  //--Buy
+      case 376830:  //--Sell
+      case 382718:  //--Buy
+      case 392581:  //--Buy
+      case 415594:  //--Buy
+      case 423432:  //--Sell
+      case 430220:  //--Sell
+      case 445363:  //--Sell
+      case 468585:  //--Sell
+      case 483794:  //--Sell
+      case 500984:  //--Sell
+      case 505123:  //--Sell
+      case 578305:  //--Sell
+      case 587002:  //--Buy
+      case 593664:  //--Buy
+      case 600568:  //--Buy
+      case 608184:  //--Buy
+      case 622145:  //--Buy
+      case 638216:  //--Buy
+      case 660397:  //--Sell
+      case 668377:  //--Sell
+      case 677236:  //--Sell
+      case 691235:  //--Sell
+      case 698943:  //--Sell
+      case 739034:  //--Buy
+      case 755245:  //--Buy
+      case 757894:  //--Sell
+      case 766217:  //--Buy
+                    //Pause("Signal test: "+DirText(signal.Direction)+" Spot "+proper(ActionText(master.OnCall))+"er: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
+                    //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
+                    //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
+                    break;
     }
 
     Execute();
@@ -1016,10 +1108,9 @@ int OnInit()
     }
 
     if (debug)
-    {
       dHandle = FileOpen("debug-man-v2.psv",FILE_TXT|FILE_WRITE);
-      WriteSignal();
-    }
+
+    WriteSignal();
 
     return(INIT_SUCCEEDED);
   }

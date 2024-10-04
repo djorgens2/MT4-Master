@@ -133,6 +133,13 @@ private:
                         QueueSnapshot   Type[6];
                       };
 
+  struct              OrderSlider
+                      {
+                        bool            Active;               //-- Order Type following fill
+                        double          Price;                //-- Trigger Price
+                        double          Step;                 //-- Slider Step
+                      };
+
   struct              OrderResubmit
                       {
                         int             Type;                 //-- Order Type following fill
@@ -222,6 +229,7 @@ private:
           OrderLog        Log[];
           OrderRequest    Queue[];
           OrderMaster     Master[2];
+          OrderSlider     Slider[4];
           OrderSummary    Summary[Total];
           QueueSummary    Snapshot[QueueStates];
 
@@ -255,6 +263,9 @@ private:
 
           void         AdverseEquityHandler(void);
 
+          bool         SliderTriggered(int Action, double Step);
+          void         InitSlider(int Action);
+
           void         ProcessProfits(int Action);
           void         ProcessLosses(int Action);
 
@@ -265,7 +276,7 @@ public:
 
           //-- Order Operational Control methods
           void         Update(double BaseCurrency=1.0);         //-- Update Order Statistics, Display, Manage Logs
-          void         ProcessRequests(void);                   //-- Process pending orders in the Request Queue
+          void         ProcessRequests(double Step=0.00);       //-- Process pending orders in the Request Queue
           void         ProcessOrders(int Action);               //-- Manage open orders by Action Type
           void         ProcessHedge(string Requestor);          //-- Hedges on Market (Immediate)
 
@@ -283,7 +294,6 @@ public:
 
           //-- Order properties
           double       Price(SummaryType Type, int Action, double Requested=0.00, double Basis=0.00, bool InPips=false);
-          double       Forecast(int Action, double Equity, double Spread=0.00);
           double       LotSize(int Action, double Lots=0.00, double Margin=0.00);
 
           //-- Margin Calcs
@@ -293,7 +303,7 @@ public:
           double       Margin(int Type, QueueStatus Status, int Format=InPercent)
                                                                              {return(Calc((MarginType)BoolToInt(IsEqual(Operation(Type),OP_BUY),MarginLong,MarginShort),
                                                                                      Snapshot[Status].Type[Operation(Type)].Lots,Format));};
-          double       Free(int Action)                                      {return(LotSize(Action)-Master[Action].Entry.Lots);};
+          double       Free(int Action, double Price, bool IncludePending=true);
           double       Split(int Action)                                     {return(fdiv(LotSize(Action),2,Account.LotPrecision));};
           double       Equity(double Value, int Format=InPercent);
           double       DCA(int Action)                                       {return(NormalizeDouble(Master[Action].DCA,Digits));};
@@ -1347,7 +1357,7 @@ void COrder::AdverseEquityHandler(void)
 //+------------------------------------------------------------------+
 //| ProcessRequests - Process requests in the Request Queue          |
 //+------------------------------------------------------------------+
-void COrder::ProcessRequests(void)
+void COrder::ProcessRequests(double Step=0.00)
   {
     bool         complete    = false;
     
@@ -1377,17 +1387,18 @@ void COrder::ProcessRequests(void)
         {
           switch(Queue[request].Type)
           {
-            case OP_BUY:        Queue[request].Status  = Immediate;
+            case OP_BUY:
+            case OP_SELL:       Queue[request].Status    = (QueueStatus)BoolToInt(SliderTriggered(Queue[request].Type),Immediate,Pending);
                                 break;
-            case OP_BUYSTOP:    Queue[request].Status  = (QueueStatus)BoolToInt(Ask>=Queue[request].Price,Immediate,Pending);
+            case OP_BUYLIMIT:   if (Ask<=Queue[request].Price)
+                                  Queue[request].Status  = (QueueStatus)BoolToInt(SliderTriggered(Queue[request].Type),Immediate,Pending);
                                 break;
-            case OP_BUYLIMIT:   Queue[request].Status  = (QueueStatus)BoolToInt(Ask<=Queue[request].Price,Immediate,Pending);
+            case OP_SELLLIMIT:  if (Bid>=Queue[request].Price)
+                                  Queue[request].Status  = (QueueStatus)BoolToInt(SliderTriggered(Queue[request].Type),Immediate,Pending);
                                 break;
-            case OP_SELL:       Queue[request].Status  = Immediate;
+            case OP_BUYSTOP:    Queue[request].Status    = (QueueStatus)BoolToInt(Ask>=Queue[request].Price,Immediate,Pending);
                                 break;
-            case OP_SELLSTOP:   Queue[request].Status  = (QueueStatus)BoolToInt(Bid<=Queue[request].Price,Immediate,Pending);
-                                break;
-            case OP_SELLLIMIT:  Queue[request].Status  = (QueueStatus)BoolToInt(Bid>=Queue[request].Price,Immediate,Pending);
+            case OP_SELLSTOP:   Queue[request].Status    = (QueueStatus)BoolToInt(Bid<=Queue[request].Price,Immediate,Pending);
                                 break;
           }          
         }
@@ -1429,6 +1440,41 @@ void COrder::ProcessRequests(void)
       
     if (complete)
       UpdatePanel();
+  }
+
+//+------------------------------------------------------------------+
+//| SliderTriggered - Activates and maintains Slider by Orderr Type  |
+//+------------------------------------------------------------------+
+bool COrder::SliderTriggered(int Action, double Step=0.00)
+  {
+    if (IsChanged(Slider[Action].Active,true))
+    {
+      Slider[Action].Price        = Close[0];
+      Slider[Action].Step         = Step;
+    }
+                                
+    switch (Action)
+    {
+      case OP_BUY:
+      case OP_BUYLIMIT:     if (IsLower(Close[0],Slider[Action].Price))
+                              return false;
+                            break;
+      case OP_SELL:
+      case OP_SELLLIMIT:    if (IsHigher(Close[0],Slider[Action].Price))
+                              return false;
+    }
+
+    return fabs(Close[0]-Slider[Action].Price)>Slider[Action].Step;
+  }
+
+//+------------------------------------------------------------------+
+//| InitSlider - Turns Slider off until next Trigger event           |
+//+------------------------------------------------------------------+
+void COrder::InitSlider(int Action)
+  {
+    Slider[Action].Active       = false;
+    Slider[Action].Price        = NoValue;
+    Slider[Action].Step         = NoValue;
   }
 
 //+------------------------------------------------------------------+
@@ -1590,6 +1636,9 @@ COrder::COrder(BrokerModel Model)
 
     for (int action=OP_BUY;action<=OP_SELL;action++)
       Account.NetProfit[action]                   = 0.00;
+
+    for (int action=OP_BUY;IsBetween(action,OP_BUY,OP_SELLLIMIT);action++)
+      InitSlider(action);
   }
 
 //+------------------------------------------------------------------+
@@ -1726,20 +1775,49 @@ double COrder::Price(SummaryType Type, int Action, double Requested=0.00, double
   }
 
 //+------------------------------------------------------------------+
-//| Forecast - returns the spread adjusted equity and risk prices    |
+//| Free - Returns Lots Open/Pend(?) in the zone of supplied Price   |
 //+------------------------------------------------------------------+
-double COrder::Forecast(int Action, double Equity, double Spread=0.00)
+double COrder::Free(int Action, double Price=0.00, bool IncludePending=true)
   {
-    //-- WIP: Ideas:
-    //-- Entry/Exit (Currently coded for exit)
-    //-- Lots needed from Price to reach Equity
-    //-- Concern: Spread gaps are an issue
-    //--   a. Long on Entry
-    //--   b. Short on Exit
-    double spread       = BoolToDouble(IsEqual(Action,OP_BUY),Spread,-Spread);
-    double equity       = fdiv(fdiv(Equity*Account.Balance,Account.LotSize),Master[Action].Summary[Net].Lots)*Direction(Action,InAction);
+    if (IsBetween(Action,OP_BUY,OP_SELL))
+    {
+      
+      double price   = BoolToDouble(Price==0.00,BoolToDouble(Action==OP_BUY,Bid,Ask),Price,Digits);
+      double lots    = LotSize(Action);
+      double req     = 0.00;
+      double ord     = 0.00;
+    
+      if (IncludePending)
+        for (int request=0;request<ArraySize(Queue);request++)
+        {
+          if (IsEqual(Queue[request].Action,Action))
+            if (IsBetween(price,Queue[request].Price-(point(Master[Action].ZoneStep*0.9,Digits)),
+                                Queue[request].Price+(point(Master[Action].ZoneStep*0.9,Digits))))
+              req    += LotSize(Action,Queue[request].Lots);
 
-    return (NormalizeDouble(Master[Action].DCA+equity+spread,Digits));
+            // Print("Limit/Stop:"+DoubleToStr(price,Digits)+":"+DoubleToStr(point(Master[Action].ZoneStep*0.9),Digits)
+            //                                +":"+DoubleToStr(Queue[request].Price,Digits)
+            //                                +":"+DoubleToStr(Queue[request].Price-point(Master[Action].ZoneStep*0.9),Digits)
+            //                                +":"+DoubleToStr(Queue[request].Price+point(Master[Action].ZoneStep*0.9),Digits));
+        }
+
+      for (int node=0;node<ArraySize(Master[Action].Order);node++)
+      {
+        if (IsEqual(Master[Action].Order[node].Action,Action))
+          if (IsBetween(price,Master[Action].Order[node].Price-(point(Master[Action].ZoneStep*0.9,Digits)),
+                              Master[Action].Order[node].Price+(point(Master[Action].ZoneStep*0.9,Digits))))
+            ord     += Master[Action].Order[node].Lots;
+
+          // Print("Open:"+DoubleToStr(price,Digits)+":"+DoubleToStr(point(Master[Action].ZoneStep*0.9),Digits)
+          //                                +":"+DoubleToStr(Master[Action].Order[node].Price,Digits)
+          //                                +":"+DoubleToStr(Master[Action].Order[node].Price-point(Master[Action].ZoneStep*0.9),Digits)
+          //                                +":"+DoubleToStr(Master[Action].Order[node].Price+point(Master[Action].ZoneStep*0.9),Digits));
+      }
+
+      return NormalizeDouble(lots-(req+ord),Account.LotPrecision);
+    }
+  
+    return NormalizeDouble(NoValue,Account.LotPrecision);
   }
 
 //+------------------------------------------------------------------+

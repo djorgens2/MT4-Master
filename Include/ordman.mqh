@@ -167,8 +167,8 @@ int ActionCode(string Action, double Price=0.00, bool Contrarian=false)
   {
     int action                                    = NoAction;
     
-    if (Action=="BUY"||Action=="LONG")   action   = BoolToInt(Contrarian,OP_SELL,OP_BUY);
-    if (Action=="SELL"||Action=="SHORT") action   = BoolToInt(Contrarian,OP_BUY,OP_SELL);
+    if (Action=="BUY"||Action=="LONG"||Action==EnumToString(Buyer))    action = BoolToInt(Contrarian,OP_SELL,OP_BUY);
+    if (Action=="SELL"||Action=="SHORT"||Action==EnumToString(Seller)) action = BoolToInt(Contrarian,OP_BUY,OP_SELL);
     
     if (Price>0)
       switch (action)
