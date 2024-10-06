@@ -511,8 +511,8 @@ void ProcessCommand(string Command)
               //-- Zone Management
               if (params[0]=="ZONE")
               {
-                if (item==2)   params[config]  = DoubleToString(order.Config(action).ZoneStep);
-                if (item==3)   params[config]  = DoubleToString(order.Config(action).MaxZoneMargin);
+                if (item==2)   params[config]  = DoubleToString(order.Config(action).ZoneSize);
+                if (item==3)   params[config]  = DoubleToString(order.Config(action).ZoneMaxMargin);
               }
             }
 

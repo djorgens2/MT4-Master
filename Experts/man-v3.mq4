@@ -232,23 +232,6 @@ void DebugPrint(void)
   }
 
 //+------------------------------------------------------------------+
-//| StrategyCode - returns strategy code from parsed text            |
-//+------------------------------------------------------------------+
-StrategyType StrategyCode(string Strategy)
-  {
-    if (trim(Strategy)=="WAIT")           return (Wait);
-    if (trim(Strategy)=="BUILD")          return (Build);
-    if (trim(Strategy)=="MANAGE")         return (Manage);
-    if (trim(Strategy)=="PROTECT")        return (Protect);
-    if (trim(Strategy)=="HEDGE")          return (Hedge);
-    if (trim(Strategy)=="CAPTURE")        return (Capture);
-    if (trim(Strategy)=="MITIGATE")       return (Mitigate);
-    if (trim(Strategy)=="SPOT")           return (Spot);
-
-    return (NoValue);
-  }
-  
-//+------------------------------------------------------------------+
 //| RefreshScreen                                                    |
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
@@ -308,6 +291,7 @@ void RefreshScreen(void)
       UpdateLabel("pvEquity","",clrNONE,1);
       UpdateLabel("pvMargin","",clrNONE,1);
 
+      Comment("");
     }
 
     if (IsEqual(panelWinID,NoValue))
@@ -317,11 +301,12 @@ void RefreshScreen(void)
       UpdateLabel("pvNetEquity","$"+dollar(order.Metrics().EquityBalance,11),clrLightGray,12,"Consolas");
       UpdateLabel("pvEquity",DoubleToStr(order.Metrics().EquityClosed*100,1)+"%",Color(order[Net].Value),12,"Consolas");
       UpdateLabel("pvMargin",DoubleToString(order.Metrics().Margin*100,1)+"%",Color(order[Net].Lots),12,"Consolas");
-      UpdateLabel("pvStratLead",EnumToString(master.Lead)+": "+EnumToString(manager[master.Lead].Strategy),clrGoldenrod,9,"Tahoma");
-      UpdateLabel("pvStratOnCall",EnumToString(master.OnCall)+": "+EnumToString(manager[master.OnCall].Strategy),clrDarkGray,9,"Tahoma");
 
       Comment(order.QueueStr()+order.OrderStr());
     }
+
+    UpdateLabel("pvStratLead",EnumToString(master.Lead)+": "+EnumToString(manager[master.Lead].Strategy),clrGoldenrod,9,"Tahoma");
+    UpdateLabel("pvStratOnCall",EnumToString(master.OnCall)+": "+EnumToString(manager[master.OnCall].Strategy),clrDarkGray,9,"Tahoma");
 
     for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
       UpdateLabel("lbvOC-"+ActionText(role)+"-Strategy",EnumToString(manager[role].Strategy),clrDarkGray);
@@ -365,45 +350,6 @@ FractalRec Fractal(FractalType Type)
       return t[Type];
 
     return s[Daily][Type];
-  }
-
-//+------------------------------------------------------------------+
-//| ManagerChanged - Returns true on change in Operations Manager    |
-//+------------------------------------------------------------------+
-bool ManagerChanged(void)
-  {
-    RoleType incoming     = (RoleType)BoolToInt(IsEqual(Fractal(signal.Type).State,Correction),
-                                        Action(Fractal(signal.Type).Direction,InDirection,InContrarian),
-                                        Action(Fractal(signal.Type).Direction));
-    RoleType incumbent    = (RoleType)BoolToInt(IsEqual(master.Lead,Unassigned),Action(incoming,InAction,InContrarian),master.Lead);
-    
-    if (IsEqual(incoming,incumbent))
-      return false;
-
-    master.OnCall         = incumbent;
-    master.Lead           = incoming;
-
-    return true;
-  }
-
-//+------------------------------------------------------------------+
-//| StrategyChanged - Returns true on change in Strategy             |
-//+------------------------------------------------------------------+
-bool StrategyChanged(RoleType Role, EventType Event)
-  {
-    if (IsBetween(Role,Buyer,Seller))
-      if (Event>NoEvent)
-      {
-        StrategyType strategy    = Strategy(Role,Event);
-
-        if (IsEqual(manager[Role].Strategy,strategy))
-          return false;
-
-        manager[Role].Strategy   = strategy;
-        return true;
-      }
-
-    return false;
   }
 
 //+------------------------------------------------------------------+
@@ -719,6 +665,45 @@ void UpdateMaster(void)
   }
 
 //+------------------------------------------------------------------+
+//| ManagerChanged - Returns true on change in Operations Manager    |
+//+------------------------------------------------------------------+
+bool ManagerChanged(void)
+  {
+    RoleType incoming     = (RoleType)BoolToInt(IsEqual(Fractal(signal.Type).State,Correction),
+                                        Action(Fractal(signal.Type).Direction,InDirection,InContrarian),
+                                        Action(Fractal(signal.Type).Direction));
+    RoleType incumbent    = (RoleType)BoolToInt(IsEqual(master.Lead,Unassigned),Action(incoming,InAction,InContrarian),master.Lead);
+    
+    if (IsEqual(incoming,incumbent))
+      return false;
+
+    master.OnCall         = incumbent;
+    master.Lead           = incoming;
+
+    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| StrategyChanged - Returns true on change in Strategy             |
+//+------------------------------------------------------------------+
+bool StrategyChanged(RoleType Role, EventType Event)
+  {
+    if (IsBetween(Role,Buyer,Seller))
+      if (Event>NoEvent)
+      {
+        StrategyType strategy    = Strategy(Role,Event);
+
+        if (IsEqual(manager[Role].Strategy,strategy))
+          return false;
+
+        manager[Role].Strategy   = strategy;
+        return true;
+      }
+
+    return false;
+  }
+
+//+------------------------------------------------------------------+
 //| Strategy - Returns Strategy for supplied Role                    |
 //+------------------------------------------------------------------+
 StrategyType Strategy(RoleType Role, EventType Event)
@@ -839,20 +824,25 @@ void ExecuteSpot(RoleType Role)
     OrderRequest request   = order.BlankRequest("Spot/"+EnumToString(Role));
     
     int    direction       = Direction(Role,InAction);
-    double price           = ParseEntryPrice(Role,BoolToStr(Role==Buyer,"-")+DoubleToStr(order.Config(Role).ZoneStep,1)+"P");
+    double price           = ParseEntryPrice(Role,BoolToStr(Role==Buyer,"-")+DoubleToStr(order.Config(Role).ZoneSize,1)+"P");
     
     if (order.Free(Role,price)>order.Split(Role))
       //-- Handle Convergences
-      if (Fractal(Term).Direction==direction)      {
+      if (Fractal(Term).Direction==direction)
+      {
         if (t.Segment().Bias==Role)
           {
             request.Type    = ActionCode(EnumToString(Role),price);
+            request.Action  = Role;
             request.Lots    = order.Free(Role);
             request.Price   = price;
-            request.Memo    = "[mv3] Auto Spot";
+            request.Memo    = "[mv3] Auto Spot ("+(string)fTick+")";
             
             if (order.Submitted(request))
+            {
               Print(order.RequestStr(request));
+              order.SetSlider(request.Type,0.00002,Always);
+            }
             else
               Print("Order Not Submitted! \n\n"+order.RequestStr(request));
           };
@@ -869,24 +859,15 @@ void ExecuteSpot(RoleType Role)
 //+------------------------------------------------------------------+
 void ManageRisk(RoleType Role)
   {
-    static double open     = 0.00;
-    static int    series   = 0;
-
-    if (StrategyChanged(Role,signal.Boundary.Event))
-      if (manager[Role].Strategy==Spot)
-      {
-        open               = Close[0];
-        series++;
-      }
-        
+    bool changed = StrategyChanged(Role,signal.Boundary.Event);
+    
+    if (changed) Pause("Strategy change for the risk manager to "+EnumToString(manager[Role].Strategy),"Risk Manager");
+              
     switch (manager[Role].Strategy)
     {
       case Spot:  ExecuteSpot(Role);
     };
     
-    //if (manager[Role].Strategy==Spot)
-    //  Print("|Spot|"+(string)fTick+"|"+(string)series+"|"+DoubleToStr(open,Digits)+"|"+ActionText(Role)+"|"+DoubleToStr(Close[0],Digits));
-
     order.ProcessOrders(Role);
   }
 
@@ -910,7 +891,12 @@ void Execute(void)
      ManageRisk(Seller);
    }
 
-    order.ProcessRequests(0.00002);
+    order.ProcessRequests();
+    
+//    if (order[Pending].Type[OP_SELLLIMIT].Count>0)
+    //if (order.Fulfilled(Seller))
+    //  Pause("Orders Pending", "Pending Catcher()");
+//    Print(order.SnapshotStr());
   }
 
 
@@ -925,56 +911,15 @@ void OnTick()
     WriteSignal();
 
 //    if (sigBoundary.Event>NoEvent)
-    switch ((int)fTick)
-    {
-      case 4097:    //--Sell
-      case 18167:   //--Sell
-      case 36029:   //--Sell
-      case 85079:   //--Sell
-      case 97841:   //--Buy
-      case 106247:  //--Buy
-      case 179942:  //--Buy
-      case 191936:  //--Buy
-      case 238624:  //--Buy
-      case 256666:  //--Buy
-      case 263178:  //--Buy
-      case 310228:  //--Buy
-      case 330244:  //--Buy
-      case 334574:  //--Buy
-      case 360198:  //--Buy
-      case 376830:  //--Sell
-      case 382718:  //--Buy
-      case 392581:  //--Buy
-      case 415594:  //--Buy
-      case 423432:  //--Sell
-      case 430220:  //--Sell
-      case 445363:  //--Sell
-      case 468585:  //--Sell
-      case 483794:  //--Sell
-      case 500984:  //--Sell
-      case 505123:  //--Sell
-      case 578305:  //--Sell
-      case 587002:  //--Buy
-      case 593664:  //--Buy
-      case 600568:  //--Buy
-      case 608184:  //--Buy
-      case 622145:  //--Buy
-      case 638216:  //--Buy
-      case 660397:  //--Sell
-      case 668377:  //--Sell
-      case 677236:  //--Sell
-      case 691235:  //--Sell
-      case 698943:  //--Sell
-      case 739034:  //--Buy
-      case 755245:  //--Buy
-      case 757894:  //--Sell
-      case 766217:  //--Buy
-                    //Pause("Signal test: "+DirText(signal.Direction)+" Spot "+proper(ActionText(master.OnCall))+"er: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
-                    //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
-                    //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
-                    break;
-    }
-
+//    switch ((int)fTick)
+//    {
+//      case 766217:  //--Buy
+//                    //Pause("Signal test: "+DirText(signal.Direction)+" Spot "+proper(ActionText(master.OnCall))+"er: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
+//                    //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
+//                    //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
+//                    break;
+//    }
+//
     Execute();
 
     RefreshScreen();

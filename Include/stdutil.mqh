@@ -94,12 +94,6 @@ enum YesNoType
        No
      };
 
-enum FeatureType
-     {
-       Disabled,        // Disabled
-       Enabled          // Enabled
-     };
-
 enum OutputFormat
      {
        Display,         // Formatted for Screen
