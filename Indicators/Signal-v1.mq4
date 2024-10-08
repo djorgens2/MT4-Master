@@ -33,7 +33,6 @@ input string inpSigFile    = "signal.bin";
             TickMA     // TickMA
           };
 
-
   struct SignalTrigger
          {
            int               Direction;
@@ -43,11 +42,16 @@ input string inpSigFile    = "signal.bin";
 
   struct SignalPivot
          {
-           EventType        Event;
-           SignalTrigger    High;
-           SignalTrigger    Low;
+           EventType         Event;
+           SignalTrigger     High;
+           SignalTrigger     Low;
          };
 
+  struct SignalFibonacci
+         {
+           SourceType        Source;
+           FractalType       Type;
+         };
 
   //-- Signals (Events) requesting Manager Action (Response)
   struct  SignalRec
@@ -67,6 +71,7 @@ input string inpSigFile    = "signal.bin";
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
             SignalPivot      Boundary;          //-- Signal Boundary Events
             SignalPivot      Recovery;          //-- Recovery Events
+            SignalFibonacci  Fibonacci;         //-- Fractal Source/Type of Last Fibo Event
           };
 
   struct  SignalFractal

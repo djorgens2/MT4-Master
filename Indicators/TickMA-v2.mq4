@@ -11,7 +11,7 @@
 #property indicator_buffers 7
 #property indicator_plots   7
 
-#include <Class\TickMA.mqh>
+#include <Class/TickMA.mqh>
 
 #define debug false
 
@@ -158,7 +158,7 @@ void RefreshScreen(void)
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
     UpdateDirection("tmaLinearDir"+(string)indWinId,t.Linear().Direction,Color(t.Linear().Direction),16);
-    UpdateLabel("tmaLinearState"+(string)indWinId,rpad(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().Type)," ",20),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaLinearState"+(string)indWinId,rpad(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().State)," ",20),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
     UpdateLabel("tmaLinearFOC"+(string)indWinId,center(lpad(t.Linear().FOC[Now],3,8)+lpad(t.Linear().FOC[Max],3,8)+lpad(t.Linear().FOC[Min],3,8),24),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
     UpdateDirection("tmaLinearLeadDir"+(string)indWinId,Direction(t.Linear().Lead,InAction),Color(Direction(t.Linear().Lead,InAction)),16);
     UpdateDirection("tmaLinearBiasDir"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),16);
@@ -341,19 +341,6 @@ int OnCalculate(const int rates_total,
     UpdateSegment(rates_total!=prev_calculated);
     RefreshScreen();
 
-    //-- SMA NewLead
-    //if (IsEqual(t.SMA().Event,NewLead))
-    //  Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
-    //        t.ActiveEventStr(),"LeadChange() Check");
-
-    //if (t[NewBoundary])
-    //if (t[NewLead])
-    //  Pause("Lead Change: "+BoolToStr(t[NewDivergence],"Divergence","Convergence")+"\n\n"+
-    //        t.ActiveEventStr(),"LeadChange() Check");
-            //BoolToStr(t[NewHigh],EnumToString(t.Alert(NewHigh))+" New High",
-            //BoolToStr(t[NewLow],EnumToString(t.Alert(NewLow))+" New Low",
-            //EnumToString(t.Alert(NewBoundary))+" New Boundary")),"NewBoundary() Check");
-
     return(rates_total);
   }
 
@@ -521,4 +508,12 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete t;
+
+    //-- Clean Open Chart Objects
+    int fObject             = 0;
+
+    while (fObject<ObjectsTotal())
+      if (InStr(ObjectName(fObject),indObjectStr))
+        ObjectDelete(ObjectName(fObject));
+      else fObject++;
   }

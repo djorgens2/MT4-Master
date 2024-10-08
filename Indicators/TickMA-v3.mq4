@@ -192,4 +192,13 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete t;
+
+    //-- Clean Open Chart Objects
+    int fObject             = 0;
+
+    while (fObject<ObjectsTotal())
+      if (InStr(ObjectName(fObject),indObjectStr))
+        ObjectDelete(ObjectName(fObject));
+      else fObject++;
+
   }

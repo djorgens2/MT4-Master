@@ -166,7 +166,7 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {
     s.Update(indPriorBuffer,indOffBuffer);
-    s.Fractal(indFractalBuffer);
+    s.CopyBuffer(indFractalBuffer);
 
     RefreshScreen();
 
@@ -240,4 +240,12 @@ int OnInit()
 void OnDeinit(const int reason)
   {
     delete s;
+
+    //-- Clean Open Chart Objects
+    int fObject             = 0;
+
+    while (fObject<ObjectsTotal())
+      if (InStr(ObjectName(fObject),sObjectStr))
+        ObjectDelete(ObjectName(fObject));
+      else fObject++;
   }

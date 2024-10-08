@@ -74,7 +74,7 @@ private:
 
     struct LinearRec
            {
-             FractalType    Type;
+             FractalState   State;
              EventType      Event;
              int            Direction;
              int            Lead;
@@ -546,7 +546,7 @@ void CTickMA::UpdateLinear(void)
       else 
         bias                = NoBias;
 
-      direction             = BoolToInt(IsEqual(bias,NoBias),BoolToInt(line.FOC[Now]>fdiv(line.FOC[Max]+line.FOC[Min],2),DirectionUp,DirectionDown),Action(bias));
+      direction             = BoolToInt(IsEqual(bias,NoBias),BoolToInt(line.FOC[Now]>fdiv(line.FOC[Max]+line.FOC[Min],2),DirectionUp,DirectionDown),Direction(bias,InAction));
       alert                 = (AlertType)BoolToInt(IsEqual(range.Direction,direction),Nominal,Notify);
 
       if (IsChanged(line.Bias,bias))
@@ -555,10 +555,10 @@ void CTickMA::UpdateLinear(void)
       SetEvent(line.Event,alert,tmaPrice.Close);
     }
 
-    //-- Set Range Fractal Type (shape)
-    line.Type              = (FractalType)BoolToInt(IsBetween(seg.Active,seg.Support,seg.Resistance),
-                                          BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Convergent,Divergent),
-                                          BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Expansion,Divergent));
+    //-- Set Range Fractal State (shape)
+    line.State              = (FractalState)BoolToInt(IsBetween(seg.Active,seg.Support,seg.Resistance),
+                                            BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Recovery,Retrace),
+                                            BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Extension,Correction));
 
     ActionChanged(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
   }

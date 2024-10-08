@@ -11,7 +11,7 @@
 #property indicator_buffers 7
 #property indicator_plots   7
 
-#include <Class\TickMA.mqh>
+#include <Class/TickMA.mqh>
 
 #define debug false
 

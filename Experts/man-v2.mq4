@@ -272,7 +272,7 @@ void RefreshScreen(void)
       
       //-- Update Panel
       order.ConsoleAlert("Connected to "+indSN+"; System "+BoolToStr(order.Enabled(),"Enabled","Disabled")+" on "+TimeToString(TimeCurrent()));
-      UpdateLabel("lbvAC-File",lower(comfile),clrGoldenrod);
+      UpdateLabel("lbvAC-File",lower(inpComFile),clrGoldenrod);
       
       //-- Hide non-Panel elements
       UpdateLabel("pvBalance","",clrNONE,1);
@@ -296,7 +296,7 @@ void RefreshScreen(void)
     else
     {
       UpdateLabel("Tick",(string)fTick,clrDarkGray,8,"Hack");
-      UpdateLabel("lbvAC-File",lower(comfile),BoolToInt(fTick==rTick,clrGoldenrod,clrDarkGray));
+      UpdateLabel("lbvAC-File",lower(inpComFile),BoolToInt(fTick==rTick,clrGoldenrod,clrDarkGray));
     }
   }
 
