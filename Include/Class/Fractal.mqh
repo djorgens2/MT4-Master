@@ -97,6 +97,7 @@ protected:
   struct PivotRec
          {
            EventType     Event;                    //-- Pivot Event
+           bool          Hedge;                    //-- Hedge Flag (Lead!=Bias)
            int           Direction;                //-- Opening Pivot Direction
            int           Lead;                     //-- Action of last Boundary Hit
            int           Bias;                     //-- Bias
@@ -162,7 +163,7 @@ private:
          void            InitPivot(FractalType Type, PivotRec &Pivot, EventLog &Log);
          void            InitFractal(void);
 
-         void            UpdateFibonacci(FibonacciRec &Extension, FibonacciRec &Retrace, double &Fractal[], bool Reset);
+         void            UpdateFibonacci(FractalType Type,FibonacciRec &Extension, FibonacciRec &Retrace, double &Fractal[], bool Reset);
          void            UpdatePivot(FractalType, PivotRec &Pivot);
          void            UpdateFractal(FractalType Type, double Support, double Resistance);
          void            ManageFractal(void);
@@ -269,14 +270,16 @@ bool CFractal::FibonacciChanged(FractalType Type, FractalRec &Fractal)
 //+------------------------------------------------------------------+
 void CFractal::InitPivot(FractalType Type, PivotRec &Pivot, EventLog &Log)
   {
+    int direction    = Pivot.Direction;
+
     Pivot.Event      = Log.Event;
-    Pivot.Direction  = BoolToInt(this[NewHigh],DirectionUp,BoolToInt(this[NewLow],DirectionDown,NoDirection));
+    Pivot.Direction  = BoolToInt(this[NewHigh],DirectionUp,BoolToInt(this[NewLow],DirectionDown,direction));
     Pivot.Price      = Log.Price;
     Pivot.Level      = (FibonacciType)BoolToInt(this[NewExtension]||this[NewBreakout],frec[Type].Extension.Level,frec[Type].Retrace.Level);
     Pivot.Open       = fPrice.Close;
     Pivot.High       = fmax(fPrice.Close,Pivot.Price);
     Pivot.Low        = fmin(fPrice.Close,Pivot.Price);
-    Pivot.Lead       = Action(fPrice.Close-Pivot.Price);
+    Pivot.Lead       = Action(Pivot.Direction);
     Pivot.Bias       = Pivot.Lead;
   }
 
@@ -329,7 +332,7 @@ void CFractal::InitFractal(void)
     for (FractalType type=Origin;IsBetween(type,Origin,Term);type++)
     {
       InitPivot(type,rec.Pivot,event);
-      UpdateFibonacci(rec.Extension,rec.Retrace,rec.Point,Always);
+      UpdateFibonacci(type,rec.Extension,rec.Retrace,rec.Point,Always);
 
       rec.Event                  = Event(type);
       frec[type]                 = rec;
@@ -346,7 +349,7 @@ void CFractal::InitFractal(void)
 //+------------------------------------------------------------------+
 //| UpdateFibonacci - Update Extension/Retrace using supplied Fractal|
 //+------------------------------------------------------------------+
-void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,double &Fractal[],bool Reset)
+void CFractal::UpdateFibonacci(FractalType Type, FibonacciRec &Extension,FibonacciRec &Retrace,double &Fractal[],bool Reset)
   {
     Extension.Event   = NoEvent;
     Retrace.Event     = NoEvent;
@@ -423,8 +426,8 @@ void CFractal::UpdateFibonacci(FibonacciRec &Extension,FibonacciRec &Retrace,dou
           }
     }
 
-    SetEvent(Extension.Event,Nominal,Extension.Price);
-    SetEvent(Retrace.Event,Nominal,Retrace.Price);
+    SetEvent(Extension.Event,Alert(Type),Extension.Price);
+    SetEvent(Retrace.Event,Alert(Type),Retrace.Price);
   }
 
 //+------------------------------------------------------------------+
@@ -440,10 +443,14 @@ void CFractal::UpdatePivot(FractalType Type, PivotRec &Pivot)
     if (IsHigher(fPrice.Close,Pivot.High))
       if (ActionChanged(Pivot.Lead,OP_BUY))
         Pivot.Event  = NewLead;
-      
+
     if (IsLower(fPrice.Close,Pivot.Low))
       if (ActionChanged(Pivot.Lead,OP_SELL))
         Pivot.Event  = NewLead;
+
+    Pivot.Hedge      = !IsEqual(Pivot.Lead,Pivot.Bias);
+
+    SetEvent(Pivot.Event,Alert(Type),fPrice.Close);
   }
 
 //+------------------------------------------------------------------+
@@ -531,7 +538,7 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
       else
         frec[Type].Point[fpRecovery]        = fmin(BoolToDouble(IsEqual(fBar,0),fPrice.Close,fPrice.Low),frec[Type].Point[fpRecovery]);
 
-    UpdateFibonacci(frec[Type].Extension,frec[Type].Retrace,frec[Type].Point,!IsEqual(fpoint[fpRoot],frec[Type].Point[fpRoot]));
+    UpdateFibonacci(Type,frec[Type].Extension,frec[Type].Retrace,frec[Type].Point,!IsEqual(fpoint[fpRoot],frec[Type].Point[fpRoot]));
     UpdatePivot(Type,frec[Type].Pivot);
     
     if (Event(NewLead,Alert(Type)))
@@ -670,7 +677,7 @@ CFractal::~CFractal()
   }
 
 //+------------------------------------------------------------------+
-//| Update - Updates fractal Term based on supplied values           |
+//| UpdateFractal - Applies supplied values to the Term Fractal      |
 //+------------------------------------------------------------------+
 void CFractal::UpdateFractal(double Support, double Resistance, double Pivot, int Bar)
   {
@@ -732,7 +739,7 @@ EventType CFractal::Event(FractalState State)
 //+------------------------------------------------------------------+
 AlertType CFractal::Alert(FractalType Type)
   {
-    static const AlertType alert[FractalTypes]  = {Critical,Major,Minor,Lead};
+    static const AlertType alert[FractalTypes]  = {Critical,Major,Minor,Nominal};
 
     return alert[Type];
   }
@@ -960,7 +967,7 @@ string CFractal::DisplayStr(void)
       Append(text," "+DirText(frec[type].Direction),"\n");
       Append(text,EnumToString(frec[type].State));
       Append(text,"["+ActionText(frec[type].Pivot.Lead)+"]");
-      Append(text,BoolToStr(IsEqual(frec[type].Pivot.Bias,frec[type].Pivot.Lead),"","Hedge"));
+      Append(text,BoolToStr(frec[type].Pivot.Hedge,"Hedge"));
       Append(text,BoolToStr(IsEqual(frec[type].Event,NoEvent),""," **"+EventText(frec[type].Event)));
       Append(text,DisplayStr(Extension,frec[type].Extension),"\n");
       Append(text,DisplayStr(Retrace,frec[type].Retrace),"\n");

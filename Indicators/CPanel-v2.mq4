@@ -176,7 +176,7 @@ void RefreshScreen(void)
     //-- Linear Box
     UpdateDirection("tmaLinearBias"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),32);
     UpdateDirection("tmaLinearDir"+(string)indWinId,t.Linear().Direction,Color(t.Linear().Direction),16);
-    UpdateLabel("tmaLinearState"+(string)indWinId,rpad(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().Type)," ",20),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
+    UpdateLabel("tmaLinearState"+(string)indWinId,rpad(DirText(t.Linear().Direction)+" "+EnumToString(t.Linear().State)," ",20),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
     UpdateLabel("tmaLinearFOC"+(string)indWinId,center(lpad(t.Linear().FOC[Now],3,8)+lpad(t.Linear().FOC[Max],3,8)+lpad(t.Linear().FOC[Min],3,8),24),Color(t.Linear().Direction),12,"Noto Sans Mono CJK HK");
     UpdateDirection("tmaLinearLeadDir"+(string)indWinId,Direction(t.Linear().Lead,InAction),Color(Direction(t.Linear().Lead,InAction)),16);
     UpdateDirection("tmaLinearBiasDir"+(string)indWinId,Direction(t.Linear().Bias,InAction),Color(Direction(t.Linear().Bias,InAction)),16);

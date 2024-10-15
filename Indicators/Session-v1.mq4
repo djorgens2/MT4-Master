@@ -168,6 +168,8 @@ int OnCalculate(const int rates_total,
     s.Update(indPriorBuffer,indOffBuffer);
     s.CopyBuffer(indFractalBuffer);
 
+    //FractalType type = (FractalType)BoolToInt(s.Alert(NewExtension)==Critical,Origin,BoolToInt(s.Alert(NewExtension)==Major,Trend,Term));
+    //Flag("NewExtension", Color(type,s[type].Direction),0,0,s[NewExtension]);
     RefreshScreen();
 
     return(rates_total);

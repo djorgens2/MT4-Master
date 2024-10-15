@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
-//|                                                    Signal-v1.mq4 |
+//|                                                    Signal-v2.mq4 |
 //|                            Copyright 2013-2024, Dennis Jorgenson |
 //|                                                                  |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2013-2024, Dennis Jorgenson"
 #property link      ""
-#property version   "1.00"
+#property version   "2.00"
 #property strict
 #property indicator_separate_window
 
@@ -71,7 +71,8 @@ input string inpSigFile    = "signal.bin";
             int              HedgeCount;        //-- Active Hedge Count; All Fractals
             double           Odds;              //-- % of Success derived from Fractals
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
-            SignalPivot      Boundary;          //-- Signal Boundary Events
+            AlertType        Boundary;          //-- Boundary Event Alert Type
+            SignalPivot      Range;             //-- Signal Boundary Events
             SignalPivot      Recovery;          //-- Recovery Events
             SignalFibonacci  Fibonacci;         //-- Fractal Source/Type of Last Fibo Event
           };
@@ -119,7 +120,7 @@ void RefreshScreen(void)
     }
   };
 
-//+------------------------------------------------------------------+c
+//+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total,
@@ -150,8 +151,11 @@ int OnCalculate(const int rates_total,
         
       if (IsChanged(lastTick,sig.Tick))
       {
-        ArrayCopy(sigHist,sigHist,1,0,inpRetention-1);
-        sigHist[0]    = sig.Price;
+        if (sig.Boundary>Notify)
+        {
+          ArrayCopy(sigHist,sigHist,1,0,inpRetention-1);
+          sigHist[0]    = sig.Price;
+        }
           
         RefreshScreen();
       }
@@ -202,9 +206,21 @@ int OnInit()
     UpdateDirection("lbvSigLead",sig.Lead,Color(sig.Lead),16);
     UpdateDirection("lbvSigBias",sig.Bias,Color(sig.Bias),16);
 
+    //--- Create Display Visuals
+    for (int obj=0;obj<inpRetention;obj++)
+    {
+      ObjectCreate("sigHL:"+(string)sigWinID+"-"+(string)obj,OBJ_TREND,sigWinID,0,0);
+      ObjectSet("sigHL:"+(string)sigWinID+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("sigHL:"+(string)sigWinID+"-"+(string)obj,OBJPROP_WIDTH,1);
+
+      ObjectCreate("sigOC:"+(string)sigWinID+"-"+(string)obj,OBJ_TREND,sigWinID,0,0);
+      ObjectSet("sigOC:"+(string)sigWinID+"-"+(string)obj,OBJPROP_RAY,false);
+      ObjectSet("sigOC:"+(string)sigWinID+"-"+(string)obj,OBJPROP_WIDTH,3);
+    }
+
     SetIndexBuffer(0,sigBuffer);
     SetIndexEmptyValue(0,0.00);
-
+    
     ArrayResize(sigHist,inpRetention);
     
     DrawBox("sig-"+(string)sigWinID+":FractalPoint",210,108,205,140,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);

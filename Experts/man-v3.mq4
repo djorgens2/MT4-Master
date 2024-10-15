@@ -95,6 +95,8 @@
             double           TakeProfit;           //-- Take Profit
             double           StopLoss;             //-- Stop Loss
             bool             Hold;                 //-- Hold Role Profit
+            int              Strength;
+            bool             Hedge;
           };
 
   struct SignalFibonacci
@@ -117,6 +119,19 @@
            SignalTrigger    Low;
          };
          
+  struct sigPivot
+         {
+           int              Direction;         //-- Direction Signaled
+           RoleType         Lead;              //-- Calculated Signal Lead
+           RoleType         Bias;              //-- Calculated Signal Bias
+           EventType        Event;
+           double           Open;
+           SignalTrigger    High;
+           SignalTrigger    Low;
+           double           Close;
+           double           Checkpoint[];
+         };
+
   struct SignalBar
          {
            int              Bar;
@@ -138,8 +153,11 @@
             SourceType       Source;            //-- Signal Source (Session/TickMA)
             FractalType      Type;              //-- Source Fractal
             FractalState     Momentum;          //-- Triggered Pullback/Rally
+            int              HedgeCount;        //-- Active Hedge Count; All Fractals
+            double           Odds;              //-- % of Success derived from Fractals
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
-            SignalPivot      Boundary;          //-- Signal Boundary Events
+            AlertType        Boundary;          //-- Boundary Event Alert Type
+            SignalPivot      Range;             //-- Signal Boundary Events
             SignalPivot      Recovery;          //-- Recovery Events
             SignalFibonacci  Fibonacci;         //-- Fractal Source/Type of Last Fibo Event
           };
@@ -159,6 +177,7 @@
   SignalRec              signal;
   SignalBar              signalFP[FractalPoints];
   double                 sigHistory[];
+  sigPivot               sigpiv;
 
 
   //-- Internal EA Configuration
@@ -167,7 +186,6 @@
   string                 objectstr           = "[mv3]";
   
   int                    dHandle;
-
 
 //+------------------------------------------------------------------+
 //| WriteSignal- Creates, maintains and writes Signal History        |
@@ -203,9 +221,23 @@ void DebugPrint(void)
         Append(ftext,EnumToString(signal.Source),"|");
         Append(ftext,EnumToString(signal.Type),"|");
         Append(ftext,EnumToString(Fractal().State),"|");
+
+        Append(ftext,EnumToString(signal.Fibonacci.Source),"|");
+        Append(ftext,EnumToString(signal.Fibonacci.Type),"|");
+        Append(ftext,EnumToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Event),"|");
+        Append(ftext,DirText(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Direction),"|");
+        Append(ftext,ActionText(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Lead),"|");
+        Append(ftext,ActionText(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Bias),"|");
+        Append(ftext,StringSubstr(EnumToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Level),4),"|");
+        Append(ftext,DoubleToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Price,Digits),"|");
+        Append(ftext,DoubleToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Open,Digits),"|");
+        Append(ftext,DoubleToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).High,Digits),"|");
+        Append(ftext,DoubleToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Low,Digits),"|");
+        
         Append(ftext,BoolToStr(IsChanged(fractalDir,Fractal().Direction),DirText(Fractal().Direction),"------"),"|");
-        Append(ftext,BoolToStr(signal.Boundary.Event>NoEvent,EnumToString(signal.Boundary.Event),"------"),"|");
+        Append(ftext,BoolToStr(signal.Range.Event>NoEvent,EnumToString(signal.Range.Event),"------"),"|");
         Append(ftext,(string)fTick,"|");
+        Append(ftext,TimeToStr(TimeCurrent()),"|");
         Append(ftext,DoubleToString(Close[0],_Digits),"|");
         Append(ftext,EnumToString(signal.State),"|");
         Append(ftext,BoolToStr(signal.Checkpoint,"Active","Idle"),"|");
@@ -213,23 +245,28 @@ void DebugPrint(void)
         Append(ftext,BoolToStr(IsChanged(rangeDir,signal.Direction),DirText(signal.Direction),"------"),"|");
         Append(ftext,BoolToStr(s[Daily].ActiveEvent(),EnumToString(s[Daily].MaxAlert()),"Idle"),"|");
         Append(ftext,BoolToStr(t.ActiveEvent(),EnumToString(t.MaxAlert()),"Idle"),"|");
-        Append(ftext,TimeToStr(TimeCurrent()),"|");
         Append(ftext,EnumToString(signal.Alert),"|");
         Append(ftext,BoolToStr(signal.Momentum>NoValue,EnumToString(signal.Momentum),"------"),"|");
 
         for (EventType type=1;type<EventTypes;type++)
           switch (type)
           {
-            case NewSegment: Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+            case NewSegment: Append(ftext,EnumToString(Alert(type)),"|");
                              Append(ftext,BoolToStr(t.Logged(NewLead,Nominal),"Nominal",
-                                         BoolToStr(t.Logged(NewLead,Warning),"Warning","NoAlert")),"|");
+                                          BoolToStr(t.Logged(NewLead,Warning),"Warning","NoAlert")),"|");
                              break;
-            case NewChannel: Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+            case NewLead:    {
+                               AlertType alert    = (AlertType)BoolToInt(s[Daily].Event(NewLead,Nominal),Nominal);
+                                         alert    = (AlertType)BoolToInt(t.Alert(NewLead)>Nominal,t.Alert(NewLead),alert);
+                               Append(ftext,EnumToString(Alert(type)),"|");
+                             }
+                             break;
+            case NewChannel: Append(ftext,EnumToString(Alert(type)),"|");
                              Append(ftext,BoolToStr(t.Logged(NewLead,Notify),"Notify","NoAlert"),"|");
                              break;
             case Exception:  Append(ftext,BoolToStr(IsEqual(signal.Event,Exception),"Critical","NoAlert"),"|");
                              break;
-            default:         Append(ftext,EnumToString(fmax(s[Daily].Alert(type),t.Alert(type))),"|");
+            default:         Append(ftext,EnumToString(Alert(type)),"|");
           }
 
         FileWrite(dHandle,ftext);
@@ -314,7 +351,11 @@ void RefreshScreen(void)
 
     UpdateLabel("pvStratLead",EnumToString(master.Lead)+": "+EnumToString(manager[master.Lead].Strategy),clrGoldenrod,9,"Tahoma");
     UpdateLabel("pvStratOnCall",EnumToString(master.OnCall)+": "+EnumToString(manager[master.OnCall].Strategy),clrDarkGray,9,"Tahoma");
-    UpdateLabel("pvSource",EnumToString(signal.Source)+" "+EnumToString(signal.Type),Color(Fractal().Direction),9,"Tahoma");
+    UpdateLabel("pvSource",EnumToString(signal.Source)+" "+EnumToString(signal.Type)+" "+
+                   EnumToString(Fractal().State),Color(Fractal().Direction),9,"Tahoma");
+    UpdateLabel("pvPivot",EnumToString(signal.Fibonacci.Source)+" "+EnumToString(signal.Fibonacci.Type)+" "+
+                   ActionText(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Lead),
+                   Color(Direction(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Bias),InAction),9,"Tahoma");
 
     for (RoleType role=Buyer;IsBetween(role,Buyer,Seller);role++)
       UpdateLabel("lbvOC-"+ActionText(role)+"-Strategy",EnumToString(manager[role].Strategy),clrDarkGray);
@@ -336,6 +377,14 @@ void RefreshScreen(void)
         UpdateText(objectstr+"lnT_"+fp[point],"",Fractal().Point[point],-7);
       }
     }
+  }
+
+//+------------------------------------------------------------------+
+//| Alert - Returns the max Alert for supplied Event                 |
+//+------------------------------------------------------------------+
+AlertType Alert(EventType Event)
+  {
+    return fmax(s[Daily].Alert(Event),t.Alert(Event));
   }
 
 //+------------------------------------------------------------------+
@@ -431,7 +480,15 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
         else
         if (Signal.Event(NewHour))                signal.Event = NewHour;
         
-      signal.Momentum   = (FractalState)BoolToInt(Signal[NewPullback],Pullback,BoolToInt(Signal[NewRally],Rally,NoValue));
+      signal.Momentum   = (FractalState)BoolToInt(Signal[NewPullback],Pullback,BoolToInt(Signal[NewRally],Rally,NoValue));      
+    }
+
+    for (FractalType fractal=Origin;IsBetween(fractal,Origin,Term);fractal++)
+    {
+      signal.HedgeCount                += BoolToInt(Signal[fractal].Pivot.Hedge,1);
+
+      manager[Action(Direction(Signal[fractal].Direction,InDirection,Signal[fractal].State==Correction))].Strength++;
+      manager[Action(Direction(Signal[fractal].Pivot.Lead,InAction,Signal[fractal].Pivot.Hedge))].Strength++;
     }
   }
 
@@ -445,7 +502,18 @@ void UpdateSignal(void)
     SignalBar         siglo        = {0,0.00};
 
     signal.Recovery.Event          = NoEvent;
-    signal.Boundary.Event          = NoEvent;
+    signal.Range.Event             = NoEvent;
+
+    signal.Boundary                = fmax(s[Daily].Alert(NewBoundary),t.Alert(NewBoundary));
+
+    signal.Odds                    = fdiv(fmax(manager[Buyer].Strength,manager[Seller].Strength),
+                                          manager[Buyer].Strength+manager[Seller].Strength,3)*
+                                          Direction(manager[Buyer].Strength-manager[Seller].Strength);
+
+    //--** new **--//
+    sigpiv.High.Price = fmax(Close[0],sigpiv.High.Price);
+    sigpiv.Low.Price = fmin(Close[0],sigpiv.Low.Price);
+    //--** new **--//
 
     if (signal.ActiveEvent&&signal.Tick>0)
     {
@@ -579,7 +647,7 @@ void UpdateSignal(void)
       {
         signal.State                         = (FractalState)BoolToInt(signal.State==Reversal,Reversal,Breakout);
         signal.Lead                          = signal.Bias;
-
+        
         if (DirectionChanged(signal.Direction,BoolToInt(signal.Price>signalFP[fpBase].Price,DirectionUp,DirectionDown)))
         {
           signal.State                       = Reversal;
@@ -593,22 +661,45 @@ void UpdateSignal(void)
           switch (signal.Direction)
           {
             case DirectionUp:
-                  signal.Boundary.Event      = BoolToEvent(IsHigher(signal.Price,signal.Boundary.High.Price),NewHigh,NewRally);
-                  signal.Boundary.High.Count = BoolToInt(IsChanged(signal.Boundary.High.Direction,
-                                               BoolToInt(signal.Boundary.Event==NewHigh,DirectionUp,DirectionDown)),1,++signal.Boundary.High.Count);
-                  signal.Boundary.High.Price = signal.Price;
-                  Flag("["+(string)fTick+"]sigHi-"+EnumToString(signal.Boundary.Event)+":"+(string)signal.Boundary.High.Count,
-                     BoolToInt(signal.Boundary.Event==NewHigh,clrLawnGreen,clrForestGreen),0,0,debug);
+                  signal.Range.Event      = BoolToEvent(IsHigher(signal.Price,signal.Range.High.Price),NewHigh,NewRally);
+                  signal.Range.High.Count = BoolToInt(IsChanged(signal.Range.High.Direction,
+                                               BoolToInt(signal.Range.Event==NewHigh,DirectionUp,DirectionDown)),1,++signal.Range.High.Count);
+                  signal.Range.High.Price = signal.Price;
+                  Flag("["+(string)fTick+"]sigHi-"+EnumToString(signal.Range.Event)+":"+(string)signal.Range.High.Count,
+                     BoolToInt(signal.Range.Event==NewHigh,clrLawnGreen,clrForestGreen),0,0,debug);
                   break;
 
             case DirectionDown:
-                  signal.Boundary.Event      = BoolToEvent(IsLower(signal.Price,signal.Boundary.Low.Price),NewLow,NewPullback);
-                  signal.Boundary.Low.Count  = BoolToInt(IsChanged(signal.Boundary.Low.Direction,
-                                               BoolToInt(signal.Boundary.Event==NewLow,DirectionDown,DirectionUp)),1,++signal.Boundary.Low.Count);
-                  signal.Boundary.Low.Price  = signal.Price;
-                  Flag("["+(string)fTick+"]sigLo-"+EnumToString(signal.Boundary.Event)+":"+(string)signal.Boundary.Low.Count,
-                     BoolToInt(signal.Boundary.Event==NewLow,clrRed,clrMaroon),0,0,debug);
+                  signal.Range.Event      = BoolToEvent(IsLower(signal.Price,signal.Range.Low.Price),NewLow,NewPullback);
+                  signal.Range.Low.Count  = BoolToInt(IsChanged(signal.Range.Low.Direction,
+                                               BoolToInt(signal.Range.Event==NewLow,DirectionDown,DirectionUp)),1,++signal.Range.Low.Count);
+                  signal.Range.Low.Price  = signal.Price;
+                  Flag("["+(string)fTick+"]sigLo-"+EnumToString(signal.Range.Event)+":"+(string)signal.Range.Low.Count,
+                     BoolToInt(signal.Range.Event==NewLow,clrRed,clrMaroon),0,0,debug);
           }
+
+          //--** new **--//
+          sigpiv.Close= Close[0];
+          
+          PrintSigPiv(Always);
+
+          sigpiv.Open = Close[0];
+          sigpiv.High.Price = Close[0];
+          sigpiv.Low.Price = Close[0];
+          sigpiv.Close = NoValue;
+
+          ArrayResize(sigpiv.Checkpoint,0,24);
+          //--** new **--//
+        }
+        else
+        {
+          //--** new **--//
+          if (signal.Event==NewFibonacci)
+          {
+            ArrayResize(sigpiv.Checkpoint,ArraySize(sigpiv.Checkpoint)+1,24);
+            sigpiv.Checkpoint[ArraySize(sigpiv.Checkpoint)-1]    =  Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Price;
+          }
+          //--** new **--//
         }
 
         signalFP[fpRecovery].Bar             = NoValue;
@@ -625,12 +716,44 @@ void UpdateSignal(void)
     }
   }
 
+void PrintSigPiv(bool Flag)
+  {
+    if (Flag)
+    {
+      Flag("spothi",clrForestGreen,0,sigpiv.High.Price);
+      Flag("spotlo",clrMaroon,0,sigpiv.Low.Price);
+    }
+    else
+    {
+      double min  = 99999;
+      double max  = 0.00;
+      string text   ="|sigpiv|"+DoubleToStr(sigpiv.Open,Digits)+"|"+DoubleToStr(sigpiv.High.Price,Digits)+"|"+
+                                DoubleToStr(sigpiv.Low.Price,Digits)+"|"+DoubleToStr(sigpiv.Close,Digits);
+      string ftext  = "";
+      for (int fibo=0;fibo<ArraySize(sigpiv.Checkpoint);fibo++)
+      {
+        min  = fmin(min,sigpiv.Checkpoint[fibo]);
+        max  = fmax(max,sigpiv.Checkpoint[fibo]);
+        Append(ftext,DoubleToStr(sigpiv.Checkpoint[fibo],Digits),"|");
+      }
+      if (min<99999)
+      {
+        Append(text,DoubleToStr(min,Digits),"|");
+        Append(text,DoubleToStr(max,Digits),"|");
+        Append(text,ftext,"|");
+      }
+    
+      Print(text);
+    }
+  }
 
 //+------------------------------------------------------------------+
 //| UpdateManager - Updates Manager data from Supplied Fractal       |
 //+------------------------------------------------------------------+
 void UpdateManager(void)
   {
+    static int direction          = DirectionPending;
+
     //-- Reset Manager Targets
     if (ManagerChanged())
       if (master.Lead>Unassigned)
@@ -644,6 +767,11 @@ void UpdateManager(void)
       manager[role].Equity[Min]   = fmin(order[role].Equity,manager[role].Equity[Min]);
       manager[role].Equity[Max]   = fmax(order[role].Equity,manager[role].Equity[Max]);
     }
+
+    if (DirectionChanged(direction,BoolToInt(manager[Buyer].Strength==0,DirectionDown,
+                                   BoolToInt(manager[Seller].Strength==0,DirectionUp,direction))))
+      Flag("ManagerDirection",clrYellow);
+    
   }
   
 
@@ -666,6 +794,12 @@ void UpdateMaster(void)
     signal.Event              = fmax(s[Daily].MaxEvent(),t.MaxEvent());
     signal.ActiveEvent        = signal.Event>NoEvent;
     signal.Checkpoint         = false;
+    signal.HedgeCount         = 0;
+    
+    //-- Manager Set Up
+//    hedge                     = false;
+    manager[Buyer].Strength   = 0;
+    manager[Seller].Strength  = 0;
 
     if (signal.ActiveEvent)
     {
@@ -688,7 +822,7 @@ void UpdateMaster(void)
       else
       if (signal.Event==NewFibonacci)
         Flag("["+(string)fTick+"]ckpt-"+EnumToString(signal.Fibonacci.Source)+" "+EnumToString(signal.Fibonacci.Type)+":"+
-          EnumToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Level),clrWhite,0,0,Always);
+          EnumToString(Pivot(signal.Fibonacci.Source,signal.Fibonacci.Type).Level),Color(signal.Fibonacci.Type),0,0,debug);
       //else
       //if (signal.Event==NewLead)
       //  Arrow("["+(string)fTick+"]ckpt-"+EnumToString(signal.Event),ArrowDash,Color(t.Segment().Direction[Lead],IN_CHART_DIR));
@@ -736,7 +870,7 @@ bool StrategyChanged(RoleType Role, EventType Event)
   }
 
 //+------------------------------------------------------------------+
-//| Strategy - Returns Strategy for supplied Role                    |
+//| Strategy - Returns Strategy for supplied Role/Event              |
 //+------------------------------------------------------------------+
 StrategyType Strategy(RoleType Role, EventType Event)
   {
@@ -769,7 +903,7 @@ StrategyType Strategy(RoleType Role, EventType Event)
                                         BoolToInt(Event==NewLow,Manage,
                                         BoolToInt(Event==NewRally,Build,
                                         BoolToInt(Event==NewLow,Protect))));
-        default:   return Wait;
+        default:          return Wait;
       }
     else
     if (Role==master.OnCall)
@@ -781,11 +915,13 @@ StrategyType Strategy(RoleType Role, EventType Event)
         case Buyer:       return (StrategyType)BoolToInt(Event==NewHigh,(BoolToInt(basis==NetShort,Hedge,Protect)),
                                         BoolToInt(Event==NewLow,Mitigate,
                                         BoolToInt(Event==NewRally,(BoolToInt(basis==NetShort,Wait,Protect)),
-                                        BoolToInt(Event==NewPullback,(BoolToInt(basis==NetZero,Spot,(BoolToInt(basis==NetShort,Capture))))))));
+                                        BoolToInt(Event==NewPullback,(BoolToInt(basis==NetZero,Spot,
+                                        BoolToInt(basis==NetShort,Capture)))))));
         case Seller:      return (StrategyType)BoolToInt(Event==NewLow,(BoolToInt(basis==NetLong,Hedge,Protect)),
                                         BoolToInt(Event==NewHigh,Mitigate,
                                         BoolToInt(Event==NewPullback,(BoolToInt(basis==NetLong,Wait,Protect)),
-                                        BoolToInt(Event==NewRally,(BoolToInt(basis==NetZero,Spot,(BoolToInt(basis==NetLong,Capture))))))));
+                                        BoolToInt(Event==NewRally,(BoolToInt(basis==NetZero,Spot,
+                                        BoolToInt(basis==NetLong,Capture)))))));
         default:          return Wait;
       }
     }
@@ -799,7 +935,7 @@ StrategyType Strategy(RoleType Role, EventType Event)
 void ManageFund(RoleType Role)
   {
     //-- Position checks
-    StrategyChanged(Role,signal.Boundary.Event);
+    StrategyChanged(Role,signal.Range.Event);
     
     //-- Free Zone/Order Entry
 //    if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
@@ -877,7 +1013,7 @@ void ExecuteSpot(RoleType Role)
             }
             else
               Print("Order Not Submitted! \n\n"+order.RequestStr(request));
-          };
+          }
       }
       else
       
@@ -891,13 +1027,47 @@ void ExecuteSpot(RoleType Role)
 //+------------------------------------------------------------------+
 void ManageRisk(RoleType Role)
   {
-    bool changed = StrategyChanged(Role,signal.Boundary.Event);
+//    static double op,cl,hi,lo;
+//    static bool   spot     = false;
+//
+    bool   changed = StrategyChanged(Role,signal.Range.Event);
     
 //    if (changed) Pause("Strategy change for the risk manager to "+EnumToString(manager[Role].Strategy),"Risk Manager");
               
     switch (manager[Role].Strategy)
     {
-      case Spot:  ExecuteSpot(Role);
+      case Spot: 
+//                 if (changed)
+//                 {
+//                   hi = Close[0];
+//                   lo = Close[0];
+//                   op = Close[0];
+//                   
+//                   spot = true;
+//
+//                   Flag("spot",Color(Direction(Role,InAction)));
+//                 }
+//
+//                 hi = fmax(hi,Close[0]);
+//                 lo = fmin(lo,Close[0]);
+//
+//                 UpdateLine("SpotHi",hi,STYLE_DOT,clrLawnGreen);
+//                 UpdateLine("SpotLo",lo,STYLE_DOT,clrRed);
+//                 ExecuteSpot(Role);
+                 break;
+
+//      default:   if (IsChanged(spot,false))
+//                 {
+//                   cl = Close[0];
+//
+//                   Flag("spothi",clrForestGreen,0,hi);
+//                   Flag("spotlo",clrMaroon,0,lo);
+//
+//                   Print("|Spot|"+DoubleToStr(op,Digits)+"|"+DoubleToStr(hi,Digits)+"|"+DoubleToStr(lo,Digits)+"|"+DoubleToStr(cl,Digits));
+//
+//                   UpdateLine("SpotHi",0,STYLE_DOT,clrLawnGreen);
+//                   UpdateLine("SpotLo",0,STYLE_DOT,clrRed);
+//                 }
     };
     
     order.ProcessOrders(Role);
@@ -924,11 +1094,6 @@ void Execute(void)
    }
 
     order.ProcessRequests();
-    
-//    if (order[Pending].Type[OP_SELLLIMIT].Count>0)
-    //if (order.Fulfilled(Seller))
-    //  Pause("Orders Pending", "Pending Catcher()");
-//    Print(order.SnapshotStr());
   }
 
 
@@ -942,16 +1107,6 @@ void OnTick()
     UpdateMaster();
     WriteSignal();
 
-//    if (sigBoundary.Event>NoEvent)
-//    switch ((int)fTick)
-//    {
-//      case 766217:  //--Buy
-//                    //Pause("Signal test: "+DirText(signal.Direction)+" Spot "+proper(ActionText(master.OnCall))+"er: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
-//                    //Pause("Signal test: "+DirText(signal.Direction)+" Boundary Hit: "+EnumToString(signal.Recovery.Event)+" on "+(string)fTick,"Signal Test()");
-//                    //Arrow("recoLow-NewHigh:"+(string)fTick,ArrowDash,clrYellow);
-//                    break;
-//    }
-//
     Execute();
 
     RefreshScreen();
@@ -969,7 +1124,11 @@ void ScreenConfig(void)
     NewLabel("pvMargin","",10,42,clrLightGray,SCREEN_UR);
     NewLabel("pvStratLead","",10,64,clrDarkGray,SCREEN_UR);
     NewLabel("pvStratOnCall","",10,80,clrDarkGray,SCREEN_UR);
-    NewLabel("pvSource","",10,96,clrDarkGray,SCREEN_UR);    
+    NewLabel("pvSource","",10,96,clrDarkGray,SCREEN_UR);
+    NewLabel("pvPivot","",10,112,clrNONE,SCREEN_UR);
+    
+    NewLine("SpotHi");
+    NewLine("SpotLo");
   }
 
 //+------------------------------------------------------------------+
@@ -1053,8 +1212,8 @@ void SignalConfig(void)
     NewPriceLabel("sigHi");
     NewPriceLabel("sigLo");
     
-    signal.Boundary.High       = trigger;
-    signal.Boundary.Low        = trigger;
+    signal.Range.High          = trigger;
+    signal.Range.Low           = trigger;
     
     signal.Recovery.High       = trigger;
     signal.Recovery.Low        = trigger;
