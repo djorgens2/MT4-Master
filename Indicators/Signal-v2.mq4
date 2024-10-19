@@ -9,8 +9,8 @@
 #property strict
 #property indicator_separate_window
 
-#property indicator_buffers 1
-#property indicator_plots   1
+#property indicator_buffers 3
+#property indicator_plots   3
 
 //--- plot Signal Price
 #property indicator_label1  "sigPrice"
@@ -18,6 +18,26 @@
 #property indicator_color1  clrRed
 #property indicator_style1  STYLE_SOLID
 #property indicator_width1  1
+
+//--- plot sigLow
+#property indicator_label2  "plLow"
+#property indicator_type2   DRAW_SECTION
+#property indicator_color2  clrNONE
+#property indicator_style2  STYLE_DOT
+#property indicator_width2  0
+
+//--- plot sigHigh
+#property indicator_label3  "plHigh"
+#property indicator_type3   DRAW_SECTION
+#property indicator_color3  clrNONE
+#property indicator_style3  STYLE_DOT
+#property indicator_width3  0
+
+//--- Indicator buffers
+double            sigHighBuffer[];
+double            sigLowBuffer[];
+double            sigBuffer[];
+double            sigHist[];
 
 #include <stdutil.mqh>
 #include <Class/Fractal.mqh>
@@ -33,62 +53,64 @@ input string inpSigFile    = "signal.bin";
             TickMA     // TickMA
           };
 
-  struct SignalTrigger
-         {
-           int               Direction;
-           int               Count;
-           double            Price;
-         };
+  //--- SegmentState
+  enum    SegmentState
+          {
+            HigherHigh,
+            LowerLow,
+            LowerHigh,
+            HigherLow
+          };
 
-  struct SignalPivot
-         {
-           EventType         Event;
-           SignalTrigger     High;
-           SignalTrigger     Low;
-         };
-
-  struct SignalFibonacci
+  struct SignalFractal
          {
            SourceType        Source;
            FractalType       Type;
          };
 
+  struct SignalSegment
+         {
+           int               Direction;        //-- Direction Signaled
+           SegmentState      State;
+           RoleType          Lead;             //-- Calculated Signal Lead
+           RoleType          Bias;             //-- Calculated Signal Bias
+           double            Open;
+           double            High;
+           double            Low;
+           double            Close;
+         };
+         
   //-- Signals (Events) requesting Manager Action (Response)
-  struct  SignalRec
-          {
-            long             Tick;              //-- Tick Signaled by Event 
-            EventType        Event;             //-- Highest Event
-            AlertType        Alert;             //-- Highest Alert Level
-            FractalState     State;             //-- State of the Signal
-            int              Direction;         //-- Direction Signaled
-            RoleType         Lead;              //-- Calculated Signal Lead
-            RoleType         Bias;              //-- Calculated Signal Bias
-            double           Price;             //-- Event Price
-            bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
-            SourceType       Source;            //-- Signal Source (Session/TickMA)
-            FractalType      Type;              //-- Source Fractal
-            FractalState     Momentum;          //-- Triggered Pullback/Rally
-            int              HedgeCount;        //-- Active Hedge Count; All Fractals
-            double           Odds;              //-- % of Success derived from Fractals
-            bool             ActiveEvent;       //-- True on Active Event (All Sources)
-            AlertType        Boundary;          //-- Boundary Event Alert Type
-            SignalPivot      Range;             //-- Signal Boundary Events
-            SignalPivot      Recovery;          //-- Recovery Events
-            SignalFibonacci  Fibonacci;         //-- Fractal Source/Type of Last Fibo Event
-          };
+  struct SignalRec
+         {
+           long             Tick;              //-- Tick Signaled by Event 
+           EventType        Event;             //-- Highest Event
+           AlertType        Alert;             //-- Highest Alert Level
+           FractalState     State;             //-- State of the Signal
+           int              Direction;         //-- Direction Signaled
+           RoleType         Lead;              //-- Calculated Signal Lead
+           RoleType         Bias;              //-- Calculated Signal Bias
+           double           Price;             //-- Event Price
+           bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
+           int              HedgeCount;        //-- Active Hedge Count; All Fractals
+           double           Strength;          //-- % of Success derived from Fractals
+           bool             ActiveEvent;       //-- True on Active Event (All Sources)
+           AlertType        MaxAlert;          //-- Event Alert Type
+           SignalFractal    Fractal;           //-- Fractal in Use;
+           SignalFractal    Pivot;             //-- Fibonacci Pivot in Use;
+           SignalSegment    Segment;           //-- Fractal Source/Type of Last Fibo Event
+         };
 
-  struct  SignalFractal
-          {
-            int              Bar;
-            double           Price;
-          };
+  struct SignalBar
+         {
+           int              Bar;
+           double           Price;
+         };
 
   int               sigWinID      = NoValue;
-  double            sigBuffer[];
-  double            sigHist[];
 
   SignalRec         sig;
-  SignalFractal     sigfp[FractalPoints];
+  SignalBar         sigfp[FractalPoints];
 
 
 //+------------------------------------------------------------------+
@@ -96,21 +118,23 @@ input string inpSigFile    = "signal.bin";
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    UpdateLabel("lbvSigTick",(string)sig.Tick,clrDarkGray,12,"Noto Sans Mono CJK HK");
+    if (sig.MaxAlert>Notify)
+      UpdateLabel("lbvSigTick",(string)sig.Tick,clrDarkGray,12,"Noto Sans Mono CJK HK");
+    
     UpdateLabel("lbvSigPrice",DoubleToString(sig.Price,_Digits),clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigEvent",EnumToString(sig.Alert)+" "+EventText(sig.Event),clrDarkGray,12,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvSigEvent",BoolToStr(sig.Alert>NoAlert,EnumToString(sig.Alert))+" "+EventText(sig.Event),clrDarkGray,12,"Noto Sans Mono CJK HK");
     UpdateLabel("lbvSigState",EnumToString(sig.State),clrDarkGray,12,"Noto Sans Mono CJK HK");
     
-    UpdateLabel("lbvOdds",DoubleToStr(sig.Odds*100,1)+"%",Color(Direction(sig.Odds)),13,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
     UpdateDirection("lbvSigDirection",sig.Direction,Color(sig.Direction),16);
     UpdateDirection("lbvSigLead",Direction(sig.Lead,InAction),Color(Direction(sig.Lead,InAction)),16);
     UpdateDirection("lbvSigBias",Direction(sig.Bias,InAction),Color(Direction(sig.Bias,InAction)),16);
 
-    UpdateLabel("lbvSigTrigger",BoolToStr(sig.Recovery.Event>NoEvent,"FIRED","IDLE "),BoolToInt(sig.Recovery.Event>NoEvent,clrWhite,clrDarkGray),8,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvSigTrigger",BoolToStr(sigfp[fpRecovery].Price==Close[0],"FIRED","IDLE "),BoolToInt(sigfp[fpRecovery].Price==Close[0],clrWhite,clrDarkGray),8,"Noto Sans Mono CJK HK");
     UpdateBox("sig-"+(string)sigWinID+":Trigger",Color(sig.Direction,IN_DARK_DIR));
     UpdateBox("sig-"+(string)sigWinID+":FractalPoint",BoolToInt(sig.Lead==Buyer,C'0,42,0',C'42,0,0'));
     
-    for (FractalPoint point=0;point<FractalPoints;point++)
+    for (FractalPoint point=fpOrigin;point<FractalPoints;point++)
     {
       UpdateRay("sig-"+(string)sigWinID+":"+EnumToString(point),inpRetention,
         BoolToDouble(sigfp[point].Bar>NoValue,sigfp[point].Price),-6);
@@ -119,6 +143,39 @@ void RefreshScreen(void)
         DoubleToString(sigfp[point].Bar,0)+"/"+DoubleToString(sigfp[point].Price,_Digits),clrDarkGray,12,"Noto Sans Mono CJK HK");
     }
   };
+
+//+------------------------------------------------------------------+
+//| UpdateNode - Repaints Node Bars                                  |
+//+------------------------------------------------------------------+
+void UpdateNode(string NodeName, int Node, double Price1, double Price2)
+  {
+    ObjectSet(NodeName+(string)Node,OBJPROP_COLOR,Color(Direction(sig.Bias,InAction)));
+    ObjectSet(NodeName+(string)Node,OBJPROP_PRICE1,Price1);
+    ObjectSet(NodeName+(string)Node,OBJPROP_PRICE2,Price2);
+    ObjectSet(NodeName+(string)Node,OBJPROP_TIME1,Time[Node]);
+    ObjectSet(NodeName+(string)Node,OBJPROP_TIME2,Time[Node]);
+  }
+
+//+------------------------------------------------------------------+
+//| UpdateSignal - Repaints visuals                                  |
+//+------------------------------------------------------------------+
+void UpdateSignal(bool Refresh)
+  {
+    if (sig.MaxAlert>Notify||Refresh)
+    {
+      ArrayInitialize(sigHighBuffer,fmax(sigfp[fpRoot].Price,sigfp[fpExpansion].Price)+point(2));
+      ArrayInitialize(sigLowBuffer,fmin(sigfp[fpRoot].Price,sigfp[fpExpansion].Price)-point(2));
+
+//      for (int node=0;node<inpRetention;node++)
+//      {
+//        UpdateNode("sigHL:"+(string)sigWinID+"-",node,t.Segment(node).High,t.Segment(node).Low);
+//        UpdateNode("sigOC:"+(string)sigWinID+"-",node,t.Segment(node).Open,t.Segment(node).Close);
+//      }
+    }
+//
+//    UpdateNode("sigHL:"+(string)sigWinID+"-",0,t.Segment(0).High,t.Segment(0).Low);
+//    UpdateNode("sigOC:"+(string)sigWinID+"-",0,t.Segment(0).Open,t.Segment(0).Close);
+  }
 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
@@ -151,7 +208,7 @@ int OnCalculate(const int rates_total,
         
       if (IsChanged(lastTick,sig.Tick))
       {
-        if (sig.Boundary>Notify)
+        if (sig.MaxAlert>Notify)
         {
           ArrayCopy(sigHist,sigHist,1,0,inpRetention-1);
           sigHist[0]    = sig.Price;
@@ -165,7 +222,9 @@ int OnCalculate(const int rates_total,
 
     ArrayInitialize(sigBuffer,0.00);    
     ArrayCopy(sigBuffer,sigHist);
-
+    
+    UpdateSignal(rates_total!=prev_calculated);
+    
     return(rates_total);
   }
 
@@ -175,8 +234,8 @@ int OnCalculate(const int rates_total,
 int OnInit()
   {
     //--- Initialize Indicator
-    IndicatorShortName("Signal-v1");
-    sigWinID = ChartWindowFind(0,"Signal-v1");
+    IndicatorShortName("Signal-v2");
+    sigWinID = ChartWindowFind(0,"Signal-v2");
 
     //--- Signal Panel Labels
     NewLabel("lbvTick","",152,2,clrDarkGray,SCREEN_UR,sigWinID);
@@ -201,7 +260,7 @@ int OnInit()
     UpdateLabel("lbvSigEvent","Critcal New Convergence",clrDarkGray,12,"Noto Sans Mono CJK HK");
     UpdateLabel("lbvSigTrigger","Fired",clrYellow,8,"Noto Sans Mono CJK HK");
 
-    UpdateLabel("lbvOdds",DoubleToStr(sig.Odds*100,1)+"%",Color(Direction(sig.Odds)),13,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
     UpdateDirection("lbvSigDirection",sig.Direction,Color(sig.Direction),16);
     UpdateDirection("lbvSigLead",sig.Lead,Color(sig.Lead),16);
     UpdateDirection("lbvSigBias",sig.Bias,Color(sig.Bias),16);

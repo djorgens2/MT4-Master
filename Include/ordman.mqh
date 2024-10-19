@@ -128,21 +128,21 @@ MethodRec ParseMethod(void)
   {
     MethodRec parser = {NoAction,NoValue,NoValue,NoValue};
 
-    parser.Action       = ActionCode(params[1]);
     parser.Method       = MethodCode(params[0]);
+    parser.Action       = ActionCode(params[1]);
 
     if (IsBetween(parser.Action,OP_BUY,OP_SELL))
-      if (StringSubstr(params[2],0,1)=="Z")
-      {
-        parser.Group    = ByZone;
-        parser.Key      = (int)StringSubstr(params[2],1);
-      }
-      else
       if (MethodCode(params[2])>NoValue)
       {
         parser.Group    = ByMethod;
         parser.Key      = MethodCode(params[2]);
-      }      
+      }
+      else
+      if ((int)params[2]>0)
+      {
+        parser.Group    = ByZone;
+        parser.Key      = (int)params[2];
+      }
       else parser.Group = ByAction;
     else
     if (InStr("+-",StringSubstr(params[1],0,1),1))
@@ -151,10 +151,10 @@ MethodRec ParseMethod(void)
       parser.Group      = (OrderGroup)BoolToInt(StringSubstr(params[1],0,1)=="+",ByProfit,ByLoss);
     }
     else
-    if (StringSubstr(params[1],0,1)=="T")
+    if ((int)params[1]>0)
     {
       parser.Group      = ByTicket;
-      parser.Key        = BoolToInt(parser.Group==ByTicket,(int)StringSubstr(params[1],1),NoValue);
+      parser.Key        = (int)params[1];
     }
 
     return parser;
@@ -366,6 +366,15 @@ void ProcessCommand(string Command)
         Alert("Nothing to hedge");
     else
 
+    //-- Set Entry Slider for non-MIT order entry
+    if (params[0]=="SLIDER")
+    {
+      if (pcount>2)
+        order.SetSlider(ActionCode(params[1]),point(StringToDouble(params[2])));
+      Print(ActionText(ActionCode(params[1]))+" "+DoubleToStr(point(StringToDouble(params[2]),Digits),Digits));
+    }
+    else
+
     //-- Order Requests
     if (IsBetween(ActionCode(params[0]),OP_BUY,OP_SELL))
     {
@@ -537,6 +546,7 @@ void ProcessCommand(string Command)
       FormatConfig(params);
       MethodRec method = ParseMethod();
       order.SetMethod(method.Action,method.Method,method.Group,method.Key);
+      Print(MethodStr(method));
     }
     else
 

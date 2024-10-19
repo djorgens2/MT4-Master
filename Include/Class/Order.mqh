@@ -343,7 +343,7 @@ public:
           int          Zone(int Action, double Price=0.00);
 
           //-- Configuration methods
-          void         SetSlider(int Action, double Step=0.00, bool Enabled=true);
+          void         SetSlider(int Action, double Step=0.00);
           void         SetDefaultStop(int Action, double Price, int Pips, bool Hide);
           void         SetDefaultTarget(int Action, double Price, int Pips, bool Hide);
 
@@ -1103,6 +1103,10 @@ OrderDetail COrder::MergeRequest(OrderRequest &Request)
     Request.TakeProfit    = Master[Request.Action].Order[detail].TakeProfit;
     Request.StopLoss      = Master[Request.Action].Order[detail].StopLoss;
 
+    if (IsBetween(Request.Type,OP_BUY,OP_SELLLIMIT))
+      if (Slider[Request.Type].Enabled)
+        Slider[Request.Type].Price                    = NoValue;
+
     ConsoleAlert("Request["+(string)Request.Key+"]:Merged "+Request.Memo); 
     AppendLog(Request.Key,Request.Ticket,"Request["+(string)Request.Key+"]:Merged");
 
@@ -1449,16 +1453,19 @@ bool COrder::SliderTriggered(int Action)
   {
     if (Slider[Action].Enabled)
     {
-      switch (Action)
-      {
-        case OP_BUY:
-        case OP_BUYLIMIT:     if (IsLower(Close[0],Slider[Action].Price))
-                                return false;
-                              break;
-        case OP_SELL:
-        case OP_SELLLIMIT:    if (IsHigher(Close[0],Slider[Action].Price))
-                                return false;
-      }
+      if (Slider[Action].Price<0.00)
+        Slider[Action].Price    = Close[0];
+      else
+        switch (Action)
+        {
+          case OP_BUY:
+          case OP_BUYLIMIT:     if (IsLower(Close[0],Slider[Action].Price))
+                                  return false;
+                                break;
+          case OP_SELL:
+          case OP_SELLLIMIT:    if (IsHigher(Close[0],Slider[Action].Price))
+                                  return false;
+        }
 
       return fabs(Close[0]-Slider[Action].Price)>Slider[Action].Step;
     }
@@ -2013,10 +2020,10 @@ int COrder::Zone(int Action, double Price=0.00)
 //+------------------------------------------------------------------+
 //| SetSlider - Sets Slider Triggering ENTRY event options           |
 //+------------------------------------------------------------------+
-void COrder::SetSlider(int Action, double Step=0.00, bool Enabled=true)
+void COrder::SetSlider(int Action, double Step=0.00)
   {
-    Slider[Action].Enabled      = Enabled;
-    Slider[Action].Price        = Close[0];
+    Slider[Action].Enabled      = Step>0.00;
+    Slider[Action].Price        = NoValue;
     Slider[Action].Step         = Step;
   }
 
