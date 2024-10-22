@@ -97,10 +97,10 @@ protected:
   struct PivotRec
          {
            EventType     Event;                    //-- Pivot Event
-           bool          Hedge;                    //-- Hedge Flag (Lead!=Bias)
            int           Direction;                //-- Opening Pivot Direction
            int           Lead;                     //-- Action of last Boundary Hit
            int           Bias;                     //-- Bias
+           bool          Hedge;                    //-- Hedge Flag (Lead!=Bias)
            FibonacciType Level;                    //-- Fibonacci Level that triggered the event
            double        Price;                    //-- Last Event Pivot (Fibonacci)
            double        Open;                     //-- Close price at time of Event
@@ -275,7 +275,7 @@ void CFractal::InitPivot(FractalType Type, PivotRec &Pivot, EventLog &Log)
     Pivot.Event      = Log.Event;
     Pivot.Direction  = BoolToInt(this[NewHigh],DirectionUp,BoolToInt(this[NewLow],DirectionDown,direction));
     Pivot.Price      = Log.Price;
-    Pivot.Level      = (FibonacciType)BoolToInt(this[NewExtension]||this[NewBreakout],frec[Type].Extension.Level,frec[Type].Retrace.Level);
+    Pivot.Level      = (FibonacciType)BoolToInt(Event(NewExtension,Alert(Type))||Event(NewBreakout,Alert(Type)),frec[Type].Extension.Level,frec[Type].Retrace.Level);
     Pivot.Open       = fPrice.Close;
     Pivot.High       = fmax(fPrice.Close,Pivot.Price);
     Pivot.Low        = fmin(fPrice.Close,Pivot.Price);
@@ -547,7 +547,6 @@ void CFractal::UpdateFractal(FractalType Type, double Support, double Resistance
     if (FibonacciChanged(Type,frec[Type]))
     {
       SetEvent(NewFibonacci,Alert(Type),frec[Type].Pivot.Price);
-
       InitPivot(Type,frec[Type].Pivot,LastEvent());
       Flag(Type,Type==fShowFlags);
     }
@@ -890,6 +889,8 @@ string CFractal::PivotStr(PivotRec &Pivot)
     Append(text,DirText(Pivot.Direction),"|");
     Append(text,ActionText(Pivot.Lead),"|");
     Append(text,ActionText(Pivot.Bias),"|");
+    Append(text,BoolToStr(Pivot.Hedge,"Hedge","No Hedge"),"|");
+    Append(text,EnumToString(Pivot.Level));
     Append(text,DoubleToStr(Pivot.Price,Digits),"|");
     Append(text,DoubleToStr(Pivot.Open,Digits),"|");
     Append(text,DoubleToStr(Pivot.High,Digits),"|");
