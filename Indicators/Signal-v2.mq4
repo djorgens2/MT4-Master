@@ -68,44 +68,46 @@ input string inpSigFile    = "signal.bin";
            FractalType       Type;
          };
 
-  struct SignalSegment
-         {
-           int               Direction;        //-- Direction Signaled
-           SegmentState      State;
-           RoleType          Lead;             //-- Calculated Signal Lead
-           RoleType          Bias;             //-- Calculated Signal Bias
-           double            Open;
-           double            High;
-           double            Low;
-           double            Close;
-         };
-         
-  //-- Signals (Events) requesting Manager Action (Response)
-  struct SignalRec
-         {
-           long             Tick;              //-- Tick Signaled by Event 
-           EventType        Event;             //-- Highest Event
-           AlertType        Alert;             //-- Highest Alert Level
-           FractalState     State;             //-- State of the Signal
-           int              Direction;         //-- Direction Signaled
-           RoleType         Lead;              //-- Calculated Signal Lead
-           RoleType         Bias;              //-- Calculated Signal Bias
-           double           Price;             //-- Event Price
-           bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
-           int              HedgeCount;        //-- Active Hedge Count; All Fractals
-           double           Strength;          //-- % of Success derived from Fractals
-           bool             ActiveEvent;       //-- True on Active Event (All Sources)
-           AlertType        MaxAlert;          //-- Event Alert Type
-           SignalFractal    Fractal;           //-- Fractal in Use;
-           SignalFractal    Pivot;             //-- Fibonacci Pivot in Use;
-           SignalSegment    Segment;           //-- Fractal Source/Type of Last Fibo Event
-         };
-
   struct SignalBar
          {
            int              Bar;
            double           Price;
          };
+
+  struct SignalSegment
+         {
+           int               Direction;         //-- Direction Signaled
+           SegmentState      State;
+           RoleType          Lead;              //-- Calculated Signal Lead
+           RoleType          Bias;              //-- Calculated Signal Bias
+           double            Open;
+           double            High;
+           double            Low;
+           double            Close;
+           double            Support;
+           double            Resistance;
+         };
+         
+  //-- Signals (Events) requesting Manager Action (Response)
+  struct  SignalRec
+          {
+            long             Tick;              //-- Tick Signaled by Event 
+            EventType        Event;             //-- Highest Event
+            AlertType        Alert;             //-- Highest Alert Level
+            FractalState     State;             //-- State of the Signal
+            int              Direction;         //-- Direction Signaled
+            RoleType         Lead;              //-- Calculated Signal Lead
+            RoleType         Bias;              //-- Calculated Signal Bias
+            double           Price;             //-- Event Price
+            bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
+            int              HedgeCount;        //-- Active Hedge Count; All Fractals
+            double           Strength;          //-- % of Success derived from Fractals
+            bool             ActiveEvent;       //-- True on Active Event (All Sources)
+            AlertType        BoundaryAlert;     //-- Alert of Last Boundary Event
+            SignalFractal    Fractal;           //-- Fractal in Use;
+            SignalFractal    Pivot;             //-- Fibonacci Pivot in Use;
+            SignalSegment    Segment;           //-- Fractal Source/Type of Last Fibo Event
+          };
 
   int               sigWinID      = NoValue;
 
@@ -118,7 +120,7 @@ input string inpSigFile    = "signal.bin";
 //+------------------------------------------------------------------+
 void RefreshScreen(void)
   {
-    if (sig.MaxAlert>Notify)
+    if (sig.BoundaryAlert>Notify)
       UpdateLabel("lbvSigTick",(string)sig.Tick,clrDarkGray,12,"Noto Sans Mono CJK HK");
     
     UpdateLabel("lbvSigPrice",DoubleToString(sig.Price,_Digits),clrDarkGray,12,"Noto Sans Mono CJK HK");
@@ -161,7 +163,7 @@ void UpdateNode(string NodeName, int Node, double Price1, double Price2)
 //+------------------------------------------------------------------+
 void UpdateSignal(bool Refresh)
   {
-    if (sig.MaxAlert>Notify||Refresh)
+    if (sig.BoundaryAlert>Notify||Refresh)
     {
       ArrayInitialize(sigHighBuffer,fmax(sigfp[fpRoot].Price,sigfp[fpExpansion].Price)+point(2));
       ArrayInitialize(sigLowBuffer,fmin(sigfp[fpRoot].Price,sigfp[fpExpansion].Price)-point(2));
@@ -208,7 +210,7 @@ int OnCalculate(const int rates_total,
         
       if (IsChanged(lastTick,sig.Tick))
       {
-        if (sig.MaxAlert>Notify)
+        if (sig.BoundaryAlert>Notify)
         {
           ArrayCopy(sigHist,sigHist,1,0,inpRetention-1);
           sigHist[0]    = sig.Price;

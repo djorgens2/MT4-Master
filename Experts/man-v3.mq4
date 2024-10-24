@@ -115,6 +115,12 @@
          };
 
 
+  struct SignalBar
+         {
+           int              Bar;
+           double           Price;
+         };
+
   struct SignalSegment
          {
            int               Direction;         //-- Direction Signaled
@@ -125,14 +131,10 @@
            double            High;
            double            Low;
            double            Close;
+           double            Support;
+           double            Resistance;
          };
          
-  struct SignalBar
-         {
-           int              Bar;
-           double           Price;
-         };
-
   //-- Signals (Events) requesting Manager Action (Response)
   struct  SignalRec
           {
@@ -148,7 +150,7 @@
             int              HedgeCount;        //-- Active Hedge Count; All Fractals
             double           Strength;          //-- % of Success derived from Fractals
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
-            AlertType        BoundaryType;     //-- Event Alert Type
+            AlertType        BoundaryAlert;     //-- Event Alert Type
             SignalFractal    Fractal;           //-- Fractal in Use;
             SignalFractal    Pivot;             //-- Fibonacci Pivot in Use;
             SignalSegment    Segment;           //-- Fractal Source/Type of Last Fibo Event
@@ -177,6 +179,20 @@
   string                 objectstr           = "[mv3]";
   
   int                    dHandle;
+
+//+------------------------------------------------------------------+
+//| IsChanged - returns true if the updated value has changed        |
+//+------------------------------------------------------------------+
+bool IsChanged(SegmentState &Check, SegmentState Compare, bool Update=true)
+  {
+    if (Check == Compare)
+      return (false);
+   
+    if (Update) 
+      Check   = Compare;
+  
+    return (true);
+  }
 
 //+------------------------------------------------------------------+
 //| WriteSignal- Creates, maintains and writes Signal History        |
@@ -224,8 +240,10 @@ void DebugPrint(void)
         Append(ftext,DoubleToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).Open,Digits),"|");
         Append(ftext,DoubleToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).High,Digits),"|");
         Append(ftext,DoubleToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).Low,Digits),"|");
-        
-        Append(ftext,BoolToStr(IsChanged(fractalDir,Fractal().Direction),DirText(Fractal().Direction),"------"),"|");
+
+        int direction = BoolToInt(Fractal().State==Correction,Direction(Fractal().Direction,InDirection,InContrarian),Fractal().Direction);
+
+        Append(ftext,BoolToStr(IsChanged(fractalDir,direction)||signal.Event==NewFractal,DirText(direction),"------"),"|");
         Append(ftext,EnumToString(signal.Segment.State),"|");
         Append(ftext,(string)fTick,"|");
         Append(ftext,TimeToStr(TimeCurrent()),"|");
@@ -422,7 +440,7 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
   {
     if (Signal.ActiveEvent())
     {
-      signal.Event                       = Exception;
+      signal.Event                       = BoolToEvent(IsBetween(signal.Event,NewFractal,NewLead),signal.Event,Exception);
 
       if (Signal.Event(NewFractal))
       {
@@ -448,33 +466,32 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
         signal.Checkpoint               = true;
       }
       else
-      if (Signal.Event(NewBoundary))
-        if (Signal.Event(NewDirection))           signal.Event = NewDirection;
+      if (signal.Event==Exception)
+        if (Signal.Event(NewBoundary))
+          if (Signal.Event(NewDirection))           signal.Event = NewDirection;
+          else
+          if (IsEqual(Signal.MaxAlert(),Notify))    signal.Event = NewTick;
+          else
+          if (IsEqual(Signal.MaxAlert(),Nominal))   signal.Event = NewSegment;
+          else
+          if (Signal.Event(CrossCheck))             signal.Event = CrossCheck;
+          else
+          if (Signal.Event(NewBias))                signal.Event = NewBias;
+          else
+          if (Signal.Event(NewExpansion))           signal.Event = NewExpansion;
+          else                                      signal.Event = NewBoundary;
         else
-        if (IsEqual(Signal.MaxAlert(),Notify))    signal.Event = NewTick;
-        else
-        if (IsEqual(Signal.MaxAlert(),Nominal))   signal.Event = NewSegment;
-        else
-        if (Signal.Event(CrossCheck))             signal.Event = CrossCheck;
-        else
-        if (Signal.Event(NewBias))                signal.Event = NewBias;
-        else
-        if (Signal.Event(NewExpansion))           signal.Event = NewExpansion;
-        else                                      signal.Event = NewBoundary;
-      else
-        if (Signal.Event(CrossCheck))             signal.Event = CrossCheck;
-        else
-        if (Signal.Event(NewBias))                signal.Event = NewBias;
-        else
-        if (Signal.Event(SessionClose))           signal.Event = SessionClose;
-        else
-        if (Signal.Event(SessionOpen))            signal.Event = SessionOpen;
-        else
-        if (Signal.Event(NewDay))                 signal.Event = NewDay;
-        else
-        if (Signal.Event(NewHour))                signal.Event = NewHour;
-        
-//      signal.Momentum   = (FractalState)BoolToInt(Signal[NewPullback],Pullback,BoolToInt(Signal[NewRally],Rally,NoValue));      
+          if (Signal.Event(CrossCheck))             signal.Event = CrossCheck;
+          else
+          if (Signal.Event(NewBias))                signal.Event = NewBias;
+          else
+          if (Signal.Event(SessionClose))           signal.Event = SessionClose;
+          else
+          if (Signal.Event(SessionOpen))            signal.Event = SessionOpen;
+          else
+          if (Signal.Event(NewDay))                 signal.Event = NewDay;
+          else
+          if (Signal.Event(NewHour))                signal.Event = NewHour;
     }
 
     for (FractalType fractal=Origin;IsBetween(fractal,Origin,Term);fractal++)
@@ -491,16 +508,23 @@ void UpdateSignal(SourceType Source, CFractal &Signal)
 //| UpdateSignal - Updates Signal Price Arrays                       |
 //+------------------------------------------------------------------+
 void UpdateSignal(void)
-  {    
+  {
     SignalBar         sighi        = {0,0.00};
     SignalBar         siglo        = {0,0.00};
+    SegmentState      state        = signal.Segment.State;
+    
+    static double strength         = 0;
 
     signal.Tick                    = fTick;
     signal.Price                   = Close[0];
-    signal.BoundaryType            = fmax(s[Daily].Alert(NewBoundary),t.Alert(NewBoundary));
+    signal.BoundaryAlert           = fmax(s[Daily].Alert(NewBoundary),t.Alert(NewBoundary));
     signal.Strength                = fdiv(fmax(manager[Buyer].Strength,manager[Seller].Strength),
                                           manager[Buyer].Strength+manager[Seller].Strength,3)*
                                           Direction(manager[Buyer].Strength-manager[Seller].Strength);
+
+    if (IsChanged(strength,signal.Strength))
+      Flag("sigstren"+BoolToStr(strength>0,">","<")+DoubleToStr(fabs(strength)*100,1),Color(strength,IN_CHART_DIR),0,0,debug);
+
     if (ArraySize(sigHistory)>0)
       signal.Bias                  = (RoleType)Action(signal.Price-sigHistory[0],InDirection);
 
@@ -508,7 +532,7 @@ void UpdateSignal(void)
     signal.Segment.High            = fmax(Close[0],signal.Segment.High);
     signal.Segment.Low             = fmin(Close[0],signal.Segment.Low);
 
-    if (signal.BoundaryType>Notify)
+    if (signal.BoundaryAlert>Notify)
     {
       ArrayCopy(sigHistory,sigHistory,1,0,inpSigRetain-1);
       sigHistory[0]                = signal.Price;
@@ -642,20 +666,23 @@ void UpdateSignal(void)
           switch (signal.Direction)
           {
             case DirectionUp:
-                  signal.Segment.State       = (SegmentState)BoolToInt(signal.Price>signal.Segment.Open,HigherHigh,LowerHigh);
-                  Flag("["+(string)fTick+"]sigHi-"+EnumToString(signal.Segment.State),
-                     BoolToInt(signal.Segment.State==HigherHigh,clrLawnGreen,clrForestGreen),0,0,debug);
+                  signal.Segment.State       = (SegmentState)BoolToInt(signal.Price>signal.Segment.Resistance,HigherHigh,LowerHigh);
+                  signal.Segment.Support     = signal.Segment.Low;
+                  //signal.Segment.Direction   = DirectionUp;
+
+                  UpdateLine("SegLo",signal.Segment.Low,STYLE_DASH,clrMagenta);
                   break;
 
             case DirectionDown:
-                  signal.Segment.State       = (SegmentState)BoolToInt(signal.Price<signal.Segment.Open,LowerLow,HigherLow);
-                  Flag("["+(string)fTick+"]sigLo-"+EnumToString(signal.Segment.State),
-                     BoolToInt(signal.Segment.State==LowerLow,clrRed,clrMaroon),0,0,debug);
+                  signal.Segment.State       = (SegmentState)BoolToInt(signal.Price<signal.Segment.Support,LowerLow,HigherLow);
+                  signal.Segment.Resistance  = signal.Segment.High;
+                  //signal.Segment.Direction   = DirectionDown;
+
+                  UpdateLine("SegHi",signal.Segment.High,STYLE_DASH,clrGoldenrod);
           }
 
-          //--** new **--//
           signal.Segment.Close= Close[0];
-          
+
           PrintSigPiv(debug);
 
           signal.Segment.Open    = Close[0];
@@ -664,7 +691,6 @@ void UpdateSignal(void)
           signal.Segment.Close   = NoValue;
 
           ArrayResize(sigFibonacci,0,24);
-          //--** new **--//
         }
 
         if (signal.Event==NewFibonacci)
@@ -685,6 +711,29 @@ void UpdateSignal(void)
         }
       }
     }
+    
+    static int dir = DirectionPending;
+    
+    if (signal.Price>signal.Segment.Resistance)
+      if (IsChanged(signal.Segment.Direction,DirectionUp))
+        signal.Segment.State  = HigherHigh;
+            
+    if (signal.Price<signal.Segment.Support)
+      if (IsChanged(signal.Segment.Direction,DirectionDown))
+        signal.Segment.State  = LowerLow;
+        
+//    if (IsChanged(dir,signal.Segment.Direction))
+    if (IsChanged(state,signal.Segment.State))
+    {
+      Flag("segstate:"+(string)fTick+"-"+EnumToString(state),BoolToInt(signal.Segment.State>LowerLow,
+        Color(signal.Direction,IN_DARK_DIR),
+        Color(signal.Segment.Direction,IN_CHART_DIR)));
+        
+//      Pause("Tick "+(string)fTick+": "+EnumToString(signal.Segment.State),"Segment State Change");
+    }
+
+    UpdateDirection("SegDir",signal.Segment.Direction,Color(signal.Segment.Direction),12);
+    UpdateLabel("SegState",EnumToString(signal.Segment.State),Color(signal.Segment.Direction),9);
   }
 
 void PrintSigPiv(bool Flag)
@@ -762,8 +811,8 @@ void UpdateMaster(void)
 
     //-- Signal Set Up
     signal.Alert              = fmax(s[Daily].MaxAlert(),t.MaxAlert());
-    signal.Event              = fmax(s[Daily].MaxEvent(),t.MaxEvent());
-    signal.ActiveEvent        = signal.Event>NoEvent;
+    signal.Event              = NoEvent;
+    signal.ActiveEvent        = s[Daily].ActiveEvent()||t.ActiveEvent();
     signal.Checkpoint         = false;
     signal.HedgeCount         = 0;
     
@@ -898,10 +947,10 @@ StrategyType Strategy(RoleType Role, SegmentState State)
 //+------------------------------------------------------------------+
 //| ManageFund - Fund Manager order processor                        |
 //+------------------------------------------------------------------+
-void ManageFund(RoleType Role)
+void ManageFund(void)
   {
     //-- Position checks
-    StrategyChanged(Role,signal.Segment.State);
+    StrategyChanged(master.Lead,signal.Segment.State);
     
     //-- Free Zone/Order Entry
 //    if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
@@ -946,7 +995,9 @@ void ManageFund(RoleType Role)
 //          Print(order.RequestStr(request));
 //    }
 
-    order.ProcessOrders(Role);
+    order.ProcessOrders(master.Lead);
+
+    ManageRisk(master.OnCall);
   }
 
 
@@ -1047,10 +1098,7 @@ void Execute(void)
   {
     //-- Handle Active Management
    if (IsBetween(master.Lead,Buyer,Seller))
-   {
-     ManageFund(master.Lead);
-     ManageRisk((RoleType)Action(master.Lead,InAction,InContrarian));
-    }
+     ManageFund();
    else
 
    //-- Handle Unassigned Manager
@@ -1093,8 +1141,10 @@ void ScreenConfig(void)
     NewLabel("pvSource","",10,96,clrDarkGray,SCREEN_UR);
     NewLabel("pvPivot","",10,112,clrNONE,SCREEN_UR);
     
-    NewLine("SpotHi");
-    NewLine("SpotLo");
+    NewLine("SegHi");
+    NewLine("SegLo");
+    NewLabel("SegDir","^",10,127,clrDarkGray,SCREEN_UR);
+    NewLabel("SegState","xxx",30,128,clrDarkGray,SCREEN_UR);
   }
 
 //+------------------------------------------------------------------+
@@ -1153,7 +1203,7 @@ void SignalConfig(void)
     signal.Direction           = NoDirection;
     signal.Lead                = NoAction;
     signal.Bias                = NoAction;
-    signal.State               = NoValue;
+    signal.State               = Breakout;
     
     //-- Set Operational Fractal
     double retrace             = 0.00;
@@ -1171,6 +1221,7 @@ void SignalConfig(void)
         signal.Fractal.Source  = TickMA;
       }
     }
+    
   }
 
 //+------------------------------------------------------------------+
