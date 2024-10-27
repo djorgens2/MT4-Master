@@ -318,6 +318,22 @@ string ActionText(int Action)
   }
 
 //+------------------------------------------------------------------+
+//| RoleChanged - Sets role on change; filters OP_NO_ACTION          |
+//+------------------------------------------------------------------+
+bool RoleChanged(RoleType &Role, double Compare, int Type=InAction, bool Update=true)
+  {
+    int role           = Action(Compare,Type);
+
+    if (role==NoAction||Role==(RoleType)role)
+      return false;
+
+    if (Update)
+      Role             = (RoleType)role;
+     
+    return true;
+  }
+
+//+------------------------------------------------------------------+
 //| ActionChanged - Sets action on change; filters OP_NO_ACTION      |
 //+------------------------------------------------------------------+
 bool ActionChanged(int &Change, int Compare, bool Update=true)
