@@ -12,6 +12,7 @@
 #import
 
 //--- Standard diectional defines
+#define StatePending         -1
 #define DirectionPending     -2
 #define DirectionDown        -1
 #define NoDirection           0      //---No Direction
@@ -247,6 +248,33 @@ int Operation(int Action, bool Contrarian=false)
   }
 
 //+------------------------------------------------------------------+
+//| Role - translates supplied value into Role                       |
+//+------------------------------------------------------------------+
+RoleType Role(double Value, int ValueType=InDirection, bool Contrarian=false)
+  {
+    int       dContrarian     = BoolToInt(Contrarian,-1,1);
+    
+    switch (ValueType)
+    {
+      case InDirection:   Value         *= dContrarian;
+                          break;
+
+      case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = NoDirection;
+    }
+    
+    if (IsLower(NoDirection,Value))  return (Buyer);
+    if (IsHigher(NoDirection,Value)) return (Seller);
+    
+    return (Unassigned);
+  }
+
+//+------------------------------------------------------------------+
 //| Action - translates price direction into order action            |
 //+------------------------------------------------------------------+
 int Action(double Value, int ValueType=InDirection, bool Contrarian=false)
@@ -342,26 +370,6 @@ bool ActionChanged(int &Change, int Compare, bool Update=true)
       return (false);
       
     return (IsChanged(Change,Compare,Update));
-  }
-
-//+------------------------------------------------------------------+
-//| RoleChanged - Sets role on change with optional Unassigned's     |
-//+------------------------------------------------------------------+
-bool RoleChanged(RoleType &Change, RoleType Compare, bool AllowUnassigned=false, bool Update=true)
-  {
-    if (Change==Compare)
-      return false;
-
-    if (Compare==Unassigned)
-      if (AllowUnassigned)
-      {
-        if (Update) Change = Unassigned;
-        return true;
-      }
-      else return false;
-      
-    if (Update) Change = Compare;
-    return true;
   }
 
 //+------------------------------------------------------------------+
@@ -1016,7 +1024,7 @@ void UpdateRay(string RayName, int BarStart, double PriceStart, int BarEnd=0, do
     ObjectSet(RayName,OBJPROP_PRICE1,PriceStart);
     ObjectSet(RayName,OBJPROP_PRICE2,BoolToDouble(IsEqual(PriceEnd,0.00),PriceStart,PriceEnd,Digits));
     
-    ObjectSet(RayName,OBJPROP_TIME1,Time[BarStart]);
+    ObjectSet(RayName,OBJPROP_TIME1,BoolToDate(BarStart<0,Time[0]+(Period()*fabs(BarStart)*60),Time[fmin(Bars-1,fmax(BarStart,0))]));
     ObjectSet(RayName,OBJPROP_TIME2,BoolToDate(BarEnd<0,Time[0]+(Period()*fabs(BarEnd)*60),Time[fmin(Bars-1,fmax(BarEnd,0))]));
     
     if (Color>NoValue)

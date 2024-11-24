@@ -9,6 +9,8 @@
 #property strict
 #property indicator_separate_window
 
+#define debug false
+
 #property indicator_buffers 3
 #property indicator_plots   3
 
@@ -76,8 +78,8 @@ input string inpSigFile    = "signal.bin";
 
   struct SignalSegment
          {
-           int               Direction;         //-- Direction Signaled
            SegmentState      State;
+           int               Direction;         //-- Direction Signaled
            RoleType          Lead;              //-- Calculated Signal Lead
            RoleType          Bias;              //-- Calculated Signal Bias
            double            Open;
@@ -229,6 +231,36 @@ int OnCalculate(const int rates_total,
   }
 
 //+------------------------------------------------------------------+
+//| LayoutTemplate - Sets default values on visuals for Layout Work  |
+//+------------------------------------------------------------------+
+void LayoutTemplate(void)
+  {
+    if (debug)
+    {
+      UpdateLabel("lbvSigTick","9999999999",clrDarkGray,12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigPrice","9.99999",clrDarkGray,12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigSource","Session Trend Retrace",clrDarkGray,12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigFibo","Extension: 116.4%",clrDarkGray,12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigEvent","Critcal New Convergence",clrDarkGray,12,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvSigTrigger","Fired",clrYellow,8,"Noto Sans Mono CJK HK");
+
+      UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
+      UpdateDirection("lbvSigDirection",sig.Segment.Direction,Color(sig.Segment.Direction),16);
+      UpdateDirection("lbvSigLead",sig.Segment.Lead,Color(sig.Segment.Lead),16);
+      UpdateDirection("lbvSigBias",sig.Segment.Bias,Color(sig.Segment.Bias),16);
+
+      for (FractalPoint point=0;point<5;point++)
+      {
+        UpdateLabel("sigpiv-"+(string)point,center(StringSubstr(EnumToString(point),2),9),clrLawnGreen,9,"Tahoma");
+        UpdateLabel("sigpiv-"+(string)point+":H:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
+        UpdateLabel("sigpiv-"+(string)point+":O:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
+        UpdateLabel("sigpiv-"+(string)point+":L:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
+        UpdateDirection("sigpiv-"+(string)point+":Dir",DirectionUp,clrLawnGreen,18);
+      }
+    }
+  }
+
+//+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -252,18 +284,6 @@ int OnInit()
 
     NewLabel("lbvSigTrigger","Fired",158,100,clrDarkGray,SCREEN_UR,sigWinID);
     NewLabel("lbvSigState","",10,109,clrDarkGray,SCREEN_UR,sigWinID);
-
-    UpdateLabel("lbvSigTick","9999999999",clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigPrice","9.99999",clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigSource","Session Trend Retrace",clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigFibo","Extension: 116.4%",clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigEvent","Critcal New Convergence",clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigTrigger","Fired",clrYellow,8,"Noto Sans Mono CJK HK");
-
-    UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
-    UpdateDirection("lbvSigDirection",sig.Segment.Direction,Color(sig.Segment.Direction),16);
-    UpdateDirection("lbvSigLead",sig.Segment.Lead,Color(sig.Segment.Lead),16);
-    UpdateDirection("lbvSigBias",sig.Segment.Bias,Color(sig.Segment.Bias),16);
 
     //--- Create Display Visuals
     for (int obj=0;obj<inpRetention;obj++)
@@ -290,18 +310,17 @@ int OnInit()
       NewRay("sig-"+(string)sigWinID+":"+EnumToString(point),fpstyle[point],fpcolor[point],false,sigWinID);
       NewLabel("sigFP-"+(string)sigWinID+":"+EnumToString(point),"xx",10,125+(point*16),clrDarkGray,SCREEN_UR,sigWinID);
       
-      NewLabel("sigpiv-"+(string)point,"",10,36+(45*point),clrNONE,SCREEN_UL,sigWinID);
-      NewLabel("sigpiv-"+(string)point+":H:","",85,30+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
-      NewLabel("sigpiv-"+(string)point+":O:","",85,42+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
-      NewLabel("sigpiv-"+(string)point+":L:","",85,54+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
-      NewLabel("sigpiv-"+(string)point+":Dir","",160,28+(45*point),clrNONE,SCREEN_UL,sigWinID);
-
-      //UpdateLabel("sigpiv-"+int(point),fp[point],clrLawnGreen,18,"Hack");
-      //UpdateLabel("sigpiv-"+int(point)+":H:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
-      //UpdateLabel("sigpiv-"+int(point)+":O:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
-      //UpdateLabel("sigpiv-"+int(point)+":L:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
-      //UpdateDirection("sigpiv-"+int(point)+":Dir",DirectionUp,clrLawnGreen,32);
+      if (point<5)
+      {
+        NewLabel("sigpiv-"+(string)point,"",10,30+(45*point),clrNONE,SCREEN_UL,sigWinID);
+        NewLabel("sigpiv-"+(string)point+":H:","",85,30+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
+        NewLabel("sigpiv-"+(string)point+":O:","",85,42+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
+        NewLabel("sigpiv-"+(string)point+":L:","",85,54+(33*point)+(12*point),clrNONE,SCREEN_UL,sigWinID);
+        NewLabel("sigpiv-"+(string)point+":Dir","",32,44+(45*point),clrNONE,SCREEN_UL,sigWinID);
+      }
     }
+
+    LayoutTemplate();
 
     return(INIT_SUCCEEDED);
   }

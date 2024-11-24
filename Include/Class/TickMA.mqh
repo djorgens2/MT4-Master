@@ -26,19 +26,9 @@ private:
 
     struct TickRec
            {
-             int            Lead;
-             int            Bias;
-             int            Count;
-             double         Open;
-             double         High;
-             double         Low;
-             double         Close;
-           };
-
-    struct SegmentRec
-           {
-             int            Direction[FractalTypes];
-             int            Bias;
+             int            Direction;
+             RoleType       Lead;
+             RoleType       Bias;
              EventType      Event;
              int            Count;
              double         Open;
@@ -62,10 +52,10 @@ private:
     struct SMARec
            {
              int            Direction;   //-- Expansion Direction
-             int            Lead;        //-- Lead based on Hi/Lo Touch
-             int            Bias;        //-- Open/Close cross
-             EventType      Event;       //-- Aggregate event
+             RoleType       Lead;        //-- Lead based on Hi/Lo Touch
+             RoleType       Bias;        //-- Open/Close cross
              FractalState   State;       //-- Aggregate state
+             EventType      Event;       //-- Aggregate event
              double         Open[];
              double         High[];
              double         Low[];
@@ -74,14 +64,14 @@ private:
 
     struct LinearRec
            {
+             int            Direction;
+             RoleType       Lead;
+             RoleType       Bias;
              FractalState   State;
              EventType      Event;
-             int            Direction;
-             int            Lead;
-             int            Bias;
              double         Head;
              double         Tail;
-             double         Price[];
+             double         Point[];
              double         FOC[MeasureTypes];
            };
 
@@ -116,7 +106,7 @@ private:
     
     //-- Aggregation Structures
     TickRec          tr[];             //-- Tick Record
-    SegmentRec       sr[];             //-- Segment Record
+    TickRec          sr[];             //-- Segment Record
     RangeRec         range;            //-- Range Record
     SMARec           sma;              //-- SMA Master Record
     LinearRec        line;             //-- Linear Regr Record
@@ -130,7 +120,7 @@ public:
 
     //-- Data Collections
     TickRec          Tick(int Node=0)      {return(tr[fmin(Node,Count(Ticks)-1)]);};
-    SegmentRec       Segment(int Node=0)   {return(sr[fmin(Node,Count(Segments)-1)]);};
+    TickRec          Segment(int Node=0)   {return(sr[fmin(Node,Count(Segments)-1)]);};
     RangeRec         Range(void)           {return(range);};
     SMARec           SMA(void)             {return(sma);};
     LinearRec        Linear(void)          {return(line);};
@@ -139,6 +129,7 @@ public:
     double           FOC(MeasureType Measure) {return line.FOC[Measure];};
     int              Count(CountType Type) {return(BoolToInt(IsEqual(Type,Ticks),ArraySize(tr),ArraySize(sr)));};
     int              Direction(double &Price[], int Speed=Fast) {return(Direction(Price[0]-Price[Speed-1]));};
+    int              Direction(FractalType Type) {return tmaDirection[Type];};
 
     //-- Format strings
     string           TickStr(int Count=0);
@@ -157,7 +148,7 @@ public:
 //+------------------------------------------------------------------+
 void CTickMA::CalcSMA(void)
   {
-    TickRec calcsma       = {0,0.00,0.00,0.00,0.00};
+    double calcsma[4]     = {0.00,0.00,0.00,0.00};
 
     if (Event(NewSegment))
     {
@@ -171,18 +162,18 @@ void CTickMA::CalcSMA(void)
     {
       if (node<Fast)
       {
-        calcsma.High     += sr[node].High;
-        calcsma.Low      += sr[node].Low;
+        calcsma[1]       += sr[node].High;
+        calcsma[2]       += sr[node].Low;
       }
 
-      calcsma.Open       += sr[node].Open;
-      calcsma.Close      += sr[node].Close;
+      calcsma[0]         += sr[node].Open;
+      calcsma[3]         += sr[node].Close;
     }
 
-    sma.Open[0]           = fdiv(calcsma.Open,Slow);
-    sma.High[0]           = fdiv(calcsma.High,Fast);
-    sma.Low[0]            = fdiv(calcsma.Low,Fast);
-    sma.Close[0]          = fdiv(calcsma.Close,Slow);
+    sma.Open[0]           = fdiv(calcsma[0],Slow);
+    sma.High[0]           = fdiv(calcsma[1],Fast);
+    sma.Low[0]            = fdiv(calcsma[2],Fast);
+    sma.Close[0]          = fdiv(calcsma[3],Slow);
   }
 
 //+------------------------------------------------------------------+
@@ -233,6 +224,7 @@ void CTickMA::NewTick()
     if (ArraySize(tr)>1)
       ArrayCopy(tr,tr,1,0,ArraySize(tr)-1);
 
+    tr[0].Event               = NewTick;
     tr[0].Count               = 0;
     tr[0].Open                = tmaPrice.Close;
     tr[0].High                = tmaPrice.Close;
@@ -241,8 +233,11 @@ void CTickMA::NewTick()
     
     if (ArraySize(tr)>1)
     {
-      tr[0].Lead              = Action(tr[0].Open-tr[1].Open,InDirection);
-      SetEvent(BoolToEvent(tr[0].Open>tr[1].Open,NewHigh,NewLow),Notify);
+      tr[0].Direction         = Direction(tr[0].Open-tr[1].Open);
+      tr[0].Lead              = Role(tr[0].Direction,InDirection);
+      tr[0].Bias              = tr[0].Lead;
+      
+      SetEvent(BoolToEvent(tr[0].Direction==DirectionUp,NewHigh,NewLow),Notify);
     }
 
     SetEvent(NewTick,Notify);
@@ -258,14 +253,15 @@ void CTickMA::NewSegment(void)
     if (ArraySize(sr)>1)
       ArrayCopy(sr,sr,1,0,ArraySize(sr)-1);
 
-    ArrayCopy(sr[0].Direction,tmaDirection);
-
+    sr[0].Direction           = tmaDirection[Term];
+    sr[0].Lead                = Role(tmaDirection[Lead],InDirection);
+    sr[0].Bias                = sr[0].Lead;
+    sr[0].Event               = NewSegment;
     sr[0].Count               = 0;
     sr[0].Open                = tr[0].Open;
     sr[0].High                = tr[0].High;
     sr[0].Low                 = tr[0].Low;
     sr[0].Close               = tr[0].Close;
-    sr[0].Event               = NewSegment;
 
     if (ArraySize(tr)>1)
     {
@@ -299,9 +295,10 @@ void CTickMA::UpdateTick(void)
 
     SetEvent(BoolToEvent(Event(NewHigh)||Event(NewLow),NewBoundary),Notify);
 
-    tr[0].Lead            = BoolToInt(Event(NewHigh),OP_BUY,BoolToInt(Event(NewLow),OP_SELL,tr[0].Lead));
-    tr[0].Bias            = Action(tr[0].Close-tr[0].Open,InDirection);
+    tr[0].Event           = BoolToEvent(Event(NewBoundary),NewBoundary);
     tr[0].Close           = tmaPrice.Close;
+    tr[0].Lead            = (RoleType)BoolToInt(Event(NewHigh),Buyer,BoolToInt(Event(NewLow),Seller,tr[0].Lead));
+    tr[0].Bias            = Role(Close[0]-tr[0].Open,InDirection);
     tr[0].Count++;
   }
 
@@ -311,7 +308,7 @@ void CTickMA::UpdateTick(void)
 void CTickMA::UpdateSegment(void)
   {
     if (Count(Ticks)>1)
-      if (DirectionChanged(tmaDirection[Lead],Direction(tr[0].Open-tr[1].Close)))
+      if (DirectionChanged(tmaDirection[Lead],tr[0].Direction))
         NewSegment();
 
     if (IsHigher(tr[0].High,sr[0].High))
@@ -352,7 +349,7 @@ void CTickMA::UpdateSegment(void)
       SetEvent(NewBoundary,Nominal);
     }
 
-    if (DirectionChanged(sr[0].Direction[Term],tmaDirection[Term]))
+    if (DirectionChanged(sr[0].Direction,tmaDirection[Term]))
       SetEvent(NewLead,Nominal);
 
     if (!IsBetween(seg.Active,seg.Support,seg.Resistance,Digits))
@@ -362,7 +359,7 @@ void CTickMA::UpdateSegment(void)
     sr[0].Close            = tr[0].Close;
     sr[0].Count           += BoolToInt(Event(NewTick),1);
     
-    SetEvent(BoolToEvent(ActionChanged(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
+    SetEvent(BoolToEvent(RoleChanged(sr[0].Bias,Action(Direction(sr[0].Close-sr[0].Open),InDirection)),NewBias),Nominal);
 
     sr[0].Event            = BoolToEvent(Event(NewLead),               NewLead,
                              BoolToEvent(Event(NewRally,Nominal),      NewRally,
@@ -438,7 +435,7 @@ void CTickMA::UpdateSMA(void)
     int dirLow       = Direction(sma.Low[0]-sma.Low[1]);
 
     sma.Event        = NoEvent;
-    sma.Bias         = Action(sma.Close[0]-sma.Open[0]);
+    sma.Bias         = Role(sma.Close[0]-sma.Open[0]);
 
     //-- Handle Flatlines
     if (IsEqual(dirHigh,NoDirection)&&IsEqual(dirLow,NoDirection))
@@ -462,7 +459,7 @@ void CTickMA::UpdateSMA(void)
     //-- Handle parabolics
     if (IsEqual(dirHigh,DirectionUp)&&IsEqual(dirLow,DirectionDown))
     {
-      sma.Direction  = sr[0].Direction[Lead];
+      sma.Direction  = tmaDirection[Lead];
       event          = NewParabolic;
       state          = Parabolic;
     }
@@ -484,7 +481,7 @@ void CTickMA::UpdateSMA(void)
     else
 
     //-- Handle Lead Changes
-    if (ActionChanged(sma.Lead,BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].High,Digits)>sma.High[0],OP_BUY,
+    if (RoleChanged(sma.Lead,BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].High,Digits)>sma.High[0],OP_BUY,
                            BoolToInt(BoolToDouble(IsEqual(tmaBar,0),Close[0],sr[0].Low,Digits)<sma.Low[0],OP_SELL,NoAction))))
     {
       sma.Event      = NewLead;
@@ -497,10 +494,10 @@ void CTickMA::UpdateSMA(void)
 //+------------------------------------------------------------------+
 void CTickMA::UpdateLinear(void)
   {
-    int        periods      = fmin(ArraySize(line.Price)-1,tmaPeriods);
-    int        bias         = line.Bias;
-    int        direction    = NoDirection;
     AlertType  alert        = NoAlert;
+    RoleType   bias         = line.Bias;
+    int        periods      = fmin(ArraySize(line.Point)-1,tmaPeriods);
+    int        direction    = NoDirection;
 
     double maxFOC           = fabs(line.FOC[Max]);
     double minFOC           = fabs(line.FOC[Min]);
@@ -511,8 +508,8 @@ void CTickMA::UpdateLinear(void)
     //--- compute FOC metrics
     if (Event(NewTick)||Event(NewDirection,Minor))
     {
-      line.Head             = line.Price[0];
-      line.Tail             = line.Price[periods-1];
+      line.Head             = line.Point[0];
+      line.Tail             = line.Point[periods-1];
       line.FOC[Now]         = (atan(fdiv(pip(line.Head-line.Tail),periods))*180)/M_PI;
 
       //-- Adverse Linear-Price Divergence
@@ -529,7 +526,7 @@ void CTickMA::UpdateLinear(void)
 
       if (IsHigher(fabs(line.FOC[Now]),maxFOC,NoUpdate,3)||Event(NewBoundary,Minor))
       {
-        bias                = Action(line.Direction);
+        bias                = (RoleType)Action(line.Direction);
 
         line.FOC[Min]       = line.FOC[Now];
         line.FOC[Max]       = line.FOC[Now];
@@ -538,7 +535,7 @@ void CTickMA::UpdateLinear(void)
       else
       if (IsLower(fabs(line.FOC[Now]),minFOC,NoUpdate,3))
       {
-        bias                = Action(line.Direction,InDirection,InContrarian);
+        bias                = (RoleType)Action(line.Direction,InDirection,InContrarian);
 
         line.FOC[Min]       = line.FOC[Now];        
         line.Event          = NewDivergence;
@@ -549,7 +546,7 @@ void CTickMA::UpdateLinear(void)
       direction             = BoolToInt(IsEqual(bias,NoBias),BoolToInt(line.FOC[Now]>fdiv(line.FOC[Max]+line.FOC[Min],2),DirectionUp,DirectionDown),Direction(bias,InAction));
       alert                 = (AlertType)BoolToInt(IsEqual(range.Direction,direction),Nominal,Notify);
 
-      if (IsChanged(line.Bias,bias))
+      if (RoleChanged(line.Bias,bias))
         SetEvent(NewBias,alert,tmaPrice.Close);
 
       SetEvent(line.Event,alert,tmaPrice.Close);
@@ -557,10 +554,10 @@ void CTickMA::UpdateLinear(void)
 
     //-- Set Range Fractal State (shape)
     line.State              = (FractalState)BoolToInt(IsBetween(seg.Active,seg.Support,seg.Resistance),
-                                            BoolToInt(IsEqual(Segment().Direction[Term],Segment().Direction[Trend]),Recovery,Retrace),
+                                            BoolToInt(IsEqual(tmaDirection[Term],tmaDirection[Trend]),Recovery,Retrace),
                                             BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Extension,Correction));
 
-    ActionChanged(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],Segment().Direction[Trend])));
+    RoleChanged(line.Lead,Action(BoolToInt(this[Term].Extension.Percent[Now]>fibonacci[Fibo100],tmaDirection[Trend])));
   }
 
 //+------------------------------------------------------------------+
@@ -577,7 +574,7 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Sh
     tmaBar                     = InitHistory(PERIOD_M1)-1;
     tmaPrice                   = Price(tmaBar);
 
-    ArrayInitialize(tmaDirection,NewDirection);
+    ArrayInitialize(tmaDirection,DirectionPending);
 
     NewTick();
     NewSegment();
@@ -586,7 +583,7 @@ CTickMA::CTickMA(int Periods, double Aggregate, FractalType Show) : CFractal (Sh
     CopyLow(NULL,PERIOD_D1,tmaPrice.Time-PERIOD_D1,1,low);
 
     //-- Initialize Range
-    range.Direction           = NewDirection;
+    range.Direction           = DirectionPending;
     range.High                = high[0];
     range.Low                 = low[0];
     range.Mean                = fdiv(range.High+range.Low,2,Digits);
@@ -631,7 +628,7 @@ void CTickMA::Update(void)
 
     if (Count(Segments)>30)
     {
-      CalcLinear(line.Price);
+      CalcLinear(line.Point);
       UpdateLinear();
     }
   }
@@ -647,6 +644,8 @@ string CTickMA::TickStr(int Node=0)
     {
       Append(text,"Tick|"+(string)(ArraySize(tr)-(Node+1)),"\n");
       Append(text,(string)tr[Node].Count,"|");
+      Append(text,EnumToString(tr[Node].Lead),"|");
+      Append(text,EnumToString(tr[Node].Bias),"|");
       Append(text,DoubleToStr(tr[Node].Open,Digits),"|");
       Append(text,DoubleToStr(tr[Node].High,Digits),"|");
       Append(text,DoubleToStr(tr[Node].Low,Digits),"|");
@@ -680,9 +679,8 @@ string CTickMA::SegmentStr(int Node)
     if (Count(Segments)>Node)
     {
       Append(text,"Segment|"+(string)(ArraySize(sr)-(Node+1)));
-      Append(text,DirText(sr[Node].Direction[Trend]),"|");
-      Append(text,DirText(sr[Node].Direction[Term]),"|");
-      Append(text,DirText(sr[Node].Direction[Lead]),"|");
+      Append(text,DirText(sr[Node].Direction),"|");
+      Append(text,ActionText(sr[Node].Lead),"|");
       Append(text,ActionText(sr[Node].Bias),"|");
       Append(text,EnumToString(sr[Node].Event),"|");
 
@@ -772,7 +770,7 @@ string CTickMA::LinearStr(int Count=0)
     Append(text,DoubleToStr(line.FOC[Now],Digits),"|");
 
     for (int node=0;node<Count;node++)
-      Append(text,DoubleToStr(line.Price[node],Digits),"|");
+      Append(text,DoubleToStr(line.Point[node],Digits),"|");
 
     return text;
   }

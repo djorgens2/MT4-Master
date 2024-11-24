@@ -173,19 +173,19 @@ void RefreshScreen(void)
     UpdateDirection("tmaSMABiasLo"+(string)indWinId,t.Direction(t.SMA().Low),Color(t.Direction(t.SMA().Low)),16);
 
     //-- Segment/Tick Box
-    UpdateDirection("tmaSegmentTerm"+(string)indWinId,t.Segment().Direction[Term],Color(t.Segment().Direction[Term]),32);
-    UpdateDirection("tmaSegmentTrend"+(string)indWinId,t.Segment().Direction[Trend],Color(t.Segment().Direction[Trend]),16);
-    UpdateLabel("tmaTickState"+(string)indWinId,rpad(proper(DirText(t.Segment().Direction[Lead]))+" ["+(string)t.Segment().Count+"]: "+
-                  proper(ActionText(Action(t.Segment().Direction[Lead])))," ",20),Color(t.Segment().Direction[Lead]),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaSegmentTerm"+(string)indWinId,t.Direction(Term),Color(t.Direction(Term)),32);
+    UpdateDirection("tmaSegmentTrend"+(string)indWinId,t.Direction(Trend),Color(t.Direction(Trend)),16);
+    UpdateLabel("tmaTickState"+(string)indWinId,rpad(BoolToStr(t.Tick().Direction==DirectionUp,"Uptick","Downtick")+
+                " ["+(string)t.Segment().Count+"]"," ",20),Color(Direction(t.Tick().Lead,InAction)),12,"Noto Sans Mono CJK HK");
     UpdateDirection("tmaTickBias"+(string)indWinId,Direction(t.Tick().Lead,InAction),Color(Direction(t.Tick().Bias,InAction)),16);
-    UpdateLabel("tmaSegmentState"+(string)indWinId,rpad(proper(DirText(t.Segment().Direction[Term]))+" "+
+    UpdateLabel("tmaSegmentState"+(string)indWinId,rpad(proper(DirText(t.Direction(Term)))+" "+
                   BoolToStr(IsBetween(t.Pivot().Active,t.Pivot().Support,t.Pivot().Resistance),
-                  BoolToStr(IsEqual(t.Segment().Direction[Term],t.Segment().Direction[Trend]),
-                      "Conforming "+proper(ActionText(Action(t.Segment().Direction[Term]))),
-                      "Contrarian "+proper(ActionText(Action(t.Segment().Direction[Term],InDirection,InContrarian)))),
-                      "Breakout "+proper(ActionText(Action(t.Segment().Direction[Term]))))," ",21),
-                  Color(t.Segment().Direction[Term]),12,"Noto Sans Mono CJK HK");
-    UpdateDirection("tmaSegmentBias"+(string)indWinId,t.Segment().Direction[Lead],Color(Direction(t.Segment().Bias,InAction)),16);
+                  BoolToStr(IsEqual(t.Direction(Term),t.Direction(Trend)),
+                      "Conforming "+proper(ActionText(Action(t.Direction(Term)))),
+                      "Contrarian "+proper(ActionText(Action(t.Direction(Term),InDirection,InContrarian)))),
+                      "Breakout "+proper(ActionText(Action(t.Direction(Term)))))," ",21),
+                  Color(t.Segment().Direction),12,"Noto Sans Mono CJK HK");
+    UpdateDirection("tmaSegmentBias"+(string)indWinId,t.Direction(Lead),Color(Direction(t.Segment().Bias,InAction)),16);
 
     //-- Range Bounds
     UpdateRay("tmaPlanSup:"+(string)indWinId,inpPeriods-1,t.Range().Support);
@@ -274,7 +274,7 @@ void UpdateTickMA(void)
     ResetBuffer(plSMACloseBuffer,t.SMA().Close);
     ResetBuffer(plSMAHighBuffer,t.SMA().High);
     ResetBuffer(plSMALowBuffer,t.SMA().Low);
-    ResetBuffer(plLineBuffer,t.Linear().Price);
+    ResetBuffer(plLineBuffer,t.Linear().Point);
   }
 
 //+------------------------------------------------------------------+
