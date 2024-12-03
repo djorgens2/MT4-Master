@@ -92,18 +92,22 @@ input string inpSigFile    = "signal.bin";
   struct  SignalRec
           {
             long             Tick;              //-- Tick Signaled by Event 
-            int              Direction;         //-- Signal Direction
             FractalState     State;             //-- State of the Signal
+            int              Direction;         //-- Signal Direction
+            RoleType         Lead;              //-- Lead from strength (100,0,-100)
+            RoleType         Bias;              //-- Lead from segment (HH,LL)
             EventType        Event;             //-- Highest Event
-            AlertType        Alert;             //-- Highest Alert Level
+            AlertType        MaxAlert;          //-- Highest Alert Level
             double           Price;             //-- Signal price (gen. Close[0])
             SignalSegment    Segment;           //-- Active Segment Range
-            double           Support;
-            double           Resistance;
+            double           Support;           //-- From last LowerLow
+            double           Resistance;        //-- From last HigherHigh
             bool             Checkpoint;        //-- Trigger (Fractal/Fibo/Lead Events)
             int              HedgeCount;        //-- Active Hedge Count; All Fractals
             double           Strength;          //-- % of Success derived from Fractals
             bool             ActiveEvent;       //-- True on Active Event (All Sources)
+            double           Boundary[2];       //-- Highest High/Lowest Low
+            RoleType         BoundaryBias[2];   //-- Role of last High/Low Boundary Change
             AlertType        BoundaryAlert;     //-- Event Alert Type
             SignalFractal    Fractal;           //-- Fractal in Use;
             SignalFractal    Pivot;             //-- Fibonacci Pivot in Use;
@@ -124,17 +128,23 @@ void RefreshScreen(void)
       UpdateLabel("lbvSigTick",(string)sig.Tick,clrDarkGray,12,"Noto Sans Mono CJK HK");
     
     UpdateLabel("lbvSigPrice",DoubleToString(sig.Price,_Digits),clrDarkGray,12,"Noto Sans Mono CJK HK");
-    UpdateLabel("lbvSigEvent",BoolToStr(sig.Alert>NoAlert,EnumToString(sig.Alert))+" "+EventText(sig.Event),clrDarkGray,12,"Noto Sans Mono CJK HK");
+    UpdateLabel("lbvSigEvent",BoolToStr(sig.MaxAlert>NoAlert,EnumToString(sig.MaxAlert))+" "+EventText(sig.Event),clrDarkGray,12,"Noto Sans Mono CJK HK");
     UpdateLabel("lbvSigState",EnumToString(sig.State),clrDarkGray,12,"Noto Sans Mono CJK HK");
     
-    UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
-    UpdateDirection("lbvSigDirection",sig.Segment.Direction,Color(sig.Segment.Direction),16);
-    UpdateDirection("lbvSigLead",Direction(sig.Segment.Lead,InAction),Color(Direction(sig.Segment.Lead,InAction)),16);
-    UpdateDirection("lbvSigBias",Direction(sig.Segment.Bias,InAction),Color(Direction(sig.Segment.Bias,InAction)),16);
+    UpdateDirection("lbvSigLead",Direction(sig.Lead,InBias),Color(Direction(sig.Lead,InBias)),16);
+    UpdateDirection("lbvSigBias",Direction(sig.Bias,InBias),Color(Direction(sig.Bias,InBias)),16);
 
-    UpdateLabel("lbvSigTrigger",BoolToStr(sigfp[fpRecovery].Price==Close[0],"FIRED","IDLE "),BoolToInt(sigfp[fpRecovery].Price==Close[0],clrWhite,clrDarkGray),8,"Noto Sans Mono CJK HK");
-    UpdateBox("sig-"+(string)sigWinID+":Trigger",Color(sig.Segment.Direction,IN_DARK_DIR));
+    UpdateLabel("lbvStrength",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),9,"Noto Sans Mono CJK HK");
+    UpdateDirection("lbvSegDir",sig.Segment.Direction,Color(sig.Segment.Direction),16);
+    UpdateDirection("lbvSegLead",Direction(sig.Segment.Lead,InBias),Color(Direction(sig.Segment.Lead,InBias)),16);
+    UpdateDirection("lbvSegBias",Direction(sig.Segment.Bias,InBias),Color(Direction(sig.Segment.Bias,InBias)),16);
+
+    UpdateLabel("lbvSigTrigger",BoolToStr(sig.Checkpoint,"FIRED","IDLE "),BoolToInt(sig.Checkpoint,clrBlack,clrDarkGray),8,"Noto Sans Mono CJK HK");
+    UpdateBox("sig-"+(string)sigWinID+":Trigger",BoolToInt(sig.Checkpoint,clrGoldenrod,Color(sig.Segment.Direction,IN_DARK_DIR)));
     UpdateBox("sig-"+(string)sigWinID+":FractalPoint",BoolToInt(sig.Segment.Lead==Buyer,C'0,42,0',C'42,0,0'));
+    
+    Arrow("HigherHigh",ArrowDash,clrYellow,0,sig.Boundary[HigherHigh]);
+    Arrow("LowerLow",ArrowDash,clrRed,0,sig.Boundary[LowerLow]);
     
     for (FractalPoint point=fpOrigin;point<FractalPoints;point++)
     {
@@ -244,12 +254,12 @@ void LayoutTemplate(void)
       UpdateLabel("lbvSigEvent","Critcal New Convergence",clrDarkGray,12,"Noto Sans Mono CJK HK");
       UpdateLabel("lbvSigTrigger","Fired",clrYellow,8,"Noto Sans Mono CJK HK");
 
-      UpdateLabel("lbvOdds",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
+      UpdateLabel("lbvStrength",DoubleToStr(sig.Strength*100,1)+"%",Color(Direction(sig.Strength)),13,"Noto Sans Mono CJK HK");
       UpdateDirection("lbvSigDirection",sig.Segment.Direction,Color(sig.Segment.Direction),16);
       UpdateDirection("lbvSigLead",sig.Segment.Lead,Color(sig.Segment.Lead),16);
       UpdateDirection("lbvSigBias",sig.Segment.Bias,Color(sig.Segment.Bias),16);
 
-      for (FractalPoint point=0;point<5;point++)
+      for (FractalPoint point=fpExpansion;point<fpClose;point++)
       {
         UpdateLabel("sigpiv-"+(string)point,center(StringSubstr(EnumToString(point),2),9),clrLawnGreen,9,"Tahoma");
         UpdateLabel("sigpiv-"+(string)point+":H:","H: 9.99999",clrLawnGreen,8,"Noto Sans Mono CJK HK");
@@ -277,13 +287,16 @@ int OnInit()
     NewLabel("lbvSigFibo","",10,38,clrDarkGray,SCREEN_UR,sigWinID);
     NewLabel("lbvSigEvent","",10,56,clrDarkGray,SCREEN_UR,sigWinID);
 
-    NewLabel("lbvOdds","",130,75,clrDarkGray,SCREEN_UR,sigWinID);
-    NewLabel("lbvSigDirection","",90,78,clrDarkGray,SCREEN_UR,sigWinID);
-    NewLabel("lbvSigLead","",50,78,clrDarkGray,SCREEN_UR,sigWinID);
-    NewLabel("lbvSigBias","",10,78,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSigLead","",175,90,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSigBias","",140,90,clrDarkGray,SCREEN_UR,sigWinID);
 
-    NewLabel("lbvSigTrigger","Fired",158,100,clrDarkGray,SCREEN_UR,sigWinID);
-    NewLabel("lbvSigState","",10,109,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvStrength","",154,70,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSegDir","",90,90,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSegLead","",55,90,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSegBias","",20,90,clrDarkGray,SCREEN_UR,sigWinID);
+
+    NewLabel("lbvSigTrigger","Fired",158,132,clrDarkGray,SCREEN_UR,sigWinID);
+    NewLabel("lbvSigState","",10,141,clrDarkGray,SCREEN_UR,sigWinID);
 
     //--- Create Display Visuals
     for (int obj=0;obj<inpRetention;obj++)
@@ -301,14 +314,18 @@ int OnInit()
     SetIndexEmptyValue(0,0.00);
     
     ArrayResize(sigHist,inpRetention);
+
+    DrawBox("sig-"+(string)sigWinID+":Signal",210,80,86,40,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
+    DrawBox("sig-"+(string)sigWinID+":Segment",120,80,115,40,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
+    DrawBox("sig-"+(string)sigWinID+":Strength",200,72,50,16,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
     
-    DrawBox("sig-"+(string)sigWinID+":FractalPoint",210,108,205,140,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
-    DrawBox("sig-"+(string)sigWinID+":Trigger",200,100,50,16,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
+    DrawBox("sig-"+(string)sigWinID+":FractalPoint",210,140,205,108,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
+    DrawBox("sig-"+(string)sigWinID+":Trigger",200,132,50,16,C'0,42,0',BORDER_FLAT,SCREEN_UR,sigWinID);
     
-    for(FractalPoint point=0;point<FractalPoints;point++)
+    for(FractalPoint point=fpBase;point<FractalPoints-1;point++)
     {
       NewRay("sig-"+(string)sigWinID+":"+EnumToString(point),fpstyle[point],fpcolor[point],false,sigWinID);
-      NewLabel("sigFP-"+(string)sigWinID+":"+EnumToString(point),"xx",10,125+(point*16),clrDarkGray,SCREEN_UR,sigWinID);
+      NewLabel("sigFP-"+(string)sigWinID+":"+EnumToString(point),"xx",10,141+(point*16),clrDarkGray,SCREEN_UR,sigWinID);
       
       if (point<5)
       {

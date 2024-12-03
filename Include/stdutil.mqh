@@ -12,7 +12,6 @@
 #import
 
 //--- Standard diectional defines
-#define StatePending         -1
 #define DirectionPending     -2
 #define DirectionDown        -1
 #define NoDirection           0      //---No Direction
@@ -32,8 +31,9 @@
 #define InDollar              3      //--- Stated in dollars
 #define InEquity              4      //--- Stated as a percent of equity
 #define InDirection           5      //--- Stated as a Direction
-#define InAction              6      //--- Stated as an Action
-#define InState               7      //--- State definition
+#define InAction              6      //--- Stated as Action
+#define InBias                7      //--- Stated as Bias/Role
+#define InState               8      //--- State definition
 
 //--- logical defines
 #define InTrueFalse          11      //--- Stated as True or False
@@ -312,10 +312,20 @@ int Direction(double Value, int ValueType=InDirection, bool Contrarian=false)
     {
       case InDirection:   Value         *= dContrarian;
                           break;
+
       case InAction:      if (Value==OP_BUY||Value==OP_BUYLIMIT||Value==OP_BUYSTOP)
                             Value        = DirectionUp*dContrarian;
                           else
                           if (Value==OP_SELL||Value==OP_SELLLIMIT||Value==OP_SELLSTOP)
+                            Value        = DirectionDown*dContrarian;
+                          else
+                            Value        = NoDirection;
+                          break;
+
+      case InBias:        if (Value==Buyer)
+                            Value        = DirectionUp*dContrarian;
+                          else
+                          if (Value==Seller)
                             Value        = DirectionDown*dContrarian;
                           else
                             Value        = NoDirection;
@@ -535,11 +545,11 @@ color Color(double Value, int Method=IN_DIRECTION, bool Contrarian=false)
     case IN_DARK_PANEL:    if (Value<0.00) return (C'42,0,0');
                            if (Value>0.00) return (C'0,42,0');
                            return (clrDarkGray);
-    case IN_ACTION:        if (Action(Value,InAction)==OP_BUY)  return (clrLawnGreen);
-                           if (Action(Value,InAction)==OP_SELL) return (clrRed);
+    case IN_ACTION:        if (Action(Value,InAction,Contrarian)==OP_BUY)  return (clrLawnGreen);
+                           if (Action(Value,InAction,Contrarian)==OP_SELL) return (clrRed);
                            return (clrYellow);
-    case IN_CHART_ACTION:  if (Action(Value,InAction)==OP_BUY)  return (clrYellow);
-                           if (Action(Value,InAction)==OP_SELL) return (clrRed);
+    case IN_CHART_ACTION:  if (Action(Value,InAction,Contrarian)==OP_BUY)  return (clrYellow);
+                           if (Action(Value,InAction,Contrarian)==OP_SELL) return (clrRed);
   }
   
   return (clrDarkGray);
@@ -971,7 +981,7 @@ void NewText(string Name, string Text, int Color=White, int Size=8, string Font=
 //+------------------------------------------------------------------+
 void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int Down=8)
   {
-    if (Bar<0 || Bar>Bars)
+    if (Bar>Bars)
       return;
       
     if (Direction==DirectionUp)
@@ -984,7 +994,7 @@ void UpdatePriceTag(string PriceTagName, int Bar, int Direction, int Up=12, int 
     else
       return;
           
-    ObjectSet(PriceTagName,OBJPROP_TIME1,Time[Bar]);
+    ObjectSet(PriceTagName,OBJPROP_TIME1,BoolToDate(Bar<0,Time[0]+(Period()*fabs(Bar)*60),Time[fmin(Bars-1,fmax(Bar,0))]));
   }
   
 //+------------------------------------------------------------------+
