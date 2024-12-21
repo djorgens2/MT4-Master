@@ -221,7 +221,7 @@ private:
                         double         DCA;                   //-- Calculated live DCA
                         OrderDetail    Order[];               //-- Order details by ticket/action
                         OrderSummary   Zone[];                //-- Aggregate order detail by order zone
-                        OrderSummary   Entry;                 //-- Entry Zone Summary
+                        OrderSummary   EntryZone;             //-- Entry Zone Summary
                         OrderSummary   Summary[Total];        //-- Order Summary by Action
                       };
 
@@ -333,7 +333,7 @@ public:
           OrderRequest   Request(int Key, int Ticket=NoValue);
           OrderDetail    Ticket(int Ticket);
           OrderSummary   Recap(int Action, SummaryType Type) {return(Master[Action].Summary[Type]);};
-          OrderSummary   Entry(int Action)                   {return(Master[Action].Entry);};
+          OrderSummary   EntryZone(int Action)               {return(Master[Action].EntryZone);};
           OrderMaster    Config(int Action)                  {return Master[Action];};
           AccountMetrics Metrics(void)                       {return Account;};
 
@@ -536,9 +536,9 @@ void COrder::UpdatePanel(void)
         UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneMaxMargin",center(DoubleToStr(Master[action].ZoneMaxMargin,1)+"%",5),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-ZoneNow",center((string)Zone(action),8),clrDarkGray,10);
         UpdateLabel("lbvOC-"+ActionText(action)+"-EntryZone",center("Entry "+DoubleToStr(Free(action),Account.LotPrecision),10),
-                                                    BoolToInt(IsEqual(Entry(action).Lots,0.00),clrLawnGreen,
-                                                    BoolToInt(IsEqual(Entry(action).Lots,LotSize(action)),clrGoldenrod,
-                                                    BoolToInt(Entry(action).Lots<fdiv(Entry(action).Lots,2),clrYellow,clrRed))));
+                                                    BoolToInt(IsEqual(EntryZone(action).Lots,0.00),clrLawnGreen,
+                                                    BoolToInt(IsEqual(EntryZone(action).Lots,LotSize(action)),clrGoldenrod,
+                                                    BoolToInt(EntryZone(action).Lots<fdiv(EntryZone(action).Lots,2),clrYellow,clrRed))));
       }
     
       //-- Order Zone metrics by Action
@@ -784,7 +784,7 @@ void COrder::UpdateSummary(void)
         InitSummary(Master[action].Summary[type]);
       }
 
-      InitSummary(Master[action].Entry,Zone(action,BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid,Digits)));
+      InitSummary(Master[action].EntryZone,Zone(action,BoolToDouble(IsEqual(action,OP_BUY),Ask,Bid,Digits)));
       ArrayResize(Master[action].Zone,0,100);
     }
 
@@ -856,10 +856,10 @@ void COrder::UpdateSummary(void)
           //-- Build Entry Zone Summary by Action/Proximity
           if (IsBetween(Master[action].Order[detail].Price,usHighBound[action],usLowBound[action],Digits))
           {
-            ArrayResize(Master[action].Entry.Ticket,++Master[action].Entry.Count,100);
-            Master[action].Entry.Lots             += Master[action].Order[detail].Lots;
-            Master[action].Entry.Value            += Master[action].Order[detail].Profit;
-            Master[action].Entry.Ticket[Master[action].Entry.Count-1] = Master[action].Order[detail].Ticket;
+            ArrayResize(Master[action].EntryZone.Ticket,++Master[action].EntryZone.Count,100);
+            Master[action].EntryZone.Lots         += Master[action].Order[detail].Lots;
+            Master[action].EntryZone.Value        += Master[action].Order[detail].Profit;
+            Master[action].EntryZone.Ticket[Master[action].EntryZone.Count-1] = Master[action].Order[detail].Ticket;
           }          
         }
     }
@@ -884,8 +884,8 @@ void COrder::UpdateSummary(void)
         Master[action].Zone[node].Margin           = fdiv(Master[action].Zone[node].Lots,Master[action].Summary[Net].Lots)*Master[action].Summary[Net].Margin;
       }
 
-      Master[action].Entry.Equity                  = Equity(Master[action].Entry.Value,InPercent);
-      Master[action].Entry.Margin                  = fdiv(Master[action].Entry.Lots,Master[action].Summary[Net].Lots)*Master[action].Summary[Net].Margin;
+      Master[action].EntryZone.Equity                  = Equity(Master[action].EntryZone.Value,InPercent);
+      Master[action].EntryZone.Margin                  = fdiv(Master[action].EntryZone.Lots,Master[action].Summary[Net].Lots)*Master[action].Summary[Net].Margin;
     }
 
     //-- Calc P/L Aggregates
@@ -1215,11 +1215,11 @@ bool COrder::OrderApproved(OrderRequest &Request)
                                       Master[Request.Action].MaxMargin,NoUpdate))
                         {
 
-                          if (IsLower(Entry(Request.Action).Margin,Master[Request.Action].ZoneMaxMargin,NoUpdate))
+                          if (IsLower(EntryZone(Request.Action).Margin,Master[Request.Action].ZoneMaxMargin,NoUpdate))
                             return (IsChanged(Request.Status,Approved));
 
                           Request.Memo     = "Margin Zone limit "+DoubleToStr(Master[Request.Action].ZoneMaxMargin,1)+"% exceeded ["+
-                                                DoubleToStr(Margin(Request.Action,Entry(Request.Action).Lots+Request.Lots,InPercent),1)+"%]";
+                                                DoubleToStr(Margin(Request.Action,EntryZone(Request.Action).Lots+Request.Lots,InPercent),1)+"%]";
                         }
                         else
                           Request.Memo     = proper(ActionText(Request.Action))+"er Margin "+DoubleToStr(Master[Request.Action].MaxMargin,1)+"% exceeded ["+

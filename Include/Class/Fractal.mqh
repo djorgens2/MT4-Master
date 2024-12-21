@@ -17,7 +17,7 @@ const int fpcolor[7]   = {clrDarkGray,clrYellow,clrRed,clrLawnGreen,clrGoldenrod
 #define   format(f) BoolToDouble(f==InDecimal,1,BoolToDouble(f==InPercent,100))
 #define   fext(b,r,e,f) fdiv(e-r,b-r)*format(f)
 #define   fret(r,e,rt,f) fdiv(rt-e,r-e)*format(f)
-#define   fprice(b,r,p) ((b-r)*fibonacci[p])+r
+#define   fprice(b,r,p) NormalizeDouble((b-r)*fibonacci[p],Digits)+r
 
 #include <Class/Event.mqh>
 
@@ -186,7 +186,6 @@ public:
         EventType        Event(FractalState State);
         AlertType        Alert(FractalType Type);
         FractalState     State(EventType Event);
-        FibonacciType    Level(double Percent);
         PivotRec         Pivot(FractalType Type) {return frec[Type].Pivot;};
 
         BarRec           Price(int Bar);
@@ -764,18 +763,6 @@ FractalState CFractal::State(EventType Event)
   }
 
 //+------------------------------------------------------------------+
-//| Level - Returns the FiboLevel based on extended fibonacci        |
-//+------------------------------------------------------------------+
-FibonacciType CFractal::Level(double Percent)
-  {
-    for (FibonacciType level=Fibo823;level>FiboRoot;level--)
-      if (Percent>fibonacci[level])
-        return (level);
-
-    return (FiboRoot);
-  }
-
-//+------------------------------------------------------------------+
 //| Price - Returns Price data for supplied Bar                      |
 //+------------------------------------------------------------------+
 BarRec CFractal::Price(int Bar)
@@ -975,6 +962,18 @@ string CFractal::DisplayStr(void)
     }
     
     return text;
+  }
+
+//+------------------------------------------------------------------+
+//| Level - Returns the FiboLevel based on extended fibonacci        |
+//+------------------------------------------------------------------+
+FibonacciType Level(double Percent)
+  {
+    for (FibonacciType level=Fibo823;level>FiboRoot;level--)
+      if (Percent>fibonacci[level])
+        return (level);
+
+    return (FiboRoot);
   }
 
 //+------------------------------------------------------------------+
