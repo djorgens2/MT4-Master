@@ -8,7 +8,7 @@
 #property version   "3.01"
 #property strict
 
-#define debug false
+#define debug true
 
 #define NetZero      0
 #define NetLong      1
@@ -181,6 +181,7 @@
             bool             Suspend;               //-- Postpone new orders (Run-Outs)
             int              Strength;                 
             bool             Hedge;
+            bool             EntryOnly;             //-- Target change; entry price only
           };
 
   //-- Master Control Operationals
@@ -188,6 +189,7 @@
           {
             RoleType         Lead;              //-- Process Manager (Owner|Lead)
             RoleType         OnCall;            //-- Manager on deck while unassigned
+            FractalState     State;             //-- Last Reported Fractal State
             double           HedgeLotSize;      //-- Fixed Hedge Lot Size
           };
           
@@ -258,12 +260,12 @@ void DebugPrint(void)
         //-- Active Fibonacci (n->u)
         Append(ftext,EnumToString(signal.Pivot.Source),"|");
         Append(ftext,EnumToString(signal.Pivot.Type),"|");
-        Append(ftext,StringSubstr(EnumToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).Level),4),"|");
-        Append(ftext,DoubleToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).Price,Digits),"|");
-        Append(ftext,EnumToString(Pivot(signal.Pivot.Source,signal.Pivot.Type).Event),"|");
-        Append(ftext,DirText(Pivot(signal.Pivot.Source,signal.Pivot.Type).Direction),"|");
-        Append(ftext,EnumToString((RoleType)Pivot(signal.Pivot.Source,signal.Pivot.Type).Lead),"|");
-        Append(ftext,EnumToString((RoleType)Pivot(signal.Pivot.Source,signal.Pivot.Type).Bias),"|");
+        Append(ftext,StringSubstr(EnumToString(Pivot(signal.Pivot).Level),4),"|");
+        Append(ftext,DoubleToString(Pivot(signal.Pivot).Price,Digits),"|");
+        Append(ftext,EnumToString(Pivot(signal.Pivot).Event),"|");
+        Append(ftext,DirText(Pivot(signal.Pivot).Direction),"|");
+        Append(ftext,EnumToString((RoleType)Pivot(signal.Pivot).Lead),"|");
+        Append(ftext,EnumToString((RoleType)Pivot(signal.Pivot).Bias),"|");
 
         //-- Signal Box (v->ad)
         Append(ftext,EnumToString(signal.State),"|");
@@ -317,7 +319,7 @@ void RefreshScreen(void)
   {
     static int     panelWinID   = NoValue;
            int     signalWinID  = ChartWindowFind(0,indSignalSN);
-           int     line         = 0;
+           int     line         = fpBase;
 
     if (signalWinID>NoValue)
     {
@@ -373,8 +375,8 @@ void RefreshScreen(void)
     UpdateLabel("pvSource",EnumToString(signal.Fractal.Source)+" "+EnumToString(signal.Fractal.Type)+" "+
                    EnumToString(Fractal().State),Color(Fractal().Direction),9,"Tahoma");
     UpdateLabel("pvPivot",EnumToString(signal.Pivot.Source)+" "+EnumToString(signal.Pivot.Type)+" "+
-                   ActionText(Pivot(signal.Pivot.Source,signal.Pivot.Type).Lead),
-                   Color(Direction(Pivot(signal.Pivot.Source,signal.Pivot.Type).Bias),InAction),9,"Tahoma");
+                   ActionText(Pivot(signal.Pivot).Lead),
+                   Color(Direction(Pivot(signal.Pivot).Bias),InAction),9,"Tahoma");
 
     UpdateRay("SigLo",-9,signal.Support,-13);
     UpdateRay("SigHi",-9,signal.Resistance,-13);
@@ -397,7 +399,7 @@ void RefreshScreen(void)
         UpdateText(objectstr+"lnT_"+EnumToString(fibo),"",price,-5,target);
       }
 
-      for (FractalPoint point=fpOrigin;IsBetween(point,fpOrigin,fpRecovery);point++)
+      for (FractalPoint point=fpBase;IsBetween(point,fpOrigin,fpRecovery);point++)
       {
         UpdateRay(objectstr+"lnS_"+fp[point],inpPeriods,Fractal().Point[point],-8);
         UpdateText(objectstr+"lnT_"+fp[point],"",Fractal().Point[point],-7);
@@ -425,6 +427,14 @@ void RefreshScreen(void)
   }
 
 //+------------------------------------------------------------------+
+//| IsEqual - returns true on equal Fractal:Pivot Source:Type        |
+//+------------------------------------------------------------------+
+bool IsEqual(void)
+  {
+    return signal.Fractal.Source==signal.Pivot.Source&&signal.Fractal.Type==signal.Pivot.Type;
+  }
+
+//+------------------------------------------------------------------+
 //| IsChanged - returns true if the updated value has changed        |
 //+------------------------------------------------------------------+
 bool IsChanged(SegmentState &Check, SegmentState Compare, bool Update=true)
@@ -449,12 +459,12 @@ AlertType MaxAlert(EventType Event)
 //+------------------------------------------------------------------+
 //| Pivot - Returns the active Pivot record                          |
 //+------------------------------------------------------------------+
-PivotRec Pivot(SourceType Source, FractalType Type)
+PivotRec Pivot(SignalFractal &Pivot)
   {
-    if (Source==TickMA)
-      return t.Pivot(Type);
+    if (Pivot.Source==TickMA)
+      return t.Pivot(Pivot.Type);
 
-    return s[Daily].Pivot(Type);
+    return s[Daily].Pivot(Pivot.Type);
   }
 
 //+------------------------------------------------------------------+
@@ -507,35 +517,22 @@ bool ManagerChanged(void)
     master.OnCall         = incumbent;
     master.Lead           = incoming;
 
+//    Flag("ManagerChanged",Color(Direction(master.Lead,InAction),IN_CHART_DIR));
     return true;
   }
 
 //+------------------------------------------------------------------+
-//| StrategySetup - Sets Strategy targets/stops & validates position |
+//| TargetChanged - Returns true on target change from Fibonacci     |
 //+------------------------------------------------------------------+
-void StrategySetup(RoleType Role, bool Contrarian=false)
+bool TargetChanged(RoleType Role, SourceType Source)
   {
-    bool changed   = false;
-    
-    for (SourceType source=0;source<SourceTypes;source++)
-      changed = changed||
-                IsChanged(manager[Role].Entry[source].Changed,false)||
-                IsChanged(manager[Role].Profit[source].Changed,false)||
-                IsChanged(manager[Role].Loss[source].Changed,false);
+    bool changed    = false;
 
-    //-- Handle Contrarian Position
-    if (Contrarian)
-    {
-    }
+    if (IsChanged(manager[Role].Entry[Source].Changed,false))  changed = true;
+    if (IsChanged(manager[Role].Profit[Source].Changed,false)) changed = true;
+    if (IsChanged(manager[Role].Loss[Source].Changed,false))   changed = true;
 
-    //-- Handle In-[Trend|Term] Position
-    else
-    {
-      if (changed)
-        Flag((string)fTick+":change-"+DoubleToStr(signal.Strength.Value*100,1)+":"+(string)signal.Strength.Count,Color(signal.Strength.Value));
-        //Pause("Do Something","Change Test()");
-        
-    }
+    return changed;
   }
 
 //+------------------------------------------------------------------+
@@ -565,28 +562,22 @@ bool StrategyChanged(RoleType Role)
 //+------------------------------------------------------------------+
 StrategyType Strategy(RoleType Role, SegmentState State)
   {
-    if (IsEqual(order[Role].Lots,0.00))
+    int basis      = Direction(order[Net].Lots);
+
+    if (Role==master.Lead)
     {
-      if (Role==master.Lead)
+      if (IsEqual(order[Role].Lots,0.00))
+        return (StrategyType)BoolToInt(IsEqual(order[master.OnCall].Lots,0.00),Spot,Hedge);        
+
+      if (basis==NetZero)
         switch (Role)
         {
           case Buyer:     return (StrategyType)BoolToInt(State==HigherLow,Build,
-                                               BoolToInt(State==LowerLow,Spot));
+                                               BoolToInt(State==LowerLow,Spot,Manage));
           case Seller:    return (StrategyType)BoolToInt(State==LowerHigh,Build,
-                                               BoolToInt(State==HigherHigh,Spot));
+                                               BoolToInt(State==HigherHigh,Spot,Manage));
         }
 
-      if (Role==master.OnCall)
-        switch (Role)
-        {
-          case Buyer:     return (StrategyType)BoolToInt(State==HigherLow,Spot,
-                                               BoolToInt(State==LowerLow&&order[master.Lead].Lots>0.00,Capture));
-          case Seller:    return (StrategyType)BoolToInt(State==LowerHigh,Spot,
-                                               BoolToInt(State==HigherHigh&&order[master.Lead].Lots>0.00,Capture));
-        }
-    }
-    else
-    if (Role==master.Lead)
       switch (Role)
       {
         case Buyer:       return (StrategyType)BoolToInt(State==HigherHigh,Manage,
@@ -598,10 +589,18 @@ StrategyType Strategy(RoleType Role, SegmentState State)
                                                BoolToInt(State==LowerHigh,Build,
                                                BoolToInt(State==HigherLow,Protect))));
       }
-    else
+    }
+
     if (Role==master.OnCall)
     {
-      int basis      = Direction(order[Net].Lots);
+      if (IsEqual(order[Role].Lots,0.00))
+        switch (Role)
+        {
+          case Buyer:     return (StrategyType)BoolToInt(State==HigherLow,Spot,
+                                               BoolToInt(State==LowerLow&&order[master.Lead].Lots>0.00,Capture));
+          case Seller:    return (StrategyType)BoolToInt(State==LowerHigh,Spot,
+                                               BoolToInt(State==HigherHigh&&order[master.Lead].Lots>0.00,Capture));
+      }
 
       switch (Role)
       {
@@ -629,14 +628,18 @@ void MergeSignal(SourceType Source, CFractal &Signal)
     if (Signal.ActiveEvent())
     {
       signal.Event                       = BoolToEvent(IsBetween(signal.Event,NewReversal,NewBreakout),signal.Event,
-                                           BoolToEvent(signal.Event==NewFibonacci,NewFibonacci,
-                                           BoolToEvent(signal.Event==NewLead,NewLead,Exception)));
+                                                        BoolToEvent(signal.Event==NewFibonacci,NewFibonacci,
+                                                        BoolToEvent(signal.Event==NewCorrection,NewCorrection,
+                                                        BoolToEvent(signal.Event==NewLead,NewLead,Exception))));
 
       if (Signal.Event(NewReversal)||Signal.Event(NewFractal))
       {
         signal.Fractal.Source            = Source;
         signal.Fractal.Type              = (FractalType)BoolToInt(Signal.Event(NewFractal,Critical),Origin,
                                                         BoolToInt(Signal.Event(NewFractal,Major),Trend,Term));
+        signal.Pivot.Source              = signal.Fractal.Source;
+        signal.Pivot.Type                = signal.Fractal.Type;
+
         signal.Event                     = NewReversal;
         signal.Checkpoint                = true;
       }
@@ -655,7 +658,8 @@ void MergeSignal(SourceType Source, CFractal &Signal)
         signal.Pivot.Source              = Source;
         signal.Pivot.Type                = (FractalType)BoolToInt(Signal.Event(NewFibonacci,Critical),Origin,
                                                         BoolToInt(Signal.Event(NewFibonacci,Major),Trend,Term));
-        signal.Event                     = BoolToEvent(IsBetween(signal.Event,NewReversal,NewBreakout),signal.Event,NewFibonacci);
+        signal.Event                     = BoolToEvent(IsBetween(signal.Event,NewReversal,NewBreakout),signal.Event,
+                                                        BoolToEvent(Signal.Event(NewCorrection),NewCorrection,NewFibonacci));
         signal.Checkpoint                = true;
       }
       else
@@ -929,14 +933,14 @@ void UpdateSignal(void)
         CalcFact(signal.Boundary[signal.Segment.State],signal.Price);
       }
           
-      Flag("segstate:"+(string)fTick+"-"+EnumToString(signal.Segment.State)+
-           "\nBias: "+EnumToString(signal.Boundary[fmin(LowerLow,state)].Bias)+
-           "\nRole: "+EnumToString(Role(state,InAction)),
-        BoolToInt(signal.Segment.State>LowerLow,
-          Color(Direction(signal.Segment.State,InAction),IN_DARK_DIR),
-        BoolToInt(signal.Boundary[fmin(LowerLow,state)].Bias==Role(state,InAction),
-          Color(signal.Segment.State,IN_CHART_ACTION),
-        BoolToInt(signal.Segment.State==HigherHigh,clrLawnGreen,clrMagenta))));
+      //Flag("segstate:"+(string)fTick+"-"+EnumToString(signal.Segment.State)+
+      //     "\nBias: "+EnumToString(signal.Boundary[fmin(LowerLow,state)].Bias)+
+      //     "\nRole: "+EnumToString(Role(state,InAction)),
+      //  BoolToInt(signal.Segment.State>LowerLow,
+      //    Color(Direction(signal.Segment.State,InAction),IN_DARK_DIR),
+      //  BoolToInt(signal.Boundary[fmin(LowerLow,state)].Bias==Role(state,InAction),
+      //    Color(signal.Segment.State,IN_CHART_ACTION),
+      //  BoolToInt(signal.Segment.State==HigherHigh,clrLawnGreen,clrMagenta))));
     }
 
     if (signal.Segment.State==HigherHigh)
@@ -955,7 +959,7 @@ void UpdateZone(void)
 
     if (ArraySize(sigHistory)>0)
       for (FractalPoint point=fpOrigin;point<FractalPoints;point++)
-        if (sigHistory[0]==sigFP[point].Price)
+        if (IsEqual(sigHistory[0],sigFP[point].Price,Digits))
         {
           if (IsChanged(sigZone[point].Active,true))
           {
@@ -990,61 +994,46 @@ void UpdateZone(void)
 //+------------------------------------------------------------------+
 //| UpdateTarget - Resets Manager targets on signal/fractal change   |
 //+------------------------------------------------------------------+
-void UpdateTarget(RoleType Role, SourceType Source, double Entry, double Profit, double Loss)
+void UpdateTarget(RoleType Role, SourceType Source, double Entry, double Profit, double Loss, bool Log=true)
   {
+    double price = manager[Role].Entry[Source].Price;
+
+    manager[Role].EntryOnly                 = false;
+
     //-- Update Fractal
     if (IsChanged(manager[Role].Entry[Source].Price,Entry))
     {
       manager[Role].Entry[Source].Changed   = true;
       manager[Role].Entry[Source].Active    = true;
+      manager[Role].EntryOnly               = true;
+
+      if (Log) Print((string)fTick+"|"+EnumToString(Role)+"|"+EnumToString(signal.Event)+"|"+EnumToString(Source)+"|Entry| "+DoubleToStr(price,Digits)+"|"+DoubleToStr(Entry,Digits));
     }
 
+    price = manager[Role].Profit[Source].Price;
     if (IsChanged(manager[Role].Profit[Source].Price,Profit))
     {
       manager[Role].Profit[Source].Changed  = true;
       manager[Role].Profit[Source].Active   = true;
+      manager[Role].EntryOnly               = false;
+
+      if (Log) Print((string)fTick+"|"+EnumToString(Role)+"|"+EnumToString(signal.Event)+"|"+EnumToString(Source)+"|Profit| "+DoubleToStr(price,Digits)+"|"+DoubleToStr(Profit,Digits));
     }
 
+
+    price = manager[Role].Loss[Source].Price;
     if (IsChanged(manager[Role].Loss[Source].Price,Loss))
     {
       manager[Role].Loss[Source].Changed    = true;
       manager[Role].Loss[Source].Active     = true;
+      manager[Role].EntryOnly               = false;
+
+      if (Log) Print((string)fTick+"|"+EnumToString(Role)+"|"+EnumToString(signal.Event)+"|"+EnumToString(Source)+"|Loss| "+DoubleToStr(price,Digits)+"|"+DoubleToStr(Loss,Digits));
     }
 
     UpdateRay(EnumToString(Role)+":Entry",-3,Entry,-5);
     UpdateRay(EnumToString(Role)+":Profit",-3,Profit,-5);
     UpdateRay(EnumToString(Role)+":Loss",-3,Loss,-5);
-  }
-
-void PrintPivot(void)
-  {
-    string text    = "|"+(string)fTick;
-    string fibo[2];
-    
-    if (debug)
-    {
-      fibo[0]        = "|"+EnumToString(signal.Fractal.Source);
-      Append(fibo[0],EnumToString(signal.Fractal.Type),"|");
-      Append(fibo[0],EnumToString(Fractal().State),"|");
-      Append(fibo[0],DirText(Fractal().Direction),"|");
-      Append(fibo[0],EnumToString(Fractal().Extension.Level),"|");
-      Append(fibo[0],EnumToString(Fractal().Retrace.Level),"|");
-
-      fibo[1]        = "|"+EnumToString(signal.Pivot.Source);
-      Append(fibo[1],EnumToString(signal.Pivot.Type),"|");
-      Append(fibo[1],EnumToString(Fractal().State),"|");
-      Append(fibo[1],DirText(Fractal().Direction),"|");
-      Append(fibo[1],EnumToString(Fractal().Extension.Level),"|");
-      Append(fibo[1],EnumToString(Fractal().Retrace.Level),"|");
-
-      for (FractalPoint point=fpBase;point<fpClose;point++)
-      {
-        Append(fibo[0],DoubleToString(Fractal().Point[point],Digits),"|");
-        Append(fibo[1],DoubleToString(Fractal().Point[point],Digits),"|");
-      }
-    
-      Print(text+fibo[0]+fibo[1]);
-    }
   }
 
 //+------------------------------------------------------------------+
@@ -1087,17 +1076,9 @@ void UpdateManager(void)
 
     if (signal.Event==NewFibonacci)
     {
-      //-- Handle Reversals
-      if (Fractal().Direction!=Fractal().Direction)
-        Print("|"+(string)fTick+"|Divergence: (s): "+EnumToString(signal.Fractal.Source)+"/"+EnumToString(signal.Fractal.Type)+
-                                         " (p): "+EnumToString(signal.Pivot.Source)+"/"+EnumToString(signal.Pivot.Type));
-      else
-
       //-- Handle Retraces
       if (IsBetween(Fractal().Retrace.Level,Fibo23,Fibo61))
       {
-        PrintPivot();
-        double level =Level(Fractal().Extension.Percent[Now]);
         UpdateTarget(master.Lead,signal.Fractal.Source,
                              Pivot().Price,
                              Fractal().Point[fpExpansion],
@@ -1124,26 +1105,38 @@ void UpdateManager(void)
                              Fractal().Point[fpExpansion],
                              fprice(Fractal().Point[fpRoot],Fractal().Point[fpExpansion],Fibo50),
                              Pivot().Price);
-      } else fibo          = FiboRoot;
+      } 
     }
 
     //-- Handle Corrections
-    if (Fractal().State==Correction)
-      if (IsChanged(fibo,Level(fret(Fractal().Point[fpRoot],Fractal().Point[fpExpansion],Fractal().Point[fpRecovery],InDecimal))))
+    if (Fractal(signal.Pivot).State==Correction)
+    {
+      if (signal.Event==NewCorrection)
       {
+        fibo          = FiboCorrection;
+        
         UpdateTarget(master.Lead,signal.Pivot.Source,
-                             fprice(Fractal().Point[fpRoot],
-                                    Fractal().Point[fpExpansion],FiboCorrection),
-                             Fractal().Point[fpRoot],
-                             fprice(Fractal().Point[fpRoot],
-                                    Fractal().Point[fpExpansion],Fibo23));
-
+                             Pivot().Price,
+                             Fractal(signal.Pivot).Point[fpRoot],
+                             fprice(Fractal(signal.Pivot).Point[fpRoot],Fractal(signal.Pivot).Point[fpExpansion],Fibo23));
         UpdateTarget(master.OnCall,signal.Pivot.Source,
-                             fprice(Fractal().Point[fpRoot],Fractal().Point[fpExpansion],fibo),
-                             fprice(Fractal().Point[fpRoot],Fractal().Point[fpExpansion],Fibo23),
-                             Fractal().Point[fpRoot]);
+                             Fractal(signal.Pivot).Point[fpRoot],
+                             fprice(Fractal(signal.Pivot).Point[fpRoot],Fractal(signal.Pivot).Point[fpExpansion],Fibo23),
+                             Fractal(signal.Pivot).Point[fpRoot]);
+//        Pause("New Correction Retrace\nTick: "+string(fTick),"Setup()");
+      }
+
+      if (IsChanged(fibo,fmin(fibo,Level(fret(Fractal(signal.Pivot).Point[fpRoot],
+                                    Fractal(signal.Pivot).Point[fpExpansion],
+                                    Fractal(signal.Pivot).Point[fpRecovery],InDecimal)))))
+      {
+        UpdateTarget(master.OnCall,signal.Pivot.Source,
+                             fprice(Fractal(signal.Pivot).Point[fpRoot],Fractal(signal.Pivot).Point[fpExpansion],fibo),
+                             fprice(Fractal(signal.Pivot).Point[fpRoot],Fractal(signal.Pivot).Point[fpExpansion],Fibo23),
+                             Fractal(signal.Pivot).Point[fpRoot]);
 //        Pause("Correction Retrace\nTick: "+string(fTick),"Target() Check");
       }
+    }
 
     if (IsChanged(state,signal.Segment.State))
       if (IsBetween(state,HigherHigh,LowerLow))
@@ -1228,9 +1221,10 @@ void ExecuteSpot(RoleType Role)
 void ManageFund(void)
   {
     //-- Position checks
-    if (StrategyChanged(master.Lead))
-      StrategySetup(master.Lead);
-    
+    bool strategy            = StrategyChanged(master.Lead);
+
+    //-- Primary Fractal Change
+
     //-- Free Zone/Order Entry
 //    if (order.Free(Role)>order.Split(Role)||IsEqual(order.Entry(Role).Count,0))
 //    {
@@ -1274,7 +1268,7 @@ void ManageFund(void)
 //          Print(order.RequestStr(request));
 //    }
 //
-//    order.ProcessOrders(master.Lead);
+    order.ProcessOrders(master.Lead);
   }
 
 //+------------------------------------------------------------------+
@@ -1335,6 +1329,33 @@ void Execute(void)
   {
     //if (signal.Checkpoint)
     //  Pause("Tick "+(string)fTick+": "+EnumToString(signal.Segment.State),"Segment State Change");
+
+    if (TargetChanged(master.Lead,signal.Pivot.Source))
+    {
+      Flag((string)fTick+":change-"+EnumToString(signal.Pivot.Source)+":"+
+            DoubleToStr(signal.Strength.Value*100,1)+":"+
+            EnumToString(signal.Event),
+            Color(Direction(signal.Strength.Bias,InAction),BoolToInt(IsBetween(signal.Event,NewBreakout,NewReversal),IN_CHART_DIR,
+                                                           BoolToInt(signal.Event==NewCorrection,clrWhite,IN_DARK_DIR))));
+
+      //Pause(EnumToString(signal.Fractal.Source)+" ["+DirText(Direction(signal.Strength.Value))+"]\n"+
+      //          "-------------------------------------------------------\n\n"+
+      //          " Lead:    "+EnumToString(master.Lead)+"\n"+
+      //          "  Entry:    "+DoubleToStr(manager[master.Lead].Entry[signal.Fractal.Source].Price,Digits)+"\n"
+      //          "  Target: "+DoubleToStr(manager[master.Lead].Profit[signal.Fractal.Source].Price,Digits)+"\n"
+      //          "  Stop:     "+DoubleToStr(manager[master.Lead].Loss[signal.Fractal.Source].Price,Digits)+"\n"
+      //          " On-Call: "+EnumToString(master.OnCall)+"\n"+
+      //          "  Entry:    "+DoubleToStr(manager[master.OnCall].Entry[signal.Fractal.Source].Price,Digits)+"\n"
+      //          "  Target: "+DoubleToStr(manager[master.OnCall].Profit[signal.Fractal.Source].Price,Digits)+"\n"
+      //          "  Stop:     "+DoubleToStr(manager[master.OnCall].Loss[signal.Fractal.Source].Price,Digits)+"\n",
+      //          "Primary Fractal Change Test()");
+    }
+    else
+    if (IsEqual(signal.Event,NewFibonacci))
+      Flag((string)fTick+":NewFibo["+EnumToString(signal.Fractal.Source)+":"+EnumToString(signal.Pivot.Source)+"]",clrGoldenrod);
+    else
+    if (IsEqual(signal.Event,NewCorrection))
+      Flag((string)fTick+":NewCorrection["+EnumToString(signal.Fractal.Source)+":"+EnumToString(signal.Pivot.Source)+"]",clrWhite);
 
     //-- Handle Active Management
    if (IsBetween(master.Lead,Buyer,Seller))

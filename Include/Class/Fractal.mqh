@@ -194,7 +194,7 @@ public:
         double           Percent(FibonacciType Level, int Format=InDecimal) {return fibonacci[Level]*format(Format);};
         
         void             CopyBuffer(double &Buffer[])           {ArrayCopy(Buffer,fbuf);};
-        FractalRec       operator[](const FractalType Type)  {return frec[Type];};
+        FractalRec       operator[](const FractalType Type)     {return frec[Type];};
 
 
         string           BufferStr(int Node);

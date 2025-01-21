@@ -55,6 +55,7 @@
 #define IN_CHART_DIR         12
 #define IN_CHART_ACTION      13
 #define IN_DARK_PANEL        14
+#define IN_GRAYSCALE         15
 
 #define clrBoxOff    C'60,60,60'
 
@@ -524,7 +525,10 @@ color Color(double Value, int Method=IN_DIRECTION, bool Contrarian=false)
 {
   if (Contrarian)
     Value       *= -1.0;  
-  
+
+  if (Method<0)
+    return (color)fabs(Method);
+
   switch (Method)
   {
     case IN_PROXIMITY:     if (IsEqual(Value,0.00))       return(clrDarkGray);
@@ -535,6 +539,8 @@ color Color(double Value, int Method=IN_DIRECTION, bool Contrarian=false)
                            if (Close[0]>Value-point(3))   return(clrGoldenrod);
                            if (Close[0]>Value-point(6))   return(clrChocolate);
                            return (clrRed);
+    case IN_GRAYSCALE:     if (Value<0.00) return (clrDimGray);
+                           if (Value>0.00) return (clrSilver);
     case IN_DIRECTION:     if (Value<0.00) return (clrRed);
                            if (Value>0.00) return (clrLawnGreen);
     case IN_DARK_DIR:      if (Value<0.00) return (clrMaroon);
